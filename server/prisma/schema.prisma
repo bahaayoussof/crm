@@ -6,3 +6,310 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+enum Role {
+  ADMIN
+  MANAGER
+  AGENT
+  CUSTOMER
+}
+
+enum TicketStatus {
+  NEW
+  OPEN
+  IN_PROGRESS
+  WAITING_CUSTOMER
+  RESOLVED
+  CLOSED
+  ESCALATED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum Channel {
+  WEB
+  EMAIL
+  WHATSAPP
+  SMS
+  LIVE_CHAT
+}
+
+enum KnowledgeArticleStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role
+  departmentId String?
+  branchId     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  department        Department?        @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  branch            Branch?            @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  customerProfile   Customer?
+  assignedTickets   Ticket[]           @relation("AssignedAgent")
+  ticketMessages    TicketMessage[]
+  ticketNotes       TicketNote[]
+  customerNotes     CustomerNote[]
+  ticketHistory     TicketHistory[]
+  knowledgeArticles KnowledgeArticle[]
+  notifications     Notification[]
+  quickReplies      QuickReply[]
+
+  @@index([role])
+  @@index([departmentId])
+  @@index([branchId])
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  phone     String?
+  userId    String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user        User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  tickets     Ticket[]
+  feedback    Feedback[]
+  notes       CustomerNote[]
+  attachments Attachment[]
+}
+
+model Ticket {
+  id                 String         @id @default(cuid())
+  subject            String
+  description        String
+  status             TicketStatus   @default(NEW)
+  priority           TicketPriority @default(MEDIUM)
+  channel            Channel        @default(WEB)
+  customerId         String
+  assignedAgentId    String?
+  categoryId         String?
+  departmentId       String?
+  branchId           String?
+  firstResponseDueAt DateTime?
+  firstRespondedAt   DateTime?
+  resolutionDueAt    DateTime?
+  resolvedAt         DateTime?
+  closedAt           DateTime?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  customer      Customer        @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  assignedAgent User?           @relation("AssignedAgent", fields: [assignedAgentId], references: [id], onDelete: SetNull)
+  category      Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  department    Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  branch        Branch?         @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  messages      TicketMessage[]
+  notes         TicketNote[]
+  attachments   Attachment[]
+  history       TicketHistory[]
+  feedback      Feedback?
+
+  @@index([customerId])
+  @@index([assignedAgentId])
+  @@index([status])
+  @@index([priority])
+  @@index([categoryId])
+  @@index([departmentId])
+  @@index([branchId])
+  @@index([createdAt])
+}
+
+model TicketMessage {
+  id           String   @id @default(cuid())
+  ticketId     String
+  authorUserId String
+  body         String
+  createdAt    DateTime @default(now())
+
+  ticket      Ticket       @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  author      User         @relation(fields: [authorUserId], references: [id], onDelete: Restrict)
+  attachments Attachment[]
+
+  @@index([ticketId, createdAt])
+  @@index([authorUserId])
+}
+
+model TicketNote {
+  id           String   @id @default(cuid())
+  ticketId     String
+  authorUserId String
+  body         String
+  createdAt    DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  author User   @relation(fields: [authorUserId], references: [id], onDelete: Restrict)
+
+  @@index([ticketId, createdAt])
+  @@index([authorUserId])
+}
+
+model CustomerNote {
+  id           String   @id @default(cuid())
+  customerId   String
+  authorUserId String
+  body         String
+  createdAt    DateTime @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  author   User     @relation(fields: [authorUserId], references: [id], onDelete: Restrict)
+
+  @@index([customerId, createdAt])
+  @@index([authorUserId])
+}
+
+model Attachment {
+  id         String   @id @default(cuid())
+  ticketId   String?
+  messageId  String?
+  customerId String?
+  fileName   String
+  mimeType   String
+  storageKey String   @unique
+  createdAt  DateTime @default(now())
+
+  ticket   Ticket?        @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  message  TicketMessage? @relation(fields: [messageId], references: [id], onDelete: Restrict)
+  customer Customer?      @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  @@index([ticketId])
+  @@index([messageId])
+  @@index([customerId])
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tickets Ticket[]
+
+  @@index([isActive])
+}
+
+model TicketHistory {
+  id          String   @id @default(cuid())
+  ticketId    String
+  actorUserId String?
+  action      String
+  oldValue    String?
+  newValue    String?
+  createdAt   DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  actor  User?  @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId, createdAt])
+  @@index([actorUserId])
+}
+
+model SlaRule {
+  id                   String         @id @default(cuid())
+  priority             TicketPriority @unique
+  firstResponseMinutes Int
+  resolutionMinutes    Int
+  isActive             Boolean        @default(true)
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+}
+
+model KnowledgeArticle {
+  id          String                 @id @default(cuid())
+  title       String
+  content     String
+  category    String?
+  status      KnowledgeArticleStatus @default(DRAFT)
+  createdById String
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  createdBy User @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([status])
+  @@index([createdById])
+  @@index([category])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  message   String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, readAt, createdAt])
+}
+
+model Feedback {
+  id         String   @id @default(cuid())
+  ticketId   String   @unique
+  customerId String
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now())
+
+  ticket   Ticket   @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  @@index([customerId])
+  @@index([rating])
+}
+
+model QuickReply {
+  id          String   @id @default(cuid())
+  title       String
+  body        String
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy User @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([createdById])
+}
+
+model Department {
+  id        String   @id @default(cuid())
+  name      String
+  branchId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  branch  Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  users   User[]
+  tickets Ticket[]
+
+  @@unique([branchId, name])
+}
+
+model Branch {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  departments Department[]
+  users       User[]
+  tickets     Ticket[]
+}

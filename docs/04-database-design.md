@@ -20,6 +20,7 @@ This is the planned logical model. Exact Prisma syntax may be implemented during
 - name
 - email
 - phone optional
+- userId optional and unique; links a CRM profile to its portal `User` identity
 - createdAt
 - updatedAt
 
@@ -36,6 +37,7 @@ This is the planned logical model. Exact Prisma syntax may be implemented during
 - departmentId optional
 - branchId optional
 - firstResponseDueAt optional
+- firstRespondedAt optional
 - resolutionDueAt optional
 - resolvedAt optional
 - closedAt optional
@@ -45,11 +47,11 @@ This is the planned logical model. Exact Prisma syntax may be implemented during
 ### TicketMessage
 - id
 - ticketId
-- authorUserId optional
-- authorCustomerId optional
+- authorUserId required; customer authors use their linked `User` identity
 - body
-- isInternal
 - createdAt
+
+`TicketMessage` contains public, customer-visible conversation only.
 
 ### TicketNote
 - id
@@ -58,6 +60,17 @@ This is the planned logical model. Exact Prisma syntax may be implemented during
 - body
 - createdAt
 
+`TicketNote` is an internal staff note attached to one ticket and is never customer-visible.
+
+### CustomerNote
+- id
+- customerId
+- authorUserId
+- body
+- createdAt
+
+`CustomerNote` is an internal staff note attached to a customer profile rather than to one ticket.
+
 ### Attachment
 - id
 - ticketId optional
@@ -65,7 +78,7 @@ This is the planned logical model. Exact Prisma syntax may be implemented during
 - customerId optional
 - fileName
 - mimeType
-- url or storageKey
+- storageKey
 - createdAt
 
 ### Category
@@ -84,7 +97,7 @@ This is the planned logical model. Exact Prisma syntax may be implemented during
 - createdAt
 
 ### SLA
-May be represented as rules/configuration rather than one row per ticket.
+Represented as one configurable `SlaRule` per priority rather than one row per ticket.
 
 Suggested fields:
 - id
@@ -132,10 +145,16 @@ Suggested fields:
 - id
 - name
 - branchId optional
+- createdAt
+- updatedAt
+
+Department names are unique within a branch through the compound `(branchId, name)` constraint. The same name may be used by different branches. `Branch.name` remains globally unique.
 
 ### Branch
 - id
 - name
+- createdAt
+- updatedAt
 
 ### AuditLog
 P2 unless time allows.
@@ -171,5 +190,14 @@ P2 unless time allows.
 - LIVE_CHAT
 
 ## Rules
+
+- `User` is the authenticated identity for internal staff and portal customers. A `Customer` is the CRM profile and may link to one `User`; unlinked customer records can exist before portal access is provisioned.
+- `TicketMessage` is public conversation, `TicketNote` is an internal ticket note, and `CustomerNote` is an internal customer-profile note.
+- Every ticket message has exactly one required `User` author. For customer messages, later service logic verifies that the author's linked customer owns the ticket. Internal notes are stored only in the dedicated note models.
+- `ESCALATED` is stored directly as a ticket status.
+- Tickets store SLA deadline snapshots in `firstResponseDueAt` and `resolutionDueAt`; `firstRespondedAt` records the actual first public agent response. `SlaRule` stores configurable targets by priority.
+- Support-history relations use `Restrict` or `SetNull` delete behavior rather than cascading historical records.
+- Attachment context is validated in the service layer: at least one supported context (`ticketId`, `messageId`, or `customerId`) is required; a supplied message must belong to the supplied ticket; and customer-level attachments must belong to the intended customer. Prisma relations alone cannot enforce these cross-record invariants.
+- The `(branchId, name)` database constraint prevents duplicate department names within a non-null branch. Because PostgreSQL treats `NULL` values as distinct in unique constraints, branchless department-name uniqueness—if required—must be enforced by later service validation.
 
 Any schema change that alters these concepts must update this document before or with implementation.

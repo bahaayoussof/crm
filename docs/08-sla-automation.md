@@ -13,7 +13,10 @@
 
 At minimum:
 - firstResponseDueAt
+- firstRespondedAt
 - resolutionDueAt
+
+`firstResponseDueAt` is the SLA deadline calculated when the ticket is created or prioritized. `firstRespondedAt` is the actual timestamp of the first public agent response and remains null until that response occurs. Their comparison supports first-response compliance and reporting such as average first-response time.
 
 Useful derived states:
 - ON_TRACK
@@ -23,9 +26,9 @@ Useful derived states:
 
 ## First Response
 
-The first public agent response satisfies the first-response target.
+The first public agent response satisfies the first-response target and sets `firstRespondedAt` once.
 
-Internal notes do not count as a customer response.
+Ticket notes and customer notes are internal and do not count as a customer response.
 
 ## Resolution
 
