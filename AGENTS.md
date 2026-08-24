@@ -173,6 +173,12 @@ Implement from memory or personal preference
 
 Existing code does not override documented product rules automatically. If existing code and documentation disagree, report the mismatch before expanding the inconsistent pattern.
 
+## Project Progress Reviews
+
+For tasks involving project planning, progress review, roadmap status, feature completion, or deciding what to work on next, read `docs/19-progress-tracking.md`.
+
+The progress tracker is a status summary only and does not override feature or domain documentation. Normal implementation tasks do not need to read the full tracker unless they depend on overall project status.
+
 ---
 
 ## Git Safety Rules
