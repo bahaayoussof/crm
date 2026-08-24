@@ -15,3 +15,31 @@ export function validateBody(schema: ZodType): RequestHandler {
     next();
   };
 }
+
+export function validateQuery(schema: ZodType): RequestHandler {
+  return (request, response, next) => {
+    const result = schema.safeParse(request.query);
+
+    if (!result.success) {
+      next(new AppError(400, "VALIDATION_ERROR", "Invalid query parameters", result.error.flatten()));
+      return;
+    }
+
+    response.locals.validatedQuery = result.data;
+    next();
+  };
+}
+
+export function validateParams(schema: ZodType): RequestHandler {
+  return (request, response, next) => {
+    const result = schema.safeParse(request.params);
+
+    if (!result.success) {
+      next(new AppError(400, "VALIDATION_ERROR", "Invalid route parameters", result.error.flatten()));
+      return;
+    }
+
+    response.locals.validatedParams = result.data;
+    next();
+  };
+}

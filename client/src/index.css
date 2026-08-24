@@ -29,4 +29,7 @@ body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--backgro
 @layer components {
   .input { @apply w-full rounded-md border bg-white px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15; }
   .button-primary { @apply w-full rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60; }
+  .button-link { @apply rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60; }
+  .button-secondary { @apply rounded-md border bg-white px-4 py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50; }
+  .button-danger { @apply rounded-md border border-red-200 bg-white px-4 py-2.5 text-sm font-medium text-red-700 disabled:cursor-not-allowed disabled:opacity-50; }
 }

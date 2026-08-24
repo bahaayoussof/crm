@@ -1,5 +1,24 @@
 {
   "app": { "title": "نظام إدارة دعم العملاء", "foundationReady": "البنية الأساسية للمشروع جاهزة." },
+  "common": {
+    "retry": "إعادة المحاولة", "previous": "السابق", "next": "التالي", "cancel": "إلغاء", "save": "حفظ", "saving": "جارٍ الحفظ…",
+    "edit": "تعديل", "delete": "حذف", "notProvided": "غير متوفر"
+  },
+  "customers": {
+    "title": "العملاء", "description": "إدارة ملفات العملاء وسجل الدعم", "add": "إضافة عميل", "search": "البحث عن العملاء…",
+    "name": "الاسم", "email": "البريد الإلكتروني", "phone": "الهاتف", "phoneOptional": "الهاتف (اختياري)", "openTickets": "التذاكر المفتوحة", "totalTickets": "إجمالي التذاكر", "lastInteraction": "آخر تفاعل",
+    "empty": "لا يوجد عملاء بعد.", "noMatches": "لا يوجد عملاء يطابقون «{{search}}».", "loadError": "تعذر تحميل العملاء.", "notFound": "العميل غير موجود.",
+    "openCount": "{{count}} مفتوحة", "pagination": "صفحات قائمة العملاء", "page": "الصفحة {{page}} من {{total}}", "createTitle": "إنشاء عميل", "editTitle": "تعديل العميل",
+    "formDescription": "بيانات اتصال العميل التي يستخدمها فريق الدعم.", "saveError": "تعذر حفظ العميل.", "detailsTitle": "تفاصيل العميل", "backToList": "العودة إلى العملاء",
+    "deleteConfirm": "حذف هذا العميل؟ لا يمكن حذف العملاء المرتبطين بحساب دخول أو سجل دعم.", "deleteError": "تعذر حذف العميل.", "detailsSections": "أقسام تفاصيل العميل",
+    "tabs": { "overview": "نظرة عامة", "tickets": "التذاكر", "activity": "النشاط", "notes": "الملاحظات", "attachments": "المرفقات" },
+    "contactInformation": "معلومات الاتصال", "customerSince": "عميل منذ", "supportSummary": "ملخص الدعم", "recentTickets": "أحدث التذاكر", "recentActivity": "أحدث النشاطات",
+    "noTickets": "لا توجد تذاكر دعم بعد.", "profileUpdated": "تم تحديث الملف {{date}}", "customerCreated": "تم إنشاء العميل", "customerUpdated": "تم تحديث ملف العميل",
+    "noteAddedBy": "أضاف {{name}} ملاحظة داخلية", "addNote": "إضافة ملاحظة", "internalNoteHint": "فريقك فقط يمكنه رؤية ملاحظات العميل.", "noteBody": "ملاحظة داخلية",
+    "noNotes": "لا توجد ملاحظات داخلية بعد.", "noteError": "تعذرت إضافة الملاحظة.", "notesLoadError": "تعذر تحميل ملاحظات العميل.", "noAttachments": "لا توجد مرفقات للعميل بعد.",
+    "validation": { "name": "يجب ألا يقل الاسم عن حرفين", "email": "أدخل بريدًا إلكترونيًا صحيحًا", "phone": "يجب ألا يزيد الهاتف عن 30 حرفًا", "note": "الملاحظة مطلوبة" },
+    "errors": { "CUSTOMER_EMAIL_EXISTS": "يوجد عميل بهذا البريد الإلكتروني بالفعل.", "CUSTOMER_HAS_SUPPORT_HISTORY": "لا يمكن حذف هذا العميل لوجود سجل دعم أو حساب دخول مرتبط.", "CUSTOMER_NOT_FOUND": "العميل غير موجود." }
+  },
   "auth": {
     "loginTitle": "تسجيل الدخول", "loginDescription": "الوصول إلى حساب دعم العملاء.",
     "registerTitle": "إنشاء حساب دعم", "registerDescription": "سجّل كعميل لطلب الدعم ومتابعته.",

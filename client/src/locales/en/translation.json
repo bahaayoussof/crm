@@ -1,5 +1,24 @@
 {
   "app": { "title": "Customer Support CRM", "foundationReady": "Project foundation is ready." },
+  "common": {
+    "retry": "Retry", "previous": "Previous", "next": "Next", "cancel": "Cancel", "save": "Save", "saving": "Saving…",
+    "edit": "Edit", "delete": "Delete", "notProvided": "Not provided"
+  },
+  "customers": {
+    "title": "Customers", "description": "Manage customer profiles and support history", "add": "Add customer", "search": "Search customers…",
+    "name": "Name", "email": "Email", "phone": "Phone", "phoneOptional": "Phone (optional)", "openTickets": "Open tickets", "totalTickets": "Total tickets", "lastInteraction": "Last interaction",
+    "empty": "No customers yet.", "noMatches": "No customers match “{{search}}”.", "loadError": "Unable to load customers.", "notFound": "Customer not found.",
+    "openCount": "{{count}} open", "pagination": "Customer list pages", "page": "Page {{page}} of {{total}}", "createTitle": "Create customer", "editTitle": "Edit customer",
+    "formDescription": "Customer contact information used by the support team.", "saveError": "Unable to save customer.", "detailsTitle": "Customer details", "backToList": "Back to customers",
+    "deleteConfirm": "Delete this customer? Customers with a login identity or support history cannot be deleted.", "deleteError": "Unable to delete customer.", "detailsSections": "Customer details sections",
+    "tabs": { "overview": "Overview", "tickets": "Tickets", "activity": "Activity", "notes": "Notes", "attachments": "Attachments" },
+    "contactInformation": "Contact information", "customerSince": "Customer since", "supportSummary": "Support summary", "recentTickets": "Recent tickets", "recentActivity": "Recent activity",
+    "noTickets": "No support tickets yet.", "profileUpdated": "Profile updated {{date}}", "customerCreated": "Customer created", "customerUpdated": "Customer profile updated",
+    "noteAddedBy": "Internal note added by {{name}}", "addNote": "Add note", "internalNoteHint": "Only your team can see customer notes.", "noteBody": "Internal note",
+    "noNotes": "No internal notes yet.", "noteError": "Unable to add the note.", "notesLoadError": "Unable to load customer notes.", "noAttachments": "No customer attachments yet.",
+    "validation": { "name": "Name must be at least 2 characters", "email": "Enter a valid email address", "phone": "Phone must be 30 characters or fewer", "note": "Note is required" },
+    "errors": { "CUSTOMER_EMAIL_EXISTS": "A customer with this email already exists.", "CUSTOMER_HAS_SUPPORT_HISTORY": "This customer cannot be deleted because support history or a login identity exists.", "CUSTOMER_NOT_FOUND": "Customer not found." }
+  },
   "auth": {
     "loginTitle": "Sign in", "loginDescription": "Access your customer support account.",
     "registerTitle": "Create a support account", "registerDescription": "Register as a customer to request and track support.",

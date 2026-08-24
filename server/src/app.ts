@@ -3,6 +3,7 @@ import express from "express";
 import { errorHandler } from "./middleware/error-handler.js";
 import { notFoundHandler } from "./middleware/not-found.js";
 import { authRouter } from "./modules/auth/auth.routes.js";
+import { customerRouter } from "./modules/customers/customer.routes.js";
 
 export const app = express();
 
@@ -14,6 +15,7 @@ app.get("/api/health", (_request, response) => {
   response.status(200).json({ status: "ok" });
 });
 app.use("/api/auth", authRouter);
+app.use("/api/customers", customerRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

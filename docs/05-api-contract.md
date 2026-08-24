@@ -52,6 +52,21 @@ PATCH  /customers/:id
 DELETE /customers/:id
 ```
 
+All customer-management routes require an authenticated `ADMIN`, `MANAGER`, or `AGENT`; `CUSTOMER` identities are rejected. Listing supports `search`, `page`, and `limit` query parameters and returns `{ data, meta: { page, limit, total, totalPages } }`. Search covers customer name, email, and phone.
+
+Manual customer creation accepts `{ name, email, phone? }`, normalizes the email, and creates only a CRM `Customer` with `userId = null`; it does not provision authentication credentials. Updates accept only `name`, `email`, and `phone`.
+
+Customer detail responses include safe linked-user identity fields, ticket counts, last-interaction time, and customer-level attachment metadata. They never include password hashes. Ticket counts are read-only summary data; Ticket Management remains a separate feature.
+
+```text
+GET  /customers/:id/notes
+POST /customers/:id/notes
+```
+
+Customer notes are internal-only, ordered newest first, and use the authenticated internal user as author. Note creation accepts `{ body }`; arbitrary author IDs are not accepted.
+
+Deletion returns `409 CUSTOMER_HAS_SUPPORT_HISTORY` when the customer has a linked login identity, tickets, feedback, notes, or attachments. Only unlinked customers without related support history can be deleted.
+
 ## Tickets
 
 ```text
