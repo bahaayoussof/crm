@@ -9,6 +9,10 @@ const envSchema = z.object({
     .string()
     .min(1, "DATABASE_URL is required")
     .default("postgresql://postgres:postgres@localhost:5432/crm"),
+  JWT_SECRET: z
+    .string()
+    .min(32, "JWT_SECRET must be at least 32 characters")
+    .default("development-jwt-secret-key-must-be-at-least-32-characters-long"),
 });
 
 const result = envSchema.safeParse(process.env);

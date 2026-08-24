@@ -1,1 +1,12 @@
-{ "app": { "title": "نظام إدارة دعم العملاء", "foundationReady": "البنية الأساسية للمشروع جاهزة." } }
+{
+  "app": { "title": "نظام إدارة دعم العملاء", "foundationReady": "البنية الأساسية للمشروع جاهزة." },
+  "auth": {
+    "loginTitle": "تسجيل الدخول", "loginDescription": "الوصول إلى حساب دعم العملاء.",
+    "registerTitle": "إنشاء حساب دعم", "registerDescription": "سجّل كعميل لطلب الدعم ومتابعته.",
+    "name": "الاسم", "email": "البريد الإلكتروني", "phoneOptional": "الهاتف (اختياري)", "password": "كلمة المرور", "confirmPassword": "تأكيد كلمة المرور",
+    "show": "إظهار", "hide": "إخفاء", "signIn": "تسجيل الدخول", "signingIn": "جارٍ تسجيل الدخول…", "register": "إنشاء حساب",
+    "createAccount": "إنشاء الحساب", "creatingAccount": "جارٍ إنشاء الحساب…", "needAccount": "تحتاج إلى حساب عميل؟", "haveAccount": "لديك حساب بالفعل؟",
+    "dashboardPlaceholder": "مساحة العمل الداخلية", "portalPlaceholder": "بوابة العميل",
+    "signedInAs": "تم تسجيل الدخول باسم {{name}}. سيتم تنفيذ هذه المساحة في ميزة لاحقة.", "logout": "تسجيل الخروج"
+  }
+}

@@ -14,6 +14,25 @@ POST /auth/login
 GET  /auth/me
 ```
 
+`POST /auth/register` accepts `{ name, email, password, phone? }`, rejects unknown fields, and always creates a customer identity. `POST /auth/login` accepts `{ email, password }`. Both successful endpoints return:
+
+```json
+{
+  "data": {
+    "token": "<access-token>",
+    "user": {
+      "id": "...",
+      "name": "...",
+      "email": "...",
+      "role": "CUSTOMER",
+      "customer": { "id": "...", "name": "...", "email": "...", "phone": null }
+    }
+  }
+}
+```
+
+`GET /auth/me` requires `Authorization: Bearer <token>` and returns `{ "data": { "user": ... } }`. Internal users have `customer: null`. Password hashes are never returned. Authentication errors use `{ "error": { "code": "...", "message": "..." } }`.
+
 ## Users
 
 ```text

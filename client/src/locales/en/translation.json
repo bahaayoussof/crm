@@ -1,1 +1,12 @@
-{ "app": { "title": "Customer Support CRM", "foundationReady": "Project foundation is ready." } }
+{
+  "app": { "title": "Customer Support CRM", "foundationReady": "Project foundation is ready." },
+  "auth": {
+    "loginTitle": "Sign in", "loginDescription": "Access your customer support account.",
+    "registerTitle": "Create a support account", "registerDescription": "Register as a customer to request and track support.",
+    "name": "Name", "email": "Email", "phoneOptional": "Phone (optional)", "password": "Password", "confirmPassword": "Confirm password",
+    "show": "Show", "hide": "Hide", "signIn": "Sign in", "signingIn": "Signing in…", "register": "Register",
+    "createAccount": "Create account", "creatingAccount": "Creating account…", "needAccount": "Need a customer account?", "haveAccount": "Already have an account?",
+    "dashboardPlaceholder": "Internal workspace", "portalPlaceholder": "Customer portal",
+    "signedInAs": "Signed in as {{name}}. This area will be implemented in a later feature.", "logout": "Log out"
+  }
+}

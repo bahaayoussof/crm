@@ -6,6 +6,12 @@ Email/password authentication using:
 - bcrypt password hashing
 - JWT authentication
 
+Public self-registration is available only to customers. `POST /api/auth/register` uses a strict request schema that does not accept a role and always creates `User.role = CUSTOMER`. `ADMIN`, `MANAGER`, and `AGENT` accounts cannot self-register; later administrator-managed user creation is outside the authentication feature.
+
+Customer registration normalizes the email by trimming and lowercasing it, hashes the password, and creates the `User` and linked `Customer` profile in one Prisma transaction. A failure to create either record rolls back both. Login applies the same email normalization and supports all four roles.
+
+The API issues an eight-hour bearer access token containing only the user identifier and role. It does not issue refresh tokens. The client persists this token locally for the assessment, attaches it centrally through Axios, loads the current identity from `/auth/me`, and removes the token on logout or an authenticated `401` response.
+
 ## Roles
 
 ### ADMIN
@@ -48,3 +54,6 @@ Email/password authentication using:
 - Password hashes never leave the server.
 - JWT secrets live in environment variables.
 - Sensitive server errors are not returned to clients.
+- Public registration cannot select an authorization role.
+- Invalid login attempts return the same generic error whether or not the email exists.
+- Backend middleware verifies authentication and role requirements; frontend route guards provide navigation behavior only.

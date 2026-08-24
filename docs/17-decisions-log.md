@@ -151,3 +151,29 @@ Separate attachment tables per context; a polymorphic context type/id pair; Post
 **Consequences**
 
 The attachment service must require at least one context, verify that a message belongs to any supplied ticket, and verify customer ownership. The schema alone permits invalid context combinations until that validation is implemented.
+
+---
+
+## ADR-006: Assessment Access-Token Session
+
+**Date:** 2026-08-24
+
+**Context**
+
+The assessment needs persistent browser authentication and logout without introducing refresh-token storage, server sessions, or external infrastructure.
+
+**Decision**
+
+Issue an eight-hour JWT access token containing the authenticated user ID and role. The browser stores the token in local storage, attaches it through the shared Axios client, and removes it on logout or an authenticated `401`. `/auth/me` remains the source of current user profile data.
+
+**Reason**
+
+This is the smallest maintainable access-token model for the time-boxed assessment and keeps authorization authoritative on the server.
+
+**Alternatives Considered**
+
+HTTP-only cookie sessions; refresh-token rotation with database persistence; in-memory-only tokens.
+
+**Consequences**
+
+There is no silent session renewal or server-side token revocation. Production hardening should reassess browser token storage and use secure HTTP-only cookies or a carefully designed refresh-token flow where appropriate.
