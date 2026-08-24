@@ -1,0 +1,2019 @@
+# UI Pages Specification
+
+## 1. Purpose
+
+This document is the implementation blueprint for the application's main screens.
+
+It complements:
+
+- `09-frontend-guidelines.md`
+- `06-auth-rbac.md`
+- `07-ticket-workflow.md`
+- `08-sla-automation.md`
+- `05-api-contract.md`
+
+The AI must not invent a materially different screen structure when a page is defined here.
+
+If implementation constraints require a meaningful deviation:
+1. preserve the page goal,
+2. preserve the information hierarchy,
+3. record the decision in `17-decisions-log.md`.
+
+---
+
+# 2. Global Product Shell
+
+## Internal CRM Shell
+
+Used by:
+
+- ADMIN
+- MANAGER
+- AGENT
+
+Desktop structure:
+
+```text
+┌──────────────┬───────────────────────────────────────────────┐
+│ Sidebar      │ Top Header                                    │
+│              ├───────────────────────────────────────────────┤
+│              │                                               │
+│              │ Main Page Content                             │
+│              │                                               │
+└──────────────┴───────────────────────────────────────────────┘
+```
+
+### Sidebar Navigation
+
+Recommended items:
+
+```text
+Dashboard
+Tickets
+Customers
+Knowledge Base
+Reports
+Users
+Settings
+```
+
+Visibility depends on role.
+
+### Header
+
+May contain:
+
+- breadcrumb or page title context
+- global ticket/customer search if implemented
+- notifications
+- language switcher
+- user menu
+
+Do not add decorative content to the header.
+
+---
+
+## Customer Portal Shell
+
+Used by CUSTOMER.
+
+Structure:
+
+```text
+┌───────────────────────────────────────────────┐
+│ Portal Header                                 │
+├───────────────────────────────────────────────┤
+│                                               │
+│ Main Content                                  │
+│                                               │
+└───────────────────────────────────────────────┘
+```
+
+Navigation:
+
+```text
+Home
+My Requests
+Knowledge Base
+```
+
+The customer portal must be visually simpler and less dense than the internal CRM.
+
+---
+
+# 3. Login
+
+## Route
+
+```text
+/login
+```
+
+## Goal
+
+Allow users to authenticate using email and password.
+
+## Layout
+
+Desktop:
+
+```text
+┌──────────────────────────────────────────────────────┐
+│                                                      │
+│                 Customer Support CRM                 │
+│                                                      │
+│             ┌──────────────────────────┐             │
+│             │ Sign in                  │             │
+│             │                          │             │
+│             │ Email                    │             │
+│             │ [                    ]   │             │
+│             │                          │             │
+│             │ Password                 │             │
+│             │ [                    ]   │             │
+│             │                          │             │
+│             │ [ Sign in ]              │             │
+│             └──────────────────────────┘             │
+│                                                      │
+└──────────────────────────────────────────────────────┘
+```
+
+## Components
+
+- Logo/product name
+- Email field
+- Password field
+- Password visibility toggle
+- Submit button
+- Authentication error alert
+
+## Data
+
+```text
+email
+password
+```
+
+## States
+
+### Default
+Form ready.
+
+### Loading
+Disable submission and show progress.
+
+### Validation Error
+Display field-level errors.
+
+### Authentication Error
+Display human-readable form-level error.
+
+### Success
+Redirect according to role.
+
+Preferred:
+- internal roles -> `/dashboard`
+- CUSTOMER -> `/portal`
+
+## Responsive
+
+- single centered form
+- full-width card within mobile-safe padding
+- no two-column marketing section required
+
+---
+
+# 4. Dashboard
+
+## Route
+
+```text
+/dashboard
+```
+
+## Roles
+
+- ADMIN
+- MANAGER
+- AGENT
+
+Content may vary by role.
+
+## Goal
+
+Answer:
+
+1. What needs attention now?
+2. How much support work is active?
+3. Are SLA targets at risk?
+4. What has recently changed?
+
+## Layout
+
+```text
+Dashboard Header
+────────────────────────────────────────────────────
+
+KPI Cards
+┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐
+│ Open       │ │ Assigned   │ │ SLA Risk   │ │ Resolved   │
+│ 42         │ │ 18         │ │ 4          │ │ 27 Today   │
+└────────────┘ └────────────┘ └────────────┘ └────────────┘
+
+Operational Charts
+┌───────────────────────────────┐ ┌──────────────────────┐
+│ Ticket Volume                 │ │ Priority / Status    │
+│                               │ │ Distribution         │
+└───────────────────────────────┘ └──────────────────────┘
+
+Needs Attention
+────────────────────────────────────────────────────
+Ticket rows
+
+Recent Activity / Recent Tickets
+────────────────────────────────────────────────────
+Rows or compact list
+```
+
+## KPI Cards
+
+Preferred metrics:
+
+- Open Tickets
+- Assigned to Me
+- SLA At Risk or Breached
+- Resolved Today
+
+Optional if API supports it:
+- Average Response Time
+- Customer Satisfaction
+
+Do not add KPI cards only for visual symmetry.
+
+## Needs Attention
+
+Prioritize:
+
+1. SLA breached
+2. urgent tickets
+3. high priority tickets
+4. long-waiting tickets
+5. unassigned tickets where relevant
+
+Suggested row data:
+
+```text
+Ticket ID
+Subject
+Customer
+Priority
+Status
+SLA state
+Assignee
+Updated time
+```
+
+## Charts
+
+Preferred:
+
+### Ticket Trend
+Created vs resolved over time.
+
+### Distribution
+One of:
+- tickets by status
+- tickets by priority
+
+Do not overload the dashboard with charts.
+
+## Actions
+
+- click KPI -> filtered tickets view where practical
+- click ticket -> ticket details
+- optional "View all tickets"
+
+## Agent Variation
+
+AGENT dashboard should emphasize:
+
+- Assigned to Me
+- Due Soon
+- Waiting Customer
+- Recent assigned tickets
+
+## Manager/Admin Variation
+
+May emphasize:
+
+- All open tickets
+- SLA breaches
+- unassigned tickets
+- agent performance summary
+
+## Responsive
+
+Desktop:
+- 4 KPI columns when width allows
+- chart + summary split
+
+Tablet:
+- 2 KPI columns
+
+Mobile:
+- single or 2-column compact cards
+- charts stack vertically
+- ticket rows become compact cards/list
+
+---
+
+# 5. Tickets List
+
+## Route
+
+```text
+/tickets
+```
+
+## Roles
+
+- ADMIN
+- MANAGER
+- AGENT
+
+## Goal
+
+Efficiently scan, search, filter, and open support tickets.
+
+## Page Header
+
+```text
+Tickets                                    [Create Ticket]
+Manage and track customer support requests
+```
+
+`Create Ticket` visibility depends on permissions.
+
+## Toolbar
+
+```text
+[ Search tickets... ]
+
+Status ▼
+Priority ▼
+Assignee ▼
+Category ▼
+Channel ▼
+
+[Clear filters]
+```
+
+Filters should use URL search params when practical.
+
+## Desktop Table
+
+```text
+┌───────┬────────────────────┬────────────┬──────────┬──────────────┬────────────┬──────────┐
+│ ID    │ Subject            │ Customer   │ Priority │ Status       │ Assignee   │ SLA      │
+├───────┼────────────────────┼────────────┼──────────┼──────────────┼────────────┼──────────┤
+│ #1042 │ Cannot login       │ Ahmed      │ High     │ Open         │ Bahaa      │ 42m      │
+│ #1041 │ Payment failed     │ Sara       │ Urgent   │ In Progress  │ Omar       │ Breach   │
+└───────┴────────────────────┴────────────┴──────────┴──────────────┴────────────┴──────────┘
+```
+
+Optional columns:
+
+- channel
+- category
+- updated time
+
+Do not make the table so wide that all columns become unreadable.
+
+## Row Behavior
+
+Clicking a row opens:
+
+```text
+/tickets/:id
+```
+
+## Status Display
+
+Use consistent `TicketStatusBadge`.
+
+## Priority Display
+
+Use consistent `TicketPriorityBadge`.
+
+## SLA Display
+
+Examples:
+
+```text
+Met
+42m left
+At risk
+Breached
+```
+
+## Pagination
+
+Use server-side pagination when implemented.
+
+Suggested controls:
+
+```text
+Previous
+Page X of Y
+Next
+```
+
+## Empty States
+
+### No tickets
+
+```text
+No tickets yet
+Create the first support request.
+[Create Ticket]
+```
+
+### No filter results
+
+```text
+No tickets match these filters
+Try changing or clearing your filters.
+[Clear filters]
+```
+
+## Loading
+
+Table skeleton preserving header/row structure.
+
+## Mobile
+
+Do not squeeze the full table.
+
+Use compact ticket cards:
+
+```text
+#1042                           High
+Cannot login
+
+Ahmed Mohamed
+Open • 42m SLA
+Assigned to Bahaa
+```
+
+---
+
+# 6. Create Ticket
+
+## Route
+
+```text
+/tickets/new
+```
+
+## Roles
+
+Internal roles with create permission.
+
+Customer creation uses portal route and customer-specific rules.
+
+## Goal
+
+Create a support ticket with enough metadata to route and manage it.
+
+## Form Fields
+
+Required:
+
+```text
+Customer
+Subject
+Description
+Priority
+Category
+```
+
+Optional:
+
+```text
+Assigned Agent
+Channel
+Attachments
+```
+
+Default channel for internal-created tickets:
+
+```text
+WEB
+```
+
+unless another supported channel is explicitly selected.
+
+## Layout
+
+Prefer one main form with grouped sections.
+
+```text
+Create Ticket
+
+Ticket Details
+──────────────────────────
+Customer
+Subject
+Description
+
+Classification
+──────────────────────────
+Priority
+Category
+Channel
+
+Assignment
+──────────────────────────
+Agent
+
+Attachments
+──────────────────────────
+Files
+
+[Cancel] [Create Ticket]
+```
+
+## Behavior
+
+- customer selector should support search
+- validation errors shown inline
+- successful creation redirects to ticket details
+- preserve form after recoverable API failure
+
+## Mobile
+
+Single-column full-width form.
+
+---
+
+# 7. Ticket Details / Ticket Workspace
+
+## Route
+
+```text
+/tickets/:id
+```
+
+## Roles
+
+- ADMIN
+- MANAGER
+- AGENT
+
+Authorization remains server-side.
+
+## Goal
+
+Provide the complete operational workspace for resolving one support request.
+
+This is the most important internal product screen.
+
+## Desktop Layout
+
+Preferred:
+
+```text
+┌────────────────────┬─────────────────────────────────┬────────────────────────┐
+│ Queue / Context    │ Conversation                    │ Customer / Ticket Info │
+│                    │                                 │                        │
+│ Search             │ #CS-1042 Cannot login          │ Ahmed Mohamed          │
+│ Filters            │ High • In Progress             │ ahmed@example.com      │
+│                    │                                 │ +20...                 │
+│ Ticket list        │ Conversation timeline           │                        │
+│                    │                                 │ Recent Tickets         │
+│                    │                                 │                        │
+│                    │                                 │ SLA                    │
+│                    │                                 │ Response ✓             │
+│                    │                                 │ Resolve 01:32          │
+│                    │                                 │                        │
+│                    │ [Reply] [Internal Note]         │ Assignee               │
+│                    │ Composer                        │ Category               │
+└────────────────────┴─────────────────────────────────┴────────────────────────┘
+```
+
+The queue panel may be omitted when necessary.
+
+The conversation remains the primary center panel.
+
+---
+
+## Ticket Header
+
+Must show:
+
+- ticket ID
+- subject
+- status
+- priority
+
+Useful secondary metadata:
+
+- created time
+- channel
+- category
+- assignee
+
+Quick controls may allow:
+
+- status change
+- priority change
+- assignment
+
+Avoid putting every possible action in the header.
+
+---
+
+## Conversation Timeline
+
+Each public message should show:
+
+- author name
+- author role when needed
+- timestamp
+- message body
+- attachments
+
+Internal notes should be visually different.
+
+Recommended distinction:
+
+```text
+Customer / public replies:
+neutral conversation surface
+
+Internal note:
+subtle tinted internal-only surface
+clear "Internal note" label
+```
+
+Do not use casual social-media chat bubble styling excessively.
+
+---
+
+## Composer
+
+Tabs/modes:
+
+```text
+Reply
+Internal Note
+```
+
+### Reply
+
+Customer-visible.
+
+Controls:
+
+- editor/textarea
+- attachment button when implemented
+- quick reply selector if implemented
+- AI suggest reply when available
+- send button
+
+### Internal Note
+
+Internal only.
+
+Controls:
+
+- textarea
+- add note
+
+Must clearly communicate:
+
+```text
+Only your team can see this note
+```
+
+---
+
+## AI Actions
+
+When enabled:
+
+```text
+Summarize
+Suggest Reply
+Suggest Category
+Suggest Article
+```
+
+Recommended placement:
+
+- summary near ticket context
+- suggest reply inside composer
+- category suggestion near classification
+- article suggestion near response/customer help context
+
+AI output must require human review.
+
+---
+
+## Customer Context Panel
+
+Sections:
+
+### Customer
+- name
+- email
+- phone
+- customer since / created date when useful
+
+### Ticket
+- status
+- priority
+- category
+- channel
+- created
+- updated
+
+### Assignment
+- assigned agent
+- department later if implemented
+- branch later if implemented
+
+### SLA
+- first response state
+- resolution deadline/state
+
+### Recent Tickets
+Small list of recent customer tickets.
+
+Click opens another ticket.
+
+---
+
+## Ticket History
+
+May be:
+
+- collapsible panel
+- side section
+- dedicated tab/section
+
+Show important events:
+
+```text
+Created
+Assigned
+Status changed
+Priority changed
+Resolved
+Closed
+Reopened
+```
+
+---
+
+## Ticket States
+
+### Loading
+Workspace skeleton.
+
+### Not Found
+Clear 404 state.
+
+### Unauthorized
+Permission message without leaking ticket details.
+
+### Error
+Retry action when useful.
+
+---
+
+## Mobile
+
+Ticket workspace becomes one primary column.
+
+Order:
+
+```text
+Ticket Header
+Conversation
+Composer
+Customer / Ticket Details
+SLA
+History
+```
+
+Secondary context may use accordion or sheet.
+
+Do not keep a three-column layout on mobile.
+
+---
+
+# 8. Customers List
+
+## Route
+
+```text
+/customers
+```
+
+## Roles
+
+- ADMIN
+- MANAGER
+- AGENT subject to permission
+
+## Goal
+
+Find customers and understand their support activity quickly.
+
+## Page Header
+
+```text
+Customers                                  [Add Customer]
+Manage customer profiles and support history
+```
+
+## Toolbar
+
+```text
+[Search customers...]
+```
+
+Additional filters only if needed.
+
+## Desktop Table
+
+Recommended:
+
+```text
+Name
+Email
+Phone
+Open Tickets
+Total Tickets
+Last Interaction
+```
+
+Example:
+
+```text
+Ahmed Mohamed
+ahmed@example.com
++20...
+2 open
+12 total
+10 min ago
+```
+
+## Actions
+
+- open customer
+- edit
+- delete only with appropriate permission
+
+## Empty States
+
+Standard:
+- no customers
+- no search results
+
+## Mobile
+
+Compact cards with:
+
+- name
+- email/phone
+- open ticket count
+- last activity
+
+---
+
+# 9. Create / Edit Customer
+
+## Routes
+
+Implementation may use:
+
+```text
+/customers/new
+/customers/:id/edit
+```
+
+or dialogs if the final design remains accessible and consistent.
+
+## Fields
+
+Core:
+
+```text
+Name
+Email
+Phone
+```
+
+Do not introduce unnecessary CRM sales fields.
+
+## Validation
+
+- name required
+- valid email where required
+- phone validation should not be unnecessarily strict for international formats
+
+## Behavior
+
+After create:
+- redirect to customer details or return to list according to implementation
+
+---
+
+# 10. Customer Details
+
+## Route
+
+```text
+/customers/:id
+```
+
+## Roles
+
+Internal roles with customer access.
+
+## Goal
+
+Provide one customer record with support context.
+
+## Header
+
+```text
+Ahmed Mohamed                                  [Edit]
+
+ahmed@example.com
++20...
+```
+
+Optional summary badges:
+
+```text
+2 Open Tickets
+12 Total Tickets
+```
+
+Avoid turning header into a large hero section.
+
+## Tabs
+
+```text
+Overview
+Tickets
+Activity
+Notes
+Attachments
+```
+
+P1 tabs may be hidden until implemented.
+
+---
+
+## Overview
+
+Recommended cards/sections:
+
+### Contact Information
+- email
+- phone
+- created date
+
+### Support Summary
+- open tickets
+- resolved tickets
+- total tickets
+- last interaction
+
+### Recent Tickets
+Small ticket list.
+
+### Recent Activity
+Small activity timeline.
+
+---
+
+## Tickets Tab
+
+Ticket table scoped to this customer.
+
+Columns:
+
+```text
+ID
+Subject
+Priority
+Status
+Assignee
+Updated
+```
+
+---
+
+## Activity Tab
+
+Timeline examples:
+
+```text
+Ticket created
+Customer replied
+Agent replied
+Status changed
+Feedback submitted
+```
+
+---
+
+## Notes Tab
+
+Customer-level notes only.
+
+Do not mix ticket internal notes into customer notes unless explicitly intended.
+
+---
+
+## Attachments Tab
+
+Customer-related attachments if implemented.
+
+---
+
+## Mobile
+
+Tabs may:
+- horizontally scroll
+- become segmented controls
+- collapse secondary information
+
+Keep customer identity and current ticket summary easy to find.
+
+---
+
+# 11. Knowledge Base List
+
+## Route
+
+```text
+/knowledge-base
+```
+
+## Internal Roles
+
+- ADMIN
+- MANAGER
+- AGENT read access
+
+Write permissions based on RBAC.
+
+## Goal
+
+Help agents find reusable solutions and allow authorized users to manage support content.
+
+## Header
+
+```text
+Knowledge Base                              [New Article]
+Create and manage support documentation
+```
+
+## Search
+
+Prominent search field:
+
+```text
+[Search articles...]
+```
+
+## Filter
+
+Optional:
+
+```text
+Category
+Status
+```
+
+## Article List
+
+Recommended columns:
+
+```text
+Title
+Category
+Status
+Updated
+Author
+```
+
+Alternative compact list acceptable.
+
+## Status
+
+Suggested:
+
+```text
+DRAFT
+PUBLISHED
+```
+
+Do not invent editorial workflows unless needed.
+
+---
+
+# 12. Knowledge Base Article View
+
+## Suggested Route
+
+```text
+/knowledge-base/:id
+```
+
+## Layout
+
+```text
+Breadcrumb
+
+Article Title
+Category • Updated date
+
+Article Content
+
+Related / Suggested articles
+```
+
+Internal authorized users may see edit action.
+
+## Content
+
+Prioritize readability:
+- sensible line length
+- headings
+- lists
+- code blocks where content needs them
+
+---
+
+# 13. Knowledge Base Editor
+
+## Suggested Routes
+
+```text
+/knowledge-base/new
+/knowledge-base/:id/edit
+```
+
+## Fields
+
+```text
+Title
+Category
+Content
+Status
+```
+
+## Behavior
+
+- validation
+- save state
+- cancel/navigation protection if unsaved handling is implemented
+
+Do not spend excessive project time building a complex rich-text editor.
+
+A textarea or simple supported editor is acceptable for the assessment.
+
+---
+
+# 14. Reports
+
+## Route
+
+```text
+/reports
+```
+
+## Roles
+
+- ADMIN
+- MANAGER
+
+AGENT access only if explicitly allowed.
+
+## Goal
+
+Provide a management summary of operational support performance.
+
+## Header
+
+```text
+Reports
+Track ticket volume, SLA performance, and team activity
+```
+
+## Filters
+
+Optional first version:
+
+```text
+Date Range
+```
+
+Additional filters:
+- agent
+- category
+- priority
+
+Only if supported by APIs.
+
+## Recommended Sections
+
+### Overview KPIs
+
+```text
+Created Tickets
+Resolved Tickets
+SLA Compliance
+Average Response Time
+Customer Satisfaction
+```
+
+Show only metrics supported by actual data.
+
+### Ticket Volume
+
+Created vs resolved chart.
+
+### Ticket Status Distribution
+
+Bar or donut chart.
+
+### SLA Performance
+
+- met
+- breached
+- compliance percentage
+
+### Agent Performance
+
+Table:
+
+```text
+Agent
+Assigned
+Resolved
+Open
+SLA Met %
+```
+
+Do not claim sophisticated productivity metrics not supported by implementation.
+
+## Responsive
+
+Charts stack vertically.
+
+Tables use responsive strategy.
+
+---
+
+# 15. Users Management
+
+## Route
+
+```text
+/users
+```
+
+## Roles
+
+ADMIN.
+
+MANAGER access only if explicitly granted.
+
+## Goal
+
+Manage internal CRM users and roles.
+
+## Table
+
+Recommended:
+
+```text
+Name
+Email
+Role
+Status
+Created
+```
+
+Actions:
+
+```text
+Create User
+Edit User
+Change Role
+```
+
+Avoid implementing unnecessary enterprise identity features.
+
+---
+
+# 16. Settings
+
+## Route
+
+```text
+/settings
+```
+
+## Roles
+
+ADMIN.
+
+## Goal
+
+Central location for configuration that actually exists.
+
+Possible sections:
+
+```text
+General
+SLA Rules
+Categories
+Quick Replies
+```
+
+Department/branch configuration may be added later.
+
+Do not create dead settings screens full of nonfunctional toggles.
+
+---
+
+# 17. Customer Portal Home
+
+## Route
+
+```text
+/portal
+```
+
+## Role
+
+CUSTOMER.
+
+## Goal
+
+Give customers a simple support entry point.
+
+## Layout
+
+```text
+Welcome Header
+
+How can we help?
+[ Search help articles... ]
+
+Primary Action
+[ Create New Request ]
+
+Request Summary
+┌──────────────┐ ┌──────────────────┐ ┌──────────────┐
+│ Open         │ │ Waiting for You  │ │ Resolved     │
+└──────────────┘ └──────────────────┘ └──────────────┘
+
+Recent Requests
+
+Popular Help Articles
+```
+
+## Important
+
+Do not expose:
+
+- internal notes
+- agent performance
+- internal audit logs
+- internal SLA configuration
+- admin metadata
+
+---
+
+# 18. Customer Portal: My Requests
+
+## Route
+
+```text
+/portal/tickets
+```
+
+## Role
+
+CUSTOMER.
+
+## Goal
+
+Allow a customer to see only their own support tickets.
+
+## List
+
+Recommended:
+
+```text
+Ticket ID
+Subject
+Customer-friendly Status
+Created
+Updated
+```
+
+Optional:
+- priority if product wants customers to see it
+
+Do not expose internal assignee or internal escalation details by default.
+
+## Search / Filters
+
+Simple:
+
+```text
+Search
+Status
+```
+
+Keep customer UI lightweight.
+
+## Security
+
+Backend must scope tickets to authenticated customer.
+
+Never rely on frontend filtering for ownership.
+
+---
+
+# 19. Customer Portal: Create Request
+
+## Route
+
+```text
+/portal/tickets/new
+```
+
+## Role
+
+CUSTOMER.
+
+## Goal
+
+Make requesting help fast and understandable.
+
+## Fields
+
+```text
+Subject
+Category
+Description
+Attachments optional
+```
+
+Do not require customer to understand internal fields such as:
+
+- assignee
+- SLA
+- department unless product requirements later demand it
+- internal priority unless explicitly allowed
+
+Default channel:
+
+```text
+WEB
+```
+
+## UX
+
+Show useful knowledge-base suggestions later if implemented.
+
+---
+
+# 20. Customer Portal: Ticket Details
+
+## Route
+
+```text
+/portal/tickets/:id
+```
+
+## Role
+
+CUSTOMER, own tickets only.
+
+## Layout
+
+```text
+Ticket Header
+#1042 Cannot login
+Status
+
+Conversation
+
+Reply Composer
+
+Ticket Summary / Metadata
+```
+
+## Show
+
+- public conversation
+- attachments
+- customer-friendly status
+- created/updated dates
+- ticket reference number
+
+## Never Show
+
+- internal notes
+- internal-only history entries
+- private staff metadata
+- other customers' information
+- internal AI prompts/output unless deliberately exposed
+- staff-only SLA details
+
+## Composer
+
+Customer can:
+
+- reply
+- attach files when enabled
+
+If RESOLVED can be reopened through reply, make behavior clear in UX.
+
+---
+
+# 21. Customer Portal: Knowledge Base
+
+## Route
+
+```text
+/portal/knowledge-base
+```
+
+## Goal
+
+Let customers find answers without creating tickets.
+
+## Layout
+
+```text
+Help Center
+
+[ Search for help... ]
+
+Categories
+
+Popular Articles
+
+Article Results
+```
+
+Only published articles appear.
+
+---
+
+# 22. Notifications
+
+## Placement
+
+Header notification control for internal app.
+
+Optional portal notifications only if time allows.
+
+## Useful Notification Types
+
+```text
+Ticket assigned
+Customer replied
+Ticket status changed
+SLA warning
+SLA breached
+```
+
+## Notification Item
+
+Display:
+
+- concise message
+- time
+- read/unread state
+- link to relevant ticket
+
+Do not create noisy notifications for every database update.
+
+---
+
+# 23. Quick Replies
+
+## Placement
+
+Ticket reply composer.
+
+## UX
+
+Control:
+
+```text
+Quick Reply ▼
+```
+
+Selecting a quick reply inserts editable content into the composer.
+
+It must not automatically send.
+
+Management may live in:
+
+```text
+/settings
+```
+
+or another documented admin section.
+
+---
+
+# 24. Common Components
+
+Prefer domain components when repeated.
+
+Recommended:
+
+```text
+AppSidebar
+AppHeader
+PageHeader
+
+TicketStatusBadge
+TicketPriorityBadge
+SlaIndicator
+ChannelIcon
+
+TicketTable
+TicketListItem
+TicketConversation
+TicketMessage
+TicketComposer
+
+CustomerSummary
+CustomerContactCard
+
+KpiCard
+EmptyState
+ErrorState
+LoadingSkeleton
+
+ConfirmDialog
+```
+
+Do not create an abstraction merely because two components share one CSS class.
+
+---
+
+# 25. Page Header Pattern
+
+Internal pages should use a consistent page header.
+
+Example:
+
+```text
+Tickets                                  [Primary Action]
+Manage and track customer support requests
+```
+
+Structure:
+
+- title
+- short description
+- primary local action
+
+Avoid oversized headers.
+
+---
+
+# 26. Destructive Actions
+
+Examples:
+
+- Delete Customer
+- Delete Ticket if supported
+- Delete Article
+- Disable User
+
+Rules:
+
+1. user explicitly initiates action
+2. confirmation dialog explains consequence
+3. destructive button has destructive styling
+4. API errors are handled
+5. success updates UI
+
+No destructive operation occurs from a single ambiguous icon click.
+
+---
+
+# 27. Page State Requirements
+
+Every major page must implement the relevant states.
+
+## Loading
+Structured skeleton.
+
+## Empty
+Clear explanation and next action.
+
+## Error
+Human-readable error and retry when useful.
+
+## Unauthorized
+No sensitive information leaked.
+
+## Not Found
+Clear resource-not-found state.
+
+## Success
+Content visibly reflects changes.
+
+These states are part of feature completion, not polish.
+
+---
+
+# 28. Responsive Breakpoint Behavior
+
+Exact Tailwind breakpoints may follow project defaults.
+
+Conceptually:
+
+## Mobile
+- one column
+- drawer navigation
+- compact cards instead of wide tables
+- sheets/accordions for secondary context
+
+## Tablet
+- reduced table columns
+- optional collapsible side panels
+- 2-column dashboard layouts
+
+## Desktop
+- dense tables
+- persistent sidebar
+- multi-panel ticket workspace
+- wider operational dashboards
+
+Do not build desktop-only first and postpone all responsive decisions until final polish.
+
+---
+
+# 29. RTL Page Behavior
+
+All screens must remain structurally valid in Arabic.
+
+Requirements:
+
+- sidebar placement follows document direction where appropriate
+- spacing uses logical properties where practical
+- directional icons handled intentionally
+- conversation alignment must not accidentally imply author solely from left/right position
+- emails, URLs, ticket IDs, and numbers remain readable
+- charts and table labels remain understandable
+
+---
+
+# 30. Role Navigation Matrix
+
+## ADMIN
+
+```text
+Dashboard
+Tickets
+Customers
+Knowledge Base
+Reports
+Users
+Settings
+```
+
+## MANAGER
+
+```text
+Dashboard
+Tickets
+Customers
+Knowledge Base
+Reports
+```
+
+Settings access only when explicitly granted.
+
+## AGENT
+
+```text
+Dashboard
+Tickets
+Customers
+Knowledge Base
+```
+
+Reports optional if allowed.
+
+## CUSTOMER
+
+Separate portal:
+
+```text
+Home
+My Requests
+Knowledge Base
+```
+
+---
+
+# 31. Required Demo Data
+
+Seed data should make pages look realistic.
+
+Create:
+
+## Users
+
+At minimum:
+- 1 ADMIN
+- 1 MANAGER
+- 2 AGENTS
+- 1 CUSTOMER account
+
+## Customers
+
+At least 8-12 realistic customers.
+
+## Tickets
+
+At least 15-25 tickets distributed across:
+
+- statuses
+- priorities
+- categories
+- agents
+- SLA states
+
+Include:
+- open
+- in progress
+- waiting customer
+- resolved
+- urgent
+- SLA breached
+- unassigned if supported
+
+## Conversations
+
+Important demo tickets should contain multiple messages.
+
+At least one ticket should demonstrate:
+
+```text
+customer message
+agent reply
+customer follow-up
+internal note
+status changes
+```
+
+## Knowledge Base
+
+At least 5 useful demo articles across multiple categories.
+
+## Feedback
+
+Include enough data for reports when feedback is implemented.
+
+The UI should not look empty during assessment/demo.
+
+---
+
+# 32. Critical Demo Flow
+
+The UI must support this scenario without manual database intervention:
+
+```text
+Internal user logs in
+        ↓
+Views Dashboard
+        ↓
+Finds or creates Customer
+        ↓
+Creates Ticket
+        ↓
+Assigns Agent
+        ↓
+Agent opens Ticket Workspace
+        ↓
+Reviews Customer context
+        ↓
+Adds Internal Note
+        ↓
+Replies to Customer
+        ↓
+SLA state is visible
+        ↓
+Customer opens Portal
+        ↓
+Customer replies
+        ↓
+Agent resolves Ticket
+        ↓
+Customer submits feedback if implemented
+        ↓
+Reports / Dashboard reflect the updated data
+```
+
+This flow has higher priority than isolated decorative pages.
+
+---
+
+# 33. AI Design Guardrail
+
+The AI must not:
+
+- redesign the overall application shell
+- replace tables with decorative card grids without reason
+- transform the ticket workspace into a generic chat page
+- introduce a second visual language for the customer portal
+- add unexplained gradients
+- add glassmorphism
+- add large hero illustrations
+- add random metrics or fake analytics
+- invent data fields solely because they look good in UI
+- expose internal fields to CUSTOMER
+- change page routes silently
+- add a new UI/component library without approval
+
+When uncertain, follow:
+
+1. `09-frontend-guidelines.md`
+2. this page specification
+3. existing implemented patterns
+4. simplest conventional support-CRM behavior
+
+---
+
+# 34. Frontend Feature Completion Checklist
+
+Before marking a page/feature complete:
+
+```text
+[ ] Page matches documented purpose
+[ ] Correct role access
+[ ] Correct data is displayed
+[ ] Primary actions work
+[ ] Loading state exists
+[ ] Empty state exists
+[ ] Error state exists
+[ ] Responsive layout checked
+[ ] Mobile interaction remains usable
+[ ] Accessibility basics checked
+[ ] RTL compatibility preserved
+[ ] Existing design system reused
+[ ] No undocumented product behavior introduced
+[ ] Relevant tests added where valuable
+```
+
+---
+
+# 35. Implementation Priority
+
+When time is limited, implement screens in this order:
+
+```text
+1. Login
+2. Application Shell
+3. Tickets List
+4. Ticket Details / Workspace
+5. Customers List
+6. Customer Details
+7. Create Ticket
+8. Dashboard
+9. Customer Portal: Requests
+10. Customer Portal: Ticket Details
+11. Customer Portal: Create Request
+12. Knowledge Base
+13. Reports
+14. Users
+15. Settings
+16. AI enhancements
+```
+
+The ticket workflow is the product core.
+
+Do not delay working ticket interactions to polish lower-priority screens.
