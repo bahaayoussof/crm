@@ -256,6 +256,27 @@ Before declaring a task complete:
 4. Report known limitations.
 5. Show suggested commit message, but DO NOT commit.
 
+
+## Frontend Design Skill
+
+For any task involving frontend UI, UX, layout, styling, responsive behavior, RTL presentation, or visual refinement, the AI MUST read:
+
+`.agents/skills/design-taste-frontend/SKILL.md`
+
+before making frontend visual implementation decisions.
+
+The skill is advisory only and does not override:
+
+1. Current developer instructions
+2. `AGENTS.md`
+3. Feature/domain documentation
+4. `docs/18-ui-pages-spec.md`
+5. `docs/09-frontend-guidelines.md`
+6. Existing approved product behavior
+
+If the skill conflicts with higher-priority project documentation, follow the higher-priority source and report the conflict.
+
+
 <!-- openwolf:begin -->
 # OpenWolf
 

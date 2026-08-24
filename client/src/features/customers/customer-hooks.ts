@@ -25,7 +25,12 @@ export function useUpdateCustomer(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (values: CustomerFormValues) => updateCustomer(id, values),
-    onSuccess: (customer) => { queryClient.setQueryData(customerKeys.detail(id), customer); queryClient.invalidateQueries({ queryKey: customerKeys.lists() }); },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: customerKeys.detail(id) }),
+        queryClient.invalidateQueries({ queryKey: customerKeys.lists() }),
+      ]);
+    },
   });
 }
 

@@ -203,3 +203,29 @@ Account-backed preferences; browser-language auto-detection; per-page direction 
 **Consequences**
 
 Invalid or unavailable stored values safely fall back to English. Email addresses, phone numbers, URLs, IDs, and similar values still require local direction isolation inside Arabic layouts.
+
+---
+
+## ADR-008: TanStack Table for Frontend Table Models
+
+**Date:** 2026-08-24
+
+**Context**
+
+The customer list was the first implemented server-paginated CRM table and used manual column and row rendering. Later ticket, report, and administration features will also need typed, accessible table models without changing the existing server-state architecture.
+
+**Decision**
+
+Use TanStack Table v8 for implemented frontend data tables. Keep TanStack Query as the server-data owner and URL parameters as the owner of shareable search and pagination state. Server-backed tables use manual pagination, filtering, or sorting only when the corresponding API behavior exists. Prefer feature-local typed column definitions, and allow mobile card views to share the same query result.
+
+**Reason**
+
+This standardizes table modeling while preserving the project's headless styling, semantic markup, server-side pagination, localization, and responsive CRM layouts.
+
+**Alternatives Considered**
+
+Continue manual table rendering; introduce a full data-grid component library; build a universal project-wide data-table abstraction immediately.
+
+**Consequences**
+
+Implemented desktop tables use TanStack Table row and header models. Features still own their column rendering and styling, no client-side sort control is shown without backend support, and mobile layouts do not need to become horizontally scrolling desktop tables.

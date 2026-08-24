@@ -8,6 +8,7 @@
   --muted: #f8f9fa;
   --muted-foreground: #6b7280;
   --border: #e5e7eb;
+  --border-strong: #d1d5db;
   --primary: #2563eb;
   --primary-foreground: #ffffff;
 }
@@ -18,18 +19,26 @@
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --radius-md: 0.5rem;
 }
 
 * { border-color: var(--border); }
-body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--background); color: var(--foreground); }
+html { background: var(--background); }
+body { margin: 0; min-width: 320px; min-height: 100dvh; background: var(--background); color: var(--foreground); font-size: 0.875rem; line-height: 1.5; text-rendering: optimizeLegibility; }
+button, input, textarea { font: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; }
+[dir="rtl"] body { font-family: Tahoma, Arial, ui-sans-serif, sans-serif; }
+::selection { background: color-mix(in srgb, var(--primary) 18%, transparent); }
 
 @layer components {
-  .input { @apply w-full rounded-md border bg-white px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15; }
-  .button-primary { @apply w-full rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60; }
-  .button-link { @apply rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60; }
-  .button-secondary { @apply rounded-md border bg-white px-4 py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50; }
-  .button-danger { @apply rounded-md border border-red-200 bg-white px-4 py-2.5 text-sm font-medium text-red-700 disabled:cursor-not-allowed disabled:opacity-50; }
+  .page-container { @apply mx-auto min-h-[calc(100dvh-4rem)] w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8; }
+  .input { @apply min-h-10 w-full rounded-md border border-border-strong bg-white px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/75 hover:border-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground aria-invalid:border-red-500 aria-invalid:ring-red-100; }
+  .button-primary { @apply inline-flex min-h-10 w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-55; }
+  .button-link { @apply inline-flex min-h-10 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-55; }
+  .button-secondary { @apply inline-flex min-h-10 items-center justify-center rounded-md border border-border-strong bg-white px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50; }
+  .button-danger { @apply inline-flex min-h-10 items-center justify-center rounded-md border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50; }
+  .button-ghost { @apply inline-flex min-h-10 items-center justify-center rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25; }
 }

@@ -1,8 +1,11 @@
 {
   "app": { "title": "Customer Support CRM", "foundationReady": "Project foundation is ready." },
-  "navigation": { "languageSwitcher": "Choose language" },
+  "navigation": {
+    "languageSwitcher": "Choose language", "primary": "Primary navigation", "dashboard": "Dashboard", "customers": "Customers",
+    "portalHome": "Portal home", "portalContext": "Support portal", "workspaceContext": "Support workspace", "openCustomers": "Open customer records"
+  },
   "common": {
-    "retry": "Retry", "previous": "Previous", "next": "Next", "cancel": "Cancel", "save": "Save", "saving": "Saving…",
+    "retry": "Retry", "previous": "Previous", "next": "Next", "cancel": "Cancel", "save": "Save", "saving": "Saving…", "clearSearch": "Clear search",
     "edit": "Edit", "delete": "Delete", "notProvided": "Not provided", "loading": "Loading…"
   },
   "validation": {

@@ -1,8 +1,11 @@
 {
   "app": { "title": "نظام إدارة دعم العملاء", "foundationReady": "البنية الأساسية للمشروع جاهزة." },
-  "navigation": { "languageSwitcher": "اختيار اللغة" },
+  "navigation": {
+    "languageSwitcher": "اختيار اللغة", "primary": "التنقل الرئيسي", "dashboard": "لوحة التحكم", "customers": "العملاء",
+    "portalHome": "الصفحة الرئيسية للبوابة", "portalContext": "بوابة الدعم", "workspaceContext": "مساحة عمل الدعم", "openCustomers": "فتح سجلات العملاء"
+  },
   "common": {
-    "retry": "إعادة المحاولة", "previous": "السابق", "next": "التالي", "cancel": "إلغاء", "save": "حفظ", "saving": "جارٍ الحفظ…",
+    "retry": "إعادة المحاولة", "previous": "السابق", "next": "التالي", "cancel": "إلغاء", "save": "حفظ", "saving": "جارٍ الحفظ…", "clearSearch": "مسح البحث",
     "edit": "تعديل", "delete": "حذف", "notProvided": "غير متوفر", "loading": "جارٍ التحميل…"
   },
   "validation": {

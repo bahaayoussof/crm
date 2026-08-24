@@ -1,5 +1,9 @@
 import type { ReactNode } from "react";
 
-export function AuthField({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
-  return <label className="block text-sm font-medium">{label}<span className="mt-2 block">{children}</span>{error && <span className="mt-1 block text-sm text-red-600">{error}</span>}</label>;
+export function AuthField({ id, label, error, children }: { id: string; label: string; error?: string; children: ReactNode }) {
+  return <div>
+    <label className="block text-sm font-medium text-foreground" htmlFor={id}>{label}</label>
+    <div className="mt-2">{children}</div>
+    {error && <p id={`${id}-error`} className="mt-1.5 text-sm text-red-700">{error}</p>}
+  </div>;
 }

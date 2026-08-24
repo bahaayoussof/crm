@@ -8,6 +8,7 @@ import { getAuthToken, setAuthToken } from "./auth-token";
 import { LoginPage } from "./login-page";
 import { ProtectedPlaceholderPage } from "./protected-placeholder-page";
 import { changeAppLanguage } from "@/lib/i18n";
+import { ProtectedRoute } from "@/app/router/protected-route";
 
 const authenticatedUser = {
   id: "admin-1",
@@ -63,7 +64,7 @@ describe("AuthProvider logout", () => {
         <AuthProvider>
           <MemoryRouter initialEntries={["/dashboard"]}>
             <Routes>
-              <Route path="/dashboard" element={<ProtectedPlaceholderPage area="dashboard" />} />
+              <Route element={<ProtectedRoute audience="internal" />}><Route path="/dashboard" element={<ProtectedPlaceholderPage area="dashboard" />} /></Route>
               <Route path="/login" element={<LoginPage />} />
             </Routes>
           </MemoryRouter>
@@ -71,7 +72,7 @@ describe("AuthProvider logout", () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "Log out" }));
+    fireEvent.click((await screen.findAllByRole("button", { name: "Log out" }))[0]);
 
     expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
     expect(getAuthToken()).toBeNull();

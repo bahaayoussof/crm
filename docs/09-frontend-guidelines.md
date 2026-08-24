@@ -535,6 +535,8 @@ Tables should:
 - show actions consistently
 - avoid horizontal overflow where possible
 
+TanStack Table is the standard table-model library for implemented data tables. TanStack Query remains responsible for server data, while URL parameters remain the source of shareable search and pagination state. Server-backed tables use TanStack Table's manual modes and the API response metadata rather than fetching all records for client-side pagination or sorting. Keep typed column definitions feature-local unless multiple implemented tables demonstrate a genuinely shared pattern. A responsive mobile card view may render the same query data without creating a second fetching path.
+
 Do not hide essential information behind hover-only interactions.
 
 Actions such as Edit/Delete may use an overflow menu when appropriate.

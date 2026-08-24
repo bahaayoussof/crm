@@ -8,6 +8,7 @@ import { getAuthErrorMessage } from "./auth-error";
 import { AuthField } from "./auth-field";
 import { getRoleHome } from "./auth-routing";
 import { registrationSchema, type RegistrationValues } from "./auth.schemas";
+import { AuthLayout } from "@/app/layouts/auth-layout";
 
 export function RegisterPage() {
   const { t } = useTranslation();
@@ -24,17 +25,16 @@ export function RegisterPage() {
     catch (error) { setApiError(getAuthErrorMessage(error, t)); }
   });
 
-  return <main className="grid min-h-screen place-items-center px-4 py-10"><section className="w-full max-w-sm">
-    <p className="mb-3 text-sm font-medium text-primary">{t("app.title")}</p><h1 className="text-2xl font-semibold">{t("auth.registerTitle")}</h1><p className="mt-2 text-sm text-muted-foreground">{t("auth.registerDescription")}</p>
-    <form className="mt-8 space-y-4" onSubmit={onSubmit} noValidate>
+  return <AuthLayout title={t("auth.registerTitle")} description={t("auth.registerDescription")}>
+    <form className="mt-6 space-y-4" onSubmit={onSubmit} noValidate>
       {apiError && <p role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{apiError}</p>}
-      <AuthField label={t("auth.name")} error={errors.name?.message ? t(errors.name.message) : undefined}><input className="input" autoComplete="name" {...register("name")} /></AuthField>
-      <AuthField label={t("auth.email")} error={errors.email?.message ? t(errors.email.message) : undefined}><input className="input text-start" dir="ltr" type="email" autoComplete="email" {...register("email")} /></AuthField>
-      <AuthField label={t("auth.phoneOptional")} error={errors.phone?.message ? t(errors.phone.message) : undefined}><input className="input text-start" dir="ltr" type="tel" autoComplete="tel" {...register("phone")} /></AuthField>
-      <AuthField label={t("auth.password")} error={errors.password?.message ? t(errors.password.message) : undefined}><div className="relative"><input className="input pe-16 text-start" dir="ltr" type={showPassword ? "text" : "password"} autoComplete="new-password" {...register("password")} /><button className="absolute end-3 top-2.5 text-sm text-primary" type="button" onClick={() => setShowPassword((value) => !value)}>{showPassword ? t("auth.hide") : t("auth.show")}</button></div></AuthField>
-      <AuthField label={t("auth.confirmPassword")} error={errors.confirmPassword?.message ? t(errors.confirmPassword.message) : undefined}><input className="input text-start" dir="ltr" type={showPassword ? "text" : "password"} autoComplete="new-password" {...register("confirmPassword")} /></AuthField>
+      <AuthField id="register-name" label={t("auth.name")} error={errors.name?.message ? t(errors.name.message) : undefined}><input id="register-name" className="input" autoComplete="name" aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? "register-name-error" : undefined} {...register("name")} /></AuthField>
+      <AuthField id="register-email" label={t("auth.email")} error={errors.email?.message ? t(errors.email.message) : undefined}><input id="register-email" className="input text-start" dir="ltr" type="email" autoComplete="email" aria-invalid={Boolean(errors.email)} aria-describedby={errors.email ? "register-email-error" : undefined} {...register("email")} /></AuthField>
+      <AuthField id="register-phone" label={t("auth.phoneOptional")} error={errors.phone?.message ? t(errors.phone.message) : undefined}><input id="register-phone" className="input text-start" dir="ltr" type="tel" autoComplete="tel" aria-invalid={Boolean(errors.phone)} aria-describedby={errors.phone ? "register-phone-error" : undefined} {...register("phone")} /></AuthField>
+      <AuthField id="register-password" label={t("auth.password")} error={errors.password?.message ? t(errors.password.message) : undefined}><div className="relative"><input id="register-password" className="input pe-16 text-start" dir="ltr" type={showPassword ? "text" : "password"} autoComplete="new-password" aria-invalid={Boolean(errors.password)} aria-describedby={errors.password ? "register-password-error" : undefined} {...register("password")} /><button className="absolute inset-y-0 end-1 my-1 min-h-8 rounded px-2.5 text-xs font-medium text-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" type="button" onClick={() => setShowPassword((value) => !value)}>{showPassword ? t("auth.hide") : t("auth.show")}</button></div></AuthField>
+      <AuthField id="register-confirm-password" label={t("auth.confirmPassword")} error={errors.confirmPassword?.message ? t(errors.confirmPassword.message) : undefined}><input id="register-confirm-password" className="input text-start" dir="ltr" type={showPassword ? "text" : "password"} autoComplete="new-password" aria-invalid={Boolean(errors.confirmPassword)} aria-describedby={errors.confirmPassword ? "register-confirm-password-error" : undefined} {...register("confirmPassword")} /></AuthField>
       <button className="button-primary" type="submit" disabled={isSubmitting}>{isSubmitting ? t("auth.creatingAccount") : t("auth.createAccount")}</button>
     </form>
     <p className="mt-6 text-center text-sm text-muted-foreground">{t("auth.haveAccount")} <Link className="font-medium text-primary" to="/login">{t("auth.signIn")}</Link></p>
-  </section></main>;
+  </AuthLayout>;
 }

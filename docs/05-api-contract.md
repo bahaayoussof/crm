@@ -56,7 +56,9 @@ All customer-management routes require an authenticated `ADMIN`, `MANAGER`, or `
 
 Manual customer creation accepts `{ name, email, phone? }`, normalizes the email, and creates only a CRM `Customer` with `userId = null`; it does not provision authentication credentials. Updates accept only `name`, `email`, and `phone`.
 
-Customer detail responses include safe linked-user identity fields, ticket counts, last-interaction time, and customer-level attachment metadata. They never include password hashes. Ticket counts are read-only summary data; Ticket Management remains a separate feature.
+`GET /customers/:id` returns the complete customer-detail representation, including safe linked-user identity fields, ticket counts, last-interaction time, and customer-level attachment metadata. It never includes password hashes. Ticket counts are read-only summary data; Ticket Management remains a separate feature.
+
+`POST /customers` and `PATCH /customers/:id` return the persisted core customer fields (`id`, `name`, `email`, `phone`, `createdAt`, and `updatedAt`). Derived detail fields such as `supportSummary` are not mutation-response fields; clients must invalidate or refetch customer detail after an update rather than replace a full detail cache entry with the mutation response.
 
 ```text
 GET  /customers/:id/notes

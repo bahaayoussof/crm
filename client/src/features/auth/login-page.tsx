@@ -8,6 +8,7 @@ import { getAuthErrorMessage } from "./auth-error";
 import { AuthField } from "./auth-field";
 import { getRoleHome } from "./auth-routing";
 import { loginSchema, type LoginValues } from "./auth.schemas";
+import { AuthLayout } from "@/app/layouts/auth-layout";
 
 export function LoginPage() {
   const { t } = useTranslation();
@@ -24,18 +25,13 @@ export function LoginPage() {
     catch (error) { setApiError(getAuthErrorMessage(error, t)); }
   });
 
-  return <AuthFrame title={t("auth.loginTitle")} description={t("auth.loginDescription")}>
-    <form className="mt-8 space-y-5" onSubmit={onSubmit} noValidate>
+  return <AuthLayout title={t("auth.loginTitle")} description={t("auth.loginDescription")}>
+    <form className="mt-6 space-y-5" onSubmit={onSubmit} noValidate>
       {apiError && <p role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{apiError}</p>}
-      <AuthField label={t("auth.email")} error={errors.email?.message ? t(errors.email.message) : undefined}><input className="input text-start" dir="ltr" type="email" autoComplete="email" {...register("email")} /></AuthField>
-      <AuthField label={t("auth.password")} error={errors.password?.message ? t(errors.password.message) : undefined}><div className="relative"><input className="input pe-16 text-start" dir="ltr" type={showPassword ? "text" : "password"} autoComplete="current-password" {...register("password")} /><button className="absolute end-3 top-2.5 text-sm text-primary" type="button" onClick={() => setShowPassword((value) => !value)}>{showPassword ? t("auth.hide") : t("auth.show")}</button></div></AuthField>
+      <AuthField id="login-email" label={t("auth.email")} error={errors.email?.message ? t(errors.email.message) : undefined}><input id="login-email" className="input text-start" dir="ltr" type="email" autoComplete="email" aria-invalid={Boolean(errors.email)} aria-describedby={errors.email ? "login-email-error" : undefined} {...register("email")} /></AuthField>
+      <AuthField id="login-password" label={t("auth.password")} error={errors.password?.message ? t(errors.password.message) : undefined}><div className="relative"><input id="login-password" className="input pe-16 text-start" dir="ltr" type={showPassword ? "text" : "password"} autoComplete="current-password" aria-invalid={Boolean(errors.password)} aria-describedby={errors.password ? "login-password-error" : undefined} {...register("password")} /><button className="absolute inset-y-0 end-1 my-1 min-h-8 rounded px-2.5 text-xs font-medium text-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" type="button" onClick={() => setShowPassword((value) => !value)}>{showPassword ? t("auth.hide") : t("auth.show")}</button></div></AuthField>
       <button className="button-primary" type="submit" disabled={isSubmitting}>{isSubmitting ? t("auth.signingIn") : t("auth.signIn")}</button>
     </form>
     <p className="mt-6 text-center text-sm text-muted-foreground">{t("auth.needAccount")} <Link className="font-medium text-primary" to="/register">{t("auth.register")}</Link></p>
-  </AuthFrame>;
-}
-
-function AuthFrame({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
-  const { t } = useTranslation();
-  return <main className="grid min-h-screen place-items-center px-4 py-10"><section className="w-full max-w-sm"><p className="mb-3 text-sm font-medium text-primary">{t("app.title")}</p><h1 className="text-2xl font-semibold">{title}</h1><p className="mt-2 text-sm text-muted-foreground">{description}</p>{children}</section></main>;
+  </AuthLayout>;
 }
