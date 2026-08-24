@@ -730,6 +730,11 @@ Use i18next.
 
 Arabic mode must support RTL.
 
+English is the default and fallback language. The shared language switcher persists
+the selected `en` or `ar` value under `crm-language` in local storage. Application
+startup and every language change synchronize the root HTML `lang` and `dir`
+attributes; Arabic uses `rtl`, while English uses `ltr`.
+
 Requirements:
 
 - logical CSS properties where possible

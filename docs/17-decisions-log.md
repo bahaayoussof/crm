@@ -177,3 +177,29 @@ HTTP-only cookie sessions; refresh-token rotation with database persistence; in-
 **Consequences**
 
 There is no silent session renewal or server-side token revocation. Production hardening should reassess browser token storage and use secure HTTP-only cookies or a carefully designed refresh-token flow where appropriate.
+
+---
+
+## ADR-007: Persisted Frontend Language and Document Direction
+
+**Date:** 2026-08-24
+
+**Context**
+
+The implemented English and Arabic interfaces need to retain the user's choice and apply bidirectional layout consistently across public and protected routes.
+
+**Decision**
+
+Use i18next with English as the default and fallback language. Persist only supported language codes (`en` or `ar`) in local storage under `crm-language`. Synchronize the root HTML `lang` and `dir` attributes during initial application startup and whenever the language changes.
+
+**Reason**
+
+This keeps language preference independent of authentication and makes document-level direction authoritative without duplicating RTL state across components.
+
+**Alternatives Considered**
+
+Account-backed preferences; browser-language auto-detection; per-page direction state.
+
+**Consequences**
+
+Invalid or unavailable stored values safely fall back to English. Email addresses, phone numbers, URLs, IDs, and similar values still require local direction isolation inside Arabic layouts.

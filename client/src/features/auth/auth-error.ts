@@ -1,8 +1,10 @@
 import axios from "axios";
+import type { TFunction } from "i18next";
 
-export function getAuthErrorMessage(error: unknown) {
-  if (axios.isAxiosError<{ error?: { message?: string } }>(error)) {
-    return error.response?.data.error?.message ?? "Unable to complete the request";
+export function getAuthErrorMessage(error: unknown, t: TFunction) {
+  if (axios.isAxiosError<{ error?: { code?: string } }>(error)) {
+    const code = error.response?.data.error?.code;
+    if (code) return t(`errors.auth.${code}`, { defaultValue: t("errors.generic") });
   }
-  return "Unable to complete the request";
+  return t("errors.generic");
 }

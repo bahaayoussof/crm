@@ -1,8 +1,17 @@
 {
   "app": { "title": "Customer Support CRM", "foundationReady": "Project foundation is ready." },
+  "navigation": { "languageSwitcher": "Choose language" },
   "common": {
     "retry": "Retry", "previous": "Previous", "next": "Next", "cancel": "Cancel", "save": "Save", "saving": "Saving…",
-    "edit": "Edit", "delete": "Delete", "notProvided": "Not provided"
+    "edit": "Edit", "delete": "Delete", "notProvided": "Not provided", "loading": "Loading…"
+  },
+  "validation": {
+    "email": "Enter a valid email address", "passwordRequired": "Password is required", "nameMin": "Name must be at least 2 characters",
+    "phoneMax": "Phone must be 30 characters or fewer", "passwordMin": "Password must be at least 8 characters", "passwordMatch": "Passwords do not match"
+  },
+  "errors": {
+    "generic": "Unable to complete the request. Please try again.",
+    "auth": { "INVALID_CREDENTIALS": "Invalid email or password.", "EMAIL_ALREADY_REGISTERED": "An account with this email already exists.", "VALIDATION_ERROR": "Check the form and try again." }
   },
   "customers": {
     "title": "Customers", "description": "Manage customer profiles and support history", "add": "Add customer", "search": "Search customers…",

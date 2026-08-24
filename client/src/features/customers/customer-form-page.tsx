@@ -32,7 +32,7 @@ export function CustomerFormPage() {
   if (isEditing && customer.isLoading) return <CustomerPage><LoadingRows /></CustomerPage>;
   if (isEditing && customer.isError) {
     const error = getCustomerError(customer.error, t("customers.loadError"));
-    return <CustomerPage><StatePanel>{error.status === 404 ? t("customers.notFound") : error.message}</StatePanel></CustomerPage>;
+    return <CustomerPage><StatePanel>{error.status === 404 ? t("customers.notFound") : getLocalizedCustomerError(customer.error, t("customers.loadError"), t)}</StatePanel></CustomerPage>;
   }
 
   return <CustomerPage>
@@ -40,8 +40,8 @@ export function CustomerFormPage() {
     <form className="mt-8 max-w-xl space-y-5 rounded-md border bg-white p-5 sm:p-6" onSubmit={submit} noValidate>
       {apiError && <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">{apiError}</p>}
       <FormField label={t("customers.name")} error={errors.name?.message ? t(errors.name.message) : undefined}><input className="input" autoComplete="name" {...register("name")} /></FormField>
-      <FormField label={t("customers.email")} error={errors.email?.message ? t(errors.email.message) : undefined}><input className="input" type="email" autoComplete="email" {...register("email")} /></FormField>
-      <FormField label={t("customers.phoneOptional")} error={errors.phone?.message ? t(errors.phone.message) : undefined}><input className="input" type="tel" autoComplete="tel" {...register("phone")} /></FormField>
+      <FormField label={t("customers.email")} error={errors.email?.message ? t(errors.email.message) : undefined}><input className="input text-start" dir="ltr" type="email" autoComplete="email" {...register("email")} /></FormField>
+      <FormField label={t("customers.phoneOptional")} error={errors.phone?.message ? t(errors.phone.message) : undefined}><input className="input text-start" dir="ltr" type="tel" autoComplete="tel" {...register("phone")} /></FormField>
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><Link className="button-secondary text-center" to={isEditing ? `/customers/${id}` : "/customers"}>{t("common.cancel")}</Link><button className="button-link" type="submit" disabled={isSubmitting}>{isSubmitting ? t("common.saving") : t("common.save")}</button></div>
     </form>
   </CustomerPage>;

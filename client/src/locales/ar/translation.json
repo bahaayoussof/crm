@@ -1,8 +1,17 @@
 {
   "app": { "title": "نظام إدارة دعم العملاء", "foundationReady": "البنية الأساسية للمشروع جاهزة." },
+  "navigation": { "languageSwitcher": "اختيار اللغة" },
   "common": {
     "retry": "إعادة المحاولة", "previous": "السابق", "next": "التالي", "cancel": "إلغاء", "save": "حفظ", "saving": "جارٍ الحفظ…",
-    "edit": "تعديل", "delete": "حذف", "notProvided": "غير متوفر"
+    "edit": "تعديل", "delete": "حذف", "notProvided": "غير متوفر", "loading": "جارٍ التحميل…"
+  },
+  "validation": {
+    "email": "أدخل بريدًا إلكترونيًا صحيحًا", "passwordRequired": "كلمة المرور مطلوبة", "nameMin": "يجب ألا يقل الاسم عن حرفين",
+    "phoneMax": "يجب ألا يزيد رقم الهاتف عن 30 حرفًا", "passwordMin": "يجب ألا تقل كلمة المرور عن 8 أحرف", "passwordMatch": "كلمتا المرور غير متطابقتين"
+  },
+  "errors": {
+    "generic": "تعذر إتمام الطلب. يرجى المحاولة مرة أخرى.",
+    "auth": { "INVALID_CREDENTIALS": "البريد الإلكتروني أو كلمة المرور غير صحيحة.", "EMAIL_ALREADY_REGISTERED": "يوجد حساب بهذا البريد الإلكتروني بالفعل.", "VALIDATION_ERROR": "راجع بيانات النموذج وحاول مرة أخرى." }
   },
   "customers": {
     "title": "العملاء", "description": "إدارة ملفات العملاء وسجل الدعم", "add": "إضافة عميل", "search": "البحث عن العملاء…",

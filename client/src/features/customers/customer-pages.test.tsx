@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import "@/lib/i18n";
+import { changeAppLanguage } from "@/lib/i18n";
 
 const mocks = vi.hoisted(() => ({
   useCustomers: vi.fn(), useCustomer: vi.fn(), useCustomerNotes: vi.fn(),
@@ -27,7 +27,8 @@ const customer = {
 
 describe("customer pages", () => {
   afterEach(cleanup);
-  beforeEach(() => {
+  beforeEach(async () => {
+    await changeAppLanguage("en");
     vi.clearAllMocks();
     mocks.useCustomers.mockReturnValue({ isLoading: false, isError: false, data: { data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 0 } }, refetch: vi.fn() });
     mocks.useCustomer.mockReturnValue({ isLoading: false, isError: false, data: customer });
@@ -41,7 +42,7 @@ describe("customer pages", () => {
   it("shows structured loading and distinguishes an empty customer list", () => {
     mocks.useCustomers.mockReturnValueOnce({ isLoading: true, isError: false, data: undefined, refetch: vi.fn() });
     const view = renderAt("/customers", <Route path="/customers" element={<CustomerListPage />} />);
-    expect(screen.getByLabelText("Loading")).toBeInTheDocument();
+    expect(screen.getByLabelText("Loading…")).toBeInTheDocument();
     view.unmount();
     renderAt("/customers", <Route path="/customers" element={<CustomerListPage />} />);
     expect(screen.getByText("No customers yet.")).toBeInTheDocument();
@@ -70,6 +71,18 @@ describe("customer pages", () => {
     fireEvent.change(screen.getByLabelText("Internal note"), { target: { value: "Follow up tomorrow" } });
     fireEvent.click(screen.getByRole("button", { name: "Add note" }));
     await waitFor(() => expect(mocks.createNote).toHaveBeenCalledWith({ body: "Follow up tomorrow" }));
+  });
+
+  it("renders representative customer list and detail UI in Arabic", async () => {
+    await changeAppLanguage("ar");
+    const list = renderAt("/customers", <Route path="/customers" element={<CustomerListPage />} />);
+    expect(screen.getByRole("heading", { name: "العملاء" })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("البحث عن العملاء…")).toBeInTheDocument();
+    list.unmount();
+
+    renderAt("/customers/customer-1", <Route path="/customers/:id" element={<CustomerDetailPage />} />);
+    expect(screen.getByRole("button", { name: "نظرة عامة" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "الملاحظات" })).toBeInTheDocument();
   });
 });
 

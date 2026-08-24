@@ -6,7 +6,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { getCustomerError, getLocalizedCustomerError } from "./customer-error";
 import { useCreateCustomerNote, useCustomer, useCustomerNotes, useDeleteCustomer } from "./customer-hooks";
 import { customerNoteSchema, type CustomerNoteValues } from "./customer.schemas";
-import { formatDate } from "./customer-format";
+import { formatDate, formatNumber } from "./customer-format";
 import { CustomerPage, LoadingRows, PageHeader, StatePanel } from "./customer-ui";
 
 const tabs = ["overview", "tickets", "activity", "notes", "attachments"] as const;
@@ -27,7 +27,7 @@ export function CustomerDetailPage() {
   if (customer.isLoading) return <CustomerPage><LoadingRows /></CustomerPage>;
   if (customer.isError || !customer.data) {
     const error = getCustomerError(customer.error, t("customers.loadError"));
-    return <CustomerPage><PageHeader title={t("customers.detailsTitle")} /><div className="mt-6"><StatePanel action={<Link className="text-primary" to="/customers">{t("customers.backToList")}</Link>}>{error.status === 404 ? t("customers.notFound") : error.message}</StatePanel></div></CustomerPage>;
+    return <CustomerPage><PageHeader title={t("customers.detailsTitle")} /><div className="mt-6"><StatePanel action={<Link className="text-primary" to="/customers">{t("customers.backToList")}</Link>}>{error.status === 404 ? t("customers.notFound") : t("customers.loadError")}</StatePanel></div></CustomerPage>;
   }
 
   const profile = customer.data;
@@ -39,7 +39,7 @@ export function CustomerDetailPage() {
   };
 
   return <CustomerPage>
-    <PageHeader title={profile.name} description={`${profile.email}${profile.phone ? ` · ${profile.phone}` : ""}`} actions={<><Link className="button-secondary" to={`/customers/${profile.id}/edit`}>{t("common.edit")}</Link><button className="button-danger" disabled={remove.isPending} onClick={deleteProfile}>{t("common.delete")}</button></>} />
+    <PageHeader title={profile.name} description={<><bdi dir="ltr">{profile.email}</bdi>{profile.phone && <> · <bdi dir="ltr">{profile.phone}</bdi></>}</>} actions={<><Link className="button-secondary" to={`/customers/${profile.id}/edit`}>{t("common.edit")}</Link><button className="button-danger" disabled={remove.isPending} onClick={deleteProfile}>{t("common.delete")}</button></>} />
     {deleteError && <p className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">{deleteError}</p>}
     <div className="mt-6 overflow-x-auto border-b"><nav className="flex min-w-max gap-6" aria-label={t("customers.detailsSections")}>{tabs.map((tab) => <button className={`border-b-2 px-1 pb-3 text-sm font-medium ${activeTab === tab ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`} key={tab} onClick={() => setParams(tab === "overview" ? {} : { tab })}>{t(`customers.tabs.${tab}`)}</button>)}</nav></div>
     <section className="mt-6">
@@ -56,7 +56,7 @@ function Overview({ profile, locale }: { profile: NonNullable<ReturnType<typeof 
   const { t } = useTranslation();
   return <div className="grid gap-5 lg:grid-cols-2">
     <InfoSection title={t("customers.contactInformation")}><Definition label={t("customers.email")} value={profile.email} ltr /><Definition label={t("customers.phone")} value={profile.phone ?? t("common.notProvided")} ltr /><Definition label={t("customers.customerSince")} value={formatDate(profile.createdAt, locale)} /></InfoSection>
-    <InfoSection title={t("customers.supportSummary")}><Definition label={t("customers.openTickets")} value={String(profile.supportSummary.openTicketCount)} /><Definition label={t("customers.totalTickets")} value={String(profile.supportSummary.totalTicketCount)} /><Definition label={t("customers.lastInteraction")} value={formatDate(profile.supportSummary.lastInteractionAt, locale)} /></InfoSection>
+    <InfoSection title={t("customers.supportSummary")}><Definition label={t("customers.openTickets")} value={formatNumber(profile.supportSummary.openTicketCount, locale)} /><Definition label={t("customers.totalTickets")} value={formatNumber(profile.supportSummary.totalTicketCount, locale)} /><Definition label={t("customers.lastInteraction")} value={formatDate(profile.supportSummary.lastInteractionAt, locale)} /></InfoSection>
     <InfoSection title={t("customers.recentTickets")}><p className="text-sm text-muted-foreground">{t("customers.noTickets")}</p></InfoSection>
     <InfoSection title={t("customers.recentActivity")}><p className="text-sm text-muted-foreground">{t("customers.profileUpdated", { date: formatDate(profile.updatedAt, locale) })}</p></InfoSection>
   </div>;
@@ -87,7 +87,7 @@ function Activity({ profile, notes, locale }: { profile: NonNullable<ReturnType<
 
 function Attachments({ attachments, locale }: { attachments: NonNullable<ReturnType<typeof useCustomer>["data"]>["attachments"]; locale: string }) {
   const { t } = useTranslation();
-  return attachments.length ? <div className="divide-y rounded-md border bg-white">{attachments.map((attachment) => <div className="flex items-center justify-between gap-4 p-4" key={attachment.id}><div><p className="text-sm font-medium">{attachment.fileName}</p><p className="text-xs text-muted-foreground">{attachment.mimeType}</p></div><time className="text-xs text-muted-foreground">{formatDate(attachment.createdAt, locale)}</time></div>)}</div> : <StatePanel>{t("customers.noAttachments")}</StatePanel>;
+  return attachments.length ? <div className="divide-y rounded-md border bg-white">{attachments.map((attachment) => <div className="flex items-center justify-between gap-4 p-4" key={attachment.id}><div className="min-w-0"><p className="truncate text-sm font-medium" dir="auto">{attachment.fileName}</p><p className="text-xs text-muted-foreground" dir="ltr">{attachment.mimeType}</p></div><time className="shrink-0 text-xs text-muted-foreground">{formatDate(attachment.createdAt, locale)}</time></div>)}</div> : <StatePanel>{t("customers.noAttachments")}</StatePanel>;
 }
 
 function InfoSection({ title, children }: { title: string; children: React.ReactNode }) { return <section className="rounded-md border bg-white p-5"><h2 className="font-semibold">{title}</h2><dl className="mt-4 space-y-3">{children}</dl></section>; }

@@ -1,22 +1,22 @@
 import { z } from "zod";
 
-const emailSchema = z.string().trim().email("Enter a valid email address").transform((value) => value.toLowerCase());
+const emailSchema = z.string().trim().email("validation.email").transform((value) => value.toLowerCase());
 
 export const loginSchema = z.strictObject({
   email: emailSchema,
-  password: z.string().min(1, "Password is required"),
+  password: z.string().min(1, "validation.passwordRequired"),
 });
 
 export const registrationSchema = z
   .strictObject({
-    name: z.string().trim().min(2, "Name must be at least 2 characters").max(100),
+    name: z.string().trim().min(2, "validation.nameMin").max(100),
     email: emailSchema,
-    phone: z.string().trim().max(30).optional(),
-    password: z.string().min(8, "Password must be at least 8 characters").max(128),
+    phone: z.string().trim().max(30, "validation.phoneMax").optional(),
+    password: z.string().min(8, "validation.passwordMin").max(128),
     confirmPassword: z.string(),
   })
   .refine((values) => values.password === values.confirmPassword, {
-    message: "Passwords do not match",
+    message: "validation.passwordMatch",
     path: ["confirmPassword"],
   });
 
