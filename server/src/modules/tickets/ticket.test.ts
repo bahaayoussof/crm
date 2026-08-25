@@ -26,6 +26,7 @@ import { app } from "../../app.js";
 import { createAccessToken } from "../auth/auth-token.js";
 
 const admin = { id: "admin-1", role: Role.ADMIN };
+const manager = { id: "manager-1", role: Role.MANAGER };
 const agent = { id: "agent-1", role: Role.AGENT };
 const otherAgent = { id: "agent-2", role: Role.AGENT };
 const auth = (identity = admin) => ({ Authorization: `Bearer ${createAccessToken(identity)}` });
@@ -101,6 +102,31 @@ describe("ticket API", () => {
   it("scopes AGENT visibility to assigned and unassigned tickets", async () => {
     await request(app).get("/api/tickets").set(auth(agent));
     expect(mocks.ticketFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ OR: [{ assignedAgentId: agent.id }, { assignedAgentId: null }] }) }));
+  });
+
+  it.each([["ADMIN", admin], ["MANAGER", manager]] as const)("filters %s ticket lists by customer without narrowing global role visibility", async (_role, identity) => {
+    mocks.ticketFindMany.mockResolvedValue([summary]); mocks.ticketCount.mockResolvedValue(1);
+    const response = await request(app).get("/api/tickets?customerId=customer-1").set(auth(identity));
+    expect(response.status).toBe(200);
+    expect(mocks.ticketFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ customerId: "customer-1" }) }));
+    expect(mocks.ticketFindMany.mock.calls.at(-1)?.[0].where).not.toHaveProperty("OR");
+  });
+
+  it("intersects customer filtering with AGENT assigned-or-unassigned visibility", async () => {
+    mocks.ticketFindMany.mockResolvedValue([summary]); mocks.ticketCount.mockResolvedValue(1);
+    const response = await request(app).get("/api/tickets?customerId=customer-1").set(auth(agent));
+    expect(response.status).toBe(200);
+    expect(mocks.ticketFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({
+      customerId: "customer-1",
+      OR: [{ assignedAgentId: agent.id }, { assignedAgentId: null }],
+    }) }));
+    expect(mocks.ticketCount).toHaveBeenCalledWith({ where: expect.objectContaining({ customerId: "customer-1", OR: expect.any(Array) }) });
+  });
+
+  it("returns an empty page when a customer has no tickets visible to AGENT", async () => {
+    const response = await request(app).get("/api/tickets?customerId=customer-with-no-visible-tickets").set(auth(agent));
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ data: [], meta: { total: 0, totalPages: 0 } });
   });
 
   it("creates a ticket with SLA snapshots and meaningful history", async () => {

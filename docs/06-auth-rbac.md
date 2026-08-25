@@ -39,7 +39,8 @@ The API issues an eight-hour bearer access token containing only the user identi
 - reply to tickets
 - update permitted statuses
 - add internal notes
-- view customer context
+- list and search customers, view customer details/support context, and read existing customer notes
+- cannot create, update, or delete customers and cannot add customer-profile notes
 - use quick replies
 
 ### CUSTOMER
@@ -57,12 +58,25 @@ Customer identities cannot access internal ticket-management APIs or pages. Cust
 
 - `ADMIN` and `MANAGER` may view every ticket, create tickets, assign or reassign tickets to `AGENT` users, change priority, and perform any valid documented status transition.
 - `AGENT` may view assigned and unassigned tickets and create tickets. An agent may change priority or use normal non-escalation status transitions only on a ticket assigned to that agent.
+- Customer-context ticket lists apply the same rule: `customerId` filtering never grants broader access, so an agent sees only that customer's tickets assigned to them or currently unassigned.
+- The separate Customer Management history endpoint may expose safe summaries for every ticket belonging to the opened customer. Other-agent summaries are `SUMMARY_ONLY`; this never authorizes Ticket detail, conversation, history, notes, or mutation APIs.
 - Assignment targets must have the `AGENT` role. Assigning `ADMIN`, `MANAGER`, or `CUSTOMER` users is invalid.
 - Unassigned tickets remain read-only for agent workflow mutations. Claiming an unassigned ticket is outside the Ticket Management feature.
 - Ticket conversation follows the same mutation boundary: an `AGENT` may add a public reply or internal ticket note only when the ticket is assigned to that agent. `ADMIN` and `MANAGER` may add replies and notes to any visible ticket. Unassigned tickets remain read-only for agent conversation mutations.
 - Ticket history is visible wherever the caller is authorized to view the ticket.
 
 ## Security Rules
+
+## Internal Customer Management Permissions
+
+| Capability | ADMIN | MANAGER | AGENT | CUSTOMER |
+| --- | --- | --- | --- | --- |
+| List/search customers | Yes | Yes | Yes | No |
+| View customer details and notes | Yes | Yes | Yes | No |
+| Create/update/delete eligible customers | Yes | Yes | No | No |
+| Add customer-profile notes | Yes | Yes | No | No |
+
+Customer-route middleware is authoritative. The client keeps Customers navigation and read pages available to `AGENT`, hides mutation actions, and redirects direct visits to customer create/edit forms back to `/customers` with replace navigation.
 
 - Never enforce permissions only in the UI.
 - CUSTOMER must never read another customer's ticket.

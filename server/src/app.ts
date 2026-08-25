@@ -9,10 +9,11 @@ import { customerRouter } from "./modules/customers/customer.routes.js";
 import { categoryRouter } from "./modules/categories/category.routes.js";
 import { ticketRouter } from "./modules/tickets/ticket.routes.js";
 import { userRouter } from "./modules/users/user.routes.js";
+import { dashboardRouter } from "./modules/dashboard/dashboard.routes.js";
 
 
-const localOriginPattern =
-  /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/;
+const allowedOrigins = new Set(env.CLIENT_URLS ?? [env.CLIENT_URL]);
+const localDevelopmentOrigin = /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/;
 
 const corsOptions: CorsOptions = {
   origin(origin, callback) {
@@ -21,13 +22,8 @@ const corsOptions: CorsOptions = {
       return;
     }
 
-    const isAllowedLocalOrigin =
-      env.NODE_ENV !== "production" &&
-      localOriginPattern.test(origin);
-
-    const isConfiguredProductionOrigin = origin === env.CLIENT_URL;
-
-    if (isAllowedLocalOrigin || isConfiguredProductionOrigin) {
+    const isLocalDevelopmentOrigin = env.NODE_ENV !== "production" && localDevelopmentOrigin.test(origin);
+    if (isLocalDevelopmentOrigin || allowedOrigins.has(origin)) {
       callback(null, true);
       return;
     }
@@ -54,6 +50,7 @@ app.use("/api/customers", customerRouter);
 app.use("/api/categories", categoryRouter);
 app.use("/api/users", userRouter);
 app.use("/api/tickets", ticketRouter);
+app.use("/api/dashboard", dashboardRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

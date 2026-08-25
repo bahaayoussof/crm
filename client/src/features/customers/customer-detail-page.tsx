@@ -8,12 +8,17 @@ import { useCreateCustomerNote, useCustomer, useCustomerNotes, useDeleteCustomer
 import { customerNoteSchema, type CustomerNoteValues } from "./customer.schemas";
 import { formatDate, formatNumber } from "./customer-format";
 import { CustomerPage, LoadingRows, PageHeader, StatePanel } from "./customer-ui";
+import { useAuth } from "@/features/auth/auth-state";
+import { canManageCustomers } from "./customer-permissions";
+import { CustomerTickets } from "./customer-tickets";
 
 const tabs = ["overview", "tickets", "activity", "notes", "attachments"] as const;
 type Tab = typeof tabs[number];
 
 export function CustomerDetailPage() {
   const { t, i18n } = useTranslation();
+  const { user } = useAuth();
+  const canManage = Boolean(user && canManageCustomers(user.role));
   const { id = "" } = useParams();
   const [params, setParams] = useSearchParams();
   const requestedTab = params.get("tab");
@@ -39,14 +44,14 @@ export function CustomerDetailPage() {
   };
 
   return <CustomerPage>
-    <PageHeader title={profile.name} description={<span className="flex flex-wrap items-center gap-x-2 gap-y-1"><bdi dir="ltr">{profile.email}</bdi>{profile.phone && <><span aria-hidden="true">·</span><bdi dir="ltr">{profile.phone}</bdi></>}</span>} actions={<><Link className="button-secondary" to={`/customers/${profile.id}/edit`}>{t("common.edit")}</Link><button className="button-danger" type="button" disabled={remove.isPending} onClick={deleteProfile}>{t("common.delete")}</button></>} />
+    <PageHeader title={profile.name} description={<span className="flex flex-wrap items-center gap-x-2 gap-y-1"><bdi dir="ltr">{profile.email}</bdi>{profile.phone && <><span aria-hidden="true">·</span><bdi dir="ltr">{profile.phone}</bdi></>}</span>} actions={canManage ? <><Link className="button-secondary" to={`/customers/${profile.id}/edit`}>{t("common.edit")}</Link><button className="button-danger" type="button" disabled={remove.isPending} onClick={deleteProfile}>{t("common.delete")}</button></> : undefined} />
     {deleteError && <p className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">{deleteError}</p>}
     <div className="mt-5 overflow-x-auto border-b"><div className="flex min-w-max gap-1" role="tablist" aria-label={t("customers.detailsSections")}>{tabs.map((tab) => <button id={`customer-tab-${tab}`} role="tab" aria-selected={activeTab === tab} aria-controls={`customer-panel-${tab}`} className={`min-h-10 border-b-2 px-3 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/25 ${activeTab === tab ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:border-border-strong hover:text-foreground"}`} key={tab} onClick={() => setParams(tab === "overview" ? {} : { tab })}>{t(`customers.tabs.${tab}`)}</button>)}</div></div>
     <section id={`customer-panel-${activeTab}`} role="tabpanel" aria-labelledby={`customer-tab-${activeTab}`} className="mt-6 outline-none">
       {activeTab === "overview" && <Overview profile={profile} locale={i18n.language} />}
-      {activeTab === "tickets" && <StatePanel>{t("customers.noTickets")}</StatePanel>}
+      {activeTab === "tickets" && <CustomerTickets customerId={profile.id} />}
       {activeTab === "activity" && <Activity profile={profile} notes={notes.data ?? []} locale={i18n.language} />}
-      {activeTab === "notes" && <Notes customerId={profile.id} />}
+      {activeTab === "notes" && <Notes customerId={profile.id} canManage={canManage} />}
       {activeTab === "attachments" && <Attachments attachments={profile.attachments} locale={i18n.language} />}
     </section>
   </CustomerPage>;
@@ -62,7 +67,7 @@ function Overview({ profile, locale }: { profile: NonNullable<ReturnType<typeof 
   </div>;
 }
 
-function Notes({ customerId }: { customerId: string }) {
+function Notes({ customerId, canManage }: { customerId: string; canManage: boolean }) {
   const { t, i18n } = useTranslation();
   const notes = useCustomerNotes(customerId);
   const create = useCreateCustomerNote(customerId);
@@ -71,7 +76,7 @@ function Notes({ customerId }: { customerId: string }) {
   const submit = handleSubmit(async (values) => { setApiError(null); try { await create.mutateAsync(values); reset(); } catch (error) { setApiError(getLocalizedCustomerError(error, t("customers.noteError"), t)); } });
   return <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_22rem]">
     <div>{notes.isLoading ? <LoadingRows /> : notes.isError ? <StatePanel action={<button className="button-secondary" onClick={() => notes.refetch()}>{t("common.retry")}</button>}>{t("customers.notesLoadError")}</StatePanel> : notes.data?.length ? <div className="divide-y border-y">{notes.data.map((note) => <article className="py-4 first:pt-0" key={note.id}><p className="whitespace-pre-wrap text-sm leading-6">{note.body}</p><p className="mt-2 text-xs text-muted-foreground"><span className="font-medium text-foreground" dir="auto">{note.author.name}</span> · {formatDate(note.createdAt, i18n.language)}</p></article>)}</div> : <StatePanel>{t("customers.noNotes")}</StatePanel>}</div>
-    <form className="h-fit rounded-md border bg-white p-5" onSubmit={submit}><h2 className="font-semibold">{t("customers.addNote")}</h2><p className="mt-1 text-xs leading-5 text-muted-foreground">{t("customers.internalNoteHint")}</p>{apiError && <p className="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">{apiError}</p>}<label className="mt-4 block text-sm font-medium" htmlFor="customer-note-body">{t("customers.noteBody")}</label><textarea id="customer-note-body" className="input mt-2 min-h-32 resize-y" aria-invalid={Boolean(errors.body)} aria-describedby={errors.body ? "customer-note-error" : undefined} {...register("body")} />{errors.body && <p id="customer-note-error" className="mt-1.5 text-sm text-red-700">{t(errors.body.message ?? "customers.validation.note")}</p>}<button className="button-link mt-4 w-full" disabled={isSubmitting} type="submit">{isSubmitting ? t("common.saving") : t("customers.addNote")}</button></form>
+    {canManage ? <form className="h-fit rounded-md border bg-white p-5" onSubmit={submit}><h2 className="font-semibold">{t("customers.addNote")}</h2><p className="mt-1 text-xs leading-5 text-muted-foreground">{t("customers.internalNoteHint")}</p>{apiError && <p className="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">{apiError}</p>}<label className="mt-4 block text-sm font-medium" htmlFor="customer-note-body">{t("customers.noteBody")}</label><textarea id="customer-note-body" className="input mt-2 min-h-32 resize-y" aria-invalid={Boolean(errors.body)} aria-describedby={errors.body ? "customer-note-error" : undefined} {...register("body")} />{errors.body && <p id="customer-note-error" className="mt-1.5 text-sm text-red-700">{t(errors.body.message ?? "customers.validation.note")}</p>}<button className="button-link mt-4 w-full" disabled={isSubmitting} type="submit">{isSubmitting ? t("common.saving") : t("customers.addNote")}</button></form> : <aside className="h-fit rounded-md border bg-muted/40 p-5"><h2 className="text-sm font-semibold">{t("customers.readOnlyTitle")}</h2><p className="mt-1 text-sm leading-6 text-muted-foreground">{t("customers.readOnlyNotes")}</p></aside>}
   </div>;
 }
 

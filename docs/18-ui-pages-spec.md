@@ -2017,3 +2017,11 @@ When time is limited, implement screens in this order:
 The ticket workflow is the product core.
 
 Do not delay working ticket interactions to polish lower-priority screens.
+### Customer Management role behavior
+
+- `ADMIN` and `MANAGER` see Add Customer on the list and Edit, Delete, and Add Customer Note controls on details.
+- `AGENT` keeps Customers navigation, list/search/pagination, detail/support context, activity, attachments, tickets, and existing-note visibility, but sees no customer mutation controls.
+- The Customer Details Tickets tab uses the dedicated customer-history endpoint and shows every safe summary. FULL summaries link to Ticket Details; an AGENT's other-assignee SUMMARY_ONLY rows/cards have no link or actions and display a localized read-only explanation.
+- Customer ticket history distinguishes loading, request failure, true no-ticket history, and pagination. Desktop uses a dense table; mobile uses the same response in compact cards; ticket identifiers preserve LTR isolation.
+- The agent Notes view shows a localized read-only explanation instead of the add-note form.
+- `/customers/new` and `/customers/:id/edit` allow `ADMIN` and `MANAGER` only. An `AGENT` direct navigation redirects to `/customers` using history replacement.

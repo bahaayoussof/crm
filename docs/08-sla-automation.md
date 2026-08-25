@@ -36,6 +36,18 @@ Useful derived states:
 - BREACHED
 - MET
 
+## Dashboard SLA Derivation
+
+The Agent Dashboard derives one effective unresolved deadline at read time. While `firstRespondedAt` is null, `firstResponseDueAt` applies. While the ticket is not `RESOLVED` or `CLOSED`, `resolutionDueAt` applies. When both apply, the earlier deadline is effective.
+
+- `BREACHED`: effective deadline is earlier than or equal to the request time
+- `AT_RISK`: effective deadline is after the request time and no more than 60 minutes away
+- `ON_TRACK`: effective deadline is more than 60 minutes away
+- `MET`: the ticket is resolved/closed, or the configured response target is complete and no unresolved resolution target applies
+- `NOT_CONFIGURED`: no applicable configured deadline exists
+
+The dashboard warning window is fixed at 60 minutes for this assessment. These states are display-time derivations only. They are not persisted and do not add timers, workers, alerts, notifications, or automatic escalation.
+
 ## First Response
 
 The first public agent response satisfies the first-response target and sets `firstRespondedAt` once.

@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { changeAppLanguage } from "@/lib/i18n";
+import { AuthContext, type AuthContextValue } from "@/features/auth/auth-state";
 
 const apiMocks = vi.hoisted(() => ({
   createCustomer: vi.fn(),
@@ -35,6 +36,14 @@ const initialCustomer: CustomerDetail = {
     totalTicketCount: 7,
     lastInteractionAt: "2026-08-24T10:00:00.000Z",
   },
+};
+
+const adminAuth: AuthContextValue = {
+  user: { id: "admin-1", name: "Admin", email: "admin@example.com", role: "ADMIN", customer: null },
+  isLoading: false,
+  login: vi.fn(),
+  register: vi.fn(),
+  logout: vi.fn(),
 };
 
 describe("customer update flow", () => {
@@ -98,15 +107,17 @@ describe("customer update flow", () => {
 function renderCustomerFlow() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   render(
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={["/customers/customer-1/edit"]}>
-        <LocationProbe />
-        <Routes>
-          <Route path="/customers/:id/edit" element={<CustomerFormPage />} />
-          <Route path="/customers/:id" element={<CustomerDetailPage />} />
-        </Routes>
-      </MemoryRouter>
-    </QueryClientProvider>,
+    <AuthContext.Provider value={adminAuth}>
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/customers/customer-1/edit"]}>
+          <LocationProbe />
+          <Routes>
+            <Route path="/customers/:id/edit" element={<CustomerFormPage />} />
+            <Route path="/customers/:id" element={<CustomerDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    </AuthContext.Provider>,
   );
   return queryClient;
 }

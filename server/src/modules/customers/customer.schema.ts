@@ -14,6 +14,11 @@ export const customerListQuerySchema = z.object({
 
 export const customerParamsSchema = z.object({ id: z.string().trim().min(1) }).strict();
 
+export const customerTicketListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+}).strict();
+
 export const createCustomerSchema = z.object({
   name: z.string().trim().min(2).max(100),
   email: normalizedEmail,
@@ -31,6 +36,7 @@ export const createCustomerNoteSchema = z.object({
 
 export type CustomerListQuery = z.infer<typeof customerListQuerySchema>;
 export type CustomerParams = z.infer<typeof customerParamsSchema>;
+export type CustomerTicketListQuery = z.infer<typeof customerTicketListQuerySchema>;
 export type CreateCustomerInput = z.infer<typeof createCustomerSchema>;
 export type UpdateCustomerInput = z.infer<typeof updateCustomerSchema>;
 export type CreateCustomerNoteInput = z.infer<typeof createCustomerNoteSchema>;

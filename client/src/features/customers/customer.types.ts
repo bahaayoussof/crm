@@ -37,4 +37,21 @@ export interface CustomerListResponse {
   meta: { page: number; limit: number; total: number; totalPages: number };
 }
 
+export interface CustomerTicketSummary {
+  id: string;
+  subject: string;
+  status: import("@/features/tickets/ticket.types").TicketStatus;
+  priority: import("@/features/tickets/ticket.types").TicketPriority;
+  createdAt: string;
+  updatedAt: string;
+  category: { id: string; name: string } | null;
+  assignedAgent: { id: string; name: string } | null;
+  access: "FULL" | "SUMMARY_ONLY";
+}
+
+export interface CustomerTicketListResponse {
+  data: CustomerTicketSummary[];
+  meta: { page: number; limit: number; total: number; totalPages: number };
+}
+
 export interface CustomerFilters { search: string; page: number; limit: number }

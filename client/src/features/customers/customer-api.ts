@@ -1,6 +1,6 @@
 import { apiClient } from "@/services/api-client";
 import type { CustomerFormValues, CustomerNoteValues } from "./customer.schemas";
-import type { CustomerDetail, CustomerFilters, CustomerListResponse, CustomerNote, CustomerRecord } from "./customer.types";
+import type { CustomerDetail, CustomerFilters, CustomerListResponse, CustomerNote, CustomerRecord, CustomerTicketListResponse } from "./customer.types";
 
 export async function getCustomers(filters: CustomerFilters) {
   const response = await apiClient.get<CustomerListResponse>("/customers", { params: filters });
@@ -10,6 +10,10 @@ export async function getCustomers(filters: CustomerFilters) {
 export async function getCustomer(customerId: string) {
   const response = await apiClient.get<{ data: CustomerDetail }>(`/customers/${customerId}`);
   return response.data.data;
+}
+
+export async function getCustomerTickets(customerId: string, page: number, limit: number) {
+  return (await apiClient.get<CustomerTicketListResponse>(`/customers/${customerId}/tickets`, { params: { page, limit } })).data;
 }
 
 export async function createCustomer(values: CustomerFormValues) {

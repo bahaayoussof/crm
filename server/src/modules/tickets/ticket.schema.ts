@@ -11,6 +11,7 @@ export const ticketListQuerySchema = z.object({
   priority: z.nativeEnum(TicketPriority).optional(),
   categoryId: z.string().trim().min(1).optional(),
   assignedAgentId: z.string().trim().min(1).optional(),
+  customerId: z.string().trim().min(1).optional(),
 }).strict();
 
 export const ticketParamsSchema = z.object({ id: z.string().trim().min(1) }).strict();

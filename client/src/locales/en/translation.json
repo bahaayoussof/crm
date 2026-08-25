@@ -16,6 +16,13 @@
     "generic": "Unable to complete the request. Please try again.",
     "auth": { "INVALID_CREDENTIALS": "Invalid email or password.", "EMAIL_ALREADY_REGISTERED": "An account with this email already exists.", "VALIDATION_ERROR": "Check the form and try again." }
   },
+  "dashboard": {
+    "title": "Support dashboard", "description": "Current workload, SLA pressure, and tickets that need attention.", "metricsLabel": "Dashboard metrics", "loadError": "Unable to load the dashboard.",
+    "metrics": { "openTickets": "Open tickets", "assignedToMe": "Assigned to me", "unassignedTickets": "Unassigned tickets", "slaAtRisk": "SLA at risk", "slaBreached": "SLA breached", "resolvedToday": "Resolved today", "waitingCustomer": "Waiting for customer" },
+    "chartTitle": "Tickets by status", "chartDescription": "Visible ticket count grouped by current status.", "ticketsCount": "Tickets", "emptyDistribution": "No ticket status data yet.",
+    "summaryTitle": "Operational summary", "generatedAt": "Generated at", "needsAttention": "Needs attention", "recentTickets": "Recent tickets", "emptyAttention": "No visible tickets currently need attention.", "emptyRecent": "No recent visible tickets.", "viewAll": "View all tickets", "sla": "SLA state",
+    "slaStates": { "ON_TRACK": "On track", "AT_RISK": "At risk", "BREACHED": "Breached", "MET": "Met", "NOT_CONFIGURED": "Not configured" }
+  },
   "tickets": {
     "title": "Tickets", "description": "Manage and track customer support requests", "new": "New ticket", "create": "Create ticket", "createTitle": "Create ticket", "editTitle": "Edit ticket", "edit": "Edit ticket",
     "formDescription": "Record the issue, classification, and operational ownership.", "ticketDetails": "Ticket details", "classification": "Classification", "subject": "Subject", "descriptionLabel": "Description",
@@ -51,8 +58,9 @@
     "deleteConfirm": "Delete this customer? Customers with a login identity or support history cannot be deleted.", "deleteError": "Unable to delete customer.", "detailsSections": "Customer details sections",
     "tabs": { "overview": "Overview", "tickets": "Tickets", "activity": "Activity", "notes": "Notes", "attachments": "Attachments" },
     "contactInformation": "Contact information", "customerSince": "Customer since", "supportSummary": "Support summary", "recentTickets": "Recent tickets", "recentActivity": "Recent activity",
-    "noTickets": "No support tickets yet.", "profileUpdated": "Profile updated {{date}}", "customerCreated": "Customer created", "customerUpdated": "Customer profile updated",
+    "noTickets": "This customer has no tickets.", "noVisibleTickets": "No tickets for this customer are visible to you.", "ticketsLoadError": "Unable to load this customer's tickets.", "ticketSummaryOnly": "Read-only — assigned to another agent", "ticketPagination": "Customer ticket history pages", "profileUpdated": "Profile updated {{date}}", "customerCreated": "Customer created", "customerUpdated": "Customer profile updated",
     "noteAddedBy": "Internal note added by {{name}}", "addNote": "Add note", "internalNoteHint": "Only your team can see customer notes.", "noteBody": "Internal note",
+    "readOnlyTitle": "Read-only customer access", "readOnlyNotes": "You can review existing customer notes, but only administrators and managers can add notes.",
     "noNotes": "No internal notes yet.", "noteError": "Unable to add the note.", "notesLoadError": "Unable to load customer notes.", "noAttachments": "No customer attachments yet.",
     "validation": { "name": "Name must be at least 2 characters", "email": "Enter a valid email address", "phone": "Phone must be 30 characters or fewer", "note": "Note is required" },
     "errors": { "CUSTOMER_EMAIL_EXISTS": "A customer with this email already exists.", "CUSTOMER_HAS_SUPPORT_HISTORY": "This customer cannot be deleted because support history or a login identity exists.", "CUSTOMER_NOT_FOUND": "Customer not found." }

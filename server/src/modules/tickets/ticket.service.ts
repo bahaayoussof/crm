@@ -2,8 +2,7 @@ import { Prisma, Role, TicketStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import type { CreateTicketInput, TicketConversationInput, TicketListQuery, UpdateTicketInput } from "./ticket.schema.js";
-
-interface Actor { userId: string; role: Role }
+import { ticketVisibilityWhere, type TicketActor as Actor } from "./ticket-visibility.js";
 
 const ticketSummarySelect = {
   id: true, subject: true, status: true, priority: true, channel: true,
@@ -26,11 +25,12 @@ const transitions: Record<TicketStatus, TicketStatus[]> = {
 
 export async function listTickets(query: TicketListQuery, actor: Actor) {
   const where: Prisma.TicketWhereInput = {
-    ...visibilityWhere(actor),
+    ...ticketVisibilityWhere(actor),
     ...(query.status && { status: query.status }),
     ...(query.priority && { priority: query.priority }),
     ...(query.categoryId && { categoryId: query.categoryId }),
     ...(query.assignedAgentId && { assignedAgentId: query.assignedAgentId }),
+    ...(query.customerId && { customerId: query.customerId }),
     ...(query.search && { AND: [{ OR: [
       { id: query.search },
       { subject: { contains: query.search, mode: "insensitive" } },
@@ -49,7 +49,7 @@ export async function listTickets(query: TicketListQuery, actor: Actor) {
 
 export async function getTicket(ticketId: string, actor: Actor) {
   const ticket = await prisma.ticket.findFirst({
-    where: { id: ticketId, ...visibilityWhere(actor) },
+    where: { id: ticketId, ...ticketVisibilityWhere(actor) },
     select: {
       ...ticketSummarySelect, description: true, resolvedAt: true, closedAt: true,
       department: { select: { id: true, name: true } }, branch: { select: { id: true, name: true } },
@@ -122,7 +122,7 @@ export async function updateTicket(ticketId: string, input: UpdateTicketInput, a
   const now = new Date();
   return prisma.$transaction(async (tx) => {
     const current = await tx.ticket.findFirst({
-      where: { id: ticketId, ...visibilityWhere(actor) },
+      where: { id: ticketId, ...ticketVisibilityWhere(actor) },
       select: { id: true, subject: true, description: true, status: true, priority: true, categoryId: true, assignedAgentId: true, departmentId: true, branchId: true, firstRespondedAt: true, category: { select: { name: true } }, assignedAgent: { select: { name: true } } },
     });
     if (!current) throw new AppError(404, "TICKET_NOT_FOUND", "Ticket not found");
@@ -160,17 +160,13 @@ export async function updateTicket(ticketId: string, input: UpdateTicketInput, a
   });
 }
 
-function visibilityWhere(actor: Actor): Prisma.TicketWhereInput {
-  return actor.role === Role.AGENT ? { OR: [{ assignedAgentId: actor.userId }, { assignedAgentId: null }] } : {};
-}
-
 const conversationSelect = {
   id: true, body: true, createdAt: true,
   author: { select: { id: true, name: true, role: true } },
 } satisfies Prisma.TicketMessageSelect & Prisma.TicketNoteSelect;
 
 async function requireConversationMutationAccess(tx: Prisma.TransactionClient, ticketId: string, actor: Actor) {
-  const ticket = await tx.ticket.findFirst({ where: { id: ticketId, ...visibilityWhere(actor) }, select: { id: true, assignedAgentId: true } });
+  const ticket = await tx.ticket.findFirst({ where: { id: ticketId, ...ticketVisibilityWhere(actor) }, select: { id: true, assignedAgentId: true } });
   if (!ticket) throw new AppError(404, "TICKET_NOT_FOUND", "Ticket not found");
   if (actor.role === Role.AGENT && ticket.assignedAgentId !== actor.userId) throw forbidden("Ticket must be assigned to the agent before adding conversation content");
 }

@@ -16,6 +16,13 @@
     "generic": "تعذر إتمام الطلب. يرجى المحاولة مرة أخرى.",
     "auth": { "INVALID_CREDENTIALS": "البريد الإلكتروني أو كلمة المرور غير صحيحة.", "EMAIL_ALREADY_REGISTERED": "يوجد حساب بهذا البريد الإلكتروني بالفعل.", "VALIDATION_ERROR": "راجع بيانات النموذج وحاول مرة أخرى." }
   },
+  "dashboard": {
+    "title": "لوحة دعم العملاء", "description": "عبء العمل الحالي وضغط اتفاقيات الخدمة والتذاكر التي تحتاج إلى اهتمام.", "metricsLabel": "مؤشرات لوحة التحكم", "loadError": "تعذر تحميل لوحة التحكم.",
+    "metrics": { "openTickets": "التذاكر المفتوحة", "assignedToMe": "المسندة إليّ", "unassignedTickets": "التذاكر غير المسندة", "slaAtRisk": "اتفاقية الخدمة معرضة للخطر", "slaBreached": "اتفاقية الخدمة متجاوزة", "resolvedToday": "تم حلها اليوم", "waitingCustomer": "بانتظار العميل" },
+    "chartTitle": "التذاكر حسب الحالة", "chartDescription": "عدد التذاكر المرئية مجمّعًا حسب الحالة الحالية.", "ticketsCount": "التذاكر", "emptyDistribution": "لا توجد بيانات لحالات التذاكر بعد.",
+    "summaryTitle": "الملخص التشغيلي", "generatedAt": "وقت الإنشاء", "needsAttention": "تحتاج إلى اهتمام", "recentTickets": "أحدث التذاكر", "emptyAttention": "لا توجد تذاكر مرئية تحتاج إلى اهتمام حاليًا.", "emptyRecent": "لا توجد تذاكر مرئية حديثة.", "viewAll": "عرض كل التذاكر", "sla": "حالة اتفاقية الخدمة",
+    "slaStates": { "ON_TRACK": "ضمن المسار", "AT_RISK": "معرضة للخطر", "BREACHED": "متجاوزة", "MET": "مستوفاة", "NOT_CONFIGURED": "غير مهيأة" }
+  },
   "tickets": {
     "title": "التذاكر", "description": "إدارة طلبات دعم العملاء ومتابعتها", "new": "تذكرة جديدة", "create": "إنشاء التذكرة", "createTitle": "إنشاء تذكرة", "editTitle": "تعديل التذكرة", "edit": "تعديل التذكرة",
     "formDescription": "تسجيل المشكلة والتصنيف والمسؤولية التشغيلية.", "ticketDetails": "تفاصيل التذكرة", "classification": "التصنيف", "subject": "الموضوع", "descriptionLabel": "الوصف",
@@ -51,8 +58,9 @@
     "deleteConfirm": "حذف هذا العميل؟ لا يمكن حذف العملاء المرتبطين بحساب دخول أو سجل دعم.", "deleteError": "تعذر حذف العميل.", "detailsSections": "أقسام تفاصيل العميل",
     "tabs": { "overview": "نظرة عامة", "tickets": "التذاكر", "activity": "النشاط", "notes": "الملاحظات", "attachments": "المرفقات" },
     "contactInformation": "معلومات الاتصال", "customerSince": "عميل منذ", "supportSummary": "ملخص الدعم", "recentTickets": "أحدث التذاكر", "recentActivity": "أحدث النشاطات",
-    "noTickets": "لا توجد تذاكر دعم بعد.", "profileUpdated": "تم تحديث الملف {{date}}", "customerCreated": "تم إنشاء العميل", "customerUpdated": "تم تحديث ملف العميل",
+    "noTickets": "لا توجد تذاكر لهذا العميل.", "noVisibleTickets": "لا توجد تذاكر لهذا العميل ضمن نطاق صلاحياتك.", "ticketsLoadError": "تعذر تحميل تذاكر هذا العميل.", "ticketSummaryOnly": "للعرض فقط — مسندة إلى موظف آخر", "ticketPagination": "صفحات سجل تذاكر العميل", "profileUpdated": "تم تحديث الملف {{date}}", "customerCreated": "تم إنشاء العميل", "customerUpdated": "تم تحديث ملف العميل",
     "noteAddedBy": "أضاف {{name}} ملاحظة داخلية", "addNote": "إضافة ملاحظة", "internalNoteHint": "فريقك فقط يمكنه رؤية ملاحظات العميل.", "noteBody": "ملاحظة داخلية",
+    "readOnlyTitle": "صلاحية قراءة بيانات العميل فقط", "readOnlyNotes": "يمكنك مراجعة ملاحظات العميل الحالية، لكن إضافة الملاحظات متاحة للمسؤولين والمديرين فقط.",
     "noNotes": "لا توجد ملاحظات داخلية بعد.", "noteError": "تعذرت إضافة الملاحظة.", "notesLoadError": "تعذر تحميل ملاحظات العميل.", "noAttachments": "لا توجد مرفقات للعميل بعد.",
     "validation": { "name": "يجب ألا يقل الاسم عن حرفين", "email": "أدخل بريدًا إلكترونيًا صحيحًا", "phone": "يجب ألا يزيد الهاتف عن 30 حرفًا", "note": "الملاحظة مطلوبة" },
     "errors": { "CUSTOMER_EMAIL_EXISTS": "يوجد عميل بهذا البريد الإلكتروني بالفعل.", "CUSTOMER_HAS_SUPPORT_HISTORY": "لا يمكن حذف هذا العميل لوجود سجل دعم أو حساب دخول مرتبط.", "CUSTOMER_NOT_FOUND": "العميل غير موجود." }

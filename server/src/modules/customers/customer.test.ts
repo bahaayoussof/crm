@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   findMany: vi.fn(), countCustomers: vi.fn(), findCustomer: vi.fn(), createCustomer: vi.fn(),
   updateCustomer: vi.fn(), deleteCustomer: vi.fn(), transaction: vi.fn(),
-  groupTickets: vi.fn(), countTickets: vi.fn(), findNotes: vi.fn(), createNote: vi.fn(),
+  groupTickets: vi.fn(), countTickets: vi.fn(), findTickets: vi.fn(), findNotes: vi.fn(), createNote: vi.fn(),
 }));
 
 vi.mock("../../config/prisma.js", () => ({
@@ -14,7 +14,7 @@ vi.mock("../../config/prisma.js", () => ({
       findMany: mocks.findMany, count: mocks.countCustomers, findUnique: mocks.findCustomer,
       create: mocks.createCustomer, update: mocks.updateCustomer, delete: mocks.deleteCustomer,
     },
-    ticket: { groupBy: mocks.groupTickets, count: mocks.countTickets },
+    ticket: { groupBy: mocks.groupTickets, count: mocks.countTickets, findMany: mocks.findTickets },
     customerNote: { findMany: mocks.findNotes, create: mocks.createNote },
     $transaction: mocks.transaction,
   },
@@ -24,6 +24,8 @@ import { app } from "../../app.js";
 import { createAccessToken } from "../auth/auth-token.js";
 
 const adminToken = createAccessToken({ id: "admin-1", role: Role.ADMIN });
+const managerToken = createAccessToken({ id: "manager-1", role: Role.MANAGER });
+const agentToken = createAccessToken({ id: "agent-1", role: Role.AGENT });
 const customerToken = createAccessToken({ id: "portal-1", role: Role.CUSTOMER });
 const auth = (token = adminToken) => ({ Authorization: `Bearer ${token}` });
 const now = new Date("2026-08-24T12:00:00.000Z");
@@ -38,6 +40,7 @@ describe("customer API", () => {
     mocks.groupTickets.mockResolvedValue([]);
     mocks.countTickets.mockResolvedValue(0);
     mocks.findNotes.mockResolvedValue([]);
+    mocks.findTickets.mockResolvedValue([]);
   });
 
   it("rejects unauthenticated and CUSTOMER-role access", async () => {
@@ -45,6 +48,81 @@ describe("customer API", () => {
     const portalUser = await request(app).get("/api/customers").set(auth(customerToken));
     expect(unauthenticated.status).toBe(401);
     expect(portalUser.status).toBe(403);
+  });
+
+  it.each([
+    ["ADMIN", adminToken], ["MANAGER", managerToken], ["AGENT", agentToken],
+  ])("allows %s to list and search customers", async (_role, token) => {
+    const response = await request(app).get("/api/customers?search=Ahmed").set(auth(token));
+    expect(response.status).toBe(200);
+    expect(mocks.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { OR: expect.any(Array) } }));
+  });
+
+  it("allows AGENT to view customer details and existing notes", async () => {
+    mocks.findCustomer.mockResolvedValue({ ...customer, user: null, attachments: [], tickets: [], _count: { tickets: 0 } });
+    mocks.findNotes.mockResolvedValue([{ id: "note-1", body: "Existing note", createdAt: now, author: { id: "admin-1", name: "Admin", role: Role.ADMIN } }]);
+    const detailResponse = await request(app).get(`/api/customers/${customer.id}`).set(auth(agentToken));
+    const notesResponse = await request(app).get(`/api/customers/${customer.id}/notes`).set(auth(agentToken));
+    expect(detailResponse.status).toBe(200);
+    expect(notesResponse.status).toBe(200);
+    expect(notesResponse.body.data[0].body).toBe("Existing note");
+  });
+
+  it.each([["ADMIN", adminToken], ["MANAGER", managerToken]])("returns all safe customer ticket summaries with FULL access for %s", async (_role, token) => {
+    mocks.findCustomer.mockResolvedValue({ id: customer.id });
+    mocks.findTickets.mockResolvedValue([
+      { id: "ticket-1", subject: "Assigned", status: "OPEN", priority: "HIGH", createdAt: now, updatedAt: now, assignedAgentId: "agent-1", category: null, assignedAgent: { id: "agent-1", name: "Agent" } },
+      { id: "ticket-2", subject: "Other", status: "NEW", priority: "LOW", createdAt: now, updatedAt: now, assignedAgentId: "agent-2", category: null, assignedAgent: { id: "agent-2", name: "Other Agent" } },
+    ]);
+    mocks.countTickets.mockResolvedValue(2);
+    const response = await request(app).get(`/api/customers/${customer.id}/tickets?page=1&limit=20`).set(auth(token));
+    expect(response.status).toBe(200);
+    expect(response.body.data.map((ticket: { access: string }) => ticket.access)).toEqual(["FULL", "FULL"]);
+    expect(mocks.findTickets).toHaveBeenCalledWith(expect.objectContaining({ where: { customerId: customer.id }, orderBy: [{ updatedAt: "desc" }, { id: "asc" }], skip: 0, take: 20 }));
+  });
+
+  it("returns complete safe history to AGENT with server-derived access and pagination", async () => {
+    mocks.findCustomer.mockResolvedValue({ id: customer.id });
+    mocks.findTickets.mockResolvedValue([
+      { id: "ticket-1", subject: "Mine", status: "OPEN", priority: "HIGH", createdAt: now, updatedAt: now, assignedAgentId: "agent-1", category: { id: "category-1", name: "Billing" }, assignedAgent: { id: "agent-1", name: "Agent" } },
+      { id: "ticket-2", subject: "Unassigned", status: "NEW", priority: "MEDIUM", createdAt: now, updatedAt: now, assignedAgentId: null, category: null, assignedAgent: null },
+      { id: "ticket-3", subject: "Other agent", status: "IN_PROGRESS", priority: "LOW", createdAt: now, updatedAt: now, assignedAgentId: "agent-2", category: null, assignedAgent: { id: "agent-2", name: "Other Agent" } },
+    ]);
+    mocks.countTickets.mockResolvedValue(23);
+    const response = await request(app).get(`/api/customers/${customer.id}/tickets?page=2&limit=10`).set(auth(agentToken));
+    expect(response.status).toBe(200);
+    expect(response.body.meta).toEqual({ page: 2, limit: 10, total: 23, totalPages: 3 });
+    expect(response.body.data.map((ticket: { access: string }) => ticket.access)).toEqual(["FULL", "FULL", "SUMMARY_ONLY"]);
+    expect(response.body.data[2]).toEqual({ id: "ticket-3", subject: "Other agent", status: "IN_PROGRESS", priority: "LOW", createdAt: now.toISOString(), updatedAt: now.toISOString(), category: null, assignedAgent: { id: "agent-2", name: "Other Agent" }, access: "SUMMARY_ONLY" });
+    expect(response.body.data[2]).not.toHaveProperty("assignedAgentId");
+  });
+
+  it("rejects unauthenticated/CUSTOMER history access and returns customer not found", async () => {
+    expect((await request(app).get(`/api/customers/${customer.id}/tickets`)).status).toBe(401);
+    expect((await request(app).get(`/api/customers/${customer.id}/tickets`).set(auth(customerToken))).status).toBe(403);
+    mocks.findCustomer.mockResolvedValue(null);
+    const missing = await request(app).get("/api/customers/missing/tickets").set(auth(agentToken));
+    expect(missing.status).toBe(404);
+    expect(missing.body.error.code).toBe("CUSTOMER_NOT_FOUND");
+  });
+
+  it.each([
+    ["create", "post", "/api/customers", { name: "Agent Write", email: "agent-write@example.com" }],
+    ["update", "patch", `/api/customers/${customer.id}`, { name: "Agent Write" }],
+    ["delete", "delete", `/api/customers/${customer.id}`, undefined],
+    ["add note", "post", `/api/customers/${customer.id}/notes`, { body: "Forbidden note" }],
+  ] as const)("returns structured 403 when AGENT attempts to %s", async (_label, method, path, body) => {
+    const call = request(app)[method](path).set(auth(agentToken));
+    const response = body ? await call.send(body) : await call;
+    expect(response.status).toBe(403);
+    expect(response.body.error).toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it.each([["ADMIN", adminToken], ["MANAGER", managerToken]])("keeps %s customer mutations available", async (_role, token) => {
+    mocks.findCustomer.mockResolvedValue(null);
+    mocks.createCustomer.mockResolvedValue(customer);
+    const response = await request(app).post("/api/customers").set(auth(token)).send({ name: customer.name, email: customer.email });
+    expect(response.status).toBe(201);
   });
 
   it("lists customers with pagination, search, and real ticket counts", async () => {

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createCustomer, createCustomerNote, deleteCustomer, getCustomer, getCustomerNotes, getCustomers, updateCustomer } from "./customer-api";
+import { createCustomer, createCustomerNote, deleteCustomer, getCustomer, getCustomerNotes, getCustomers, getCustomerTickets, updateCustomer } from "./customer-api";
 import type { CustomerFormValues, CustomerNoteValues } from "./customer.schemas";
 import type { CustomerFilters } from "./customer.types";
 
@@ -10,11 +10,13 @@ export const customerKeys = {
   details: () => [...customerKeys.all, "detail"] as const,
   detail: (id: string) => [...customerKeys.details(), id] as const,
   notes: (id: string) => [...customerKeys.detail(id), "notes"] as const,
+  tickets: (id: string, pagination: { page: number; limit: number }) => [...customerKeys.detail(id), "tickets", pagination] as const,
 };
 
 export const useCustomers = (filters: CustomerFilters) => useQuery({ queryKey: customerKeys.list(filters), queryFn: () => getCustomers(filters) });
 export const useCustomer = (id: string) => useQuery({ queryKey: customerKeys.detail(id), queryFn: () => getCustomer(id), enabled: Boolean(id), retry: false });
 export const useCustomerNotes = (id: string) => useQuery({ queryKey: customerKeys.notes(id), queryFn: () => getCustomerNotes(id), enabled: Boolean(id), retry: false });
+export const useCustomerTickets = (id: string, page: number, limit = 20) => useQuery({ queryKey: customerKeys.tickets(id, { page, limit }), queryFn: () => getCustomerTickets(id, page, limit), enabled: Boolean(id), retry: false });
 
 export function useCreateCustomer() {
   const queryClient = useQueryClient();

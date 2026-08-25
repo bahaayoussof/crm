@@ -16,7 +16,7 @@ export interface TicketDetail extends TicketListItem {
   customer: TicketPerson & { phone: string | null; createdAt: string };
   department: { id: string; name: string } | null; branch: { id: string; name: string } | null; history: TicketHistory[]; conversation: TicketConversationItem[];
 }
-export interface TicketFilters { search: string; page: number; limit: number; status?: TicketStatus; priority?: TicketPriority; categoryId?: string; assignedAgentId?: string }
+export interface TicketFilters { search: string; page: number; limit: number; status?: TicketStatus; priority?: TicketPriority; categoryId?: string; assignedAgentId?: string; customerId?: string }
 export interface TicketListResponse { data: TicketListItem[]; meta: { page: number; limit: number; total: number; totalPages: number } }
 export type AgentOption = TicketPerson;
 export interface TicketCreateValues { customerId: string; subject: string; description: string; priority: TicketPriority; categoryId?: string | null; assignedAgentId?: string | null }

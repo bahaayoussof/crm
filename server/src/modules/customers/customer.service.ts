@@ -1,7 +1,7 @@
-import { Prisma, TicketStatus } from "@prisma/client";
+import { Prisma, Role, TicketStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
-import type { CreateCustomerInput, CustomerListQuery, UpdateCustomerInput } from "./customer.schema.js";
+import type { CreateCustomerInput, CustomerListQuery, CustomerTicketListQuery, UpdateCustomerInput } from "./customer.schema.js";
 
 const closedStatuses = [TicketStatus.RESOLVED, TicketStatus.CLOSED];
 
@@ -84,6 +84,28 @@ export async function getCustomer(customerId: string) {
       totalTicketCount: _count.tickets,
       lastInteractionAt: tickets[0]?.updatedAt ?? customer.updatedAt,
     },
+  };
+}
+
+export async function listCustomerTickets(customerId: string, query: CustomerTicketListQuery, actor: { userId: string; role: Role }) {
+  await ensureCustomerExists(customerId);
+  const where: Prisma.TicketWhereInput = { customerId };
+  const skip = (query.page - 1) * query.limit;
+  const select = {
+    id: true, subject: true, status: true, priority: true, createdAt: true, updatedAt: true, assignedAgentId: true,
+    category: { select: { id: true, name: true } },
+    assignedAgent: { select: { id: true, name: true } },
+  } satisfies Prisma.TicketSelect;
+  const [tickets, total] = await prisma.$transaction([
+    prisma.ticket.findMany({ where, skip, take: query.limit, orderBy: [{ updatedAt: "desc" }, { id: "asc" }], select }),
+    prisma.ticket.count({ where }),
+  ]);
+  return {
+    data: tickets.map(({ assignedAgentId, ...ticket }) => ({
+      ...ticket,
+      access: actor.role !== Role.AGENT || assignedAgentId === null || assignedAgentId === actor.userId ? "FULL" as const : "SUMMARY_ONLY" as const,
+    })),
+    meta: { page: query.page, limit: query.limit, total, totalPages: total === 0 ? 0 : Math.ceil(total / query.limit) },
   };
 }
 

@@ -63,7 +63,7 @@ PATCH  /customers/:id
 DELETE /customers/:id
 ```
 
-All customer-management routes require an authenticated `ADMIN`, `MANAGER`, or `AGENT`; `CUSTOMER` identities are rejected. Listing supports `search`, `page`, and `limit` query parameters and returns `{ data, meta: { page, limit, total, totalPages } }`. Search covers customer name, email, and phone.
+All customer-management routes require authentication, and `CUSTOMER` identities are rejected. `ADMIN` and `MANAGER` may use every customer route. `AGENT` has read-only access to `GET /customers`, `GET /customers/:id`, and `GET /customers/:id/notes`; this includes the paginated customer search used by Ticket creation. `AGENT` receives the standard structured `403 FORBIDDEN` response from `POST /customers`, `PATCH /customers/:id`, `DELETE /customers/:id`, and `POST /customers/:id/notes`. Listing supports `search`, `page`, and `limit` query parameters and returns `{ data, meta: { page, limit, total, totalPages } }`. Search covers customer name, email, and phone.
 
 Manual customer creation accepts `{ name, email, phone? }`, normalizes the email, and creates only a CRM `Customer` with `userId = null`; it does not provision authentication credentials. Updates accept only `name`, `email`, and `phone`.
 
@@ -78,6 +78,14 @@ POST /customers/:id/notes
 
 Customer notes are internal-only, ordered newest first, and use the authenticated internal user as author. Note creation accepts `{ body }`; arbitrary author IDs are not accepted.
 
+```text
+GET /customers/:id/tickets?page=1&limit=20
+```
+
+This internal Customer Management endpoint returns a complete paginated safe-summary history for the requested customer to `ADMIN`, `MANAGER`, and `AGENT`; `CUSTOMER` is rejected. It verifies the customer exists, orders by `updatedAt` descending then `id` ascending, and returns only `id`, `subject`, `status`, `priority`, `createdAt`, `updatedAt`, safe `category`, safe `assignedAgent`, and server-derived `access`.
+
+`ADMIN` and `MANAGER` receive `FULL` for every summary. An `AGENT` receives `FULL` when the ticket is assigned to that agent or unassigned, and `SUMMARY_ONLY` when it belongs to another agent. `SUMMARY_ONLY` is presentation metadata only: it never authorizes Ticket detail, conversation, notes, history, mutation, queue, or Dashboard access.
+
 Deletion returns `409 CUSTOMER_HAS_SUPPORT_HISTORY` when the customer has a linked login identity, tickets, feedback, notes, or attachments. Only unlinked customers without related support history can be deleted.
 
 ## Tickets
@@ -89,7 +97,7 @@ POST   /tickets
 PATCH  /tickets/:id
 ```
 
-All routes require `ADMIN`, `MANAGER`, or `AGENT`; `CUSTOMER` is rejected. `ADMIN` and `MANAGER` see all tickets. `AGENT` sees assigned and unassigned tickets only. Listing supports server-side `page`, `limit`, `search`, `status`, `priority`, `categoryId`, and `assignedAgentId` filters and uses the standard pagination envelope.
+All routes require `ADMIN`, `MANAGER`, or `AGENT`; `CUSTOMER` is rejected. `ADMIN` and `MANAGER` see all tickets. `AGENT` sees assigned and unassigned tickets only. Listing supports server-side `page`, `limit`, `search`, `status`, `priority`, `categoryId`, `assignedAgentId`, and `customerId` filters and uses the standard pagination envelope. Requested filters are intersected with server-authoritative visibility. This remains the normal Ticket Management contract and is not broadened by customer-history summary access.
 
 Creation accepts documented ticket fields and defaults channel to `WEB`. Assignment targets must be `AGENT` users. Updates accept only editable ticket fields and enforce the role permissions and transition matrix in `07-ticket-workflow.md`. Workflow timestamps and SLA deadline snapshots are service-owned.
 
@@ -164,6 +172,18 @@ GET /reports/tickets
 GET /reports/agents
 GET /reports/sla
 ```
+
+## Dashboard
+
+```text
+GET /dashboard/overview
+```
+
+`GET /dashboard/overview` requires `ADMIN`, `MANAGER`, or `AGENT`; `CUSTOMER` is rejected. `ADMIN` and `MANAGER` receive metrics and tickets across all internal tickets. `AGENT` receives only tickets assigned to that agent plus unassigned tickets, matching Ticket Management visibility. This scope applies independently to metrics, status distribution, Needs Attention, and recent tickets.
+
+The standard `{ data }` envelope contains `metrics`, real counts grouped in `statusDistribution`, at most 10 `needsAttention` tickets, at most 8 `recentTickets`, and `generatedAt`. Dashboard ticket items expose only identifier, subject, status, priority, update time, effective SLA deadline/state, safe customer summary, and safe assignee summary. Needs Attention is ordered by SLA breach, urgent priority, SLA risk, high priority, unassigned state, oldest relevant update, and final identifier tie-breaker. Recent tickets use `updatedAt` descending and identifier ascending.
+
+Active metrics include `NEW`, `OPEN`, `IN_PROGRESS`, `WAITING_CUSTOMER`, and `ESCALATED`, excluding `RESOLVED` and `CLOSED`. `assignedToMe` always means active tickets assigned to the authenticated user. `resolvedToday` uses the current UTC calendar day. SLA state is derived at read time according to `08-sla-automation.md`; no derived state is persisted.
 
 ## Customer Portal
 
