@@ -4,10 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { changeAppLanguage } from "@/lib/i18n";
 
 const mocks = vi.hoisted(() => ({
-  useTickets: vi.fn(), useTicket: vi.fn(), useCategories: vi.fn(), useAgents: vi.fn(), useCreateTicket: vi.fn(), useUpdateTicket: vi.fn(), useCustomers: vi.fn(), useAuth: vi.fn(),
-  create: vi.fn(), update: vi.fn(), refetch: vi.fn(),
+  useTickets: vi.fn(), useTicket: vi.fn(), useCategories: vi.fn(), useAgents: vi.fn(), useCreateTicket: vi.fn(), useUpdateTicket: vi.fn(), useCreateTicketMessage: vi.fn(), useCreateTicketNote: vi.fn(), useCustomers: vi.fn(), useAuth: vi.fn(),
+  create: vi.fn(), update: vi.fn(), createMessage: vi.fn(), createNote: vi.fn(), refetch: vi.fn(),
 }));
-vi.mock("./ticket-hooks", () => ({ useTickets: mocks.useTickets, useTicket: mocks.useTicket, useCategories: mocks.useCategories, useAgents: mocks.useAgents, useCreateTicket: mocks.useCreateTicket, useUpdateTicket: mocks.useUpdateTicket }));
+vi.mock("./ticket-hooks", () => ({ useTickets: mocks.useTickets, useTicket: mocks.useTicket, useCategories: mocks.useCategories, useAgents: mocks.useAgents, useCreateTicket: mocks.useCreateTicket, useUpdateTicket: mocks.useUpdateTicket, useCreateTicketMessage: mocks.useCreateTicketMessage, useCreateTicketNote: mocks.useCreateTicketNote }));
 vi.mock("@/features/customers/customer-hooks", () => ({ useCustomers: mocks.useCustomers }));
 vi.mock("@/features/auth/auth-state", () => ({ useAuth: mocks.useAuth }));
 
@@ -22,6 +22,7 @@ const ticket = {
   customer: { id: "customer-1", name: "Ahmed Mohamed", email: "ahmed@example.com", phone: "+201000000000", createdAt: "2026-08-20T08:00:00.000Z" },
   assignedAgent: { id: "agent-1", name: "Mariam Hassan", email: "mariam@example.com" }, category: { id: "category-1", name: "Billing" }, department: null, branch: null,
   history: [{ id: "history-1", action: "STATUS_CHANGED", oldValue: "OPEN", newValue: "IN_PROGRESS", createdAt: "2026-08-25T08:30:00.000Z", actor: { id: "admin-1", name: "Admin", role: "ADMIN" } }],
+  conversation: [],
 };
 const listTicket = { ...ticket, customer: { id: ticket.customer.id, name: ticket.customer.name, email: ticket.customer.email } };
 
@@ -35,6 +36,7 @@ describe("ticket pages", () => {
     mocks.useCategories.mockReturnValue({ data: [{ id: "category-1", name: "Billing" }] }); mocks.useAgents.mockReturnValue({ data: [{ id: "agent-1", name: "Mariam Hassan", email: "mariam@example.com" }] });
     mocks.useCustomers.mockReturnValue({ isLoading: false, data: { data: [{ id: "customer-1", name: "Ahmed Mohamed", email: "ahmed@example.com" }], meta: { page: 1, limit: 10, total: 1, totalPages: 1 } } });
     mocks.useCreateTicket.mockReturnValue({ mutateAsync: mocks.create }); mocks.useUpdateTicket.mockReturnValue({ mutateAsync: mocks.update, isPending: false });
+    mocks.useCreateTicketMessage.mockReturnValue({ mutateAsync: mocks.createMessage, isPending: false }); mocks.useCreateTicketNote.mockReturnValue({ mutateAsync: mocks.createNote, isPending: false });
   });
 
   it("renders structured loading and a genuine empty state inside the table", () => {
@@ -122,6 +124,40 @@ describe("ticket pages", () => {
   it("renders details and localized operational history", () => {
     renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
     expect(screen.getByRole("heading", { name: ticket.subject })).toBeInTheDocument(); expect(screen.getByText(ticket.description)).toBeInTheDocument(); expect(screen.getByText("Status changed")).toBeInTheDocument(); expect(screen.getByText("Conversation")).toBeInTheDocument();
+  });
+
+  it("renders public messages and internal notes chronologically with explicit semantics", () => {
+    mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: { ...ticket, conversation: [
+      { id: "message-1", kind: "PUBLIC_MESSAGE", body: "Customer-visible update", createdAt: "2026-08-25T09:00:00.000Z", author: { id: "agent-1", name: "Mariam Hassan", role: "AGENT" } },
+      { id: "note-1", kind: "INTERNAL_NOTE", body: "Private investigation", createdAt: "2026-08-25T09:05:00.000Z", author: { id: "admin-1", name: "Admin", role: "ADMIN" } },
+    ] } });
+    renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
+    expect(screen.getByText("Customer-visible update")).toBeInTheDocument(); expect(screen.getByText("Private investigation")).toBeInTheDocument();
+    expect(screen.getByText("Visible to customer")).toBeInTheDocument(); expect(screen.getAllByText("Internal note").length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("switches composer modes and clears only after successful submission", async () => {
+    mocks.createMessage.mockResolvedValue({}); mocks.createNote.mockResolvedValue({});
+    renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
+    const reply = screen.getByLabelText("Public reply"); fireEvent.change(reply, { target: { value: "Public update" } }); fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
+    await waitFor(() => expect(mocks.createMessage).toHaveBeenCalledWith({ body: "Public update" })); expect(reply).toHaveValue("");
+    fireEvent.click(screen.getByRole("tab", { name: "Internal note" })); const note = screen.getByLabelText("Internal note"); fireEvent.change(note, { target: { value: "Private context" } }); fireEvent.click(screen.getByRole("button", { name: "Add note" }));
+    await waitFor(() => expect(mocks.createNote).toHaveBeenCalledWith({ body: "Private context" })); expect(note).toHaveValue("");
+  });
+
+  it("preserves composer content on localized failure and prevents pending duplicates", async () => {
+    mocks.createMessage.mockRejectedValue(new Error("failure"));
+    renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
+    const reply = screen.getByLabelText("Public reply"); fireEvent.change(reply, { target: { value: "Keep this reply" } }); fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to send the reply."); expect(reply).toHaveValue("Keep this reply");
+    cleanup(); mocks.useCreateTicketMessage.mockReturnValue({ mutateAsync: mocks.createMessage, isPending: true }); renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
+    expect(screen.getByRole("button", { name: "Sending…" })).toBeDisabled();
+  });
+
+  it("renders an accessible RTL conversation composer", async () => {
+    await changeAppLanguage("ar"); renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
+    expect(screen.getByRole("tablist", { name: "وضع محرر الرسالة" })).toBeInTheDocument(); expect(screen.getByRole("tab", { name: "رد" })).toHaveAttribute("aria-selected", "true");
+    expect(document.documentElement).toHaveAttribute("dir", "rtl");
   });
 
   it("updates status and assignment through one safe mutation", async () => {

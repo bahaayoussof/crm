@@ -40,6 +40,8 @@ Useful derived states:
 
 The first public agent response satisfies the first-response target and sets `firstRespondedAt` once.
 
+Ticket Conversation records this timestamp in the same database transaction as the first successful internal public reply. The message creation timestamp is used, clients cannot control it, and later public replies do not overwrite it. Failed reply transactions leave it unchanged.
+
 Ticket notes and customer notes are internal and do not count as a customer response.
 
 ## Resolution

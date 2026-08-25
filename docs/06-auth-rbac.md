@@ -59,6 +59,7 @@ Customer identities cannot access internal ticket-management APIs or pages. Cust
 - `AGENT` may view assigned and unassigned tickets and create tickets. An agent may change priority or use normal non-escalation status transitions only on a ticket assigned to that agent.
 - Assignment targets must have the `AGENT` role. Assigning `ADMIN`, `MANAGER`, or `CUSTOMER` users is invalid.
 - Unassigned tickets remain read-only for agent workflow mutations. Claiming an unassigned ticket is outside the Ticket Management feature.
+- Ticket conversation follows the same mutation boundary: an `AGENT` may add a public reply or internal ticket note only when the ticket is assigned to that agent. `ADMIN` and `MANAGER` may add replies and notes to any visible ticket. Unassigned tickets remain read-only for agent conversation mutations.
 - Ticket history is visible wherever the caller is authorized to view the ticket.
 
 ## Security Rules

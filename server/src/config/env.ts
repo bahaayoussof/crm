@@ -1,10 +1,15 @@
 import "dotenv/config";
 import { z } from "zod";
 
+const clientUrlsSchema = z.string()
+  .transform((value) => value.split(",").map((origin) => origin.trim()).filter(Boolean))
+  .pipe(z.array(z.string().url()).min(1));
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(3000),
   CLIENT_URL: z.string().url().default("http://localhost:5173"),
+  CLIENT_URLS: clientUrlsSchema.optional(),
   DATABASE_URL: z
     .string()
     .min(1, "DATABASE_URL is required")

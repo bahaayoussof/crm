@@ -255,3 +255,29 @@ All-agent ticket visibility; agent self-claiming; arbitrary enum transitions; a 
 **Consequences**
 
 Agents cannot mutate unassigned tickets or claim work in this branch. Customer ticket access remains a later portal concern. Automatic escalation, timers, notifications, and reopening on customer reply remain later features.
+
+---
+
+## ADR-010: Internal Ticket Conversation Read Shape
+
+**Date:** 2026-08-25
+
+**Context**
+
+The internal ticket workspace needs one chronological view of public messages and private ticket notes, while future customer portal responses must never expose internal notes.
+
+**Decision**
+
+Extend the existing internal-only `GET /tickets/:id` response with a discriminated `conversation` array. Each item is explicitly `PUBLIC_MESSAGE` or `INTERNAL_NOTE` and contains only its identifier, body, creation timestamp, and safe author summary. The service reads both relations with explicit selects and merges them deterministically by timestamp, kind, and identifier. Future portal ticket reads must define and query a separate public-only response.
+
+**Reason**
+
+The ticket detail is already the authoritative workspace query. A discriminated timeline avoids a second request and frontend record-type guessing while keeping the private-note boundary explicit in both the contract and service.
+
+**Alternatives Considered**
+
+Separate message and note read endpoints; separate unordered arrays on ticket detail; a shared internal/customer detail serializer.
+
+**Consequences**
+
+Internal detail invalidation refetches the complete ticket and conversation after each mutation. Customer portal work cannot reuse this internal detail shape and must never select `TicketNote`.

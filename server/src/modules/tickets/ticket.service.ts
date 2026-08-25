@@ -1,7 +1,7 @@
 import { Prisma, Role, TicketStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
-import type { CreateTicketInput, TicketListQuery, UpdateTicketInput } from "./ticket.schema.js";
+import type { CreateTicketInput, TicketConversationInput, TicketListQuery, UpdateTicketInput } from "./ticket.schema.js";
 
 interface Actor { userId: string; role: Role }
 
@@ -58,10 +58,43 @@ export async function getTicket(ticketId: string, actor: Actor) {
         id: true, action: true, oldValue: true, newValue: true, createdAt: true,
         actor: { select: { id: true, name: true, role: true } },
       } },
+      messages: { orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: conversationSelect },
+      notes: { orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: conversationSelect },
     },
   });
   if (!ticket) throw new AppError(404, "TICKET_NOT_FOUND", "Ticket not found");
-  return ticket;
+  const { messages, notes, ...detail } = ticket;
+  return {
+    ...detail,
+    conversation: [
+      ...messages.map((item) => ({ ...item, kind: "PUBLIC_MESSAGE" as const })),
+      ...notes.map((item) => ({ ...item, kind: "INTERNAL_NOTE" as const })),
+    ].sort(compareConversation),
+  };
+}
+
+export async function addTicketMessage(ticketId: string, input: TicketConversationInput, actor: Actor) {
+  const createdAt = new Date();
+  return prisma.$transaction(async (tx) => {
+    await requireConversationMutationAccess(tx, ticketId, actor);
+    const message = await tx.ticketMessage.create({
+      data: { ticketId, authorUserId: actor.userId, body: input.body, createdAt },
+      select: conversationSelect,
+    });
+    await tx.ticket.updateMany({ where: { id: ticketId, firstRespondedAt: null }, data: { firstRespondedAt: createdAt } });
+    return { ...message, kind: "PUBLIC_MESSAGE" as const };
+  });
+}
+
+export async function addTicketNote(ticketId: string, input: TicketConversationInput, actor: Actor) {
+  return prisma.$transaction(async (tx) => {
+    await requireConversationMutationAccess(tx, ticketId, actor);
+    const note = await tx.ticketNote.create({
+      data: { ticketId, authorUserId: actor.userId, body: input.body },
+      select: conversationSelect,
+    });
+    return { ...note, kind: "INTERNAL_NOTE" as const };
+  });
 }
 
 export async function createTicket(input: CreateTicketInput, actor: Actor) {
@@ -129,6 +162,21 @@ export async function updateTicket(ticketId: string, input: UpdateTicketInput, a
 
 function visibilityWhere(actor: Actor): Prisma.TicketWhereInput {
   return actor.role === Role.AGENT ? { OR: [{ assignedAgentId: actor.userId }, { assignedAgentId: null }] } : {};
+}
+
+const conversationSelect = {
+  id: true, body: true, createdAt: true,
+  author: { select: { id: true, name: true, role: true } },
+} satisfies Prisma.TicketMessageSelect & Prisma.TicketNoteSelect;
+
+async function requireConversationMutationAccess(tx: Prisma.TransactionClient, ticketId: string, actor: Actor) {
+  const ticket = await tx.ticket.findFirst({ where: { id: ticketId, ...visibilityWhere(actor) }, select: { id: true, assignedAgentId: true } });
+  if (!ticket) throw new AppError(404, "TICKET_NOT_FOUND", "Ticket not found");
+  if (actor.role === Role.AGENT && ticket.assignedAgentId !== actor.userId) throw forbidden("Ticket must be assigned to the agent before adding conversation content");
+}
+
+function compareConversation(left: { createdAt: Date; kind: string; id: string }, right: { createdAt: Date; kind: string; id: string }) {
+  return left.createdAt.getTime() - right.createdAt.getTime() || left.kind.localeCompare(right.kind) || left.id.localeCompare(right.id);
 }
 
 function enforceMutationPermissions(current: { assignedAgentId: string | null }, input: UpdateTicketInput, actor: Actor) {

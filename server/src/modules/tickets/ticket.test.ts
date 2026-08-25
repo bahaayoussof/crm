@@ -4,13 +4,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   ticketFindMany: vi.fn(), ticketCount: vi.fn(), ticketFindFirst: vi.fn(), ticketCreate: vi.fn(), ticketUpdate: vi.fn(),
+  ticketUpdateMany: vi.fn(), messageCreate: vi.fn(), noteCreate: vi.fn(),
   historyCreate: vi.fn(), historyCreateMany: vi.fn(), customerFind: vi.fn(), userFindFirst: vi.fn(), userFindMany: vi.fn(),
   categoryFindFirst: vi.fn(), categoryFindMany: vi.fn(), departmentFind: vi.fn(), branchFind: vi.fn(), slaFind: vi.fn(), transaction: vi.fn(),
 }));
 
 vi.mock("../../config/prisma.js", () => {
   const prisma = {
-    ticket: { findMany: mocks.ticketFindMany, count: mocks.ticketCount, findFirst: mocks.ticketFindFirst, create: mocks.ticketCreate, update: mocks.ticketUpdate },
+    ticket: { findMany: mocks.ticketFindMany, count: mocks.ticketCount, findFirst: mocks.ticketFindFirst, create: mocks.ticketCreate, update: mocks.ticketUpdate, updateMany: mocks.ticketUpdateMany },
+    ticketMessage: { create: mocks.messageCreate }, ticketNote: { create: mocks.noteCreate },
     ticketHistory: { create: mocks.historyCreate, createMany: mocks.historyCreateMany },
     customer: { findUnique: mocks.customerFind }, user: { findFirst: mocks.userFindFirst, findMany: mocks.userFindMany },
     category: { findFirst: mocks.categoryFindFirst, findMany: mocks.categoryFindMany }, department: { findUnique: mocks.departmentFind },
@@ -40,7 +42,8 @@ describe("ticket API", () => {
     vi.clearAllMocks();
     mocks.ticketFindMany.mockResolvedValue([]); mocks.ticketCount.mockResolvedValue(0);
     mocks.transaction.mockImplementation(async (value: unknown) => typeof value === "function" ? value({
-      ticket: { findFirst: mocks.ticketFindFirst, create: mocks.ticketCreate, update: mocks.ticketUpdate },
+      ticket: { findFirst: mocks.ticketFindFirst, create: mocks.ticketCreate, update: mocks.ticketUpdate, updateMany: mocks.ticketUpdateMany },
+      ticketMessage: { create: mocks.messageCreate }, ticketNote: { create: mocks.noteCreate },
       ticketHistory: { create: mocks.historyCreate, createMany: mocks.historyCreateMany }, customer: { findUnique: mocks.customerFind },
       user: { findFirst: mocks.userFindFirst }, category: { findFirst: mocks.categoryFindFirst }, department: { findUnique: mocks.departmentFind },
       branch: { findUnique: mocks.branchFind }, slaRule: { findFirst: mocks.slaFind },
@@ -49,6 +52,9 @@ describe("ticket API", () => {
     mocks.categoryFindFirst.mockResolvedValue({ id: "category-1", name: "Billing" }); mocks.departmentFind.mockResolvedValue(null);
     mocks.branchFind.mockResolvedValue(null); mocks.slaFind.mockResolvedValue(null); mocks.historyCreate.mockResolvedValue({});
     mocks.historyCreateMany.mockResolvedValue({ count: 1 }); mocks.ticketCreate.mockResolvedValue(summary); mocks.ticketUpdate.mockResolvedValue(summary);
+    mocks.ticketUpdateMany.mockResolvedValue({ count: 1 });
+    mocks.messageCreate.mockResolvedValue({ id: "message-1", body: "We are checking this.", createdAt: now, author: { id: admin.id, name: "Admin", role: Role.ADMIN } });
+    mocks.noteCreate.mockResolvedValue({ id: "note-1", body: "Check the payment provider.", createdAt: now, author: { id: admin.id, name: "Admin", role: Role.ADMIN } });
     mocks.userFindMany.mockResolvedValue([]); mocks.categoryFindMany.mockResolvedValue([]);
   });
 
@@ -115,11 +121,63 @@ describe("ticket API", () => {
   });
 
   it("returns details with history and hides another agent's ticket", async () => {
-    mocks.ticketFindFirst.mockResolvedValueOnce({ ...summary, description: "Issue", history: [], department: null, branch: null });
+    mocks.ticketFindFirst.mockResolvedValueOnce({ ...summary, description: "Issue", history: [], department: null, branch: null, messages: [], notes: [] });
     expect((await request(app).get("/api/tickets/ticket-1").set(auth(agent))).status).toBe(200);
     mocks.ticketFindFirst.mockResolvedValueOnce(null);
     const hidden = await request(app).get("/api/tickets/other-ticket").set(auth(agent));
     expect(hidden.status).toBe(404); expect(hidden.body.error.code).toBe("TICKET_NOT_FOUND");
+  });
+
+  it("returns a deterministic discriminated internal conversation", async () => {
+    const sameTime = new Date("2026-08-25T09:00:00.000Z");
+    mocks.ticketFindFirst.mockResolvedValue({ ...summary, description: "Issue", history: [], department: null, branch: null,
+      messages: [{ id: "message-2", body: "Public", createdAt: sameTime, author: { id: agent.id, name: "Agent", role: Role.AGENT } }],
+      notes: [{ id: "note-1", body: "Private", createdAt: sameTime, author: { id: admin.id, name: "Admin", role: Role.ADMIN } }],
+    });
+    const response = await request(app).get("/api/tickets/ticket-1").set(auth());
+    expect(response.status).toBe(200);
+    expect(response.body.data.conversation.map((item: { kind: string }) => item.kind)).toEqual(["INTERNAL_NOTE", "PUBLIC_MESSAGE"]);
+    expect(response.body.data).not.toHaveProperty("notes"); expect(response.body.data).not.toHaveProperty("messages");
+  });
+
+  it("creates a public reply with the authenticated author and records first response", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: agent.id });
+    const response = await request(app).post("/api/tickets/ticket-1/messages").set(auth(agent)).send({ body: "  We are checking this.  " });
+    expect(response.status).toBe(201); expect(response.body.data.kind).toBe("PUBLIC_MESSAGE");
+    expect(mocks.messageCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ authorUserId: agent.id, body: "We are checking this." }) }));
+    expect(mocks.ticketUpdateMany).toHaveBeenCalledWith({ where: { id: "ticket-1", firstRespondedAt: null }, data: { firstRespondedAt: expect.any(Date) } });
+  });
+
+  it("rejects spoofed authors and empty replies", async () => {
+    const spoofed = await request(app).post("/api/tickets/ticket-1/messages").set(auth()).send({ body: "Reply", authorUserId: otherAgent.id });
+    const empty = await request(app).post("/api/tickets/ticket-1/messages").set(auth()).send({ body: "   " });
+    expect(spoofed.status).toBe(400); expect(empty.status).toBe(400); expect(mocks.messageCreate).not.toHaveBeenCalled();
+  });
+
+  it("stores internal notes separately without recording first response", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: agent.id });
+    const response = await request(app).post("/api/tickets/ticket-1/notes").set(auth(agent)).send({ body: "  Check provider logs. " });
+    expect(response.status).toBe(201); expect(response.body.data.kind).toBe("INTERNAL_NOTE");
+    expect(mocks.noteCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ authorUserId: agent.id, body: "Check provider logs." }) }));
+    expect(mocks.messageCreate).not.toHaveBeenCalled(); expect(mocks.ticketUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("enforces manager, assigned-agent, unassigned, other-agent, and customer conversation access", async () => {
+    const manager = { id: "manager-1", role: Role.MANAGER };
+    mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: otherAgent.id });
+    expect((await request(app).post("/api/tickets/ticket-1/messages").set(auth(manager)).send({ body: "Manager reply" })).status).toBe(201);
+    mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: null });
+    expect((await request(app).post("/api/tickets/ticket-1/messages").set(auth(agent)).send({ body: "Agent reply" })).status).toBe(403);
+    mocks.ticketFindFirst.mockResolvedValue(null);
+    expect((await request(app).post("/api/tickets/ticket-1/notes").set(auth(agent)).send({ body: "Hidden" })).status).toBe(404);
+    const customerToken = createAccessToken({ id: "customer-user", role: Role.CUSTOMER });
+    expect((await request(app).post("/api/tickets/ticket-1/notes").set({ Authorization: `Bearer ${customerToken}` }).send({ body: "No" })).status).toBe(403);
+  });
+
+  it("does not record first response when reply creation fails", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: agent.id }); mocks.messageCreate.mockRejectedValueOnce(new Error("write failed"));
+    const response = await request(app).post("/api/tickets/ticket-1/messages").set(auth(agent)).send({ body: "Reply" });
+    expect(response.status).toBe(500); expect(mocks.ticketUpdateMany).not.toHaveBeenCalled();
   });
 
   it("updates a valid status and owns resolution timestamps", async () => {

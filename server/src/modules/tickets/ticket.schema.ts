@@ -38,7 +38,12 @@ export const updateTicketSchema = z.object({
   branchId: nullableId,
 }).strict().refine((value) => Object.keys(value).length > 0, { message: "At least one ticket field is required" });
 
+export const ticketConversationBodySchema = z.object({
+  body: z.string().trim().min(1).max(20_000),
+}).strict();
+
 export type TicketListQuery = z.infer<typeof ticketListQuerySchema>;
 export type TicketParams = z.infer<typeof ticketParamsSchema>;
 export type CreateTicketInput = z.infer<typeof createTicketSchema>;
 export type UpdateTicketInput = z.infer<typeof updateTicketSchema>;
+export type TicketConversationInput = z.infer<typeof ticketConversationBodySchema>;

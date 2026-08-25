@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createTicket, getAgents, getCategories, getTicket, getTickets, updateTicket } from "./ticket-api";
-import type { TicketCreateValues, TicketFilters, TicketUpdateValues } from "./ticket.types";
+import { createTicket, createTicketMessage, createTicketNote, getAgents, getCategories, getTicket, getTickets, updateTicket } from "./ticket-api";
+import type { TicketConversationValues, TicketCreateValues, TicketFilters, TicketUpdateValues } from "./ticket.types";
 
 export const ticketKeys = {
   all: ["tickets"] as const,
@@ -22,3 +22,11 @@ export function useUpdateTicket(id: string) {
     await Promise.all([client.invalidateQueries({ queryKey: ticketKeys.detail(id) }), client.invalidateQueries({ queryKey: ticketKeys.lists() })]);
   } });
 }
+function useConversationMutation(id: string, mutationFn: (id: string, values: TicketConversationValues) => Promise<unknown>) {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: (values: TicketConversationValues) => mutationFn(id, values), onSuccess: async () => {
+    await Promise.all([client.invalidateQueries({ queryKey: ticketKeys.detail(id) }), client.invalidateQueries({ queryKey: ticketKeys.lists() })]);
+  } });
+}
+export const useCreateTicketMessage = (id: string) => useConversationMutation(id, createTicketMessage);
+export const useCreateTicketNote = (id: string) => useConversationMutation(id, createTicketNote);

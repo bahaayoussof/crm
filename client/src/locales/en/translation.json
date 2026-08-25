@@ -24,7 +24,16 @@
     "search": "Search tickets by ID, subject, or customer…", "allStatuses": "All statuses", "allPriorities": "All priorities", "allCategories": "All categories", "allAgents": "All agents", "clearFilters": "Clear filters",
     "empty": "No tickets yet.", "noSearchMatches": "No tickets found for “{{search}}”.", "noStatusMatches": "No tickets with status “{{status}}”.", "noPriorityMatches": "No tickets with priority “{{priority}}”.", "noCategoryMatches": "No tickets in category “{{category}}”.", "noAgentMatches": "No tickets assigned to “{{agent}}”.", "noMatches": "No tickets match the current filters.", "loadError": "Unable to load tickets.", "loadDetailError": "Unable to load this ticket.", "notFound": "Ticket not found.", "unauthorized": "You do not have access to this ticket.",
     "saveError": "Unable to save ticket.", "updateError": "Unable to update ticket.", "saveOperations": "Save changes", "backToList": "Back to tickets", "pagination": "Ticket list pages", "page": "Page {{page}} of {{total}}", "noHistory": "No ticket history yet.", "systemActor": "System",
-    "firstResponseDue": "First response due", "resolutionDue": "Resolution due", "conversationLaterTitle": "Conversation", "conversationLater": "Public replies and internal ticket notes will be added in the Ticket Conversation feature.",
+    "firstResponseDue": "First response due", "resolutionDue": "Resolution due",
+    "conversation": {
+      "title": "Conversation", "description": "Public customer-visible replies and private team notes for this ticket.", "timelineLabel": "Ticket conversation timeline",
+      "emptyTitle": "No conversation yet", "emptyDescription": "Send the first public reply or add a private note for your team.", "composerMode": "Composer mode",
+      "replyTab": "Reply", "noteTab": "Internal note", "replyLabel": "Public reply", "noteLabel": "Internal note",
+      "replyHelp": "This response is visible to the customer.", "noteHelp": "Only your team can see this note.", "readOnly": "This ticket must be assigned to you before you can reply or add a note.",
+      "sendReply": "Send reply", "addNote": "Add note", "sending": "Sending…", "adding": "Adding…", "replySuccess": "Reply sent.", "noteSuccess": "Internal note added.",
+      "replyError": "Unable to send the reply.", "noteError": "Unable to add the internal note.", "internalLabel": "Internal note", "publicLabel": "Visible to customer",
+      "roles": { "ADMIN": "Admin", "MANAGER": "Manager", "AGENT": "Agent", "CUSTOMER": "Customer" }
+    },
     "columns": { "id": "ID", "ticket": "Ticket" },
     "status": { "NEW": "New", "OPEN": "Open", "IN_PROGRESS": "In progress", "WAITING_CUSTOMER": "Waiting for customer", "RESOLVED": "Resolved", "CLOSED": "Closed", "ESCALATED": "Escalated" },
     "priority": { "LOW": "Low", "MEDIUM": "Medium", "HIGH": "High", "URGENT": "Urgent" },

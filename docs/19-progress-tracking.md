@@ -1,19 +1,18 @@
 # Customer Support CRM — Progress Tracking
 
-Last Updated: 2026-08-24
+Last Updated: 2026-08-25
 
-Current Integration Branch: `master` at `cfd4799`
+Current Integration Branch: `master` at `4d188bd`
 
-Current Working Branch: `fix/frontend-design-polish` at `a1da980` (clean, one commit ahead of `master`)
+Current Working Branch: `feature/ticket-conversation` (staged but uncommitted implementation based on `master` at `4d188bd`)
 
 > This file is a status summary. Requirements, architecture, API contracts, RBAC rules, workflows, UI specifications, and architecture decisions remain authoritative in their respective documents.
 
 ## 1. Overall Status
 
-- The application foundation, PostgreSQL domain schema, authentication/RBAC, customer management, and English/Arabic localization are operational on `master`.
-- Frontend design polish, the customer edit-cache correction, and the TanStack Table customer-list refactor are committed on the current local branch and need review/integration.
-- Ticket Management is the next unimplemented P0 dependency and should begin only after the current branch is reviewed.
-- The core demo journey is not yet complete because tickets, conversations, dashboard, portal, and SLA behavior are not implemented.
+- `master` at `4d188bd` contains the application foundation, PostgreSQL schema, authentication/RBAC, customer management, localization/RTL, frontend design polish, TanStack Table work, Ticket Management, and bilingual typography.
+- Ticket Conversation is implemented and staged but uncommitted on `feature/ticket-conversation`, including public replies, private notes, first-response recording, localized UI, and a multi-origin development CORS follow-up.
+- The core demo journey is not yet complete because the Agent Dashboard and Customer Portal remain unimplemented.
 - Provider-backed channels and other production external integrations remain intentionally deferred.
 
 ## 2. Feature Progress
@@ -25,13 +24,13 @@ Current Working Branch: `fix/frontend-design-polish` at `a1da980` (clean, one co
 | Authentication | ✅ COMPLETE | `feature/authentication` | Registration, login, `/auth/me`, JWT and role middleware | Login, registration, protected routing and logout | Passing | Yes, prior verified run | No refresh-token or revocation infrastructure. |
 | Customer Management | ✅ COMPLETE | `feature/customer-management` | Protected CRUD, search, notes and safe deletion | List, create/edit, detail, notes and activity | Passing | Yes, prior verified run | Attachments are metadata-only; ticket-derived context awaits tickets. |
 | Frontend Localization / RTL | ✅ COMPLETE | `fix/frontend-localization` | Localized API error support where implemented | Persisted English/Arabic and document direction | Passing | N/A | Tip is the current `master`. |
-| Frontend Design Polish | 🟠 NEEDS REVIEW | `fix/frontend-design-polish` | No material backend scope | Shared auth/protected shells and responsive refinement | Passing | N/A | Committed locally; not contained in `master`. |
-| TanStack Table Refactor | 🟠 NEEDS REVIEW | `fix/frontend-design-polish` | Existing server pagination retained | Typed customer table with responsive cards | Passing | N/A | Committed with design polish; not contained in `master`. |
-| Ticket Management | 🔵 READY NEXT | Not created | Schema only | No feature implementation | None | Schema only | Next P0 dependency: CRUD, assignment, priority, category and workflow. |
-| Ticket Conversation | ⚪ NOT STARTED | — | Schema only | Not implemented | None | Schema only | Public messages and internal notes require service/API/UI behavior. |
+| Frontend Design Polish | ✅ COMPLETE | `fix/frontend-design-polish` | No material backend scope | Shared auth/protected shells and responsive refinement | Passing | N/A | Tip is contained in `master`. |
+| TanStack Table Refactor | ✅ COMPLETE | `fix/frontend-design-polish` | Existing server pagination retained | Typed customer and ticket tables with responsive cards | Passing | N/A | Tip is contained in `master`. |
+| Ticket Management | ✅ COMPLETE | `feature/ticket-management` | Protected CRUD, assignment, workflow, history and SLA snapshots | Queue, forms, detail controls and responsive views | Passing | Yes | Tip is contained in `master`. |
+| Ticket Conversation | ✅ COMPLETE | `feature/ticket-conversation` | Internal detail conversation read, public replies, internal notes, RBAC and first-response transaction | Localized timeline and accessible reply/note composer | 94 total passing | Yes | Staged but uncommitted and not merged; browser capture verification was attempted but not completed. |
 | Agent Dashboard | ⚪ NOT STARTED | — | Not implemented | Placeholder protected route only | None | No | Depends on ticket data. |
 | Customer Portal | ⚪ NOT STARTED | — | Authentication identity exists; ticket scoping absent | Placeholder protected route only | Auth routing only | Partial | Requires customer-owned ticket APIs and portal pages. |
-| SLA / Automation | ⚪ NOT STARTED | — | Schema/deadline fields only | Not implemented | Schema only | Schema only | No deadline calculation service, scheduler, warning, or breach processing. |
+| SLA / Automation | 🟡 PARTIAL | `feature/ticket-management`, `feature/ticket-conversation` | Deadline snapshots and one-time first-response recording | SLA deadlines shown in ticket context | Passing | Yes | No scheduler, warning/breach automation, notifications, or automatic escalation. |
 | Knowledge Base | ⚪ NOT STARTED | — | Schema only | Not implemented | Schema only | Schema only | P1 after the P0 demo flow. |
 | Reports | ⚪ NOT STARTED | — | Not implemented | Not implemented | None | No | Depends on meaningful ticket/SLA/feedback data. |
 | AI Assistant | 🟣 DEFERRED | — | Not implemented | Not implemented | None | No | P2; must require human review when promoted. |
@@ -42,7 +41,7 @@ Current Working Branch: `fix/frontend-design-polish` at `a1da980` (clean, one co
 | Multi-Branch | 🟣 DEFERRED | — | Schema only | Not implemented | Schema only | Schema only | P2 behavior. |
 | External Integrations | 🟣 DEFERRED | — | Channel enum representation only | Not implemented | Schema only | Schema only | WhatsApp, SMS, inbound email, live transport, ERP, and arbitrary systems are demonstration/architecture only. |
 | Deployment | ⚪ NOT STARTED | — | No deployed API evidence | No deployed frontend evidence | Local build passing | Development DB only | Deployment targets are documented but not configured or verified. |
-| Final QA | ⚪ NOT STARTED | — | Current implemented scope passes checks | Current implemented scope passes checks | 49 passing | Prior feature verification | Full demo-flow, accessibility, responsive, RTL, and deployment QA remain. |
+| Final QA | ⚪ NOT STARTED | — | Current implemented scope passes checks | Current implemented scope passes checks | 94 passing | Ticket Conversation DB verified | Full demo-flow, manual responsive/RTL visual review, and deployment QA remain. |
 
 ## 3. Completed Work
 
@@ -83,18 +82,16 @@ Current Working Branch: `fix/frontend-design-polish` at `a1da980` (clean, one co
 
 ## 4. Current Work
 
-- Current branch: `fix/frontend-design-polish`.
-- Current feature state: 🟠 NEEDS REVIEW; no implementation is actively in progress and the working tree was clean before this documentation task.
-- Objective already committed: shared application/auth shells, frontend refinement, customer edit-cache correction, and TanStack Table adoption for the customer list.
-- Remaining before integration: developer review, any requested manual UI review, and manual merge/commit handling by the developer. Git does not show this branch contained in `master`.
+- Current branch: `feature/ticket-conversation`.
+- Current feature state: ✅ implementation and automated/database verification complete; changes are staged but not committed or merged.
+- Delivered: typed internal conversation read contract, public reply and private-note mutations, server-authoritative permissions, transactional one-time first response, localized responsive timeline/composer, and validated multi-origin CORS support for local client ports.
+- Remaining before integration: manual English/Arabic desktop/mobile visual review, developer code review, and developer-controlled commit/merge/push.
 
 ## 5. Next Recommended Work
 
-1. Review and integrate `fix/frontend-design-polish`; retain the passing verification baseline.
-2. Implement Ticket Management on `feature/ticket-management`: list/detail/create/update, assignment, category, priority, status transitions, authorization, and essential search/filtering.
-3. Add the ticket conversation workspace: public messages, internal notes, history, customer context, and first-response timestamps.
-4. Implement the Agent Dashboard from real ticket/SLA queries.
-5. Implement customer-owned portal requests, ticket details/replies, and basic SLA presentation to complete the P0 demo journey.
+1. Review and manually commit/integrate `feature/ticket-conversation` after completing visual review.
+2. Implement the Agent Dashboard from real ticket/SLA queries.
+3. Implement customer-owned portal requests, ticket details/replies, and customer-triggered reopening to complete the P0 demo journey.
 
 This follows the P0 roadmap and the dependency order in `docs/01-scope-and-priorities.md`, `docs/14-implementation-plan.md`, and `docs/18-ui-pages-spec.md`.
 
@@ -102,11 +99,10 @@ This follows the P0 roadmap and the dependency order in `docs/01-scope-and-prior
 
 ### Core Remaining
 
-- Ticket CRUD, assignment, priority, categories, workflow, filtering, and customer scoping.
-- Public ticket conversation, internal notes, and ticket history.
 - Agent dashboard backed by real ticket data.
 - Customer portal request creation, list, detail, and replies.
-- Basic SLA calculation and visible response/resolution state.
+- Customer ownership scoping and customer-triggered resolved-ticket reopening.
+- Remaining SLA warning/breach presentation and automation beyond existing snapshots/first-response recording.
 - Responsive, accessible, bilingual states for every new P0 screen.
 
 ### Secondary
@@ -122,10 +118,10 @@ This follows the P0 roadmap and the dependency order in `docs/01-scope-and-prior
 ## 7. Known Limitations
 
 - No refresh-token, token-revocation, or production session infrastructure.
-- No ticket CRUD, assignment, workflow, conversation, internal ticket notes, or customer ticket ownership behavior.
+- No customer-owned ticket APIs, Customer Portal conversation, or customer-triggered reopening behavior.
 - No attachment upload/storage provider; attachment contexts still require service-level presence and ownership validation.
 - No real-time messaging or provider-backed communication channel.
-- No SLA calculation or background warning/breach processing.
+- SLA deadlines and first-response recording exist, but background warning/breach processing does not.
 - No knowledge base, notifications, reports, feedback workflow, or AI actions.
 - No seed script or realistic required demo dataset.
 - No automated visual regression suite; current visual evidence is manual/headless-browser verification from prior feature work.
@@ -142,16 +138,16 @@ This follows the P0 roadmap and the dependency order in `docs/01-scope-and-prior
 
 ## 9. Testing Status
 
-Verified on `fix/frontend-design-polish` at `a1da980` on 2026-08-24:
+Verified on uncommitted `feature/ticket-conversation` based on `4d188bd` on 2026-08-25:
 
 | Category | Status | Evidence |
 | --- | --- | --- |
 | Lint | ✅ COMPLETE | Root client and server lint commands passed. |
 | Typecheck | ✅ COMPLETE | Root client and server typechecks passed. |
-| Unit/integration tests | ✅ COMPLETE | 15 test files and 49 tests passed: 25 client, 24 server. Server service/API tests mock Prisma. |
-| Frontend tests | ✅ COMPLETE | 10 test files and 25 tests passed. |
-| Real DB verification | 🟠 NEEDS REVIEW | Migration and auth/customer flows passed in prior feature runs; not rerun during this documentation update. |
-| Manual UI verification | 🟠 NEEDS REVIEW | Prior English/Arabic browser checks are documented in project handoff state; current branch awaits developer review. |
+| Unit/integration tests | ✅ COMPLETE | 17 test files and 94 tests passed: 47 client, 47 server. Server service/API suites mock Prisma. |
+| Frontend tests | ✅ COMPLETE | 11 test files and 47 tests passed. |
+| Real DB verification | ✅ COMPLETE | Configured PostgreSQL migration is current; two temporary public replies and one temporary note verified persistence, one-time first response, and note isolation, then verification records were cleaned up. |
+| Manual UI verification | 🟠 INCOMPLETE | English/Arabic desktop/mobile CDP capture attempts failed or timed out; no visual pass is claimed. Focused RTL, accessibility, and responsive component tests pass. |
 | Build | ✅ COMPLETE | Client and server builds passed; client emitted a non-failing chunk-size warning. |
 
 These results cover implemented features, not the unimplemented project scope.
@@ -160,13 +156,16 @@ These results cover implemented features, not the unimplemented project scope.
 
 | Branch | Purpose | Status | Merged? |
 | --- | --- | --- | --- |
-| `master` | Integration branch | At `cfd4799`; clean baseline before current docs | N/A |
+| `master` | Integration branch | At `4d188bd`; base of current feature | N/A |
 | `feature/project-foundation` | Client/server foundation | ✅ COMPLETE; tip contained in `master` | Yes |
 | `feature/database-schema` | CRM Prisma schema and migration | ✅ COMPLETE; tip contained in `master` | Yes |
 | `feature/authentication` | Authentication and RBAC | ✅ COMPLETE; tip contained in `master` | Yes |
 | `feature/customer-management` | Customer APIs and UI | ✅ COMPLETE; tip contained in `master` | Yes |
 | `fix/frontend-localization` | English/Arabic localization and RTL | ✅ COMPLETE; tip equals `master` | Yes |
-| `fix/frontend-design-polish` | Shell/design polish, edit-cache fix, and customer table refactor | 🟠 NEEDS REVIEW at `a1da980` | No |
+| `fix/frontend-design-polish` | Shell/design polish, edit-cache fix, and customer table refactor | ✅ COMPLETE; tip contained in `master` | Yes |
+| `feature/ticket-management` | Ticket CRUD, queue, assignment, workflow, history and SLA snapshots | ✅ COMPLETE; tip contained in `master` | Yes |
+| `fix/bilingual-typography` | Inter/Cairo typography system | ✅ COMPLETE; tip equals `master` | Yes |
+| `feature/ticket-conversation` | Internal public replies, internal ticket notes, timeline, first-response recording and local multi-origin CORS follow-up | ✅ COMPLETE; staged but uncommitted | No |
 
 “Yes” means Git ancestry confirms the branch tip is contained in `master`; it does not infer how integration occurred.
 

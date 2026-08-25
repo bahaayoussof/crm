@@ -24,7 +24,16 @@
     "search": "البحث برقم التذكرة أو الموضوع أو العميل…", "allStatuses": "كل الحالات", "allPriorities": "كل الأولويات", "allCategories": "كل التصنيفات", "allAgents": "كل الموظفين", "clearFilters": "مسح عوامل التصفية",
     "empty": "لا توجد تذاكر بعد.", "noSearchMatches": "لم يتم العثور على تذاكر لـ «{{search}}».", "noStatusMatches": "لا توجد تذاكر بالحالة «{{status}}».", "noPriorityMatches": "لا توجد تذاكر بالأولوية «{{priority}}».", "noCategoryMatches": "لا توجد تذاكر في التصنيف «{{category}}».", "noAgentMatches": "لا توجد تذاكر مسندة إلى «{{agent}}».", "noMatches": "لا توجد تذاكر تطابق عوامل التصفية الحالية.", "loadError": "تعذر تحميل التذاكر.", "loadDetailError": "تعذر تحميل هذه التذكرة.", "notFound": "التذكرة غير موجودة.", "unauthorized": "ليس لديك صلاحية للوصول إلى هذه التذكرة.",
     "saveError": "تعذر حفظ التذكرة.", "updateError": "تعذر تحديث التذكرة.", "saveOperations": "حفظ التغييرات", "backToList": "العودة إلى التذاكر", "pagination": "صفحات قائمة التذاكر", "page": "الصفحة {{page}} من {{total}}", "noHistory": "لا يوجد سجل للتذكرة بعد.", "systemActor": "النظام",
-    "firstResponseDue": "موعد الرد الأول", "resolutionDue": "موعد الحل", "conversationLaterTitle": "المحادثة", "conversationLater": "ستتم إضافة الردود العامة وملاحظات التذكرة الداخلية في ميزة محادثة التذكرة.",
+    "firstResponseDue": "موعد الرد الأول", "resolutionDue": "موعد الحل",
+    "conversation": {
+      "title": "المحادثة", "description": "الردود العامة الظاهرة للعميل والملاحظات الخاصة بالفريق لهذه التذكرة.", "timelineLabel": "الخط الزمني لمحادثة التذكرة",
+      "emptyTitle": "لا توجد محادثة بعد", "emptyDescription": "أرسل أول رد عام أو أضف ملاحظة خاصة لفريقك.", "composerMode": "وضع محرر الرسالة",
+      "replyTab": "رد", "noteTab": "ملاحظة داخلية", "replyLabel": "رد عام", "noteLabel": "ملاحظة داخلية",
+      "replyHelp": "هذا الرد ظاهر للعميل.", "noteHelp": "يمكن لفريقك فقط رؤية هذه الملاحظة.", "readOnly": "يجب إسناد هذه التذكرة إليك قبل أن تتمكن من الرد أو إضافة ملاحظة.",
+      "sendReply": "إرسال الرد", "addNote": "إضافة الملاحظة", "sending": "جارٍ الإرسال…", "adding": "جارٍ الإضافة…", "replySuccess": "تم إرسال الرد.", "noteSuccess": "تمت إضافة الملاحظة الداخلية.",
+      "replyError": "تعذر إرسال الرد.", "noteError": "تعذرت إضافة الملاحظة الداخلية.", "internalLabel": "ملاحظة داخلية", "publicLabel": "ظاهر للعميل",
+      "roles": { "ADMIN": "مسؤول", "MANAGER": "مدير", "AGENT": "وكيل دعم", "CUSTOMER": "عميل" }
+    },
     "columns": { "id": "المعرّف", "ticket": "التذكرة" },
     "status": { "NEW": "جديدة", "OPEN": "مفتوحة", "IN_PROGRESS": "قيد التنفيذ", "WAITING_CUSTOMER": "بانتظار العميل", "RESOLVED": "تم حلها", "CLOSED": "مغلقة", "ESCALATED": "مصعّدة" },
     "priority": { "LOW": "منخفضة", "MEDIUM": "متوسطة", "HIGH": "عالية", "URGENT": "عاجلة" },

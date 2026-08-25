@@ -95,18 +95,56 @@ Creation accepts documented ticket fields and defaults channel to `WEB`. Assignm
 
 Ticket deletion is intentionally unavailable because tickets are retained as support history.
 
-### Later Ticket Actions
+### Internal Ticket Conversation
+
+`GET /tickets/:id` includes an internal-only `conversation` array for callers authorized to view the Ticket Management detail. The array combines public messages and internal ticket notes into one deterministic chronological read shape:
+
+```json
+{
+  "conversation": [
+    {
+      "kind": "PUBLIC_MESSAGE",
+      "id": "...",
+      "body": "...",
+      "createdAt": "2026-08-25T10:00:00.000Z",
+      "author": { "id": "...", "name": "...", "role": "AGENT" }
+    },
+    {
+      "kind": "INTERNAL_NOTE",
+      "id": "...",
+      "body": "...",
+      "createdAt": "2026-08-25T10:05:00.000Z",
+      "author": { "id": "...", "name": "...", "role": "MANAGER" }
+    }
+  ]
+}
+```
+
+Items are ordered by `createdAt` ascending, then by `kind` and `id` for stable ties. Only the fields shown above are returned. This shape belongs exclusively to the internal Ticket Management detail contract. Future customer/portal ticket responses must use a separate public shape that includes public messages only and never queries or serializes `TicketNote` records.
 
 ```text
 POST /tickets/:id/messages
 POST /tickets/:id/notes
+```
+
+Both mutations accept the strict body `{ body: string }`, trim it, reject empty or unknown fields, and derive `authorUserId` from the authenticated internal identity. They never accept a client-provided author or timestamp.
+
+`POST /tickets/:id/messages` creates a customer-visible `TicketMessage`. The first successful public staff reply sets `firstRespondedAt` to the message creation timestamp in the same transaction only when it is currently null; later replies do not overwrite it. The response is `{ data: { kind: "PUBLIC_MESSAGE", id, body, createdAt, author } }`.
+
+`POST /tickets/:id/notes` creates an internal-only `TicketNote`, never a `TicketMessage` or `CustomerNote`, and never changes `firstRespondedAt`, ticket status, `resolvedAt`, or `closedAt`. The response is `{ data: { kind: "INTERNAL_NOTE", id, body, createdAt, author } }`.
+
+`ADMIN` and `MANAGER` may read and mutate conversation on any ticket. `AGENT` may read assigned or unassigned tickets but may create replies or notes only on tickets assigned to that agent. Tickets assigned to another agent are hidden. `CUSTOMER` cannot access these internal routes. Public replies and internal notes do not perform automatic status transitions, including on `RESOLVED` or `CLOSED` tickets.
+
+### Later Ticket Actions
+
+```text
 POST /tickets/:id/assign
 POST /tickets/:id/status
 POST /tickets/:id/attachments
 GET  /tickets/:id/history
 ```
 
-For core Ticket Management, history may be included in `GET /tickets/:id`; `GET /tickets/:id/history` may also be implemented as a focused read endpoint. Message, note, and attachment mutations remain outside this branch.
+For core Ticket Management, history is included in `GET /tickets/:id`; `GET /tickets/:id/history` may also be implemented as a focused read endpoint. Assignment, status, and attachment action endpoints remain outside this branch because existing ticket updates own the implemented assignment and status behavior.
 
 ## Knowledge Base
 

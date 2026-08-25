@@ -9,13 +9,16 @@ export interface TicketListItem {
   createdAt: string; updatedAt: string; customer: TicketPerson; assignedAgent: TicketPerson | null; category: TicketCategory | null;
 }
 export interface TicketHistory { id: string; action: string; oldValue: string | null; newValue: string | null; createdAt: string; actor: { id: string; name: string; role: string } | null }
+export type TicketConversationKind = "PUBLIC_MESSAGE" | "INTERNAL_NOTE";
+export interface TicketConversationItem { id: string; kind: TicketConversationKind; body: string; createdAt: string; author: { id: string; name: string; role: string } }
 export interface TicketDetail extends TicketListItem {
   description: string; resolvedAt: string | null; closedAt: string | null;
   customer: TicketPerson & { phone: string | null; createdAt: string };
-  department: { id: string; name: string } | null; branch: { id: string; name: string } | null; history: TicketHistory[];
+  department: { id: string; name: string } | null; branch: { id: string; name: string } | null; history: TicketHistory[]; conversation: TicketConversationItem[];
 }
 export interface TicketFilters { search: string; page: number; limit: number; status?: TicketStatus; priority?: TicketPriority; categoryId?: string; assignedAgentId?: string }
 export interface TicketListResponse { data: TicketListItem[]; meta: { page: number; limit: number; total: number; totalPages: number } }
 export type AgentOption = TicketPerson;
 export interface TicketCreateValues { customerId: string; subject: string; description: string; priority: TicketPriority; categoryId?: string | null; assignedAgentId?: string | null }
 export type TicketUpdateValues = Partial<Omit<TicketCreateValues, "customerId"> & { status: TicketStatus }>;
+export interface TicketConversationValues { body: string }
