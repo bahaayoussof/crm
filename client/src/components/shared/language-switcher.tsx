@@ -12,11 +12,9 @@ export function LanguageSwitcher() {
     {supportedLanguages.map((language) => <button
       type="button"
       key={language}
-      lang={language}
-      dir={language === "ar" ? "rtl" : "ltr"}
       aria-pressed={activeLanguage === language}
       className={`min-h-8 rounded px-2.5 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 ${activeLanguage === language ? "bg-foreground text-white" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
       onClick={() => void changeAppLanguage(language)}
-    >{languageLabels[language]}</button>)}
+    ><span lang={language} dir={language === "ar" ? "rtl" : "ltr"}>{languageLabels[language]}</span></button>)}
   </div>;
 }
