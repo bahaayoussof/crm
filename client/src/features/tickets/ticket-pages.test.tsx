@@ -1,0 +1,147 @@
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { changeAppLanguage } from "@/lib/i18n";
+
+const mocks = vi.hoisted(() => ({
+  useTickets: vi.fn(), useTicket: vi.fn(), useCategories: vi.fn(), useAgents: vi.fn(), useCreateTicket: vi.fn(), useUpdateTicket: vi.fn(), useCustomers: vi.fn(), useAuth: vi.fn(),
+  create: vi.fn(), update: vi.fn(), refetch: vi.fn(),
+}));
+vi.mock("./ticket-hooks", () => ({ useTickets: mocks.useTickets, useTicket: mocks.useTicket, useCategories: mocks.useCategories, useAgents: mocks.useAgents, useCreateTicket: mocks.useCreateTicket, useUpdateTicket: mocks.useUpdateTicket }));
+vi.mock("@/features/customers/customer-hooks", () => ({ useCustomers: mocks.useCustomers }));
+vi.mock("@/features/auth/auth-state", () => ({ useAuth: mocks.useAuth }));
+
+import { TicketDetailPage } from "./ticket-detail-page";
+import { TicketFormPage } from "./ticket-form-page";
+import { TicketListPage } from "./ticket-list-page";
+
+const ticket = {
+  id: "ticket-12345678", subject: "Payment failed", description: "The customer's card was rejected.", status: "IN_PROGRESS", priority: "HIGH", channel: "WEB",
+  firstResponseDueAt: "2026-08-25T09:00:00.000Z", firstRespondedAt: null, resolutionDueAt: "2026-08-26T08:00:00.000Z", resolvedAt: null, closedAt: null,
+  createdAt: "2026-08-25T08:00:00.000Z", updatedAt: "2026-08-25T08:30:00.000Z",
+  customer: { id: "customer-1", name: "Ahmed Mohamed", email: "ahmed@example.com", phone: "+201000000000", createdAt: "2026-08-20T08:00:00.000Z" },
+  assignedAgent: { id: "agent-1", name: "Mariam Hassan", email: "mariam@example.com" }, category: { id: "category-1", name: "Billing" }, department: null, branch: null,
+  history: [{ id: "history-1", action: "STATUS_CHANGED", oldValue: "OPEN", newValue: "IN_PROGRESS", createdAt: "2026-08-25T08:30:00.000Z", actor: { id: "admin-1", name: "Admin", role: "ADMIN" } }],
+};
+const listTicket = { ...ticket, customer: { id: ticket.customer.id, name: ticket.customer.name, email: ticket.customer.email } };
+
+describe("ticket pages", () => {
+  afterEach(cleanup);
+  beforeEach(async () => {
+    await changeAppLanguage("en"); vi.clearAllMocks();
+    mocks.useAuth.mockReturnValue({ user: { id: "admin-1", name: "Admin", email: "admin@example.com", role: "ADMIN" } });
+    mocks.useTickets.mockReturnValue({ isLoading: false, isError: false, data: { data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 0 } }, refetch: mocks.refetch });
+    mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: ticket });
+    mocks.useCategories.mockReturnValue({ data: [{ id: "category-1", name: "Billing" }] }); mocks.useAgents.mockReturnValue({ data: [{ id: "agent-1", name: "Mariam Hassan", email: "mariam@example.com" }] });
+    mocks.useCustomers.mockReturnValue({ isLoading: false, data: { data: [{ id: "customer-1", name: "Ahmed Mohamed", email: "ahmed@example.com" }], meta: { page: 1, limit: 10, total: 1, totalPages: 1 } } });
+    mocks.useCreateTicket.mockReturnValue({ mutateAsync: mocks.create }); mocks.useUpdateTicket.mockReturnValue({ mutateAsync: mocks.update, isPending: false });
+  });
+
+  it("renders structured loading and a genuine empty state inside the table", () => {
+    mocks.useTickets.mockReturnValueOnce({ isLoading: true, isError: false, data: undefined, refetch: mocks.refetch });
+    const loading = renderAt("/tickets", <Route path="/tickets" element={<TicketListPage />} />); expect(screen.getByLabelText("loading")).toBeInTheDocument(); loading.unmount();
+    renderAt("/tickets", <Route path="/tickets" element={<TicketListPage />} />);
+    expect(screen.getAllByText("No tickets yet.")).toHaveLength(2);
+    expect(within(screen.getByRole("table")).getByRole("columnheader", { name: "ID" })).toBeInTheDocument();
+  });
+
+  it.each([
+    ["/tickets?search=missing-id", "No tickets found for “missing-id”."],
+    ["/tickets?status=WAITING_CUSTOMER", "No tickets with status “Waiting for customer”."],
+    ["/tickets?priority=URGENT", "No tickets with priority “Urgent”."],
+    ["/tickets?categoryId=category-1", "No tickets in category “Billing”."],
+    ["/tickets?assignedAgentId=agent-1", "No tickets assigned to “Mariam Hassan”."],
+    ["/tickets?status=OPEN&priority=URGENT", "No tickets match the current filters."],
+  ])("keeps the table header for context-aware empty results at %s", (path, message) => {
+    renderAt(path, <Route path="/tickets" element={<TicketListPage />} />);
+    expect(screen.getAllByText(message)).toHaveLength(2);
+    expect(within(screen.getByRole("table")).getByRole("columnheader", { name: "Ticket" })).toBeInTheDocument();
+  });
+
+  it("drives backend search and filters from URL state", async () => {
+    renderAt("/tickets", <Route path="/tickets" element={<TicketListPage />} />);
+    fireEvent.change(screen.getByPlaceholderText("Search tickets by ID, subject, or customer…"), { target: { value: "ticket-12345678" } });
+    fireEvent.change(screen.getByLabelText("Status"), { target: { value: "OPEN" } });
+    await waitFor(() => expect(mocks.useTickets).toHaveBeenLastCalledWith(expect.objectContaining({ search: "ticket-12345678", status: "OPEN" })), { timeout: 1000 });
+  });
+
+  it("clears search and filter URL state", async () => {
+    renderAt("/tickets?search=missing-id&status=OPEN", <Route path="/tickets" element={<TicketListPage />} />);
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    await waitFor(() => expect(mocks.useTickets).toHaveBeenLastCalledWith(expect.objectContaining({ search: "", status: undefined })));
+    expect(screen.getByRole("searchbox")).toHaveValue("");
+  });
+
+  it("uses TanStack Table with server pagination", async () => {
+    mocks.useTickets.mockReturnValue({ isLoading: false, isError: false, data: { data: [listTicket], meta: { page: 2, limit: 20, total: 60, totalPages: 3 } }, refetch: mocks.refetch });
+    renderAt("/tickets?page=2", <Route path="/tickets" element={<TicketListPage />} />);
+    expect(within(screen.getByRole("table")).getByRole("columnheader", { name: "Ticket" })).toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByRole("columnheader", { name: "ID" })).toBeInTheDocument();
+    expect(screen.getAllByTitle(ticket.id).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => expect(mocks.useTickets).toHaveBeenLastCalledWith(expect.objectContaining({ page: 3 })));
+  });
+
+  it("validates ticket creation and preserves mutation boundaries", async () => {
+    mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: undefined });
+    renderAt("/tickets/new", <Route path="/tickets/new" element={<TicketFormPage />} />);
+    expect(screen.queryByLabelText("Find customer")).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Customer" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Create ticket" }));
+    expect(await screen.findByText("Select a customer")).toBeInTheDocument(); expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it("searches customers inside the combobox and selects a server result", async () => {
+    mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: undefined });
+    renderAt("/tickets/new", <Route path="/tickets/new" element={<TicketFormPage />} />);
+    const customerInput = screen.getByRole("combobox", { name: "Customer" });
+    fireEvent.change(customerInput, { target: { value: "Ahmed" } });
+    await waitFor(() => expect(mocks.useCustomers).toHaveBeenLastCalledWith({ search: "Ahmed", page: 1, limit: 10 }), { timeout: 1000 });
+    fireEvent.click(screen.getByRole("option", { name: /Ahmed Mohamed/ }));
+    expect(customerInput).toHaveValue("Ahmed Mohamed");
+    expect(screen.getByText("ahmed@example.com")).toBeInTheDocument();
+  });
+
+  it("shows a localized empty customer-search state", () => {
+    mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: undefined });
+    mocks.useCustomers.mockReturnValue({ isLoading: false, data: { data: [], meta: { page: 1, limit: 10, total: 0, totalPages: 0 } } });
+    renderAt("/tickets/new", <Route path="/tickets/new" element={<TicketFormPage />} />);
+    fireEvent.focus(screen.getByRole("combobox", { name: "Customer" }));
+    expect(screen.getByText("No customers match your search.")).toBeInTheDocument();
+  });
+
+  it("creates a ticket and navigates to details", async () => {
+    mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: undefined }); mocks.create.mockResolvedValue(listTicket);
+    renderAt("/tickets/new", <><Route path="/tickets/new" element={<TicketFormPage />} /><Route path="/tickets/:id" element={<p>Created detail</p>} /></>);
+    fireEvent.focus(screen.getByRole("combobox", { name: "Customer" })); fireEvent.click(screen.getByRole("option", { name: /Ahmed Mohamed/ })); fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "Payment failed" } }); fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Card rejected" } }); fireEvent.change(screen.getByLabelText("Category"), { target: { value: "category-1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create ticket" }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ customerId: "customer-1", priority: "MEDIUM", categoryId: "category-1" })));
+    expect(await screen.findByText("Created detail")).toBeInTheDocument();
+  });
+
+  it("renders details and localized operational history", () => {
+    renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
+    expect(screen.getByRole("heading", { name: ticket.subject })).toBeInTheDocument(); expect(screen.getByText(ticket.description)).toBeInTheDocument(); expect(screen.getByText("Status changed")).toBeInTheDocument(); expect(screen.getByText("Conversation")).toBeInTheDocument();
+  });
+
+  it("updates status and assignment through one safe mutation", async () => {
+    mocks.update.mockResolvedValue(listTicket); renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
+    fireEvent.change(screen.getByLabelText("Status"), { target: { value: "RESOLVED" } }); fireEvent.change(screen.getByLabelText("Assigned agent"), { target: { value: "" } }); fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({ status: "RESOLVED", assignedAgentId: null }));
+  });
+
+  it("renders representative ticket UI in Arabic", async () => {
+    await changeAppLanguage("ar"); mocks.useTickets.mockReturnValue({ isLoading: false, isError: false, data: { data: [listTicket], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } }, refetch: mocks.refetch });
+    renderAt("/tickets", <Route path="/tickets" element={<TicketListPage />} />);
+    expect(screen.getByRole("heading", { name: "التذاكر" })).toBeInTheDocument(); expect(within(screen.getByRole("table")).getByRole("columnheader", { name: "المعرّف" })).toBeInTheDocument(); expect(screen.getAllByText("قيد التنفيذ").length).toBeGreaterThan(0);
+  });
+
+  it("localizes filtered-empty messaging in Arabic", async () => {
+    await changeAppLanguage("ar");
+    renderAt("/tickets?status=WAITING_CUSTOMER", <Route path="/tickets" element={<TicketListPage />} />);
+    expect(screen.getAllByText("لا توجد تذاكر بالحالة «بانتظار العميل».")).toHaveLength(2);
+    expect(screen.getByRole("table")).toBeInTheDocument();
+  });
+});
+
+function renderAt(path: string, routes: React.ReactNode) { return render(<MemoryRouter initialEntries={[path]}><Routes>{routes}</Routes></MemoryRouter>); }

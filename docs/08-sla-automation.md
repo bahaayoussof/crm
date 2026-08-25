@@ -18,6 +18,18 @@ At minimum:
 
 `firstResponseDueAt` is the SLA deadline calculated when the ticket is created or prioritized. `firstRespondedAt` is the actual timestamp of the first public agent response and remains null until that response occurs. Their comparison supports first-response compliance and reporting such as average first-response time.
 
+## Ticket Management Snapshots
+
+When a ticket is created, use the active `SlaRule` matching its priority, if one exists. Calculate `firstResponseDueAt` and `resolutionDueAt` from the persisted creation time. If no active matching rule exists, both deadlines remain null and creation succeeds.
+
+When an unresolved ticket changes priority, recalculate from the priority-change time using the new priority's active rule:
+
+- update `firstResponseDueAt` only while `firstRespondedAt` is null
+- update `resolutionDueAt` only while the ticket is not `RESOLVED` or `CLOSED`
+- set each relevant unresolved deadline to null when no active matching rule exists
+
+This snapshot behavior does not include timers, workers, alerts, notifications, automatic escalation, or any other SLA automation.
+
 Useful derived states:
 - ON_TRACK
 - AT_RISK

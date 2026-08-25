@@ -1,7 +1,7 @@
 {
   "app": { "title": "Customer Support CRM", "foundationReady": "Project foundation is ready." },
   "navigation": {
-    "languageSwitcher": "Choose language", "primary": "Primary navigation", "dashboard": "Dashboard", "customers": "Customers",
+    "languageSwitcher": "Choose language", "primary": "Primary navigation", "dashboard": "Dashboard", "tickets": "Tickets", "customers": "Customers",
     "portalHome": "Portal home", "portalContext": "Support portal", "workspaceContext": "Support workspace", "openCustomers": "Open customer records"
   },
   "common": {
@@ -15,6 +15,23 @@
   "errors": {
     "generic": "Unable to complete the request. Please try again.",
     "auth": { "INVALID_CREDENTIALS": "Invalid email or password.", "EMAIL_ALREADY_REGISTERED": "An account with this email already exists.", "VALIDATION_ERROR": "Check the form and try again." }
+  },
+  "tickets": {
+    "title": "Tickets", "description": "Manage and track customer support requests", "new": "New ticket", "create": "Create ticket", "createTitle": "Create ticket", "editTitle": "Edit ticket", "edit": "Edit ticket",
+    "formDescription": "Record the issue, classification, and operational ownership.", "ticketDetails": "Ticket details", "classification": "Classification", "subject": "Subject", "descriptionLabel": "Description",
+    "customer": "Customer", "customerComboboxPlaceholder": "Search or select customer…", "customerResults": "Customer search results", "customerSearching": "Searching customers…", "customerSearchError": "Unable to search customers.", "noCustomerResults": "No customers match your search.", "category": "Category", "selectCategory": "Select a category",
+    "assignedAgent": "Assigned agent", "unassigned": "Unassigned", "statusLabel": "Status", "priorityLabel": "Priority", "created": "Created", "updated": "Updated", "history": "History", "metadata": "Ticket metadata", "operations": "Manage ticket",
+    "search": "Search tickets by ID, subject, or customer…", "allStatuses": "All statuses", "allPriorities": "All priorities", "allCategories": "All categories", "allAgents": "All agents", "clearFilters": "Clear filters",
+    "empty": "No tickets yet.", "noSearchMatches": "No tickets found for “{{search}}”.", "noStatusMatches": "No tickets with status “{{status}}”.", "noPriorityMatches": "No tickets with priority “{{priority}}”.", "noCategoryMatches": "No tickets in category “{{category}}”.", "noAgentMatches": "No tickets assigned to “{{agent}}”.", "noMatches": "No tickets match the current filters.", "loadError": "Unable to load tickets.", "loadDetailError": "Unable to load this ticket.", "notFound": "Ticket not found.", "unauthorized": "You do not have access to this ticket.",
+    "saveError": "Unable to save ticket.", "updateError": "Unable to update ticket.", "saveOperations": "Save changes", "backToList": "Back to tickets", "pagination": "Ticket list pages", "page": "Page {{page}} of {{total}}", "noHistory": "No ticket history yet.", "systemActor": "System",
+    "firstResponseDue": "First response due", "resolutionDue": "Resolution due", "conversationLaterTitle": "Conversation", "conversationLater": "Public replies and internal ticket notes will be added in the Ticket Conversation feature.",
+    "columns": { "id": "ID", "ticket": "Ticket" },
+    "status": { "NEW": "New", "OPEN": "Open", "IN_PROGRESS": "In progress", "WAITING_CUSTOMER": "Waiting for customer", "RESOLVED": "Resolved", "CLOSED": "Closed", "ESCALATED": "Escalated" },
+    "priority": { "LOW": "Low", "MEDIUM": "Medium", "HIGH": "High", "URGENT": "Urgent" },
+    "channel": { "WEB": "Web", "EMAIL": "Email", "WHATSAPP": "WhatsApp", "SMS": "SMS", "LIVE_CHAT": "Live chat" },
+    "historyActions": { "TICKET_CREATED": "Ticket created", "STATUS_CHANGED": "Status changed", "PRIORITY_CHANGED": "Priority changed", "ASSIGNMENT_CHANGED": "Assignment changed", "CATEGORY_CHANGED": "Category changed" },
+    "validation": { "customer": "Select a customer", "subject": "Subject must be at least 3 characters", "subjectMax": "Subject must be 200 characters or fewer", "description": "Description is required", "descriptionMax": "Description is too long", "category": "Select a category" },
+    "errors": { "TICKET_NOT_FOUND": "Ticket not found.", "CUSTOMER_NOT_FOUND": "Customer not found.", "INVALID_STATUS_TRANSITION": "This status transition is not allowed.", "INVALID_ASSIGNED_AGENT": "Select a valid support agent.", "CATEGORY_NOT_FOUND": "Category not found.", "FORBIDDEN": "You do not have permission to make this change.", "DEPARTMENT_BRANCH_MISMATCH": "The department does not belong to the selected branch." }
   },
   "customers": {
     "title": "Customers", "description": "Manage customer profiles and support history", "add": "Add customer", "search": "Search customers…",

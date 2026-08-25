@@ -7,6 +7,7 @@ import type { ProtectedAudience } from "@/features/auth/auth-routing";
 
 const internalNavigation = [
   { to: "/dashboard", key: "dashboard" },
+  { to: "/tickets", key: "tickets" },
   { to: "/customers", key: "customers" },
 ] as const;
 

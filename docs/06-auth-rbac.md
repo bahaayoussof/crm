@@ -23,6 +23,7 @@ The API issues an eight-hour bearer access token containing only the user identi
 
 ### MANAGER
 - view all relevant tickets
+- create tickets
 - assign agents
 - escalate tickets
 - access reports
@@ -30,7 +31,11 @@ The API issues an eight-hour bearer access token containing only the user identi
 - monitor SLA
 
 ### AGENT
-- view assigned or permitted tickets
+- view tickets assigned to them and unassigned tickets
+- create internal tickets
+- change priority and normal workflow status only on tickets assigned to them
+- cannot view tickets assigned to another agent
+- cannot assign, reassign, claim, manually escalate, or remove escalation
 - reply to tickets
 - update permitted statuses
 - add internal notes
@@ -45,6 +50,16 @@ The API issues an eight-hour bearer access token containing only the user identi
 - upload attachments to own tickets
 - view knowledge base
 - submit feedback for own eligible tickets
+
+Customer identities cannot access internal ticket-management APIs or pages. Customer ticket creation and ownership-scoped access use later Customer Portal workflows.
+
+## Internal Ticket Permissions
+
+- `ADMIN` and `MANAGER` may view every ticket, create tickets, assign or reassign tickets to `AGENT` users, change priority, and perform any valid documented status transition.
+- `AGENT` may view assigned and unassigned tickets and create tickets. An agent may change priority or use normal non-escalation status transitions only on a ticket assigned to that agent.
+- Assignment targets must have the `AGENT` role. Assigning `ADMIN`, `MANAGER`, or `CUSTOMER` users is invalid.
+- Unassigned tickets remain read-only for agent workflow mutations. Claiming an unassigned ticket is outside the Ticket Management feature.
+- Ticket history is visible wherever the caller is authorized to view the ticket.
 
 ## Security Rules
 

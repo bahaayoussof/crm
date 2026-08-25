@@ -1,7 +1,7 @@
 {
   "app": { "title": "نظام إدارة دعم العملاء", "foundationReady": "البنية الأساسية للمشروع جاهزة." },
   "navigation": {
-    "languageSwitcher": "اختيار اللغة", "primary": "التنقل الرئيسي", "dashboard": "لوحة التحكم", "customers": "العملاء",
+    "languageSwitcher": "اختيار اللغة", "primary": "التنقل الرئيسي", "dashboard": "لوحة التحكم", "tickets": "التذاكر", "customers": "العملاء",
     "portalHome": "الصفحة الرئيسية للبوابة", "portalContext": "بوابة الدعم", "workspaceContext": "مساحة عمل الدعم", "openCustomers": "فتح سجلات العملاء"
   },
   "common": {
@@ -15,6 +15,23 @@
   "errors": {
     "generic": "تعذر إتمام الطلب. يرجى المحاولة مرة أخرى.",
     "auth": { "INVALID_CREDENTIALS": "البريد الإلكتروني أو كلمة المرور غير صحيحة.", "EMAIL_ALREADY_REGISTERED": "يوجد حساب بهذا البريد الإلكتروني بالفعل.", "VALIDATION_ERROR": "راجع بيانات النموذج وحاول مرة أخرى." }
+  },
+  "tickets": {
+    "title": "التذاكر", "description": "إدارة طلبات دعم العملاء ومتابعتها", "new": "تذكرة جديدة", "create": "إنشاء التذكرة", "createTitle": "إنشاء تذكرة", "editTitle": "تعديل التذكرة", "edit": "تعديل التذكرة",
+    "formDescription": "تسجيل المشكلة والتصنيف والمسؤولية التشغيلية.", "ticketDetails": "تفاصيل التذكرة", "classification": "التصنيف", "subject": "الموضوع", "descriptionLabel": "الوصف",
+    "customer": "العميل", "customerComboboxPlaceholder": "ابحث عن عميل أو اختره…", "customerResults": "نتائج البحث عن العملاء", "customerSearching": "جارٍ البحث عن العملاء…", "customerSearchError": "تعذر البحث عن العملاء.", "noCustomerResults": "لا يوجد عملاء يطابقون بحثك.", "category": "التصنيف", "selectCategory": "اختر تصنيفًا",
+    "assignedAgent": "الموظف المسؤول", "unassigned": "غير مسندة", "statusLabel": "الحالة", "priorityLabel": "الأولوية", "created": "تاريخ الإنشاء", "updated": "آخر تحديث", "history": "السجل", "metadata": "بيانات التذكرة", "operations": "إدارة التذكرة",
+    "search": "البحث برقم التذكرة أو الموضوع أو العميل…", "allStatuses": "كل الحالات", "allPriorities": "كل الأولويات", "allCategories": "كل التصنيفات", "allAgents": "كل الموظفين", "clearFilters": "مسح عوامل التصفية",
+    "empty": "لا توجد تذاكر بعد.", "noSearchMatches": "لم يتم العثور على تذاكر لـ «{{search}}».", "noStatusMatches": "لا توجد تذاكر بالحالة «{{status}}».", "noPriorityMatches": "لا توجد تذاكر بالأولوية «{{priority}}».", "noCategoryMatches": "لا توجد تذاكر في التصنيف «{{category}}».", "noAgentMatches": "لا توجد تذاكر مسندة إلى «{{agent}}».", "noMatches": "لا توجد تذاكر تطابق عوامل التصفية الحالية.", "loadError": "تعذر تحميل التذاكر.", "loadDetailError": "تعذر تحميل هذه التذكرة.", "notFound": "التذكرة غير موجودة.", "unauthorized": "ليس لديك صلاحية للوصول إلى هذه التذكرة.",
+    "saveError": "تعذر حفظ التذكرة.", "updateError": "تعذر تحديث التذكرة.", "saveOperations": "حفظ التغييرات", "backToList": "العودة إلى التذاكر", "pagination": "صفحات قائمة التذاكر", "page": "الصفحة {{page}} من {{total}}", "noHistory": "لا يوجد سجل للتذكرة بعد.", "systemActor": "النظام",
+    "firstResponseDue": "موعد الرد الأول", "resolutionDue": "موعد الحل", "conversationLaterTitle": "المحادثة", "conversationLater": "ستتم إضافة الردود العامة وملاحظات التذكرة الداخلية في ميزة محادثة التذكرة.",
+    "columns": { "id": "المعرّف", "ticket": "التذكرة" },
+    "status": { "NEW": "جديدة", "OPEN": "مفتوحة", "IN_PROGRESS": "قيد التنفيذ", "WAITING_CUSTOMER": "بانتظار العميل", "RESOLVED": "تم حلها", "CLOSED": "مغلقة", "ESCALATED": "مصعّدة" },
+    "priority": { "LOW": "منخفضة", "MEDIUM": "متوسطة", "HIGH": "عالية", "URGENT": "عاجلة" },
+    "channel": { "WEB": "الويب", "EMAIL": "البريد الإلكتروني", "WHATSAPP": "واتساب", "SMS": "رسالة نصية", "LIVE_CHAT": "محادثة مباشرة" },
+    "historyActions": { "TICKET_CREATED": "تم إنشاء التذكرة", "STATUS_CHANGED": "تم تغيير الحالة", "PRIORITY_CHANGED": "تم تغيير الأولوية", "ASSIGNMENT_CHANGED": "تم تغيير الموظف المسؤول", "CATEGORY_CHANGED": "تم تغيير التصنيف" },
+    "validation": { "customer": "اختر عميلاً", "subject": "يجب ألا يقل الموضوع عن 3 أحرف", "subjectMax": "يجب ألا يزيد الموضوع عن 200 حرف", "description": "الوصف مطلوب", "descriptionMax": "الوصف طويل جدًا", "category": "اختر تصنيفًا" },
+    "errors": { "TICKET_NOT_FOUND": "التذكرة غير موجودة.", "CUSTOMER_NOT_FOUND": "العميل غير موجود.", "INVALID_STATUS_TRANSITION": "لا يُسمح بهذا الانتقال بين الحالات.", "INVALID_ASSIGNED_AGENT": "اختر موظف دعم صالحًا.", "CATEGORY_NOT_FOUND": "التصنيف غير موجود.", "FORBIDDEN": "ليست لديك صلاحية لإجراء هذا التغيير.", "DEPARTMENT_BRANCH_MISMATCH": "القسم لا يتبع الفرع المحدد." }
   },
   "customers": {
     "title": "العملاء", "description": "إدارة ملفات العملاء وسجل الدعم", "add": "إضافة عميل", "search": "البحث عن العملاء…",

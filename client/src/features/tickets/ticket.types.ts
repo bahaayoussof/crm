@@ -1,0 +1,21 @@
+export type TicketStatus = "NEW" | "OPEN" | "IN_PROGRESS" | "WAITING_CUSTOMER" | "RESOLVED" | "CLOSED" | "ESCALATED";
+export type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+export type TicketChannel = "WEB" | "EMAIL" | "WHATSAPP" | "SMS" | "LIVE_CHAT";
+export interface TicketPerson { id: string; name: string; email: string }
+export interface TicketCategory { id: string; name: string; description?: string | null }
+export interface TicketListItem {
+  id: string; subject: string; status: TicketStatus; priority: TicketPriority; channel: TicketChannel;
+  firstResponseDueAt: string | null; firstRespondedAt: string | null; resolutionDueAt: string | null;
+  createdAt: string; updatedAt: string; customer: TicketPerson; assignedAgent: TicketPerson | null; category: TicketCategory | null;
+}
+export interface TicketHistory { id: string; action: string; oldValue: string | null; newValue: string | null; createdAt: string; actor: { id: string; name: string; role: string } | null }
+export interface TicketDetail extends TicketListItem {
+  description: string; resolvedAt: string | null; closedAt: string | null;
+  customer: TicketPerson & { phone: string | null; createdAt: string };
+  department: { id: string; name: string } | null; branch: { id: string; name: string } | null; history: TicketHistory[];
+}
+export interface TicketFilters { search: string; page: number; limit: number; status?: TicketStatus; priority?: TicketPriority; categoryId?: string; assignedAgentId?: string }
+export interface TicketListResponse { data: TicketListItem[]; meta: { page: number; limit: number; total: number; totalPages: number } }
+export type AgentOption = TicketPerson;
+export interface TicketCreateValues { customerId: string; subject: string; description: string; priority: TicketPriority; categoryId?: string | null; assignedAgentId?: string | null }
+export type TicketUpdateValues = Partial<Omit<TicketCreateValues, "customerId"> & { status: TicketStatus }>;
