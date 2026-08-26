@@ -14,7 +14,7 @@ This contract mixes live and planned endpoints. Each section is tagged:
 - `PARTIAL` — only part of the listed surface is registered; the rest is planned.
 - `PLANNED` — documented target with no registered route yet. Do not consume as a live API.
 
-Registered routers as of `master` `8e24d22`: `/api/auth`, `/api/customers`, `/api/categories`, `/api/users` (lookup only), `/api/tickets`, `/api/dashboard`, `/api/knowledge-articles`, `/api/attachments`, `/api/portal/knowledge-articles`, `/api/portal/attachments`, `/api/portal`, `/api/health`, plus attachment sub-routes on `/api/tickets`, `/api/customers`, and the portal ticket router (`feature/attachments`, integrated at `8e24d22`). There is no registered `/api/reports`, `/api/notifications`, `/api/feedback`, `/api/quick-replies`, or `/api/settings` route.
+Registered routers as of `master` `e34818b` plus the uncommitted `feature/quick-replies` branch: `/api/auth`, `/api/customers`, `/api/categories`, `/api/users` (lookup only), `/api/tickets`, `/api/dashboard`, `/api/knowledge-articles`, `/api/quick-replies` (on `feature/quick-replies`, not yet integrated), `/api/attachments`, `/api/portal/knowledge-articles`, `/api/portal/attachments`, `/api/portal`, `/api/health`, plus attachment sub-routes on `/api/tickets`, `/api/customers`, and the portal ticket router (`feature/attachments`, integrated at `8e24d22`). There is no registered `/api/reports`, `/api/notifications`, `/api/feedback`, or `/api/settings` route.
 
 ## Authentication
 
@@ -307,9 +307,23 @@ No route is registered. `Feedback` (`ticketId`, `customerId`, `rating`, `comment
 
 No route is registered. `Notification` (`userId`, `type`, `title`, `message`, `readAt?`) exists in `schema.prisma` only. `feature/notifications` covers in-app notifications and a read/unread workflow. It must distinguish event-driven in-app notifications from SLA request-time derivation and from any scheduled monitoring; serverless scheduling constraints apply.
 
-## Quick Replies — PLANNED
+## Quick Replies — LIVE (on `feature/quick-replies`, not yet integrated)
 
-No route is registered. `QuickReply` (`title`, `body`, `createdById`) exists in `schema.prisma` only. `feature/quick-replies` covers management permissions, list/search where practical, and insertion of editable content into the Ticket composer. A quick reply is never sent automatically.
+```text
+GET    /api/quick-replies          list (ADMIN, MANAGER, AGENT)
+GET    /api/quick-replies/:id      read one (ADMIN, MANAGER, AGENT)
+POST   /api/quick-replies          create (ADMIN, MANAGER)
+PATCH  /api/quick-replies/:id      update (ADMIN, MANAGER)
+DELETE /api/quick-replies/:id      delete (ADMIN, MANAGER) → 204
+```
+
+`quickReplyRouter` is registered at `/api/quick-replies` in `server/src/app.ts`. `requireAuth` then a use-role group (`ADMIN`/`MANAGER`/`AGENT`) on `GET` and a manage-role group (`ADMIN`/`MANAGER`) on `POST`/`PATCH`/`DELETE`. `AGENT` and `CUSTOMER` receive the standard `403 FORBIDDEN` on mutations; `CUSTOMER` and unauthenticated callers are rejected from every route. There is no Portal route — the Customer Portal never sees quick replies.
+
+`QuickReply` (`id`, `title`, `body`, `createdById`, `createdAt`, `updatedAt`) is used unchanged; no Prisma schema or migration change. `createdById` is assigned from the authenticated user and never accepted from the client; strict schemas reject unknown fields. `title` is trimmed 2–120 chars; `body` is trimmed 1–5,000 chars; `PATCH` requires at least one of `title`/`body`.
+
+List response: `{ data: QuickReply[], meta: { page, limit, total, totalPages } }` where each item is `{ id, title, body, createdAt, updatedAt, createdBy: { id, name, role } }` (author email is never projected; `body` is included so the composer inserter needs no second request). Ordering is `title asc, id asc`. `search` is a case-insensitive `contains` over `title` and `body`. `page`/`limit` are bounded (`limit` max 100, default 20). A missing id returns `404 QUICK_REPLY_NOT_FOUND`.
+
+`feature/quick-replies` also adds a manager-only `/quick-replies` management workspace (list + create/edit) with a nav item shown only to `ADMIN`/`MANAGER`, and a `QuickReplyPicker` in the internal Ticket public-reply composer: a searchable, keyboard-accessible combobox that queries this list endpoint's `search` (debounced, bounded page) so every quick reply is reachable, and inserts the selected `body` as editable plain text at the textarea cursor (replacing any selected range, preserving surrounding draft, restoring focus and caret) subject to the 20,000-char public-reply limit. Selection never sends; the picker is absent from the Internal Note tab, read-only/unassigned agent states, and the Customer Portal.
 
 ## Settings / Configuration management — PLANNED
 

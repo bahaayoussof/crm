@@ -50,10 +50,10 @@ export function AttachmentRows({
         {attachments.map((attachment) => (
           <li className="flex items-center justify-between gap-3 px-4 py-3" key={attachment.id}>
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium">
+              <p className="truncate text-sm font-medium" title={attachment.fileName}>
                 <bdi dir="auto">{attachment.fileName}</bdi>
               </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
+              <p className="mt-0.5 whitespace-nowrap text-xs text-muted-foreground">
                 <bdi dir="ltr">{attachment.mimeType}</bdi>
                 <span aria-hidden="true"> · </span>
                 <bdi dir="ltr">{formatTicketDate(attachment.createdAt, locale)}</bdi>
@@ -183,8 +183,8 @@ export function AttachmentUploadForm({
           {t("attachments.uploadSuccess")}
         </p>
       )}
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" className="button-primary" disabled={!file || isPending} onClick={submit}>
+      <div className="mt-3 flex flex-wrap gap-2 sm:justify-end">
+        <button type="button" className="button-primary sm:w-auto" disabled={!file || isPending} onClick={submit}>
           {isPending ? t("attachments.uploadPending") : failed ? t("attachments.retry") : t("attachments.upload")}
         </button>
         <button
@@ -284,7 +284,7 @@ export function MessageAttachmentList({
       <ul className="flex flex-col gap-1.5" aria-label={t("attachments.title")}>
         {attachments.map((attachment) => (
           <li className="flex items-center justify-between gap-3 rounded-sm border bg-white px-2 py-1" key={attachment.id}>
-            <span className="min-w-0 truncate text-xs font-medium">
+            <span className="min-w-0 truncate text-xs font-medium" title={attachment.fileName}>
               <span aria-hidden="true">📎 </span>
               <bdi dir="auto">{attachment.fileName}</bdi>
             </span>

@@ -4,6 +4,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
 import { useAuth } from "@/features/auth/auth-state";
 import type { ProtectedAudience } from "@/features/auth/auth-routing";
+import { canManageQuickReplies } from "@/features/quick-replies/quick-reply-permissions";
 
 const internalNavigation = [
   { to: "/dashboard", key: "dashboard" },
@@ -41,7 +42,9 @@ export function AppShell({ audience, children }: PropsWithChildren<{ audience: P
     </div>;
   }
 
-  const navigation = internalNavigation;
+  const navigation = user && canManageQuickReplies(user.role)
+    ? [...internalNavigation, { to: "/quick-replies", key: "quickReplies" }]
+    : internalNavigation;
 
   return <div className="min-h-[100dvh] bg-background lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
     <aside className="hidden border-e bg-white lg:flex lg:min-h-[100dvh] lg:flex-col">

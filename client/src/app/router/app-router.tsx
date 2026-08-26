@@ -17,6 +17,9 @@ import { KnowledgeArticleFormPage } from "@/features/knowledge-base/knowledge-ar
 import { KnowledgeBaseDetailPage } from "@/features/knowledge-base/knowledge-base-detail-page";
 import { KnowledgeBaseListPage } from "@/features/knowledge-base/knowledge-base-list-page";
 import { KnowledgeArticleManageRoute } from "./knowledge-article-manage-route";
+import { QuickReplyFormPage } from "@/features/quick-replies/quick-reply-form-page";
+import { QuickReplyListPage } from "@/features/quick-replies/quick-reply-list-page";
+import { QuickReplyManageRoute } from "./quick-reply-manage-route";
 import { TicketEditRoute } from "./ticket-edit-route";
 
 export function AppRouter() {
@@ -41,6 +44,11 @@ export function AppRouter() {
         <Route path="/knowledge-base/:id/edit" element={<KnowledgeArticleFormPage />} />
       </Route>
       <Route path="/knowledge-base/:id" element={<KnowledgeBaseDetailPage />} />
+      <Route element={<QuickReplyManageRoute />}>
+        <Route path="/quick-replies" element={<QuickReplyListPage />} />
+        <Route path="/quick-replies/new" element={<QuickReplyFormPage />} />
+        <Route path="/quick-replies/:id/edit" element={<QuickReplyFormPage />} />
+      </Route>
     </Route>
     <Route element={<ProtectedRoute audience="customer" />}><Route path="/portal" element={<PortalShell />}><Route index element={<PortalHomePage />} /><Route path="tickets" element={<PortalTicketsPage />} /><Route path="tickets/new" element={<PortalNewTicketPage />} /><Route path="tickets/:id" element={<PortalTicketDetailPage />} /><Route path="knowledge-base" element={<PortalKnowledgeBasePage />} /><Route path="knowledge-base/:id" element={<PortalKnowledgeArticlePage />} /></Route></Route>
     <Route path="*" element={<Navigate to="/login" replace />} />

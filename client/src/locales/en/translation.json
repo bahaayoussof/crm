@@ -1,7 +1,7 @@
 {
   "app": { "title": "Customer Support CRM", "foundationReady": "Project foundation is ready." },
   "navigation": {
-    "languageSwitcher": "Choose language", "primary": "Primary navigation", "dashboard": "Dashboard", "tickets": "Tickets", "customers": "Customers", "knowledgeBase": "Knowledge Base",
+    "languageSwitcher": "Choose language", "primary": "Primary navigation", "dashboard": "Dashboard", "tickets": "Tickets", "customers": "Customers", "knowledgeBase": "Knowledge Base", "quickReplies": "Quick Replies",
     "portalHome": "Portal home", "portalContext": "Support portal", "workspaceContext": "Support workspace", "openCustomers": "Open customer records"
   },
   "common": {
@@ -45,6 +45,7 @@
       "replyHelp": "This response is visible to the customer.", "noteHelp": "Only your team can see this note.", "readOnly": "This ticket must be assigned to you before you can reply or add a note.",
       "sendReply": "Send reply", "addNote": "Add note", "sending": "Sending…", "adding": "Adding…", "replySuccess": "Reply sent.", "noteSuccess": "Internal note added.",
       "replyError": "Unable to send the reply.", "noteError": "Unable to add the internal note.", "internalLabel": "Internal note", "publicLabel": "Visible to customer",
+      "showMore": "Show more", "showLess": "Show less",
       "roles": { "ADMIN": "Admin", "MANAGER": "Manager", "AGENT": "Agent", "CUSTOMER": "Customer" }
     },
     "columns": { "id": "ID", "ticket": "Ticket" },
@@ -93,6 +94,51 @@
       "categoryMax": "Category must be 100 characters or fewer"
     },
     "errors": { "KNOWLEDGE_ARTICLE_NOT_FOUND": "Article not found.", "VALIDATION_ERROR": "Check the form and try again.", "FORBIDDEN": "You do not have permission to perform this action." }
+  },
+  "quickReplies": {
+    "title": "Quick Replies",
+    "description": "Create and manage reusable reply snippets agents can insert into the ticket composer.",
+    "create": "Create quick reply",
+    "search": "Search quick replies by title or text…",
+    "clearFilters": "Clear search",
+    "empty": "No quick replies yet.",
+    "noMatches": "No quick replies match the current search.",
+    "loadError": "Unable to load quick replies.",
+    "notFound": "Quick reply not found.",
+    "pagination": "Quick reply pages",
+    "page": "Page {{page}} of {{total}}",
+    "createTitle": "Create quick reply",
+    "editTitle": "Edit quick reply",
+    "formDescription": "A short title agents recognize and the reply text inserted into the composer.",
+    "fieldTitle": "Title",
+    "fieldBody": "Reply text",
+    "bodyHelp": "Plain text. Inserted into the reply composer as editable text and never sent automatically.",
+    "saveError": "Unable to save the quick reply.",
+    "editAction": "Edit quick reply",
+    "deleteAction": "Delete quick reply",
+    "deleteConfirmLabel": "Delete “{{title}}”?",
+    "deleteError": "Unable to delete the quick reply.",
+    "confirmDelete": "Confirm delete",
+    "deleting": "Deleting…",
+    "columns": { "title": "Title", "body": "Reply text", "updated": "Updated", "author": "Author", "actions": "Actions" },
+    "picker": {
+      "label": "Quick reply",
+      "trigger": "Insert quick reply",
+      "searchPlaceholder": "Search quick replies…",
+      "results": "Quick reply results",
+      "searching": "Searching quick replies…",
+      "error": "Unable to search quick replies. Try again.",
+      "empty": "No quick replies available.",
+      "noResults": "No quick replies match your search.",
+      "lengthExceeded": "Inserting this quick reply would exceed the maximum reply length. Your draft is unchanged."
+    },
+    "validation": {
+      "title": "Title must be at least 2 characters",
+      "titleMax": "Title must be 120 characters or fewer",
+      "body": "Reply text is required",
+      "bodyMax": "Reply text must be 5,000 characters or fewer"
+    },
+    "errors": { "QUICK_REPLY_NOT_FOUND": "Quick reply not found.", "VALIDATION_ERROR": "Check the form and try again.", "FORBIDDEN": "You do not have permission to perform this action." }
   },
   "attachments": {
     "title": "Attachments",

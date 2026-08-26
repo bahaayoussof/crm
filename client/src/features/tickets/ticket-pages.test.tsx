@@ -14,6 +14,7 @@ vi.mock("@/features/attachments/attachment-hooks", () => ({
   useTicketAttachments: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
   useUploadTicketAttachment: () => ({ mutateAsync: vi.fn().mockResolvedValue({}), isPending: false }),
 }));
+vi.mock("@/features/quick-replies/quick-reply-picker", () => ({ QuickReplyPicker: () => null }));
 
 import { TicketDetailPage } from "./ticket-detail-page";
 import { TicketFormPage } from "./ticket-form-page";

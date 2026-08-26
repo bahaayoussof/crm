@@ -650,28 +650,26 @@ For a `RESOLVED` ticket, eligible users receive a dedicated localized `Close tic
 
 ## Conversation Timeline
 
-Each public message should show:
+Each entry shows:
 
-- author name
-- author role when needed
-- timestamp
+- author name (`min-w-0 break-words`)
+- author role
+- localized timestamp (`<time dir="ltr">`, `whitespace-nowrap shrink-0` — never wraps character-by-character and is never overlapped by the body)
 - message body
-- attachments
+- whether the entry is a public reply (`"Visible to customer"`) or an Internal Note (`"Internal note"` label) — an explicit localized label, never conveyed by side or colour alone
+- message attachments (public messages only)
 
-Internal notes should be visually different.
+### Implemented presentation
 
-Recommended distinction:
+Entries are compact bordered cards, not edge-to-edge rows. Each card is `min-w-0`, full width on mobile and `max-w-[min(85%,46rem)]` on `sm+` so it never spans the whole content column on wide screens. Logical side alignment via flexbox `justify-*` (flips naturally under RTL): customer messages and Internal Notes at the logical start, staff public replies at the logical end. Internal Notes keep the tinted amber surface **and** the explicit `"Internal note"` label. Restrained borders/spacing — not casual social-media bubbles.
 
-```text
-Customer / public replies:
-neutral conversation surface
+### Long messages — progressive disclosure
 
-Internal note:
-subtle tinted internal-only surface
-clear "Internal note" label
-```
+Short messages render in full. A genuinely long message (deterministic threshold: body longer than 800 characters **or** more than 10 newlines — documented here, chosen over fragile runtime overflow detection) is line-clamped to ~10 lines with a localized **Show more** / **Show less** toggle carrying `aria-expanded`. The complete, unchanged message text is always in the DOM (clamped, never truncated); `white-space: pre-wrap` preserves newlines, `overflow-wrap: anywhere` keeps long URLs and unbroken strings inside the card and copyable when expanded. Body is plain text — raw HTML is never rendered.
 
-Do not use casual social-media chat bubble styling excessively.
+### Long-content containment (Ticket Details generally)
+
+The two Ticket Details grid columns are `min-w-0` so intrinsic content cannot widen the `minmax(0,1fr)` track and produce a page-level horizontal scrollbar; the fix is `min-w-0` on the shrinkable grid/flex children, not application-level `overflow-x-hidden`. Message bodies, the ticket subject (`h1`), the description, History action/description rows, and the customer email/phone all use `break-words [overflow-wrap:anywhere]`; `whitespace-pre-wrap` is kept only where newlines matter (message body, description). Attachment filenames stay `truncate` with the full value exposed through `title`. The app sidebar keeps its fixed width; the main column stays inside the viewport.
 
 ---
 
@@ -1641,29 +1639,52 @@ Do not create noisy notifications for every database update.
 
 # 23. Quick Replies
 
-## Placement
+Implemented on `feature/quick-replies` (roadmap order 3), not yet integrated.
 
-Ticket reply composer.
+## Composer control (Ticket Details Reply tab)
 
-## UX
+Placement: a composer footer beneath the reply textarea, inside the internal Ticket public-reply composer only — the "Reply" tab of the ticket conversation composer. Not the Internal Note tab, not read-only / unassigned agent states, and not the Customer Portal. Mounted only when `mode === "reply" && canMutate`.
 
-Control:
+Footer layout: one row under the textarea holding the Quick Reply control at the logical start and **Send reply** at the logical end (`flex flex-col gap-2 sm:flex-row sm:items-center`, Send pushed out with `sm:ms-auto`). On mobile both controls are full-width and stack (trigger row, then Send row); on `sm+` they sit on one line. Send keeps its existing pending / disabled behaviour. The Quick Reply control is styled `button-secondary` — secondary to the primary Send button.
 
-```text
-Quick Reply ▼
-```
+Collapsed trigger: a compact button `[speech-bubble icon] Insert quick reply` (localized `quickReplies.picker.trigger`; icon from the project's inline-SVG set — no icon dependency). No search field is shown until the trigger is activated. The trigger carries `aria-haspopup="listbox"`, `aria-expanded`, and `aria-controls` for the popover, and has a visible focus ring. It is understandable without the icon.
 
-Selecting a quick reply inserts editable content into the composer.
+Popover selector: activating the trigger opens a popover whose content is rendered through a **React portal on `document.body`** and positioned with `position: fixed` against the trigger's `getBoundingClientRect()` — so it escapes the Ticket Conversation card's `overflow-hidden` clipping instead of being cut off inside it. It is anchored to the trigger, aligned to the trigger's logical-start edge (flipped for RTL) and clamped into the viewport; it opens below the trigger and **flips above** when there is more room there; width is `max(triggerWidth, 288px)` clamped to the viewport; height is bounded (~320px, reduced to the available space) with the result list scrolling internally; it repositions on scroll/resize while open. `z-50` keeps it above cards, borders, and the sticky page header. It contains a search `input` (`role="combobox"`, auto-focused on open, `aria-controls` the listbox) and a result `listbox`. Each result shows the Quick Reply title (primary line) and a short body preview (secondary line). Typing filters through the existing `GET /api/quick-replies` `search` contract (case-insensitive over `title` and `body`), debounced (~300 ms), fetched only while the popover is open, bounded to a deterministic page (`limit` 10, `title asc, id asc`); quick replies past the first page stay reachable by searching. The popover renders explicit loading, empty (no quick replies), and no-results (search returned nothing) states; a list-request failure shows a non-blocking inline message and leaves the composer usable. Arrow Up/Down move the active option, Enter selects, Escape closes and returns focus to the trigger, and a document-level outside `pointerdown` (outside both the trigger and the portalled panel) closes it. Selection never submits and never changes the composer mode. The card's `overflow-hidden` is left untouched — no unrelated Ticket Details overflow is removed.
 
-It must not automatically send.
+Insertion: the selected `body` is inserted into the reply textarea at the current cursor — replacing the selected range if any, otherwise at the caret — preserving the draft text before and after. Blank-line spacing is added only when the adjacent side is non-empty and not already whitespace, so mid-line replacements are not broken up. Focus returns to the textarea and the caret is placed immediately after the inserted quick reply. The insert respects the public-reply maximum length (20,000, matching `ticketConversationBodySchema` / `portalReplySchema`): if the result would exceed it, the draft is left unchanged and a localized accessible error (`role="alert"`) is shown — neither the quick reply nor the existing draft is silently truncated. Unrelated composer state (the Internal Note draft, attachments, success message) is not reset.
 
-Management may live in:
+## Ticket Details action sizing (desktop vs mobile)
 
-```text
-/settings
-```
+`button-primary` is full width by default (mobile-friendly); on `sm+` the Ticket Details primary actions add `sm:w-auto` so they are content-sized, and align to the logical end:
 
-or another documented admin section.
+- **Composer footer:** the reply textarea keeps the full composer width; beneath it a single row holds the **Insert quick reply** trigger at the logical start and **Send reply** at the logical end (`flex flex-col gap-2 sm:flex-row sm:items-center`, Send pushed out with `sm:ms-auto sm:w-auto`). Both controls stack full-width on mobile. Pending/disabled behaviour unchanged; the portalled Quick Reply popover still anchors to the trigger after this layout.
+- **Attachments:** the Upload control is not a full-width primary bar on desktop — the Upload/Cancel actions sit in a `sm:justify-end` row with `sm:w-auto` on Upload (full width on mobile). Filenames are `truncate` + `title`; the row's icon actions stay grouped and cannot be pushed out of the card.
+- **Manage Ticket:** Status / Priority / Category / Assigned agent use a responsive `grid gap-4 sm:grid-cols-2 xl:grid-cols-1` (single column on mobile and inside the narrow `22rem` xl sidebar, two columns at the wider `sm`–`lg` stacked layout). **Save changes** is content-sized on desktop (`sm:w-auto sm:ms-auto`), full width on mobile; validation, transitions, permissions, and mutation behaviour are unchanged. The Close-ticket confirm action is likewise `sm:w-auto`.
+
+## Management workspace
+
+Route: `/quick-replies` (list) and `/quick-replies/new` + `/quick-replies/:id/edit` (create/edit). Visible only to `ADMIN`/`MANAGER`; the nav item is role-gated and direct navigation by `AGENT`/`CUSTOMER` redirects to `/dashboard`.
+
+### Desktop table
+
+Explicit columns, in order: **Title**, **Reply text**, **Updated**, **Actions** (all four headers visible and localized). `table-fixed` with a `<colgroup>` for column ownership and a readable minimum width; horizontal scroll is contained in the table wrapper. Recommended sizing: Title `24%`, Reply text the flexible remainder, Updated `184px`, Actions `116px`. Rows are top-aligned and compact; padding is consistent. Logical `text-start` alignment for the first three columns and `text-end` for Actions, so ownership is identical in LTR and RTL. The Author value moves to mobile-card metadata only — it is not a desktop column.
+
+- **Title cell:** medium weight, `min-w-0`, `break-words`, two-line clamp, full value in `title` when clamped; links to the edit route.
+- **Reply text cell:** a controlled two-line preview — `line-clamp-2` with `whitespace-pre-line` and `[overflow-wrap:anywhere]` so both normal sentences and long unbroken strings stay inside the column; full body in `title`; never rendered as HTML.
+- **Updated cell:** existing locale-aware date, `whitespace-nowrap`, direction-safe via `<bdi dir="ltr">`, stable width.
+- **Actions cell:** compact icon buttons only — Edit (pencil, links to the edit route) and Delete (trash, destructive `border-red-200 text-red-700` treatment) — grouped horizontally in one cell (`size-9` targets, localized `aria-label` + `title`, visible focus rings, no wrapping into unrelated lines). Icon clicks do not trigger row navigation.
+
+Deletion confirmation: Delete opens a small anchored confirmation popover (`role="dialog"`, `aria-label` naming the reply, `absolute`, does not reflow the table) with a localized prompt and explicit **Confirm delete** / **Cancel** controls. Focus moves to Confirm on open; Cancel or Escape closes it and returns focus to the Delete trigger; an outside interaction closes it. A pending delete disables both buttons and shows a spinner; a failed delete stays visible with a `role="alert"` message and the Confirm control relabelled **Retry**.
+
+### Mobile cards
+
+Below `md`, quick replies render as cards (not the desktop table): the Title as the primary value (full width, two-line clamp, links to edit), a controlled two/three-line Reply text preview, an Updated · Author metadata line, and the same Edit / Delete icon group on its own trailing row aligned to the logical end — so the actions never cover the title. Long content wraps safely with no page-level horizontal overflow; readable at 320 px and 375 px; Arabic ordering and alignment stay natural.
+
+### Form
+
+`Title` (2–120 chars) and `Reply text` (1–5,000 chars, plain text) with a help note that the text is inserted as editable content and never sent automatically. Loading / error / empty / no-results / success states; English/Arabic and RTL.
+
+No placeholders or variables, categories/folders, favorites, usage analytics, or AI generation. `feature/settings` (roadmap order 7) may later surface a link to this workspace rather than a second management surface.
 
 ---
 

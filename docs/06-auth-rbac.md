@@ -31,9 +31,12 @@ The role descriptions below include capabilities that are not yet built. As of `
 
 - Attachment listing/download and upload per context. Internal routes require `ADMIN`/`MANAGER`/`AGENT`; `CUSTOMER`/anonymous rejected. Ticket and message listing/download follow the existing ticket visibility predicate; ticket/message upload also requires an `AGENT` to be the assigned agent, and message upload requires `message.authorUserId ===` the authenticated user for every role. Customer-profile listing/download is available to every internal read role; customer-profile upload is `ADMIN`/`MANAGER` only. Portal attachment routes are `CUSTOMER` only, ownership-scoped through `User -> Customer.userId`, upload blocked on `CLOSED` tickets, and never expose customer-profile attachments or another customer's data. See `docs/05-api-contract.md` "Attachments — LIVE" and the matrix below.
 
+### Implemented — `feature/quick-replies`, on branch, not yet integrated
+
+- Quick Replies (`/api/quick-replies`): `ADMIN`/`MANAGER`/`AGENT` may list and read quick replies; `ADMIN`/`MANAGER` may create, update, and delete; `AGENT` is read/use-only (`403` on `POST`/`PATCH`/`DELETE`); `CUSTOMER` and unauthenticated callers are rejected from every route. `createdById` is server-derived from the authenticated `ADMIN`/`MANAGER`. There is no Portal route. The client shows the `/quick-replies` management workspace and nav item to `ADMIN`/`MANAGER` only and guards `/quick-replies*` with replace navigation to `/dashboard` for `AGENT`; `AGENT` reaches quick replies only through the `QuickReplyPicker` in the internal Ticket public-reply composer, which inserts editable text and never sends. See the matrix below.
+
 ### Planned — permission model known, not implemented
 
-- `AGENT` quick-reply use and `ADMIN` quick-reply management (`feature/quick-replies`).
 - `CUSTOMER` feedback submission for own eligible tickets (`feature/customer-feedback`).
 - `ADMIN`/`MANAGER` Reports access (`feature/reports`).
 - `ADMIN`-managed internal user creation and role changes (`feature/user-management`).
@@ -47,7 +50,7 @@ The role descriptions below include capabilities that are not yet built. As of `
 - Custom Branding: who may change application/Portal branding and within what bounds (`feature/custom-branding`).
 - General Audit Logs: whether a dedicated `AuditLog` beyond `TicketHistory` is introduced, and who reads it.
 
-Do not describe Users Management, Feedback, Notifications, Tasks, Settings, or Reports permissions as implemented. Knowledge Base management is implemented (`feature/knowledge-base`); the other role-list items below remain the target model.
+Do not describe Users Management, Feedback, Notifications, Tasks, Settings, or Reports permissions as implemented. Knowledge Base management (`feature/knowledge-base`) and Quick Replies management (`feature/quick-replies`, on branch) are implemented; the other role-list items below remain the target model.
 
 ## Roles
 
@@ -57,6 +60,7 @@ Do not describe Users Management, Feedback, Notifications, Tasks, Settings, or R
 - settings access
 - reports
 - all tickets and customers
+- manage quick replies
 
 ### MANAGER
 - view all relevant tickets
@@ -65,6 +69,7 @@ Do not describe Users Management, Feedback, Notifications, Tasks, Settings, or R
 - escalate tickets
 - access reports
 - manage knowledge base
+- manage quick replies
 - monitor SLA
 
 ### AGENT
@@ -134,6 +139,18 @@ Customer-route middleware is authoritative. The client keeps Customers navigatio
 `/api/knowledge-articles/*` middleware is authoritative: `requireAuth` then a read role group (`ADMIN`/`MANAGER`/`AGENT`) on `GET` and a manage role group (`ADMIN`/`MANAGER`) on `POST`/`PATCH`/`DELETE`. `AGENT` and `CUSTOMER` receive the standard `403 FORBIDDEN` on mutations. `createdById` is assigned from the authenticated user and never accepted from the client; unknown request fields are rejected. `/api/portal/knowledge-articles/*` is `CUSTOMER`-only, always filters `status = PUBLISHED`, and returns an identical `404` for a `DRAFT` id and a missing id so draft existence cannot be probed.
 
 The client shows the internal Knowledge Base navigation item to `ADMIN`/`MANAGER`/`AGENT` (never `CUSTOMER`), shows the Create/Edit/Delete controls only to `ADMIN`/`MANAGER`, and guards `/knowledge-base/new` and `/knowledge-base/:id/edit` with replace navigation to `/knowledge-base` for `AGENT`. `/knowledge-base` and `/knowledge-base/:id` remain available to `AGENT`. These guards are UX only; backend middleware is authoritative.
+
+## Internal Quick Replies Permissions (`feature/quick-replies`, on branch)
+
+| Capability | ADMIN | MANAGER | AGENT | CUSTOMER |
+| --- | --- | --- | --- | --- |
+| List/search quick replies, read one | Yes | Yes | Yes | No |
+| Create / edit / delete quick replies | Yes | Yes | No | No |
+| Insert a quick reply into the internal public-reply composer | Yes | Yes | Yes | No |
+
+`/api/quick-replies/*` middleware is authoritative: `requireAuth` then a use-role group (`ADMIN`/`MANAGER`/`AGENT`) on `GET` and a manage-role group (`ADMIN`/`MANAGER`) on `POST`/`PATCH`/`DELETE`. `AGENT` and `CUSTOMER` receive the standard `403 FORBIDDEN` on mutations; `CUSTOMER` and unauthenticated callers are rejected from every route. `createdById` is assigned from the authenticated user and never accepted from the client; unknown request fields are rejected. There is no Portal route — the Customer Portal never exposes quick replies, and the picker never appears in the Internal Note tab.
+
+The client shows the `/quick-replies` navigation item and management workspace to `ADMIN`/`MANAGER` only and guards `/quick-replies`, `/quick-replies/new`, and `/quick-replies/:id/edit` with replace navigation to `/dashboard` for `AGENT` and `CUSTOMER`. These guards are UX only; backend middleware is authoritative. Selecting a quick reply in the composer inserts editable plain text and never sends.
 
 - Never enforce permissions only in the UI.
 - CUSTOMER must never read another customer's ticket.
