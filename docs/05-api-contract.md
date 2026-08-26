@@ -14,7 +14,7 @@ This contract mixes live and planned endpoints. Each section is tagged:
 - `PARTIAL` — only part of the listed surface is registered; the rest is planned.
 - `PLANNED` — documented target with no registered route yet. Do not consume as a live API.
 
-Registered routers as of `master` `d89cf47` plus `feature/knowledge-base`: `/api/auth`, `/api/customers`, `/api/categories`, `/api/users` (lookup only), `/api/tickets`, `/api/dashboard`, `/api/knowledge-articles` (`feature/knowledge-base`), `/api/portal/knowledge-articles` (`feature/knowledge-base`), `/api/portal`, `/api/health`. There is no registered `/api/reports`, `/api/notifications`, `/api/feedback`, `/api/quick-replies`, `/api/settings`, or attachment upload/download route.
+Registered routers as of `master` `ef647ef`: `/api/auth`, `/api/customers`, `/api/categories`, `/api/users` (lookup only), `/api/tickets`, `/api/dashboard`, `/api/knowledge-articles`, `/api/portal/knowledge-articles`, `/api/portal`, `/api/health`. There is no registered `/api/reports`, `/api/notifications`, `/api/feedback`, `/api/quick-replies`, `/api/settings`, or attachment upload/download route.
 
 ## Authentication
 
