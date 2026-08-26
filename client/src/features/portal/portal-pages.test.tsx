@@ -31,6 +31,12 @@ describe("portal pages", () => {
     expect(screen.getByText("Support")).toBeInTheDocument(); expect(screen.getByText("Replying will reopen this request.")).toBeInTheDocument();
     const field = screen.getByRole("textbox"); fireEvent.change(field, { target: { value: "Still broken" } }); expect(field).toHaveValue("Still broken"); expect(screen.getByText(/message has been preserved/)).toBeInTheDocument();
   });
+  it("never renders internal SLA state, target, or deadlines even if present in the payload", () => {
+    mocks.detail.mockReturnValue({ data: { ...ticket, status: "OPEN", description: "Details", messages: [], slaState: "BREACHED", effectiveSlaTarget: "FIRST_RESPONSE", effectiveSlaDueAt: "2026-08-25T09:00:00Z", firstResponseDueAt: "2026-08-25T09:00:00Z", firstRespondedAt: null, resolutionDueAt: "2026-08-26T09:00:00Z" } });
+    const { container } = renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
+    for (const text of [/SLA/i, /Breached/i, /At risk/i, /On track/i, /First response due/i, /Resolution due/i, /Effective deadline/i]) expect(screen.queryByText(text)).not.toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/BREACHED|FIRST_RESPONSE/);
+  });
   it("hides closed composer and localizes RTL", async () => { await changeAppLanguage("ar"); mocks.detail.mockReturnValue({ data: { ...ticket, status: "CLOSED", description: "Details", messages: [] } }); renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678"); expect(screen.getByText("هذا الطلب مغلق ولم يعد يقبل الردود.")).toBeInTheDocument(); expect(screen.queryByRole("button", { name: "إرسال الرد" })).not.toBeInTheDocument(); expect(document.documentElement).toHaveAttribute("dir", "rtl"); expect(document.querySelector('bdi[dir="ltr"]')).toBeInTheDocument(); });
 });
 function renderPage(element: React.ReactNode, path = "/portal") { return render(<MemoryRouter initialEntries={[path]}><Routes><Route path="/portal/*" element={element}/></Routes></MemoryRouter>); }

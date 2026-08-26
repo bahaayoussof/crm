@@ -7,7 +7,8 @@ vi.mock("../../config/prisma.js", () => ({ prisma: { ticket: mocks, $transaction
 
 import { app } from "../../app.js";
 import { createAccessToken } from "../auth/auth-token.js";
-import { deriveSla, getDashboardOverview } from "./dashboard.service.js";
+import { deriveSla } from "../../shared/sla/derive-sla.js";
+import { getDashboardOverview } from "./dashboard.service.js";
 
 const now = new Date("2026-08-25T12:00:00.000Z");
 const base = { id: "t-1", subject: "Payment failed", status: TicketStatus.OPEN, priority: TicketPriority.MEDIUM, updatedAt: new Date("2026-08-25T10:00:00.000Z"), firstResponseDueAt: null, firstRespondedAt: null, resolutionDueAt: null, resolvedAt: null, closedAt: null, customer: { id: "c-1", name: "Ahmed" }, assignedAgent: null };
@@ -65,6 +66,7 @@ describe("dashboard overview", () => {
     const data = await getDashboardOverview({ userId: "admin", role: Role.ADMIN }, now);
     expect(data.primaryTickets.map((item) => item.id)).toEqual(["b", "u", "a", "z"]);
     expect(Object.keys(data.primaryTickets[0]).sort()).toEqual(["assignedAgent", "customer", "effectiveSlaDueAt", "id", "priority", "slaState", "status", "subject", "updatedAt"].sort());
+    expect(data.primaryTickets[0]).not.toHaveProperty("effectiveSlaTarget");
   });
 
   it("builds an AGENT primary queue from active assigned tickets only and orders it deterministically", async () => {

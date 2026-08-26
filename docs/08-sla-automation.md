@@ -36,17 +36,19 @@ Useful derived states:
 - BREACHED
 - MET
 
-## Dashboard SLA Derivation
+## Shared Request-Time SLA Derivation
 
-The Agent Dashboard derives one effective unresolved deadline at read time. While `firstRespondedAt` is null, `firstResponseDueAt` applies. While the ticket is not `RESOLVED` or `CLOSED`, `resolutionDueAt` applies. When both apply, the earlier deadline is effective.
+The Agent Dashboard and authorized internal Ticket Details use one pure shared backend derivation with an explicitly injected request time. While `firstRespondedAt` is null, `firstResponseDueAt` applies. While the ticket is not terminal, `resolutionDueAt` applies. When both apply, the earlier deadline is effective; an exact tie selects `FIRST_RESPONSE` deterministically.
+
+The result contains `slaState`, `effectiveSlaDueAt`, and `effectiveSlaTarget`. The target is `FIRST_RESPONSE`, `RESOLUTION`, or `null`. Terminal, met-with-no-active-target, and unconfigured results return null target and deadline. API timestamps are ISO strings derived from persisted UTC-safe values, without localized-string comparison or minute rounding.
 
 - `BREACHED`: effective deadline is earlier than or equal to the request time
 - `AT_RISK`: effective deadline is after the request time and no more than 60 minutes away
 - `ON_TRACK`: effective deadline is more than 60 minutes away
-- `MET`: the ticket is resolved/closed, or the configured response target is complete and no unresolved resolution target applies
+- `MET`: status is `RESOLVED` or `CLOSED`, `resolvedAt` or `closedAt` is set, or the configured response target is complete and no unresolved resolution target applies
 - `NOT_CONFIGURED`: no applicable configured deadline exists
 
-The dashboard warning window is fixed at 60 minutes for this assessment. These states are display-time derivations only. They are not persisted and do not add timers, workers, alerts, notifications, or automatic escalation.
+Exactly zero remaining is `BREACHED`; exactly 60 minutes remaining is `AT_RISK`. The warning window is fixed at 60 minutes for this assessment. These states are display-time derivations only. They are not persisted and do not add timers, workers, polling, alerts, notifications, or automatic escalation.
 
 ## First Response
 
@@ -76,4 +78,8 @@ Manual assignment is acceptable for the core delivery.
 
 ## Portal SLA interpretation
 
-Portal-created requests snapshot the active MEDIUM rule. Customer replies never set `firstRespondedAt`. Reopening preserves `resolutionDueAt` and does not recalculate deadlines. Portal responses never expose SLA fields.
+Portal-created requests snapshot the active MEDIUM rule. Customer replies never set `firstRespondedAt`. Reopening preserves `resolutionDueAt` and does not recalculate deadlines. Portal responses never expose raw or derived SLA fields.
+
+## Basic Tracking Versus Deferred Automation
+
+Basic SLA tracking consists of deadline snapshots, eligible priority-change recalculation, one-time first-response recording, shared request-time derivation, Dashboard presentation, and internal Ticket Details presentation. Background workers, scheduled monitoring, persisted SLA state or breach events, notifications, automatic escalation/assignment, SLA reports, and SLA administration remain deferred.

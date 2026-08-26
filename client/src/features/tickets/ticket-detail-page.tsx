@@ -8,7 +8,7 @@ import { TicketConversation } from "./ticket-conversation";
 import { getTicketError, getTicketErrorStatus } from "./ticket-error";
 import { formatTicketDate, ticketReference } from "./ticket-format";
 import { useAgents, useCategories, useTicket, useUpdateTicket } from "./ticket-hooks";
-import type { TicketPriority, TicketStatus } from "./ticket.types";
+import type { SlaState, TicketDetail, TicketPriority, TicketStatus } from "./ticket.types";
 import { TicketPage, TicketSkeleton, TicketState } from "./ticket-ui";
 import { canCloseTicket, canManageTicketDefinition, canOperateAssignedTicket } from "./ticket-permissions";
 
@@ -40,11 +40,37 @@ export function TicketDetailPage() {
         {canManage && <Control label={t("tickets.assignedAgent")}><select className="input" value={assignedAgentId} onChange={(event) => setAssignedAgentId(event.target.value)}><option value="">{t("tickets.unassigned")}</option>{agents.data?.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></Control>}
         <button className="button-primary" disabled={update.isPending} onClick={saveOperations}>{update.isPending ? t("common.saving") : t("tickets.saveOperations")}</button></div>}{canClose && <div className="mt-5 border-t pt-5">{confirmingClose ? <div className="rounded-md border border-red-200 bg-red-50 p-4" role="group" aria-label={t("tickets.closeConfirmation")}><p className="text-sm text-red-900">{t("tickets.closeConfirmation")}</p><div className="mt-3 flex flex-wrap gap-2"><button ref={confirmCloseRef} className="button-primary bg-red-700 hover:bg-red-800" disabled={update.isPending} onClick={closeTicket}>{update.isPending ? t("tickets.closing") : t("tickets.confirmClose")}</button><button className="button-secondary" disabled={update.isPending} onClick={() => setConfirmingClose(false)}>{t("tickets.cancelClose")}</button></div></div> : <button className="button-secondary border-red-300 text-red-700" onClick={() => setConfirmingClose(true)}>{t("tickets.closeTicket")}</button>}</div>}</section>
         <section className="rounded-md border bg-white p-5"><h2 className="text-base font-semibold">{t("tickets.customer")}</h2><Link className="mt-3 block font-medium text-primary" to={`/customers/${record.customer.id}`}>{record.customer.name}</Link><p className="mt-1 text-sm text-muted-foreground"><bdi dir="ltr">{record.customer.email}</bdi></p>{record.customer.phone && <p className="text-sm text-muted-foreground"><bdi dir="ltr">{record.customer.phone}</bdi></p>}</section>
-        <section className="rounded-md border bg-white p-5"><h2 className="text-base font-semibold">{t("tickets.metadata")}</h2><dl className="mt-3 space-y-3 text-sm"><Meta label={t("tickets.category")} value={record.category?.name ?? t("common.notProvided")} /><Meta label={t("tickets.assignedAgent")} value={record.assignedAgent?.name ?? t("tickets.unassigned")} /><Meta label={t("tickets.created")} value={formatTicketDate(record.createdAt, i18n.language)} /><Meta label={t("tickets.updated")} value={formatTicketDate(record.updatedAt, i18n.language)} /><Meta label={t("tickets.firstResponseDue")} value={record.firstResponseDueAt ? formatTicketDate(record.firstResponseDueAt, i18n.language) : t("common.notProvided")} /><Meta label={t("tickets.resolutionDue")} value={record.resolutionDueAt ? formatTicketDate(record.resolutionDueAt, i18n.language) : t("common.notProvided")} /></dl></section>
+        <section className="rounded-md border bg-white p-5"><h2 className="text-base font-semibold">{t("tickets.metadata")}</h2><dl className="mt-3 space-y-3 text-sm"><Meta label={t("tickets.category")} value={record.category?.name ?? t("common.notProvided")} /><Meta label={t("tickets.assignedAgent")} value={record.assignedAgent?.name ?? t("tickets.unassigned")} /><Meta label={t("tickets.created")} value={<DateValue value={record.createdAt} language={i18n.language} />} /><Meta label={t("tickets.updated")} value={<DateValue value={record.updatedAt} language={i18n.language} />} /></dl><SlaDetails record={record} language={i18n.language} /></section>
       </aside>
     </div>
   </TicketPage>;
 }
 function Control({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block"><span className="text-sm font-medium">{label}</span><span className="mt-2 block">{children}</span></label>; }
-function Meta({ label, value }: { label: string; value: string }) { return <div className="flex items-start justify-between gap-4"><dt className="text-muted-foreground">{label}</dt><dd className="text-end">{value}</dd></div>; }
+function SlaDetails({ record, language }: { record: TicketDetail; language: string }) {
+  const { t } = useTranslation();
+  return <section className="mt-5 border-t pt-4" aria-labelledby="ticket-sla-heading">
+    <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold" id="ticket-sla-heading">{t("tickets.sla.title")}</h3><SlaStateLabel state={record.slaState} /></div>
+    <p className="mt-2 text-xs leading-5 text-muted-foreground">{t(`tickets.sla.explanations.${record.slaState}`)}</p>
+    <dl className="mt-4 space-y-3 text-sm">
+      {record.effectiveSlaTarget && <Meta label={t("tickets.sla.activeTarget")} value={t(`tickets.sla.targets.${record.effectiveSlaTarget}`)} />}
+      {record.effectiveSlaDueAt && <Meta label={t("tickets.sla.effectiveDue")} value={<DateValue value={record.effectiveSlaDueAt} language={language} />} />}
+      <Meta label={t("tickets.firstResponseDue")} value={record.firstResponseDueAt ? <DateValue value={record.firstResponseDueAt} language={language} /> : t("common.notProvided")} />
+      <Meta label={t("tickets.sla.firstRespondedAt")} value={record.firstRespondedAt ? <DateValue value={record.firstRespondedAt} language={language} /> : t("tickets.sla.awaitingFirstResponse")} />
+      <Meta label={t("tickets.resolutionDue")} value={record.resolutionDueAt ? <DateValue value={record.resolutionDueAt} language={language} /> : t("common.notProvided")} />
+    </dl>
+  </section>;
+}
+function SlaStateLabel({ state }: { state: SlaState }) {
+  const { t } = useTranslation();
+  const styles: Record<SlaState, string> = {
+    BREACHED: "border-red-300 bg-red-50 text-red-800",
+    AT_RISK: "border-amber-300 bg-amber-50 text-amber-900",
+    ON_TRACK: "border-emerald-300 bg-emerald-50 text-emerald-800",
+    MET: "border-green-200 bg-green-50 text-green-800",
+    NOT_CONFIGURED: "border-gray-300 bg-gray-50 text-gray-700",
+  };
+  return <span className={`inline-flex rounded-sm border px-2 py-0.5 text-xs font-semibold ${styles[state]}`}>{t(`tickets.sla.states.${state}`)}</span>;
+}
+function DateValue({ value, language }: { value: string; language: string }) { return <time dateTime={value}><bdi dir="ltr">{formatTicketDate(value, language)}</bdi></time>; }
+function Meta({ label, value }: { label: string; value: React.ReactNode }) { return <div className="grid gap-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] sm:gap-4"><dt className="text-muted-foreground">{label}</dt><dd className="min-w-0 break-words sm:text-end">{value}</dd></div>; }
 function displayValue(value: string, t: TFunction) { if (["NEW", "OPEN", "IN_PROGRESS", "WAITING_CUSTOMER", "RESOLVED", "CLOSED", "ESCALATED"].includes(value)) return t(`tickets.status.${value}`); if (["LOW", "MEDIUM", "HIGH", "URGENT"].includes(value)) return t(`tickets.priority.${value}`); return value; }

@@ -170,6 +170,31 @@ describe("ticket API", () => {
     expect(hidden.status).toBe(404); expect(hidden.body.error.code).toBe("TICKET_NOT_FOUND");
   });
 
+  it.each([admin, manager, agent])("returns derived SLA and raw snapshots to authorized $role detail reads", async (identity) => {
+    const firstResponseDueAt = new Date("2099-08-26T12:00:00.000Z");
+    const resolutionDueAt = new Date("2099-08-27T12:00:00.000Z");
+    mocks.ticketFindFirst.mockResolvedValue({ ...summary, firstResponseDueAt, resolutionDueAt, description: "Issue", resolvedAt: null, closedAt: null, history: [], department: null, branch: null, messages: [], notes: [] });
+    const response = await request(app).get("/api/tickets/ticket-1").set(auth(identity));
+    expect(response.status).toBe(200);
+    expect(response.body.data).toMatchObject({
+      slaState: "ON_TRACK",
+      effectiveSlaDueAt: firstResponseDueAt.toISOString(),
+      effectiveSlaTarget: "FIRST_RESPONSE",
+      firstResponseDueAt: firstResponseDueAt.toISOString(),
+      firstRespondedAt: null,
+      resolutionDueAt: resolutionDueAt.toISOString(),
+      resolvedAt: null,
+      closedAt: null,
+    });
+  });
+
+  it("rejects unauthenticated and CUSTOMER internal Ticket Details reads", async () => {
+    expect((await request(app).get("/api/tickets/ticket-1")).status).toBe(401);
+    const customerToken = createAccessToken({ id: "customer-user", role: Role.CUSTOMER });
+    expect((await request(app).get("/api/tickets/ticket-1").set({ Authorization: `Bearer ${customerToken}` })).status).toBe(403);
+    expect(mocks.ticketFindFirst).not.toHaveBeenCalled();
+  });
+
   it("returns a deterministic discriminated internal conversation", async () => {
     const sameTime = new Date("2026-08-25T09:00:00.000Z");
     mocks.ticketFindFirst.mockResolvedValue({ ...summary, description: "Issue", history: [], department: null, branch: null,

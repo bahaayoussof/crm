@@ -18,6 +18,7 @@ import { TicketListPage } from "./ticket-list-page";
 const ticket = {
   id: "ticket-12345678", subject: "Payment failed", description: "The customer's card was rejected.", status: "IN_PROGRESS", priority: "HIGH", channel: "WEB",
   firstResponseDueAt: "2026-08-25T09:00:00.000Z", firstRespondedAt: null, resolutionDueAt: "2026-08-26T08:00:00.000Z", resolvedAt: null, closedAt: null,
+  slaState: "BREACHED" as const, effectiveSlaDueAt: "2026-08-25T09:00:00.000Z", effectiveSlaTarget: "FIRST_RESPONSE" as const,
   createdAt: "2026-08-25T08:00:00.000Z", updatedAt: "2026-08-25T08:30:00.000Z",
   customer: { id: "customer-1", name: "Ahmed Mohamed", email: "ahmed@example.com", phone: "+201000000000", createdAt: "2026-08-20T08:00:00.000Z" },
   assignedAgent: { id: "agent-1", name: "Mariam Hassan", email: "mariam@example.com" }, category: { id: "category-1", name: "Billing" }, department: null, branch: null,
@@ -136,6 +137,42 @@ describe("ticket pages", () => {
     expect(screen.getByRole("heading", { name: ticket.subject })).toBeInTheDocument(); expect(screen.getByText(ticket.description)).toBeInTheDocument(); expect(screen.getByText("Status changed")).toBeInTheDocument(); expect(screen.getByText("Conversation")).toBeInTheDocument();
   });
 
+  it.each([
+    ["ON_TRACK", "On track", "The active target is currently within its SLA window."],
+    ["AT_RISK", "At risk", "The active target is due within 60 minutes."],
+    ["BREACHED", "Breached", "The active target deadline has passed."],
+    ["MET", "Target completed", "No active target remains for this completed SLA."],
+    ["NOT_CONFIGURED", "Not configured", "No applicable SLA deadline is configured for this ticket."],
+  ] as const)("renders the %s SLA state with explicit text", (slaState, label, explanation) => {
+    mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: { ...ticket, slaState, effectiveSlaDueAt: slaState === "MET" || slaState === "NOT_CONFIGURED" ? null : ticket.effectiveSlaDueAt, effectiveSlaTarget: slaState === "MET" || slaState === "NOT_CONFIGURED" ? null : ticket.effectiveSlaTarget } });
+    renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
+    expect(screen.getByText(label)).toBeVisible();
+    expect(screen.getByText(explanation)).toBeVisible();
+  });
+
+  it("shows effective and raw SLA target details with direction-safe dates", () => {
+    mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: { ...ticket, firstRespondedAt: "2026-08-25T08:45:00.000Z", effectiveSlaDueAt: ticket.resolutionDueAt, effectiveSlaTarget: "RESOLUTION", slaState: "ON_TRACK" } });
+    const { container } = renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
+    const sla = screen.getByRole("heading", { name: "SLA" }).closest("section");
+    expect(sla).not.toBeNull();
+    expect(within(sla as HTMLElement).getByText("Resolution")).toBeVisible();
+    expect(within(sla as HTMLElement).getByText("Effective deadline")).toBeVisible();
+    expect(within(sla as HTMLElement).getByText("First response due")).toBeVisible();
+    expect(within(sla as HTMLElement).getByText("First response completed")).toBeVisible();
+    expect(within(sla as HTMLElement).getByText("Resolution due")).toBeVisible();
+    expect(container.querySelectorAll('bdi[dir="ltr"]').length).toBeGreaterThanOrEqual(5);
+  });
+
+  it("shows the first-response target and omits a fake deadline when none is effective", () => {
+    const first = renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
+    expect(screen.getByText("First response", { selector: "dd" })).toBeVisible();
+    first.unmount();
+    mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: { ...ticket, slaState: "NOT_CONFIGURED", effectiveSlaDueAt: null, effectiveSlaTarget: null, firstResponseDueAt: null, resolutionDueAt: null } });
+    renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
+    expect(screen.queryByText("Effective deadline")).not.toBeInTheDocument();
+    expect(screen.getByText("Not configured")).toBeVisible();
+  });
+
   it("renders public messages and internal notes chronologically with explicit semantics", () => {
     mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: { ...ticket, conversation: [
       { id: "message-1", kind: "PUBLIC_MESSAGE", body: "Customer-visible update", createdAt: "2026-08-25T09:00:00.000Z", author: { id: "agent-1", name: "Mariam Hassan", role: "AGENT" } },
@@ -168,6 +205,16 @@ describe("ticket pages", () => {
     await changeAppLanguage("ar"); renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
     expect(screen.getByRole("tablist", { name: "وضع محرر الرسالة" })).toBeInTheDocument(); expect(screen.getByRole("tab", { name: "رد" })).toHaveAttribute("aria-selected", "true");
     expect(document.documentElement).toHaveAttribute("dir", "rtl");
+  });
+
+  it("localizes SLA presentation in Arabic and preserves RTL date isolation", async () => {
+    await changeAppLanguage("ar");
+    const { container } = renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
+    expect(screen.getByRole("heading", { name: "اتفاقية مستوى الخدمة" })).toBeVisible();
+    expect(screen.getByText("تم تجاوز الموعد")).toBeVisible();
+    expect(screen.getByText("الرد الأول", { selector: "dd" })).toBeVisible();
+    expect(document.documentElement).toHaveAttribute("dir", "rtl");
+    expect(container.querySelector('bdi[dir="ltr"]')).not.toBeNull();
   });
 
   it("updates status and assignment through one safe mutation", async () => {

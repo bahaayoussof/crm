@@ -382,3 +382,29 @@ Ticket visibility and an operational work queue answer different questions. Expl
 **Consequences**
 
 AGENT metrics and Recent Tickets may still include eligible unassigned tickets. No claiming, assignment, workflow, schema, background processing, or Portal behavior changes. Dashboard clients must use the explicit primary response and preserve role-aware localized headings.
+
+---
+
+## ADR-017: Shared Request-Time SLA Derivation
+
+**Date:** 2026-08-26
+
+**Context**
+
+Dashboard SLA derivation gained a second real consumer when internal Ticket Details needed the same operational state and effective target.
+
+**Decision**
+
+Keep one pure shared backend helper that accepts persisted ticket SLA timestamps plus an explicit current time. It returns the derived state, ISO effective deadline, and explicit first-response or resolution target. Dashboard continues exposing its established response shape; internal Ticket Details adds the target; Portal remains on isolated SLA-free selects.
+
+**Reason**
+
+One deterministic derivation prevents Dashboard and Ticket Details boundary drift without adding persistence, services, routes, schema changes, or client-side SLA calculation.
+
+**Alternatives Considered**
+
+Duplicate calculation in Ticket service; derive state in the browser; persist current SLA state; broaden a shared serializer across internal and Portal reads.
+
+**Consequences**
+
+Both internal consumers share exact 60-minute and zero-time boundaries plus the first-response tie rule. State remains a request-time snapshot. Deferred workers, events, notifications, escalation, and reporting are unchanged.

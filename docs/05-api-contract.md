@@ -132,6 +132,18 @@ Ticket deletion is intentionally unavailable because tickets are retained as sup
 
 Items are ordered by `createdAt` ascending, then by `kind` and `id` for stable ties. Only the fields shown above are returned. This shape belongs exclusively to the internal Ticket Management detail contract. Future customer/portal ticket responses must use a separate public shape that includes public messages only and never queries or serializes `TicketNote` records.
 
+The authorized internal detail also includes request-time SLA derivation alongside the existing raw snapshot timestamps:
+
+```json
+{
+  "slaState": "AT_RISK",
+  "effectiveSlaDueAt": "2026-08-26T12:00:00.000Z",
+  "effectiveSlaTarget": "FIRST_RESPONSE"
+}
+```
+
+`effectiveSlaTarget` is `FIRST_RESPONSE`, `RESOLUTION`, or `null`. The effective deadline is an ISO timestamp or `null`. These values are derived only after internal Ticket visibility succeeds, are never accepted from clients, and are not added to Ticket list or Portal response contracts.
+
 ```text
 POST /tickets/:id/messages
 POST /tickets/:id/notes
@@ -213,4 +225,4 @@ All `/api/portal/*` endpoints require an authenticated `CUSTOMER` and derive own
 - `POST /portal/tickets`: strict subject, description, and optional category creation.
 - `POST /portal/tickets/:id/messages`: strict customer reply, maximum 20,000 characters.
 
-Portal responses exclude priority, assignee, organization, SLA, notes, history, attachments, staff roles/emails, audit data, and escalation semantics.
+Portal responses exclude priority, assignee, organization, SLA state, SLA targets, SLA deadlines, notes, history, attachments, staff roles/emails, audit data, and escalation semantics. In particular, Portal serializers never expose `slaState`, `effectiveSlaDueAt`, `effectiveSlaTarget`, `firstResponseDueAt`, `firstRespondedAt`, or `resolutionDueAt`.

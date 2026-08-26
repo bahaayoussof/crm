@@ -32,6 +32,12 @@
     "empty": "No tickets yet.", "noSearchMatches": "No tickets found for “{{search}}”.", "noStatusMatches": "No tickets with status “{{status}}”.", "noPriorityMatches": "No tickets with priority “{{priority}}”.", "noCategoryMatches": "No tickets in category “{{category}}”.", "noAgentMatches": "No tickets assigned to “{{agent}}”.", "noMatches": "No tickets match the current filters.", "loadError": "Unable to load tickets.", "loadDetailError": "Unable to load this ticket.", "notFound": "Ticket not found.", "unauthorized": "You do not have access to this ticket.",
     "saveError": "Unable to save ticket.", "updateError": "Unable to update ticket.", "saveOperations": "Save changes", "backToList": "Back to tickets", "pagination": "Ticket list pages", "page": "Page {{page}} of {{total}}", "noHistory": "No ticket history yet.", "systemActor": "System", "closeTicket": "Close ticket", "closeConfirmation": "Closing is final and prevents further customer replies. Close this ticket?", "confirmClose": "Confirm close", "cancelClose": "Cancel", "closing": "Closing...", "closeError": "Unable to close ticket.", "unassignedReadOnly": "This ticket must be assigned to you before you can change its workflow or conversation.",
     "firstResponseDue": "First response due", "resolutionDue": "Resolution due",
+    "sla": {
+      "title": "SLA", "activeTarget": "Active target", "effectiveDue": "Effective deadline", "firstRespondedAt": "First response completed", "awaitingFirstResponse": "Awaiting first response",
+      "states": { "ON_TRACK": "On track", "AT_RISK": "At risk", "BREACHED": "Breached", "MET": "Target completed", "NOT_CONFIGURED": "Not configured" },
+      "targets": { "FIRST_RESPONSE": "First response", "RESOLUTION": "Resolution" },
+      "explanations": { "ON_TRACK": "The active target is currently within its SLA window.", "AT_RISK": "The active target is due within 60 minutes.", "BREACHED": "The active target deadline has passed.", "MET": "No active target remains for this completed SLA.", "NOT_CONFIGURED": "No applicable SLA deadline is configured for this ticket." }
+    },
     "conversation": {
       "title": "Conversation", "description": "Public customer-visible replies and private team notes for this ticket.", "timelineLabel": "Ticket conversation timeline",
       "emptyTitle": "No conversation yet", "emptyDescription": "Send the first public reply or add a private note for your team.", "composerMode": "Composer mode",

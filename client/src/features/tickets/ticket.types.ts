@@ -1,6 +1,8 @@
 export type TicketStatus = "NEW" | "OPEN" | "IN_PROGRESS" | "WAITING_CUSTOMER" | "RESOLVED" | "CLOSED" | "ESCALATED";
 export type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 export type TicketChannel = "WEB" | "EMAIL" | "WHATSAPP" | "SMS" | "LIVE_CHAT";
+export type SlaState = "ON_TRACK" | "AT_RISK" | "BREACHED" | "MET" | "NOT_CONFIGURED";
+export type SlaTarget = "FIRST_RESPONSE" | "RESOLUTION" | null;
 export interface TicketPerson { id: string; name: string; email: string }
 export interface TicketCategory { id: string; name: string; description?: string | null }
 export interface TicketListItem {
@@ -13,6 +15,7 @@ export type TicketConversationKind = "PUBLIC_MESSAGE" | "INTERNAL_NOTE";
 export interface TicketConversationItem { id: string; kind: TicketConversationKind; body: string; createdAt: string; author: { id: string; name: string; role: string } }
 export interface TicketDetail extends TicketListItem {
   description: string; resolvedAt: string | null; closedAt: string | null;
+  slaState: SlaState; effectiveSlaDueAt: string | null; effectiveSlaTarget: SlaTarget;
   customer: TicketPerson & { phone: string | null; createdAt: string };
   department: { id: string; name: string } | null; branch: { id: string; name: string } | null; history: TicketHistory[]; conversation: TicketConversationItem[];
 }

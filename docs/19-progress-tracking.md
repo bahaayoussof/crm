@@ -2,15 +2,16 @@
 
 Last Updated: 2026-08-26
 
-Current Integration Branch: `master` at `19fbedde` (`19fbedde3da4249ed68e4fd79b65fe61e3a210e4`), synchronized with `origin/master` before this fix branch was created
+Current Integration Branch: `master`, synchronized with `origin/master` at feature start (local/remote ahead 0, behind 0). The reviewed dashboard ticket-queue fix is now contained in `master`.
 
-Current Working Branch: `fix/dashboard-ticket-queues` at `3c4ba49` - implementation is committed locally; this verification-count reconciliation remains unstaged
+Current Working Branch: `feature/sla` - basic SLA presentation and shared derivation implemented from synchronized `master`; all changes remain unstaged and uncommitted.
 
 > This file is a status summary. Requirements, architecture, API contracts, RBAC rules, workflows, UI specifications, and architecture decisions remain authoritative in their respective documents.
 
 ## 1. Overall Status
 
-- `master` at `19fbedde` contains Project Foundation, Database Schema, Authentication, Customer Management, Localization and RTL, Frontend Design Polish, TanStack Table adoption, Bilingual Typography, Ticket Management, Ticket Conversation, Agent Dashboard, Customer Portal, and the reviewed Ticket authorization/workflow fix.
+- `master` contains Project Foundation, Database Schema, Authentication, Customer Management, Localization and RTL, Frontend Design Polish, TanStack Table adoption, Bilingual Typography, Ticket Management, Ticket Conversation, Agent Dashboard, Customer Portal, the reviewed Ticket authorization/workflow fix, and the reviewed Dashboard ticket-queue fix.
+- `feature/sla` adds basic SLA presentation: one shared request-time derivation helper (`server/src/shared/sla/derive-sla.ts`) now consumed by both the Agent Dashboard and authorized internal Ticket Details, an explicit `effectiveSlaTarget`, derived Ticket Details response fields, and a compact localized Ticket Details SLA subsection. Changes are unstaged.
 - The end-to-end customer/agent support loop is implemented: customers can create, list, inspect, reply to, and reopen eligible requests through the owned Portal boundary, while internal staff can manage, converse on, and resolve tickets with customer context and Dashboard visibility.
 - The project is not finished or production-ready: final SLA presentation/monitoring scope, realistic demo data, final integrated QA, unresolved Dashboard visual verification, deployment verification, and deferred/P1 features remain.
 - Provider-backed channels and other production external integrations remain intentionally deferred.
@@ -28,9 +29,9 @@ Current Working Branch: `fix/dashboard-ticket-queues` at `3c4ba49` - implementat
 | TanStack Table Refactor | ✅ COMPLETE | `fix/frontend-design-polish` | Existing server pagination retained | Typed customer and ticket tables with responsive cards | Passing | N/A | Tip is contained in `master`. |
 | Ticket Management authorization/workflow fix | ✅ COMPLETE | `fix/ticket-agent-permissions` | AGENT update allowlist, actor-derived creation assignment/history, and unchanged close transition enforcement | Protected edit route, role-scoped controls, confirmed close action, explicit Ticket/Customer column containment | Passing | Prior verification | Commit `19fbedde` is integrated into `master`. |
 | Ticket Conversation | ✅ COMPLETE | `feature/ticket-conversation` | Internal detail conversation read, public replies, internal notes, RBAC and first-response transaction | Localized timeline and accessible reply/note composer | Passing | Yes | Tip is contained in `master`; browser capture verification was not completed. |
-| Agent Dashboard | ✅ FIX IMPLEMENTED AND VERIFIED | `fix/dashboard-ticket-queues` | Explicit role-derived primary queues; AGENT active assigned-only work; backend Recent exclusion after primary selection | Localized role-aware headings, non-duplicate sections, fixed-width scrollable tables, overflow-safe mobile cards, and stale-response crash protection | 94 client / 104 server passing | Yes | Implementation is committed locally at `3c4ba49`; tracker reconciliation is unstaged. Browser visual verification remains incomplete. |
+| Agent Dashboard | ✅ COMPLETE | `fix/dashboard-ticket-queues` (contained in `master`) | Explicit role-derived primary queues; AGENT active assigned-only work; backend Recent exclusion after primary selection; now uses the shared SLA derivation helper without response-shape change | Localized role-aware headings, non-duplicate sections, fixed-width scrollable tables, overflow-safe mobile cards, and stale-response crash protection | 103 client / 126 server passing | Yes, prior verified run | Dashboard queue fix is integrated into `master`. `feature/sla` extracts the SLA helper; dashboard regression tests confirm unchanged counts, visibility, ranking, response shape, and boundaries. Browser visual verification remains incomplete. |
 | Customer Portal | ✅ COMPLETE | `feature/customer-portal` | Customer-owned Portal APIs, IDOR-safe ownership, creation, public replies, and reopening | Final responsive English/Arabic Portal shell, overview, list, creation, detail, and navigation polish | 82 client / 87 server passing | Yes, prior verified run | Commit `458af2e` ancestry confirms integration into `master`. Authenticated English/Arabic desktop and mobile visual verification and final navigation regression verification were completed previously. |
-| SLA / Automation | 🟡 PARTIAL | `feature/ticket-management`, `feature/ticket-conversation`, `feature/agent-dashboard`, `feature/customer-portal` | Deadline snapshots/recalculation, one-time first-response recording, Dashboard derivation, and Portal-safe behavior | Implemented SLA presentation uses `ON_TRACK`, `AT_RISK`, `BREACHED`, `MET`, and `NOT_CONFIGURED` where applicable | Passing | Yes, prior verified run | Basic SLA tracking implemented; automation remains partial/deferred. No background workers, scheduled monitoring, persisted breach events, notifications, or automatic escalation. |
+| SLA / Automation | 🟡 BASIC PRESENTATION IMPLEMENTED | `feature/sla` (unstaged) | Deadline snapshots/recalculation, one-time first-response recording, Portal-safe behavior, and one shared request-time derivation helper (`SlaState` + `SlaTarget` + fixed 60-minute window) consumed by Dashboard and authorized internal Ticket Details | Dashboard SLA presentation unchanged; internal Ticket Details gains a compact localized English/Arabic SLA subsection (state, effective target, effective deadline, raw first-response/resolution deadlines, first-response completion) using derived API fields, text-not-color-alone, LTR-isolated dates, no countdown | 103 client / 126 server passing | Not this session; deterministic boundary tests cover all states | Basic SLA presentation and shared derivation complete on `feature/sla`, unstaged. Deferred: background workers, scheduled monitoring, persisted SLA state/breach events, notifications, automatic escalation/assignment, SLA reports, and SLA administration. |
 | Knowledge Base | ⚪ NOT STARTED | — | Schema only | Not implemented | Schema only | Schema only | P1 after the P0 demo flow. |
 | Reports | ⚪ NOT STARTED | — | Not implemented | Not implemented | None | No | Depends on meaningful ticket/SLA/feedback data. |
 | AI Assistant | 🟣 DEFERRED | — | Not implemented | Not implemented | None | No | P2; must require human review when promoted. |
@@ -41,7 +42,7 @@ Current Working Branch: `fix/dashboard-ticket-queues` at `3c4ba49` - implementat
 | Multi-Branch | 🟣 DEFERRED | — | Schema only | Not implemented | Schema only | Schema only | P2 behavior. |
 | External Integrations | 🟣 DEFERRED | — | Channel enum representation only | Not implemented | Schema only | Schema only | WhatsApp, SMS, inbound email, live transport, ERP, and arbitrary systems are demonstration/architecture only. |
 | Deployment | ⚪ NOT STARTED | — | No deployed API evidence | No deployed frontend evidence | Local build passing | Development DB only | Deployment targets are documented but not configured or verified. |
-| Final QA | 🟡 INCOMPLETE | — | Current working scope passes automated and PostgreSQL checks | Current working scope passes automated checks | 16 client files / 92 tests; 8 server files / 104 tests; 196 total passed, 0 failed | Yes for this fix | Representative authenticated English/Arabic Dashboard browser verification remains incomplete because headless captures never advanced beyond blank/loading output. |
+| Final QA | 🟡 INCOMPLETE | — | Current working scope passes automated checks | Current working scope passes automated checks | 16 client files / 103 tests; 9 server files / 126 tests; 229 total passed, 0 failed, 0 skipped, 0 todo | Not this session | `feature/sla`: lint, typecheck, and builds pass; the non-failing Vite chunk-size warning remains. PostgreSQL and authenticated English/Arabic browser verification for the SLA presentation were not performed this session; deterministic boundary tests cover every SLA state. |
 
 ## 3. Completed Work
 
@@ -117,21 +118,22 @@ Current Working Branch: `fix/dashboard-ticket-queues` at `3c4ba49` - implementat
 
 ## 4. Current Work
 
-- `fix/dashboard-ticket-queues` is implemented from synchronized `master` at `19fbedde`.
-- Backend: role-derived `primaryQueueType`/`primaryTickets`; AGENT primary work is active and assigned-only; Recent Tickets excludes primary IDs before its eight-item limit while retaining role visibility.
-- Frontend: auth-context role headings, localized assigned/recent empty states, explicit Dashboard column sizing, bounded horizontal table overflow, two-line long-value containment, LTR ticket IDs, and compact mobile cards.
-- Verification: 94 client and 104 server tests passed (198 latest independently verified); focused Dashboard tests are 12/12 client and 10/10 server; Ticket visibility regression is 39/39. Client/server lint, typecheck, builds, translation JSON, and PostgreSQL role checks passed. The existing Vite chunk-size warning remains.
-- PostgreSQL observed AGENT `MY_ASSIGNED_TICKETS` with 2 primary, 3 recent, 0 duplicates, 0 unassigned primary, and 0 terminal primary; ADMIN observed `NEEDS_ATTENTION` with 5 primary and 0 duplicates.
-- Six authenticated headless browser attempts covered the requested breakpoint/language matrix, but the captures remained blank or on loading output even against a healthy isolated API. No visual verification is claimed.
-- The implementation is committed locally at `3c4ba49`. This tracker reconciliation remains unstaged. Git ancestry does not show integration into `master`, and no push was performed or verified by the AI.
+- `feature/sla` is implemented from `master` synchronized with `origin/master` at feature start. The Dashboard ticket-queue fix it builds on is already contained in `master`.
+- Shared derivation: the Dashboard's local SLA derivation moved to a pure `server/src/shared/sla/derive-sla.ts` module owning `SlaState`, `SlaTarget`, the fixed 60-minute `SLA_WARNING_MINUTES` constant, and `deriveSla(ticket, now)`. `now` is injected; terminal (`RESOLVED`/`CLOSED`/`resolvedAt`/`closedAt`) returns `MET` with null target and deadline; while `firstRespondedAt` is null the first-response deadline applies, the resolution deadline applies while non-terminal, the earlier deadline wins, and an exact tie prefers `FIRST_RESPONSE`; `dueAt <= now` is `BREACHED`, `0 < remaining <= 60min` is `AT_RISK` (60 minutes exactly is `AT_RISK`), `> 60min` is `ON_TRACK`; a configured-and-completed first response with no resolution deadline returns `MET`; otherwise `NOT_CONFIGURED` with null target and deadline. Boundaries use millisecond UTC `Date` math with no minute rounding.
+- Dashboard: `getDashboardOverview` now calls the shared helper; the `GET /api/dashboard/overview` response shape, role visibility, active-ticket definitions, KPI meanings, warning window, Needs Attention / Recent ordering, list sizes, and safe summaries are unchanged. `effectiveSlaTarget` is not added to Dashboard items.
+- Ticket Details: `GET /api/tickets/:id` adds `slaState`, `effectiveSlaDueAt`, and `effectiveSlaTarget`, derived only after existing authorization/visibility succeeds, alongside the unchanged raw `firstResponseDueAt`, `firstRespondedAt`, `resolutionDueAt`, `resolvedAt`, and `closedAt`. No Ticket List or Portal contract change; `CUSTOMER` and unauthenticated callers remain rejected.
+- Portal: no SLA field added to `/api/portal/*`; server and client regression assertions confirm Portal responses and pages never expose `slaState`, `effectiveSlaDueAt`, `effectiveSlaTarget`, `firstResponseDueAt`, `firstRespondedAt`, or `resolutionDueAt`.
+- Frontend: a compact bordered SLA subsection inside the existing Ticket Details metadata surface (not a nested card) shows the localized state with a text label plus restrained semantic accent (state never conveyed by color alone), the localized effective target, the effective deadline when applicable, and the raw first-response deadline, first-response completion, and resolution deadline. Dates use the existing locale formatter with `<bdi dir="ltr">` isolation. No countdown, interval, polling, or client-side state derivation. Full English and Arabic strings added; RTL mirrors through document direction.
+- Verification: 103 client and 126 server tests pass (229 total, 0 failed/skipped/todo), including 18 shared-helper boundary tests, ADMIN/MANAGER/AGENT Ticket Details derived-field coverage, unauthenticated/CUSTOMER rejection, raw-snapshot presence, Portal SLA-free server and client assertions, Dashboard response-shape regression, and 5 Ticket Details SLA-state UI tests plus target-label, deadline-formatting, missing-deadline, first-response-completion, English, Arabic, and RTL tests. Client/server lint, typecheck, builds, translation JSON, `git diff --check`, and OpenWolf validation pass. The existing Vite chunk-size warning remains.
+- PostgreSQL verification and authenticated English/Arabic desktop/mobile browser verification of the SLA presentation were not performed this session; deterministic boundary tests cover every SLA state. Prior feature verification evidence is preserved unchanged below.
+- All `feature/sla` changes remain unstaged and uncommitted. No stage, commit, push, merge, rebase, amend, or tag was performed.
 
 ## 5. Next Recommended Work
 
-1. Developer review and manual browser verification of `fix/dashboard-ticket-queues`, then manual commit/integration if accepted.
-2. Continue with `feature/sla` only after this fix is integrated.
-3. Add realistic seed/demo data and demo accounts.
-4. Run final end-to-end QA, accessibility, responsive, English/Arabic, and RTL review.
-5. Complete deployment preparation and verification.
+1. Developer review and manual browser/PostgreSQL verification of `feature/sla`, then manual commit/integration if accepted.
+2. Add realistic demo seed data and demo accounts covering the critical support journey and a range of live SLA states.
+3. Run final end-to-end QA, accessibility, responsive, English/Arabic, and RTL review.
+4. Complete deployment preparation and verification.
 
 This follows the P0 roadmap and the dependency order in `docs/01-scope-and-priorities.md`, `docs/14-implementation-plan.md`, and `docs/18-ui-pages-spec.md`.
 
@@ -162,7 +164,7 @@ This follows the P0 roadmap and the dependency order in `docs/01-scope-and-prior
 - Customer Portal Knowledge Base, attachments, feedback, notifications, profile editing, and external messaging integrations remain deferred.
 - No attachment upload/storage provider; attachment contexts still require service-level presence and ownership validation.
 - No real-time messaging or provider-backed communication channel.
-- Basic SLA tracking exists: deadline snapshots on creation, eligible priority-change recalculation, one-time first-response recording, and Dashboard request-time `ON_TRACK` / `AT_RISK` / `BREACHED` / `MET` / `NOT_CONFIGURED` derivation. Portal behavior remains SLA-safe without exposing internal fields. Background workers, scheduled monitoring, persisted breach events, notifications, and automatic escalation do not exist.
+- Basic SLA presentation exists: deadline snapshots on creation, eligible priority-change recalculation, one-time first-response recording, and one shared request-time `deriveSla` helper (`ON_TRACK` / `AT_RISK` / `BREACHED` / `MET` / `NOT_CONFIGURED` plus an explicit `FIRST_RESPONSE` / `RESOLUTION` / null target) consumed by the Agent Dashboard and authorized internal Ticket Details. On `feature/sla` (unstaged), internal Ticket Details renders a compact localized SLA subsection; Portal behavior remains SLA-safe without exposing raw or derived internal fields. Background workers, scheduled monitoring, persisted SLA state or breach events, notifications, automatic escalation/assignment, SLA reports, and SLA administration do not exist.
 - No knowledge base, notifications, reports, feedback workflow, or AI actions.
 - No seed script or realistic required demo dataset.
 - No automated visual regression suite; current visual evidence is manual/headless-browser verification from prior feature work.
@@ -179,28 +181,31 @@ This follows the P0 roadmap and the dependency order in `docs/01-scope-and-prior
 
 ## 9. Testing Status
 
-Verified on unstaged/uncommitted `fix/dashboard-ticket-queues` based on synchronized `master` at `19fbedde3da4249ed68e4fd79b65fe61e3a210e4` on 2026-08-26.
+Verified on unstaged/uncommitted `feature/sla` based on `master` synchronized with `origin/master` at feature start, on 2026-08-26.
 
 | Command / category | Files | Passed | Failed | Skipped | Todo | Exit code | Evidence |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| Client tests: `npm --prefix client run test` | 16 | 94 | 0 | 0 | 0 | 0 | Complete Vitest client suite passed after stale-response regression coverage was added. |
-| Server tests: `npm --prefix server run test` | 8 | 104 | 0 | 0 | 0 | 0 | Complete Vitest server suite passed. Expected handled stderr from the negative CORS and simulated failed-write tests did not fail the suite. |
-| Combined/root tests: `npm run test` | 24 | 196 | 0 | 0 | 0 | 0 | Root command reran both configured suites successfully. |
+| Client tests: `npm --prefix client run test` | 16 | 103 | 0 | 0 | 0 | 0 | Complete Vitest client suite passed, including the new Ticket Details SLA presentation tests and the Portal SLA-free assertion. |
+| Server tests: `npm --prefix server run test` | 9 | 126 | 0 | 0 | 0 | 0 | Complete Vitest server suite passed, including 18 shared `deriveSla` boundary tests. Expected handled stderr from the negative CORS and simulated failed-write tests did not fail the suite. |
+| Combined/root tests: `npm run test` | 25 | 229 | 0 | 0 | 0 | 0 | Root command ran both configured suites successfully. |
 | Client lint: `npm --prefix client run lint` | — | — | — | — | — | 0 | ESLint passed. |
 | Server lint: `npm --prefix server run lint` | — | — | — | — | — | 0 | ESLint passed. |
 | Client typecheck: `npm --prefix client run typecheck` | — | — | — | — | — | 0 | TypeScript project check passed. |
 | Server typecheck: `npm --prefix server run typecheck` | — | — | — | — | — | 0 | TypeScript no-emit check passed. |
 | Client build: `npm --prefix client run build` | — | — | — | — | — | 0 | Production build passed; Vite retained the non-failing warning for a minified JavaScript chunk larger than 500 kB. |
 | Server build: `npm --prefix server run build` | — | — | — | — | — | 0 | TypeScript production build passed. |
-| Focused Dashboard client/server | 2 | 22 | 0 | 0 | 0 | 0 | Role headings, queue scope/order, exclusion, safe projection, stale-response compatibility, localization, semantics, and overflow behavior passed. |
-| Ticket visibility regression | 1 | 39 | 0 | 0 | 0 | 0 | Existing internal Ticket visibility and authorization suite passed unchanged. |
-| Translation JSON validation | 2 files | 2 | 0 | — | — | 0 | English and Arabic translation JSON parsed successfully. |
-| OpenWolf validation | 10 core files / 7 hooks | — | 0 | — | — | 0 | All `.wolf/*.json` files parsed; `openwolf status` reported all core files, hook scripts, and registered hook matchers present. |
+| Shared SLA helper: `server/src/shared/sla/derive-sla.test.ts` | 1 | 18 | 0 | 0 | 0 | 0 | NOT_CONFIGURED, first-response and resolution boundaries at 61/60/30/0/-1 minutes, earlier-deadline selection, exact-tie FIRST_RESPONSE, completed-first-response switch to resolution and MET, terminal status/timestamp MET, and ISO serialization. |
+| Ticket Details API regression: `server/src/modules/tickets/ticket.test.ts` | 1 | 43 | 0 | 0 | 0 | 0 | ADMIN/MANAGER/AGENT receive derived SLA plus unchanged raw snapshots; unauthenticated 401 and CUSTOMER 403 without a visibility query; existing visibility, creation snapshot, priority recalculation, first-response, and internal-note behavior unchanged. |
+| Dashboard regression: `server/src/modules/dashboard/dashboard.test.ts` | 1 | 10 | 0 | 0 | 0 | 0 | Counts, visibility, ranking, safe projection, and `effectiveSlaTarget`-free item shape unchanged after helper extraction. |
+| Portal security regression: `server/src/modules/portal/portal.test.ts` | 1 | 11 | 0 | 0 | 0 | 0 | Portal detail body has none of `slaState`, `effectiveSlaDueAt`, `effectiveSlaTarget`, `firstResponseDueAt`, `firstRespondedAt`, `resolutionDueAt`. |
+| Translation JSON validation | 2 files | 2 | 0 | — | — | 0 | English and Arabic translation JSON parsed successfully with matching `tickets.sla.*` keys. |
+| Whitespace: `git diff --check` | — | — | — | — | — | 0 | No trailing-whitespace or conflict markers. |
+| OpenWolf validation | 10 core files / 7 hooks | — | 0 | — | — | 0 | `openwolf status` reported all core files, hook scripts, and registered hook matchers present. |
 
 Current verification evidence:
 
-- PostgreSQL/API: isolated-port requests using real ADMIN and AGENT identities passed queue type, active assigned-only AGENT primary scope, system-wide ADMIN scope, and zero cross-section duplicate checks.
-- Dashboard visual verification: incomplete; six authenticated English/Arabic captures at 1440, 1280, 1024, 768, and 375 pixels stayed blank or on structured loading output despite a healthy isolated API, so no visual pass is claimed.
+- PostgreSQL/API: not performed this session for the SLA presentation. Deterministic automated coverage exercises every SLA state and boundary.
+- SLA presentation visual verification: not performed this session; authenticated browser verification of the Ticket Details SLA subsection in English/Arabic desktop/mobile remains outstanding.
 
 Prior verification evidence preserved without claiming a rerun:
 
@@ -214,7 +219,7 @@ These results cover implemented features, not the unimplemented project scope.
 
 | Branch / area | Purpose | Integration state | Ancestry evidence |
 | --- | --- | --- | --- |
-| `master` | Synchronized integration branch | `bc25a02`; equals `origin/master` before this documentation edit | Local/remote ahead 0, behind 0. |
+| `master` | Synchronized integration branch | Equals `origin/master` at feature start | Local/remote ahead 0, behind 0. |
 | Project Foundation | Client/server foundation | Contained in `master` | Local feature ref is an ancestor of `master`. |
 | Database Schema | CRM Prisma schema and migration | Contained in `master` | Local feature ref is an ancestor of `master`. |
 | Authentication | Authentication and RBAC | Contained in `master` | Local feature ref is an ancestor of `master`. |
@@ -226,6 +231,8 @@ These results cover implemented features, not the unimplemented project scope.
 | Ticket Conversation | Public replies, internal notes, timeline, and first-response recording | Contained in `master` | Commit `879762e` is an ancestor of `master`. |
 | Agent Dashboard and customer refinements | Operational Dashboard and Customer Management authorization/support context | Contained in `master` | Commit `d12067b` is an ancestor of `master`. |
 | Customer Portal | Owned customer support journey and final Portal polish | Contained in `master` | Commit `458af2e` is an ancestor of `master`. |
+| Dashboard ticket-queue fix | Role-aware primary queues and Recent exclusion | Contained in `master` | Commit `3c4ba49` is an ancestor of `master`. |
+| SLA presentation | Shared request-time `deriveSla` helper, Ticket Details derived fields and UI, Portal SLA-free assertions | Implemented on `feature/sla`; unstaged and uncommitted | No `feature/sla` commit exists; branch tip equals `master` and Git ancestry does not show integration. |
 
 “Contained in `master`” means Git ancestry confirms the cited commit or local branch ref is an ancestor of `master`; it does not infer how integration occurred.
 

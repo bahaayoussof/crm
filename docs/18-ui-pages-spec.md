@@ -759,8 +759,14 @@ Sections:
 - branch later if implemented
 
 ### SLA
-- first response state
-- resolution deadline/state
+- localized request-time SLA state with text, never color alone
+- currently effective first-response or resolution target
+- effective deadline when one applies
+- raw first-response deadline and completion timestamp
+- raw resolution deadline
+- explicit met or not-configured explanation when no effective deadline applies
+
+Keep this as a compact bordered subsection inside the existing metadata surface, not a nested card. Dates use the existing locale formatter with LTR isolation. The browser does not recalculate state, run a countdown, poll, or create timers solely for SLA.
 
 ### Recent Tickets
 Small list of recent customer tickets.
@@ -825,6 +831,8 @@ History
 Secondary context may use accordion or sheet.
 
 Do not keep a three-column layout on mobile.
+
+The SLA subsection follows the same single-column metadata flow on mobile, allows dates to wrap, mirrors through document direction in Arabic, and keeps ticket controls and conversation more prominent than SLA decoration.
 
 ---
 

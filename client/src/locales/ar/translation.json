@@ -32,6 +32,12 @@
     "empty": "لا توجد تذاكر بعد.", "noSearchMatches": "لم يتم العثور على تذاكر لـ «{{search}}».", "noStatusMatches": "لا توجد تذاكر بالحالة «{{status}}».", "noPriorityMatches": "لا توجد تذاكر بالأولوية «{{priority}}».", "noCategoryMatches": "لا توجد تذاكر في التصنيف «{{category}}».", "noAgentMatches": "لا توجد تذاكر مسندة إلى «{{agent}}».", "noMatches": "لا توجد تذاكر تطابق عوامل التصفية الحالية.", "loadError": "تعذر تحميل التذاكر.", "loadDetailError": "تعذر تحميل هذه التذكرة.", "notFound": "التذكرة غير موجودة.", "unauthorized": "ليس لديك صلاحية للوصول إلى هذه التذكرة.",
     "saveError": "تعذر حفظ التذكرة.", "updateError": "تعذر تحديث التذكرة.", "saveOperations": "حفظ التغييرات", "backToList": "العودة إلى التذاكر", "pagination": "صفحات قائمة التذاكر", "page": "الصفحة {{page}} من {{total}}", "noHistory": "لا يوجد سجل للتذكرة بعد.", "systemActor": "النظام", "closeTicket": "إغلاق التذكرة", "closeConfirmation": "الإغلاق نهائي ويمنع ردود العميل اللاحقة. هل تريد إغلاق التذكرة؟", "confirmClose": "تأكيد الإغلاق", "cancelClose": "إلغاء", "closing": "جارٍ الإغلاق...", "closeError": "تعذر إغلاق التذكرة.", "unassignedReadOnly": "يجب إسناد هذه التذكرة إليك قبل أن تتمكن من تغيير سير العمل أو المحادثة.",
     "firstResponseDue": "موعد الرد الأول", "resolutionDue": "موعد الحل",
+    "sla": {
+      "title": "اتفاقية مستوى الخدمة", "activeTarget": "الهدف الحالي", "effectiveDue": "الموعد الفعلي", "firstRespondedAt": "اكتمل الرد الأول", "awaitingFirstResponse": "بانتظار الرد الأول",
+      "states": { "ON_TRACK": "ضمن الوقت", "AT_RISK": "معرضة للتجاوز", "BREACHED": "تم تجاوز الموعد", "MET": "تم استيفاء الهدف", "NOT_CONFIGURED": "غير مهيأة" },
+      "targets": { "FIRST_RESPONSE": "الرد الأول", "RESOLUTION": "الحل" },
+      "explanations": { "ON_TRACK": "الهدف الحالي ما زال ضمن المدة المحددة.", "AT_RISK": "يحين موعد الهدف الحالي خلال 60 دقيقة.", "BREACHED": "تجاوز الهدف الحالي موعده المحدد.", "MET": "لا يوجد هدف نشط بعد استيفاء اتفاقية مستوى الخدمة.", "NOT_CONFIGURED": "لا يوجد موعد لاتفاقية مستوى الخدمة ينطبق على هذه التذكرة." }
+    },
     "conversation": {
       "title": "المحادثة", "description": "الردود العامة الظاهرة للعميل والملاحظات الخاصة بالفريق لهذه التذكرة.", "timelineLabel": "الخط الزمني لمحادثة التذكرة",
       "emptyTitle": "لا توجد محادثة بعد", "emptyDescription": "أرسل أول رد عام أو أضف ملاحظة خاصة لفريقك.", "composerMode": "وضع محرر الرسالة",

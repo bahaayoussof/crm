@@ -1,6 +1,7 @@
 import { Prisma, Role, TicketStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
+import { deriveSla } from "../../shared/sla/derive-sla.js";
 import type { CreateTicketInput, TicketConversationInput, TicketListQuery, UpdateTicketInput } from "./ticket.schema.js";
 import { ticketVisibilityWhere, type TicketActor as Actor } from "./ticket-visibility.js";
 
@@ -47,7 +48,7 @@ export async function listTickets(query: TicketListQuery, actor: Actor) {
   return { data: records, meta: { page: query.page, limit: query.limit, total, totalPages: total === 0 ? 0 : Math.ceil(total / query.limit) } };
 }
 
-export async function getTicket(ticketId: string, actor: Actor) {
+export async function getTicket(ticketId: string, actor: Actor, now = new Date()) {
   const ticket = await prisma.ticket.findFirst({
     where: { id: ticketId, ...ticketVisibilityWhere(actor) },
     select: {
@@ -66,6 +67,7 @@ export async function getTicket(ticketId: string, actor: Actor) {
   const { messages, notes, ...detail } = ticket;
   return {
     ...detail,
+    ...deriveSla(detail, now),
     conversation: [
       ...messages.map((item) => ({ ...item, kind: "PUBLIC_MESSAGE" as const })),
       ...notes.map((item) => ({ ...item, kind: "INTERNAL_NOTE" as const })),

@@ -1,9 +1,9 @@
 import { Prisma, TicketPriority, TicketStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
+import { deriveSla, SLA_WARNING_MINUTES } from "../../shared/sla/derive-sla.js";
 import { ticketVisibilityWhere, type TicketActor } from "../tickets/ticket-visibility.js";
 
 export const ACTIVE_STATUSES = [TicketStatus.NEW, TicketStatus.OPEN, TicketStatus.IN_PROGRESS, TicketStatus.WAITING_CUSTOMER, TicketStatus.ESCALATED] as const;
-export const SLA_WARNING_MINUTES = 60;
 
 const dashboardTicketSelect = {
   id: true, subject: true, status: true, priority: true, updatedAt: true,
@@ -12,7 +12,6 @@ const dashboardTicketSelect = {
 } satisfies Prisma.TicketSelect;
 
 type DashboardRecord = Prisma.TicketGetPayload<{ select: typeof dashboardTicketSelect }>;
-export type SlaState = "ON_TRACK" | "AT_RISK" | "BREACHED" | "MET" | "NOT_CONFIGURED";
 export type PrimaryQueueType = "NEEDS_ATTENTION" | "MY_ASSIGNED_TICKETS";
 
 export async function getDashboardOverview(actor: TicketActor, now = new Date()) {
@@ -70,22 +69,13 @@ export async function getDashboardOverview(actor: TicketActor, now = new Date())
   };
 }
 
-export function deriveSla(ticket: Pick<DashboardRecord, "status" | "firstResponseDueAt" | "firstRespondedAt" | "resolutionDueAt" | "resolvedAt" | "closedAt">, now: Date) {
-  if (ticket.status === TicketStatus.RESOLVED || ticket.status === TicketStatus.CLOSED || ticket.resolvedAt || ticket.closedAt) return { effectiveSlaDueAt: null, slaState: "MET" as const };
-  const deadlines = [ticket.firstRespondedAt ? null : ticket.firstResponseDueAt, ticket.resolutionDueAt].filter((value): value is Date => value !== null);
-  if (!deadlines.length) return { effectiveSlaDueAt: null, slaState: ticket.firstRespondedAt && ticket.firstResponseDueAt ? "MET" as const : "NOT_CONFIGURED" as const };
-  const effectiveSlaDueAt = new Date(Math.min(...deadlines.map((value) => value.getTime())));
-  const remaining = effectiveSlaDueAt.getTime() - now.getTime();
-  const slaState: SlaState = remaining <= 0 ? "BREACHED" : remaining <= SLA_WARNING_MINUTES * 60_000 ? "AT_RISK" : "ON_TRACK";
-  return { effectiveSlaDueAt: effectiveSlaDueAt.toISOString(), slaState };
-}
-
 function slaWindowWhere(end: Date): Prisma.TicketWhereInput {
   return { OR: [{ firstRespondedAt: null, firstResponseDueAt: { lte: end } }, { resolutionDueAt: { lte: end } }] };
 }
 function andWhere(...where: Prisma.TicketWhereInput[]): Prisma.TicketWhereInput { return { AND: where }; }
 function serialize(ticket: DashboardRecord, now: Date) {
-  return { id: ticket.id, subject: ticket.subject, status: ticket.status, priority: ticket.priority, updatedAt: ticket.updatedAt.toISOString(), ...deriveSla(ticket, now), customer: ticket.customer, assignedAgent: ticket.assignedAgent };
+  const sla = deriveSla(ticket, now);
+  return { id: ticket.id, subject: ticket.subject, status: ticket.status, priority: ticket.priority, updatedAt: ticket.updatedAt.toISOString(), effectiveSlaDueAt: sla.effectiveSlaDueAt, slaState: sla.slaState, customer: ticket.customer, assignedAgent: ticket.assignedAgent };
 }
 function dedupe(records: DashboardRecord[]) { return [...new Map(records.map((item) => [item.id, item])).values()]; }
 function compareAttention(a: DashboardRecord, b: DashboardRecord, now: Date) {
