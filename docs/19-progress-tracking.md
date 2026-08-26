@@ -4,7 +4,7 @@ Last Updated: 2026-08-26
 
 Current Integration Branch: `master` at `19fbedde` (`19fbedde3da4249ed68e4fd79b65fe61e3a210e4`), synchronized with `origin/master` before this fix branch was created
 
-Current Working Branch: `fix/dashboard-ticket-queues` - implementation and automated/PostgreSQL verification are unstaged and uncommitted
+Current Working Branch: `fix/dashboard-ticket-queues` at `3c4ba49` - implementation is committed locally; this verification-count reconciliation remains unstaged
 
 > This file is a status summary. Requirements, architecture, API contracts, RBAC rules, workflows, UI specifications, and architecture decisions remain authoritative in their respective documents.
 
@@ -28,7 +28,7 @@ Current Working Branch: `fix/dashboard-ticket-queues` - implementation and autom
 | TanStack Table Refactor | ✅ COMPLETE | `fix/frontend-design-polish` | Existing server pagination retained | Typed customer and ticket tables with responsive cards | Passing | N/A | Tip is contained in `master`. |
 | Ticket Management authorization/workflow fix | ✅ COMPLETE | `fix/ticket-agent-permissions` | AGENT update allowlist, actor-derived creation assignment/history, and unchanged close transition enforcement | Protected edit route, role-scoped controls, confirmed close action, explicit Ticket/Customer column containment | Passing | Prior verification | Commit `19fbedde` is integrated into `master`. |
 | Ticket Conversation | ✅ COMPLETE | `feature/ticket-conversation` | Internal detail conversation read, public replies, internal notes, RBAC and first-response transaction | Localized timeline and accessible reply/note composer | Passing | Yes | Tip is contained in `master`; browser capture verification was not completed. |
-| Agent Dashboard | ✅ FIX IMPLEMENTED AND VERIFIED | `fix/dashboard-ticket-queues` | Explicit role-derived primary queues; AGENT active assigned-only work; backend Recent exclusion after primary selection | Localized role-aware headings, non-duplicate sections, fixed-width scrollable tables, overflow-safe mobile cards | 92 client / 104 server passing | Yes | Changes are unstaged/uncommitted. Browser matrix remained blocked by blank/loading headless captures, so visual verification is incomplete. |
+| Agent Dashboard | ✅ FIX IMPLEMENTED AND VERIFIED | `fix/dashboard-ticket-queues` | Explicit role-derived primary queues; AGENT active assigned-only work; backend Recent exclusion after primary selection | Localized role-aware headings, non-duplicate sections, fixed-width scrollable tables, overflow-safe mobile cards, and stale-response crash protection | 94 client / 104 server passing | Yes | Implementation is committed locally at `3c4ba49`; tracker reconciliation is unstaged. Browser visual verification remains incomplete. |
 | Customer Portal | ✅ COMPLETE | `feature/customer-portal` | Customer-owned Portal APIs, IDOR-safe ownership, creation, public replies, and reopening | Final responsive English/Arabic Portal shell, overview, list, creation, detail, and navigation polish | 82 client / 87 server passing | Yes, prior verified run | Commit `458af2e` ancestry confirms integration into `master`. Authenticated English/Arabic desktop and mobile visual verification and final navigation regression verification were completed previously. |
 | SLA / Automation | 🟡 PARTIAL | `feature/ticket-management`, `feature/ticket-conversation`, `feature/agent-dashboard`, `feature/customer-portal` | Deadline snapshots/recalculation, one-time first-response recording, Dashboard derivation, and Portal-safe behavior | Implemented SLA presentation uses `ON_TRACK`, `AT_RISK`, `BREACHED`, `MET`, and `NOT_CONFIGURED` where applicable | Passing | Yes, prior verified run | Basic SLA tracking implemented; automation remains partial/deferred. No background workers, scheduled monitoring, persisted breach events, notifications, or automatic escalation. |
 | Knowledge Base | ⚪ NOT STARTED | — | Schema only | Not implemented | Schema only | Schema only | P1 after the P0 demo flow. |
@@ -120,10 +120,10 @@ Current Working Branch: `fix/dashboard-ticket-queues` - implementation and autom
 - `fix/dashboard-ticket-queues` is implemented from synchronized `master` at `19fbedde`.
 - Backend: role-derived `primaryQueueType`/`primaryTickets`; AGENT primary work is active and assigned-only; Recent Tickets excludes primary IDs before its eight-item limit while retaining role visibility.
 - Frontend: auth-context role headings, localized assigned/recent empty states, explicit Dashboard column sizing, bounded horizontal table overflow, two-line long-value containment, LTR ticket IDs, and compact mobile cards.
-- Verification: 92 client and 104 server tests passed (196 total); focused Dashboard tests are 10/10 client and 10/10 server; Ticket visibility regression is 39/39. Client/server lint, typecheck, builds, translation JSON, and PostgreSQL role checks passed. The existing Vite chunk-size warning remains.
+- Verification: 94 client and 104 server tests passed (198 latest independently verified); focused Dashboard tests are 12/12 client and 10/10 server; Ticket visibility regression is 39/39. Client/server lint, typecheck, builds, translation JSON, and PostgreSQL role checks passed. The existing Vite chunk-size warning remains.
 - PostgreSQL observed AGENT `MY_ASSIGNED_TICKETS` with 2 primary, 3 recent, 0 duplicates, 0 unassigned primary, and 0 terminal primary; ADMIN observed `NEEDS_ATTENTION` with 5 primary and 0 duplicates.
 - Six authenticated headless browser attempts covered the requested breakpoint/language matrix, but the captures remained blank or on loading output even against a healthy isolated API. No visual verification is claimed.
-- All changes remain unstaged and uncommitted; the fix is not integrated into `master` and is not pushed.
+- The implementation is committed locally at `3c4ba49`. This tracker reconciliation remains unstaged. Git ancestry does not show integration into `master`, and no push was performed or verified by the AI.
 
 ## 5. Next Recommended Work
 
@@ -183,7 +183,7 @@ Verified on unstaged/uncommitted `fix/dashboard-ticket-queues` based on synchron
 
 | Command / category | Files | Passed | Failed | Skipped | Todo | Exit code | Evidence |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| Client tests: `npm --prefix client run test` | 16 | 92 | 0 | 0 | 0 | 0 | Complete Vitest client suite passed. |
+| Client tests: `npm --prefix client run test` | 16 | 94 | 0 | 0 | 0 | 0 | Complete Vitest client suite passed after stale-response regression coverage was added. |
 | Server tests: `npm --prefix server run test` | 8 | 104 | 0 | 0 | 0 | 0 | Complete Vitest server suite passed. Expected handled stderr from the negative CORS and simulated failed-write tests did not fail the suite. |
 | Combined/root tests: `npm run test` | 24 | 196 | 0 | 0 | 0 | 0 | Root command reran both configured suites successfully. |
 | Client lint: `npm --prefix client run lint` | — | — | — | — | — | 0 | ESLint passed. |
@@ -192,7 +192,7 @@ Verified on unstaged/uncommitted `fix/dashboard-ticket-queues` based on synchron
 | Server typecheck: `npm --prefix server run typecheck` | — | — | — | — | — | 0 | TypeScript no-emit check passed. |
 | Client build: `npm --prefix client run build` | — | — | — | — | — | 0 | Production build passed; Vite retained the non-failing warning for a minified JavaScript chunk larger than 500 kB. |
 | Server build: `npm --prefix server run build` | — | — | — | — | — | 0 | TypeScript production build passed. |
-| Focused Dashboard client/server | 2 | 20 | 0 | 0 | 0 | 0 | Role headings, queue scope/order, exclusion, safe projection, localization, semantics, and overflow behavior passed. |
+| Focused Dashboard client/server | 2 | 22 | 0 | 0 | 0 | 0 | Role headings, queue scope/order, exclusion, safe projection, stale-response compatibility, localization, semantics, and overflow behavior passed. |
 | Ticket visibility regression | 1 | 39 | 0 | 0 | 0 | 0 | Existing internal Ticket visibility and authorization suite passed unchanged. |
 | Translation JSON validation | 2 files | 2 | 0 | — | — | 0 | English and Arabic translation JSON parsed successfully. |
 | OpenWolf validation | 10 core files / 7 hooks | — | 0 | — | — | 0 | All `.wolf/*.json` files parsed; `openwolf status` reported all core files, hook scripts, and registered hook matchers present. |
