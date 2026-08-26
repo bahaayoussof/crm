@@ -388,6 +388,8 @@ Optional columns:
 
 Do not make the table so wide that all columns become unreadable.
 
+The desktop table uses an explicit column-width contract inside a horizontally scrollable wrapper. Subject owns the largest width and uses contained two-line wrapping for long or unbroken text. Customer reserves a separate readable width; names and LTR-isolated emails truncate inside their own cell. Tablet keeps the intentionally reduced column set, while mobile retains compact cards with overflow-safe subject, customer, identifier, priority, and date content. English and Arabic preserve the same cell ownership.
+
 ## Row Behavior
 
 Clicking a row opens:
@@ -548,6 +550,8 @@ Files
 - validation errors shown inline
 - successful creation redirects to ticket details
 - preserve form after recoverable API failure
+- `AGENT` sees no assignee selector and the request omits `assignedAgentId`; the server returns the ticket already assigned to that agent
+- `ADMIN` and `MANAGER` may select a valid agent or create an unassigned ticket
 
 ## Mobile
 
@@ -570,6 +574,8 @@ Single-column full-width form.
 - AGENT
 
 Authorization remains server-side.
+
+The definition-edit route `/tickets/:id/edit` is restricted to `ADMIN` and `MANAGER`; direct agent navigation redirects to Ticket Details with replacement navigation. Agent creation at `/tickets/new` remains available.
 
 ## Goal
 
@@ -629,6 +635,10 @@ Quick controls may allow:
 - assignment
 
 Avoid putting every possible action in the header.
+
+`ADMIN` and `MANAGER` retain definition editing plus Status, Priority, Category, and Assignment controls. An assigned `AGENT` receives only Status, Priority, Reply, Internal Note, and an eligible Close action; Category remains read-only metadata. An unassigned agent view keeps detail, conversation, history, and customer context readable, hides save/edit/close actions, disables conversation submission, and explains that assignment is required before mutation.
+
+For a `RESOLVED` ticket, eligible users receive a dedicated localized `Close ticket` action. Closing requires an accessible inline confirmation with Confirm and Cancel controls, prevents duplicate pending requests, uses the existing `{ status: "CLOSED" }` mutation, and reports localized failure without replacing rich detail data. `CLOSED` is absent from the generic status selector.
 
 ---
 

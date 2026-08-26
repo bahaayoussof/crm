@@ -12,6 +12,7 @@ import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { CustomerManageRoute } from "./customer-manage-route";
 import { PortalHomePage, PortalNewTicketPage, PortalTicketDetailPage, PortalTicketsPage } from "@/features/portal/portal-pages";
 import { PortalShell } from "@/features/portal/portal-ui";
+import { TicketEditRoute } from "./ticket-edit-route";
 
 export function AppRouter() {
   return <BrowserRouter><Routes>
@@ -21,7 +22,7 @@ export function AppRouter() {
       <Route path="/dashboard" element={<DashboardPage />} />
       <Route path="/tickets" element={<TicketListPage />} />
       <Route path="/tickets/new" element={<TicketFormPage />} />
-      <Route path="/tickets/:id/edit" element={<TicketFormPage />} />
+      <Route element={<TicketEditRoute />}><Route path="/tickets/:id/edit" element={<TicketFormPage />} /></Route>
       <Route path="/tickets/:id" element={<TicketDetailPage />} />
       <Route path="/customers" element={<CustomerListPage />} />
       <Route element={<CustomerManageRoute />}>

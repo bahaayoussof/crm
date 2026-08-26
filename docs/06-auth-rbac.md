@@ -58,12 +58,15 @@ Customer identities cannot access internal ticket-management APIs or pages. Cust
 
 - `ADMIN` and `MANAGER` may view every ticket, create tickets, assign or reassign tickets to `AGENT` users, change priority, and perform any valid documented status transition.
 - `AGENT` may view assigned and unassigned tickets and create tickets. An agent may change priority or use normal non-escalation status transitions only on a ticket assigned to that agent.
+- An agent-created internal ticket is assigned server-side to its authenticated creator. Agents cannot supply `assignedAgentId`, including their own ID or `null`.
+- After creation, an agent may update only `status` and `priority`, and only while assigned. Subject, description, category, department, branch, and assignment remain `ADMIN`/`MANAGER` capabilities.
 - Customer-context ticket lists apply the same rule: `customerId` filtering never grants broader access, so an agent sees only that customer's tickets assigned to them or currently unassigned.
 - The separate Customer Management history endpoint may expose safe summaries for every ticket belonging to the opened customer. Other-agent summaries are `SUMMARY_ONLY`; this never authorizes Ticket detail, conversation, history, notes, or mutation APIs.
 - Assignment targets must have the `AGENT` role. Assigning `ADMIN`, `MANAGER`, or `CUSTOMER` users is invalid.
 - Unassigned tickets remain read-only for agent workflow mutations. Claiming an unassigned ticket is outside the Ticket Management feature.
 - Ticket conversation follows the same mutation boundary: an `AGENT` may add a public reply or internal ticket note only when the ticket is assigned to that agent. `ADMIN` and `MANAGER` may add replies and notes to any visible ticket. Unassigned tickets remain read-only for agent conversation mutations.
 - Ticket history is visible wherever the caller is authorized to view the ticket.
+- `ADMIN` and `MANAGER` may close any `RESOLVED` ticket. An `AGENT` may close only a `RESOLVED` ticket assigned to that agent. Closing continues through `PATCH /tickets/:id` with `{ "status": "CLOSED" }`.
 
 ## Security Rules
 

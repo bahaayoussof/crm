@@ -346,3 +346,21 @@ Support staff need complete customer history context without gaining another age
 ## ADR-011: Isolated Customer Portal boundary
 
 The Customer Portal uses dedicated routes, schemas, response types, Prisma selects, query keys, and pages. Ownership comes from the linked Customer profile. Public status mapping hides ESCALATED, staff authors become SUPPORT, and Portal reads never query notes, history, attachments, SLA, or assignment data.
+
+---
+
+## ADR-015: Agent Ticket Ownership and Definition Boundary
+
+**Date:** 2026-08-26
+
+**Decision**
+
+Internal tickets created by an `AGENT` are assigned transactionally to the authenticated agent and receive one assignment-history event. Client-supplied assignment is forbidden for agent creation. After creation, the agent update boundary is an explicit `status` and `priority` allowlist that requires ownership; ticket definition, classification, organization, and assignment remain `ADMIN`/`MANAGER` capabilities. Closing remains the documented `RESOLVED -> CLOSED` update and is exposed through a dedicated confirmed action.
+
+**Reason**
+
+This removes the unassigned creation dead end, prevents partial or unintended core-field mutation, and makes the consequential close operation discoverable without adding an endpoint or changing the workflow model.
+
+**Consequences**
+
+The client protects ticket edit routes for `ADMIN`/`MANAGER`, renders unassigned agent views read-only, and invalidates rich detail plus related list, dashboard, and customer-context queries after updates. Customer Portal behavior and ticket visibility remain unchanged.

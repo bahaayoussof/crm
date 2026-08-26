@@ -98,22 +98,23 @@ export async function addTicketNote(ticketId: string, input: TicketConversationI
 }
 
 export async function createTicket(input: CreateTicketInput, actor: Actor) {
-  if (actor.role === Role.AGENT && input.assignedAgentId) throw forbidden("Agents cannot assign tickets");
+  if (actor.role === Role.AGENT && input.assignedAgentId !== undefined) throw forbidden("Agents cannot choose a ticket assignee");
+  const creationInput: CreateTicketInput = actor.role === Role.AGENT ? { ...input, assignedAgentId: actor.userId } : input;
   const now = new Date();
   return prisma.$transaction(async (tx) => {
-    const relations = await validateRelations(tx, input);
-    const sla = await tx.slaRule.findFirst({ where: { priority: input.priority, isActive: true } });
+    const relations = await validateRelations(tx, creationInput);
+    const sla = await tx.slaRule.findFirst({ where: { priority: creationInput.priority, isActive: true } });
     const ticket = await tx.ticket.create({
       data: {
-        ...input, createdAt: now,
+        ...creationInput, createdAt: now,
         firstResponseDueAt: sla ? addMinutes(now, sla.firstResponseMinutes) : null,
         resolutionDueAt: sla ? addMinutes(now, sla.resolutionMinutes) : null,
       },
       select: ticketSummarySelect,
     });
     await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorUserId: actor.userId, action: "TICKET_CREATED", newValue: TicketStatus.NEW } });
-    if (input.assignedAgentId) await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorUserId: actor.userId, action: "ASSIGNMENT_CHANGED", newValue: relations.agent?.name ?? input.assignedAgentId } });
-    if (input.categoryId) await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorUserId: actor.userId, action: "CATEGORY_CHANGED", newValue: relations.category?.name ?? input.categoryId } });
+    if (creationInput.assignedAgentId) await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorUserId: actor.userId, action: "ASSIGNMENT_CHANGED", newValue: relations.agent?.name ?? creationInput.assignedAgentId } });
+    if (creationInput.categoryId) await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorUserId: actor.userId, action: "CATEGORY_CHANGED", newValue: relations.category?.name ?? creationInput.categoryId } });
     return ticket;
   });
 }
@@ -177,7 +178,8 @@ function compareConversation(left: { createdAt: Date; kind: string; id: string }
 
 function enforceMutationPermissions(current: { assignedAgentId: string | null }, input: UpdateTicketInput, actor: Actor) {
   if (actor.role !== Role.AGENT) return;
-  if (input.assignedAgentId !== undefined) throw forbidden("Agents cannot assign tickets");
+  const allowedFields = new Set<keyof UpdateTicketInput>(["status", "priority"]);
+  if ((Object.keys(input) as (keyof UpdateTicketInput)[]).some((field) => !allowedFields.has(field))) throw forbidden("Agents may update only ticket status and priority");
   if ((input.priority !== undefined || input.status !== undefined) && current.assignedAgentId !== actor.userId) throw forbidden("Ticket must be assigned to the agent before workflow changes");
 }
 

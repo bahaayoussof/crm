@@ -24,7 +24,9 @@ WAITING_CUSTOMER -> RESOLVED
 RESOLVED -> CLOSED
 ```
 
-Arbitrary skipping and undocumented backward transitions are invalid. In particular, `NEW -> RESOLVED` and `OPEN -> CLOSED` are rejected.
+Arbitrary skipping and undocumented backward transitions are invalid. Direct closing from `NEW`, `OPEN`, `IN_PROGRESS`, `WAITING_CUSTOMER`, or `ESCALATED` is rejected. `CLOSED` has no further manual transition.
+
+Closing uses the existing ticket update endpoint and sets `closedAt` server-side while preserving `resolvedAt`, conversation, SLA snapshots, and status history. `ADMIN` and `MANAGER` may close any resolved ticket; `AGENT` may close only a resolved ticket assigned to that agent. The internal UI presents closing as a dedicated confirmed action rather than duplicating `CLOSED` in the generic status selector.
 
 ## Reopen
 

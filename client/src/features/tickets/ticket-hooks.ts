@@ -19,7 +19,7 @@ export function useCreateTicket() { const client = useQueryClient(); return useM
 export function useUpdateTicket(id: string) {
   const client = useQueryClient();
   return useMutation({ mutationFn: (values: TicketUpdateValues) => updateTicket(id, values), onSuccess: async () => {
-    await Promise.all([client.invalidateQueries({ queryKey: ticketKeys.detail(id) }), client.invalidateQueries({ queryKey: ticketKeys.lists() })]);
+    await Promise.all([client.invalidateQueries({ queryKey: ticketKeys.detail(id) }), client.invalidateQueries({ queryKey: ticketKeys.lists() }), client.invalidateQueries({ queryKey: ["dashboard"] }), client.invalidateQueries({ queryKey: ["customers"] })]);
   } });
 }
 function useConversationMutation(id: string, mutationFn: (id: string, values: TicketConversationValues) => Promise<unknown>) {

@@ -137,6 +137,22 @@ describe("ticket API", () => {
     expect(mocks.historyCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: "TICKET_CREATED", actorUserId: admin.id }) }));
   });
 
+  it("auto-assigns agent-created tickets and records assignment history", async () => {
+    mocks.userFindFirst.mockResolvedValue({ id: agent.id, name: "Assigned Agent" });
+    mocks.ticketCreate.mockResolvedValue({ ...summary, assignedAgent: { id: agent.id, name: "Assigned Agent", email: "agent@example.com" } });
+    const response = await request(app).post("/api/tickets").set(auth(agent)).send({ subject: "Phone request", description: "Captured by agent", customerId: "customer-1" });
+    expect(response.status).toBe(201);
+    expect(mocks.ticketCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ assignedAgentId: agent.id }) }));
+    expect(mocks.historyCreate).toHaveBeenNthCalledWith(1, expect.objectContaining({ data: expect.objectContaining({ action: "TICKET_CREATED", actorUserId: agent.id }) }));
+    expect(mocks.historyCreate).toHaveBeenNthCalledWith(2, expect.objectContaining({ data: expect.objectContaining({ action: "ASSIGNMENT_CHANGED", actorUserId: agent.id, newValue: "Assigned Agent" }) }));
+    expect(response.body.data.assignedAgent.id).toBe(agent.id);
+  });
+
+  it.each([{ assignedAgentId: agent.id }, { assignedAgentId: otherAgent.id }, { assignedAgentId: null }])("rejects any agent-supplied assignee property: %j", async (body) => {
+    const response = await request(app).post("/api/tickets").set(auth(agent)).send({ subject: "Phone request", description: "Captured by agent", customerId: "customer-1", ...body });
+    expect(response.status).toBe(403); expect(response.body.error.code).toBe("FORBIDDEN"); expect(mocks.ticketCreate).not.toHaveBeenCalled();
+  });
+
   it("rejects an invalid customer and invalid assignment", async () => {
     mocks.customerFind.mockResolvedValueOnce(null);
     const missingCustomer = await request(app).post("/api/tickets").set(auth()).send({ subject: "Payment failed", description: "Card rejected", customerId: "missing" });
@@ -211,6 +227,34 @@ describe("ticket API", () => {
     await request(app).patch("/api/tickets/ticket-1").set(auth(agent)).send({ status: "RESOLVED" });
     expect(mocks.ticketUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "RESOLVED", resolvedAt: expect.any(Date) }) }));
     expect(mocks.historyCreateMany).toHaveBeenCalledWith({ data: [expect.objectContaining({ action: "STATUS_CHANGED", oldValue: "IN_PROGRESS", newValue: "RESOLVED" })] });
+  });
+
+  it.each(["subject", "description", "categoryId", "departmentId", "branchId", "assignedAgentId"])("rejects assigned-agent updates to forbidden field %s", async (field) => {
+    mocks.ticketFindFirst.mockResolvedValue({ ...current, status: TicketStatus.IN_PROGRESS, assignedAgentId: agent.id });
+    const value = field === "subject" ? "Changed subject" : field === "description" ? "Changed description" : "relation-1";
+    const response = await request(app).patch("/api/tickets/ticket-1").set(auth(agent)).send({ [field]: value });
+    expect(response.status).toBe(403); expect(response.body.error.code).toBe("FORBIDDEN"); expect(mocks.ticketUpdate).not.toHaveBeenCalled(); expect(mocks.historyCreateMany).not.toHaveBeenCalled();
+  });
+
+  it("rejects mixed allowed and forbidden agent updates atomically", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({ ...current, assignedAgentId: agent.id });
+    const response = await request(app).patch("/api/tickets/ticket-1").set(auth(agent)).send({ status: "OPEN", subject: "Forbidden change" });
+    expect(response.status).toBe(403); expect(mocks.ticketUpdate).not.toHaveBeenCalled(); expect(mocks.historyCreateMany).not.toHaveBeenCalled();
+  });
+
+  it.each([[Role.ADMIN, "admin-close"], [Role.MANAGER, "manager-close"], [Role.AGENT, "agent-close"]] as const)("allows %s to close an eligible resolved ticket", async (role, id) => {
+    const identity = { id: role === Role.AGENT ? agent.id : id, role };
+    mocks.ticketFindFirst.mockResolvedValue({ ...current, status: TicketStatus.RESOLVED, resolvedAt: now, assignedAgentId: role === Role.AGENT ? agent.id : otherAgent.id });
+    const response = await request(app).patch("/api/tickets/ticket-1").set(auth(identity)).send({ status: "CLOSED" });
+    expect(response.status).toBe(200);
+    expect(mocks.ticketUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "CLOSED", closedAt: expect.any(Date) }) }));
+  });
+
+  it("rejects direct close transitions and unassigned agent close", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({ ...current, status: TicketStatus.IN_PROGRESS, assignedAgentId: agent.id });
+    expect((await request(app).patch("/api/tickets/ticket-1").set(auth(agent)).send({ status: "CLOSED" })).status).toBe(409);
+    mocks.ticketFindFirst.mockResolvedValue({ ...current, status: TicketStatus.RESOLVED, assignedAgentId: null });
+    expect((await request(app).patch("/api/tickets/ticket-1").set(auth(agent)).send({ status: "CLOSED" })).status).toBe(403);
   });
 
   it("rejects invalid transitions and agent workflow changes on unassigned tickets", async () => {

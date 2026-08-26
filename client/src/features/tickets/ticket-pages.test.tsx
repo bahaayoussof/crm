@@ -121,6 +121,16 @@ describe("ticket pages", () => {
     expect(await screen.findByText("Created detail")).toBeInTheDocument();
   });
 
+  it("keeps agent creation available while omitting assignee selection and payload", async () => {
+    mocks.useAuth.mockReturnValue({ user: { id: "agent-1", name: "Agent", email: "agent@example.com", role: "AGENT" } });
+    mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: undefined }); mocks.create.mockResolvedValue(listTicket);
+    renderAt("/tickets/new", <><Route path="/tickets/new" element={<TicketFormPage />} /><Route path="/tickets/:id" element={<p>Agent ticket detail</p>} /></>);
+    expect(screen.queryByLabelText("Assigned agent")).not.toBeInTheDocument();
+    fireEvent.focus(screen.getByRole("combobox", { name: "Customer" })); fireEvent.click(screen.getByRole("option", { name: /Ahmed Mohamed/ })); fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "Phone request" } }); fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Captured by agent" } }); fireEvent.change(screen.getByLabelText("Category"), { target: { value: "category-1" } }); fireEvent.click(screen.getByRole("button", { name: "Create ticket" }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalled());
+    expect(mocks.create.mock.calls[0][0]).not.toHaveProperty("assignedAgentId"); expect(await screen.findByText("Agent ticket detail")).toBeInTheDocument();
+  });
+
   it("renders details and localized operational history", () => {
     renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
     expect(screen.getByRole("heading", { name: ticket.subject })).toBeInTheDocument(); expect(screen.getByText(ticket.description)).toBeInTheDocument(); expect(screen.getByText("Status changed")).toBeInTheDocument(); expect(screen.getByText("Conversation")).toBeInTheDocument();
@@ -164,6 +174,29 @@ describe("ticket pages", () => {
     mocks.update.mockResolvedValue(listTicket); renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
     fireEvent.change(screen.getByLabelText("Status"), { target: { value: "RESOLVED" } }); fireEvent.change(screen.getByLabelText("Assigned agent"), { target: { value: "" } }); fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({ status: "RESOLVED", assignedAgentId: null }));
+  });
+
+  it("limits assigned-agent details to operational controls and confirms close", async () => {
+    mocks.useAuth.mockReturnValue({ user: { id: "agent-1", name: "Agent", email: "agent@example.com", role: "AGENT" } });
+    mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: { ...ticket, status: "RESOLVED", resolvedAt: "2026-08-25T10:00:00.000Z" } }); mocks.update.mockResolvedValue({ ...listTicket, status: "CLOSED" });
+    renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
+    expect(screen.queryByRole("link", { name: "Edit" })).not.toBeInTheDocument(); expect(screen.queryByLabelText("Category")).not.toBeInTheDocument(); expect(screen.getByLabelText("Status")).toBeInTheDocument(); expect(screen.getByLabelText("Priority")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Close ticket" })); expect(screen.getByText(/Closing is final/)).toBeInTheDocument(); fireEvent.click(screen.getByRole("button", { name: "Confirm close" }));
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({ status: "CLOSED" }));
+  });
+
+  it("renders an unassigned ticket read-only to an agent", () => {
+    mocks.useAuth.mockReturnValue({ user: { id: "agent-1", name: "Agent", email: "agent@example.com", role: "AGENT" } });
+    mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: { ...ticket, assignedAgent: null } });
+    renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
+    expect(screen.getByText("This ticket must be assigned to you before you can change its workflow or conversation.")).toBeInTheDocument(); expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument(); expect(screen.getByRole("button", { name: "Send reply" })).toBeDisabled();
+  });
+
+  it("contains long subject and customer values in separate accessible cells", () => {
+    const longSubject = "A".repeat(250); const longEmail = `${"customer".repeat(20)}@example.com`;
+    mocks.useTickets.mockReturnValue({ isLoading: false, isError: false, data: { data: [{ ...listTicket, subject: longSubject, customer: { ...listTicket.customer, name: "Long customer name ".repeat(10), email: longEmail } }], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } }, refetch: mocks.refetch });
+    renderAt("/tickets", <Route path="/tickets" element={<TicketListPage />} />);
+    const table = screen.getByRole("table"); const subjectLink = within(table).getByRole("link", { name: longSubject }); expect(subjectLink.closest("td")).not.toBe(within(table).getByText(longEmail).closest("td")); expect(subjectLink).toHaveAttribute("title", longSubject); expect(within(table).getByText(longEmail).closest("bdi")).toHaveAttribute("dir", "ltr");
   });
 
   it("renders representative ticket UI in Arabic", async () => {

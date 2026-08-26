@@ -2,9 +2,9 @@
 
 Last Updated: 2026-08-26
 
-Current Integration Branch: `master` at `bc25a02` (`bc25a028276d7a2aad2096d6ae4ca0f311baeccc`), synchronized with `origin/master`
+Current Integration Branch: `master` at `4499494` (`44994949ac81d3e78973e94e35ba2eaa57ebbeb6`), synchronized with `origin/master` before this fix branch was created
 
-Current Working Branch: `master` — progress-tracking reconciliation; this documentation change remains unstaged and uncommitted
+Current Working Branch: `fix/ticket-agent-permissions` - implementation and verification are unstaged and uncommitted
 
 > This file is a status summary. Requirements, architecture, API contracts, RBAC rules, workflows, UI specifications, and architecture decisions remain authoritative in their respective documents.
 
@@ -26,7 +26,7 @@ Current Working Branch: `master` — progress-tracking reconciliation; this docu
 | Frontend Localization / RTL | ✅ COMPLETE | `fix/frontend-localization` | Localized API error support where implemented | Persisted English/Arabic and document direction | Passing | N/A | Commit ancestry confirms it is contained in `master`. |
 | Frontend Design Polish | ✅ COMPLETE | `fix/frontend-design-polish` | No material backend scope | Shared auth/protected shells and responsive refinement | Passing | N/A | Tip is contained in `master`. |
 | TanStack Table Refactor | ✅ COMPLETE | `fix/frontend-design-polish` | Existing server pagination retained | Typed customer and ticket tables with responsive cards | Passing | N/A | Tip is contained in `master`. |
-| Ticket Management | ✅ COMPLETE | `feature/ticket-management` | Protected CRUD, assignment, workflow, history and SLA snapshots | Queue, forms, detail controls and responsive views | Passing | Yes | Tip is contained in `master`. |
+| Ticket Management authorization/workflow fix | ✅ IMPLEMENTED AND VERIFIED | `fix/ticket-agent-permissions` | AGENT update allowlist, actor-derived creation assignment/history, and unchanged close transition enforcement | Protected edit route, role-scoped controls, confirmed close action, explicit Ticket/Customer column containment | 89 client / 102 server passing | Not rerun | Changes remain unstaged and uncommitted; not integrated into `master`. |
 | Ticket Conversation | ✅ COMPLETE | `feature/ticket-conversation` | Internal detail conversation read, public replies, internal notes, RBAC and first-response transaction | Localized timeline and accessible reply/note composer | Passing | Yes | Tip is contained in `master`; browser capture verification was not completed. |
 | Agent Dashboard | ✅ COMPLETE | `feature/agent-dashboard` | Role-scoped overview, real metrics, SLA derivation, bounded lists and status grouping | Localized KPI, chart, attention/recent desktop and mobile states | 82 client / 87 server passing | Yes, prior verified run | Commit `d12067b` ancestry confirms integration into `master`, including Customer Management authorization/support-context refinements. Automated and PostgreSQL verification completed previously; authenticated Dashboard visual verification remains incomplete. |
 | Customer Portal | ✅ COMPLETE | `feature/customer-portal` | Customer-owned Portal APIs, IDOR-safe ownership, creation, public replies, and reopening | Final responsive English/Arabic Portal shell, overview, list, creation, detail, and navigation polish | 82 client / 87 server passing | Yes, prior verified run | Commit `458af2e` ancestry confirms integration into `master`. Authenticated English/Arabic desktop and mobile visual verification and final navigation regression verification were completed previously. |
@@ -41,7 +41,7 @@ Current Working Branch: `master` — progress-tracking reconciliation; this docu
 | Multi-Branch | 🟣 DEFERRED | — | Schema only | Not implemented | Schema only | Schema only | P2 behavior. |
 | External Integrations | 🟣 DEFERRED | — | Channel enum representation only | Not implemented | Schema only | Schema only | WhatsApp, SMS, inbound email, live transport, ERP, and arbitrary systems are demonstration/architecture only. |
 | Deployment | ⚪ NOT STARTED | — | No deployed API evidence | No deployed frontend evidence | Local build passing | Development DB only | Deployment targets are documented but not configured or verified. |
-| Final QA | 🟡 INCOMPLETE | — | Current integrated scope passes automated checks | Current integrated scope passes automated checks | 15 client files / 82 tests; 8 server files / 87 tests; 169 total passed, 0 failed | Prior PostgreSQL verification preserved; not rerun in this documentation task | Complete demo-data verification, authenticated Dashboard visual verification, final end-to-end assessment review, remaining accessibility/responsive review, and deployment verification remain. |
+| Final QA | 🟡 INCOMPLETE | — | Current working scope passes automated checks | Current working scope passes automated checks | 16 client files / 89 tests; 8 server files / 102 tests; 191 total passed, 0 failed | Prior PostgreSQL verification preserved; not rerun for this fix | This fix still requires representative authenticated English/Arabic desktop/mobile browser verification and optional live PostgreSQL verification before integration. |
 
 ## 3. Completed Work
 
@@ -117,17 +117,20 @@ Current Working Branch: `master` — progress-tracking reconciliation; this docu
 
 ## 4. Current Work
 
-- All product work through Customer Portal is committed and integrated into synchronized `master` at `bc25a02`.
-- No product feature is currently active.
-- The current task is a documentation-only reconciliation on `master`; the `docs/19-progress-tracking.md` change remains unstaged and uncommitted until the developer reviews and handles it.
+- `fix/ticket-agent-permissions` is implemented and automatically verified from synchronized `master` at `4499494`.
+- Backend: AGENT create derives assignment from the authenticated actor and writes assignment history atomically; AGENT PATCH accepts only assigned-ticket status/priority updates; resolved close permissions and transition rules are preserved.
+- Frontend: AGENT creation omits assignment, edit is restricted to `ADMIN`/`MANAGER`, assigned/unassigned operations match the authorization policy, close has confirmation, and long Subject/Customer values remain in deliberately sized cells/cards across LTR/RTL structures.
+- Verification: 89 client and 102 server tests passed (191 total), with zero failed/skipped/todo tests; client/server lint, typecheck, builds, translation JSON, and focused route/Ticket regressions passed. The existing Vite chunk-size warning remains.
+- PostgreSQL verification was not rerun, and the requested authenticated representative browser matrix was not completed; no visual pass is claimed.
+- All changes remain unstaged and uncommitted; the fix is not integrated into `master` and is not pushed.
 
 ## 5. Next Recommended Work
 
-1. Finish and formalize the remaining SLA scope.
-2. Add realistic seed/demo data and demo accounts.
-3. Run final end-to-end QA, accessibility, responsive, English/Arabic, and RTL review.
-4. Complete deployment preparation and verification.
-5. Continue with approved P1 features, beginning with Knowledge Base when P0 delivery is stable.
+1. Developer review, representative browser/database verification if required, and manual commit/integration of `fix/ticket-agent-permissions`.
+2. Continue with `feature/sla` only after this fix is integrated.
+3. Add realistic seed/demo data and demo accounts.
+4. Run final end-to-end QA, accessibility, responsive, English/Arabic, and RTL review.
+5. Complete deployment preparation and verification.
 
 This follows the P0 roadmap and the dependency order in `docs/01-scope-and-priorities.md`, `docs/14-implementation-plan.md`, and `docs/18-ui-pages-spec.md`.
 

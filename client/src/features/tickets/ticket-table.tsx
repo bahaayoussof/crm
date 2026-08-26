@@ -10,8 +10,8 @@ export function TicketTable({ tickets, emptyMessage, page, pageSize, pageCount, 
   const { t, i18n } = useTranslation();
   const columns = useMemo<ColumnDef<TicketListItem>[]>(() => [
     { id: "id", accessorKey: "id", header: t("tickets.columns.id"), cell: ({ row }) => <span className="font-mono text-xs text-muted-foreground" title={row.original.id}><bdi dir="ltr">{ticketReference(row.original.id)}</bdi></span> },
-    { id: "ticket", header: t("tickets.columns.ticket"), cell: ({ row }) => <div className="min-w-48"><Link className="font-semibold hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" to={`/tickets/${row.original.id}`}>{row.original.subject}</Link></div> },
-    { id: "customer", accessorKey: "customer.name", header: t("tickets.customer"), cell: ({ row }) => <div><p>{row.original.customer.name}</p><p className="text-xs text-muted-foreground"><bdi dir="ltr">{row.original.customer.email}</bdi></p></div> },
+    { id: "ticket", header: t("tickets.columns.ticket"), cell: ({ row }) => <div className="min-w-0"><Link className="line-clamp-2 break-words font-semibold hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" title={row.original.subject} to={`/tickets/${row.original.id}`}>{row.original.subject}</Link></div> },
+    { id: "customer", accessorKey: "customer.name", header: t("tickets.customer"), cell: ({ row }) => <div className="min-w-0"><p className="truncate" title={row.original.customer.name}>{row.original.customer.name}</p><p className="truncate text-xs text-muted-foreground" title={row.original.customer.email}><bdi dir="ltr">{row.original.customer.email}</bdi></p></div> },
     { id: "status", accessorKey: "status", header: t("tickets.statusLabel"), cell: ({ row }) => <TicketStatusBadge status={row.original.status} /> },
     { id: "priority", accessorKey: "priority", header: t("tickets.priorityLabel"), cell: ({ row }) => <TicketPriorityText priority={row.original.priority} /> },
     { id: "category", header: t("tickets.category"), cell: ({ row }) => row.original.category?.name ?? t("common.notProvided") },
@@ -27,4 +27,9 @@ export function TicketTable({ tickets, emptyMessage, page, pageSize, pageCount, 
   </>;
 }
 function changePage(updater: Updater<PaginationState>, current: PaginationState, onPageChange: (page: number) => void) { const next = typeof updater === "function" ? updater(current) : updater; if (next.pageIndex !== current.pageIndex) onPageChange(next.pageIndex + 1); }
-function columnClass(id: string) { if (["category", "agent"].includes(id)) return "hidden lg:table-cell"; if (id === "updated") return "hidden xl:table-cell"; return ""; }
+function columnClass(id: string) {
+  const width = { id: "w-28", ticket: "w-[28rem]", customer: "w-64", status: "w-40", priority: "w-28", category: "w-40", agent: "w-44", updated: "w-44" }[id] ?? "";
+  if (["category", "agent"].includes(id)) return `${width} hidden lg:table-cell`;
+  if (id === "updated") return `${width} hidden xl:table-cell`;
+  return width;
+}
