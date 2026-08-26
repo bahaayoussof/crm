@@ -14,9 +14,7 @@ This contract mixes live and planned endpoints. Each section is tagged:
 - `PARTIAL` — only part of the listed surface is registered; the rest is planned.
 - `PLANNED` — documented target with no registered route yet. Do not consume as a live API.
 
-Registered routers as of `master` `ef647ef`: `/api/auth`, `/api/customers`, `/api/categories`, `/api/users` (lookup only), `/api/tickets`, `/api/dashboard`, `/api/knowledge-articles`, `/api/portal/knowledge-articles`, `/api/portal`, `/api/health`. There is no registered `/api/reports`, `/api/notifications`, `/api/feedback`, `/api/quick-replies`, or `/api/settings` route.
-
-On the uncommitted `feature/attachments` branch (not in `master`): `/api/attachments`, `/api/portal/attachments`, plus attachment sub-routes appended to `/api/tickets` and `/api/customers` and the portal ticket router. See "Attachments — LIVE" below.
+Registered routers as of `master` `8e24d22`: `/api/auth`, `/api/customers`, `/api/categories`, `/api/users` (lookup only), `/api/tickets`, `/api/dashboard`, `/api/knowledge-articles`, `/api/attachments`, `/api/portal/knowledge-articles`, `/api/portal/attachments`, `/api/portal`, `/api/health`, plus attachment sub-routes on `/api/tickets`, `/api/customers`, and the portal ticket router (`feature/attachments`, integrated at `8e24d22`). There is no registered `/api/reports`, `/api/notifications`, `/api/feedback`, `/api/quick-replies`, or `/api/settings` route.
 
 ## Authentication
 
@@ -242,7 +240,7 @@ GET /reports/sla           PLANNED
 
 No route is registered. This is the `feature/reports` contract for `ADMIN`/`MANAGER`: created/resolved volume, status distribution, SLA compliance, average first-response time, agent performance, and customer satisfaction, all from real persisted data with an explicit date-range and timezone definition. `GET /dashboard/overview` (LIVE, below) is an operational snapshot, not the Reports feature. Satisfaction metrics depend on `feature/customer-feedback`. Do not invent fabricated analytics.
 
-## Attachments — LIVE (on `feature/attachments`, not integrated into `master`)
+## Attachments — LIVE (integrated into `master` at `8e24d22`)
 
 Backed by `server/src/modules/attachments/*` and registered in `server/src/app.ts`. `Attachment` is used as-is (no schema change, no migration). Bytes live in a **private Vercel Blob store** through an `AttachmentStorage` interface (`@vercel/blob@2.x` server SDK adapter + an in-memory test adapter). The provider token (`BLOB_READ_WRITE_TOKEN`) is server-side only; a raw provider URL or token is never returned. When the token is unset every upload/download returns `503 STORAGE_UNAVAILABLE` — there is no fallback to public or local-disk storage.
 

@@ -27,7 +27,7 @@ The role descriptions below include capabilities that are not yet built. As of `
 - `GET /users/agents` and `GET /categories`: `ADMIN`/`MANAGER`/`AGENT` lookup only.
 - Knowledge Base (`feature/knowledge-base`): `ADMIN`/`MANAGER`/`AGENT` may list/search and read internal articles (`DRAFT` and `PUBLISHED`); `ADMIN`/`MANAGER` may create, update, publish/unpublish, and delete; `AGENT` is read-only (`403` on create/update/delete); `CUSTOMER` and unauthenticated callers are rejected from `/api/knowledge-articles/*`. `createdById` is server-derived from the authenticated `ADMIN`/`MANAGER`. `CUSTOMER` may read `PUBLISHED` articles only through `/api/portal/knowledge-articles`; internal roles receive `403` there. A `DRAFT` id returns the same `404` as a missing id in the Portal path.
 
-### Implemented on `feature/attachments` (uncommitted branch, not in `master`)
+### Implemented — `feature/attachments`, integrated into `master` at `8e24d22`
 
 - Attachment listing/download and upload per context. Internal routes require `ADMIN`/`MANAGER`/`AGENT`; `CUSTOMER`/anonymous rejected. Ticket and message listing/download follow the existing ticket visibility predicate; ticket/message upload also requires an `AGENT` to be the assigned agent, and message upload requires `message.authorUserId ===` the authenticated user for every role. Customer-profile listing/download is available to every internal read role; customer-profile upload is `ADMIN`/`MANAGER` only. Portal attachment routes are `CUSTOMER` only, ownership-scoped through `User -> Customer.userId`, upload blocked on `CLOSED` tickets, and never expose customer-profile attachments or another customer's data. See `docs/05-api-contract.md` "Attachments — LIVE" and the matrix below.
 
@@ -145,7 +145,7 @@ The client shows the internal Knowledge Base navigation item to `ADMIN`/`MANAGER
 - Invalid login attempts return the same generic error whether or not the email exists.
 - Backend middleware verifies authentication and role requirements; frontend route guards provide navigation behavior only.
 
-## Internal Attachment Permissions (`feature/attachments`, uncommitted)
+## Internal Attachment Permissions (`feature/attachments`, integrated at `8e24d22`)
 
 | Capability | ADMIN | MANAGER | AGENT | CUSTOMER |
 | --- | --- | --- | --- | --- |
@@ -158,7 +158,7 @@ The client shows the internal Knowledge Base navigation item to `ADMIN`/`MANAGER
 
 Unauthenticated internal requests receive `401`. Route middleware is authoritative: `requireAuth` then `requireRole(ADMIN, MANAGER, AGENT)` on `/api/attachments` and the ticket sub-routes; the customer sub-routes reuse the customer read group for `GET` and the customer write group (`ADMIN`/`MANAGER`) for `POST`. Context ids and `storageKey` are never accepted from the request body. Missing/hidden tickets return `404 TICKET_NOT_FOUND`; missing/unauthorized attachments return `404 ATTACHMENT_NOT_FOUND`; missing stored objects also return `404 ATTACHMENT_NOT_FOUND` with no provider detail.
 
-## Customer Portal Attachment Permissions (`feature/attachments`, uncommitted)
+## Customer Portal Attachment Permissions (`feature/attachments`, integrated at `8e24d22`)
 
 `CUSTOMER` only; internal roles receive `403` from `/api/portal/attachments/*` and the portal ticket attachment routes. Ownership derives from `User -> Customer.userId`; no client `customerId` participates. A customer may list/download attachments only when their context belongs to an owned ticket/message, and may upload one file at a time to an owned ticket that is not `CLOSED` (`409 TICKET_CLOSED` otherwise). A Portal upload alone never creates a message or reopens the ticket. Customer-profile attachments and other customers' attachments return `404 ATTACHMENT_NOT_FOUND`.
 
