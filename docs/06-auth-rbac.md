@@ -87,3 +87,7 @@ Customer-route middleware is authoritative. The client keeps Customers navigatio
 - Public registration cannot select an authorization role.
 - Invalid login attempts return the same generic error whether or not the email exists.
 - Backend middleware verifies authentication and role requirements; frontend route guards provide navigation behavior only.
+
+## Customer Portal boundary
+
+The Portal namespace and `/portal` browser routes accept `CUSTOMER` only. Internal roles continue using CRM routes and receive `403` from Portal APIs. Every Portal operation resolves `User -> Customer.userId`; no client customer ID or email participates in authorization. Ticket access queries combine ticket ID with the authenticated Customer ID.

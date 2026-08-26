@@ -2025,3 +2025,11 @@ Do not delay working ticket interactions to polish lower-priority screens.
 - Customer ticket history distinguishes loading, request failure, true no-ticket history, and pagination. Desktop uses a dense table; mobile uses the same response in compact cards; ticket identifiers preserve LTR isolation.
 - The agent Notes view shows a localized read-only explanation instead of the add-note form.
 - `/customers/new` and `/customers/:id/edit` allow `ADMIN` and `MANAGER` only. An `AGENT` direct navigation redirects to `/customers` using history replacement.
+
+### Customer Portal implemented behavior
+
+Routes are `/portal`, `/portal/tickets`, `/portal/tickets/new`, and `/portal/tickets/:id`. The responsive shell contains Home, My Requests, New Request, language switching, customer identity, and logout only. Home shows owned counts/recent requests; the list uses URL-backed server search/status/page state; creation exposes subject, optional active category, and description; details show safe metadata and public conversation. Resolved requests explain reopening and closed requests hide the composer. English, Arabic, RTL, locale dates, and LTR-isolated references are required.
+
+Knowledge Base, attachments, feedback, notifications, profile editing, and realtime updates remain deferred.
+
+The customer audience route guard provides authorization and redirect behavior only; `PortalShell` is the single owner of Portal identity, navigation, language, account, and logout chrome. Portal navigation uses explicit route matching so request details activate My Requests while creation activates New Request exclusively. Portal forms and filters use the approved visible shared control treatment, bounded content regions, intrinsic desktop actions, and full-width mobile actions.

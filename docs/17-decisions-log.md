@@ -342,3 +342,7 @@ Customer Details uses `GET /customers/:id/tickets` for complete customer history
 **Reason**
 
 Support staff need complete customer history context without gaining another agent's operational ticket workspace or private content. A separate response shape makes that distinction explicit and prevents rich Ticket list/detail fields from leaking into customer context.
+
+## ADR-011: Isolated Customer Portal boundary
+
+The Customer Portal uses dedicated routes, schemas, response types, Prisma selects, query keys, and pages. Ownership comes from the linked Customer profile. Public status mapping hides ESCALATED, staff authors become SUPPORT, and Portal reads never query notes, history, attachments, SLA, or assignment data.

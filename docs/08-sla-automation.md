@@ -73,3 +73,7 @@ Preferred later automation:
 - assign to eligible agent with the lowest number of active tickets
 
 Manual assignment is acceptable for the core delivery.
+
+## Portal SLA interpretation
+
+Portal-created requests snapshot the active MEDIUM rule. Customer replies never set `firstRespondedAt`. Reopening preserves `resolutionDueAt` and does not recalculate deadlines. Portal responses never expose SLA fields.

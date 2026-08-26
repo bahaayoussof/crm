@@ -1,6 +1,6 @@
 # Customer Support CRM — Progress Tracking
 
-Last Updated: 2026-08-25
+Last Updated: 2026-08-26
 
 Current Integration Branch: `master` at `879762e`
 
@@ -12,7 +12,7 @@ Current Working Branch: `feature/agent-dashboard` (unstaged implementation based
 
 - `master` at `879762e` contains the foundation through Ticket Management and Ticket Conversation.
 - Agent Dashboard is implemented but uncommitted on `feature/agent-dashboard`, including its role-scoped API, real metrics, derived SLA state, bounded ticket lists, localized responsive UI, and status chart.
-- The core demo journey is not yet complete because the Customer Portal remains unimplemented.
+- The core demo journey, including the Customer Portal, is complete on its feature branches pending developer integration.
 - Provider-backed channels and other production external integrations remain intentionally deferred.
 
 ## 2. Feature Progress
@@ -29,7 +29,7 @@ Current Working Branch: `feature/agent-dashboard` (unstaged implementation based
 | Ticket Management | ✅ COMPLETE | `feature/ticket-management` | Protected CRUD, assignment, workflow, history and SLA snapshots | Queue, forms, detail controls and responsive views | Passing | Yes | Tip is contained in `master`. |
 | Ticket Conversation | ✅ COMPLETE | `feature/ticket-conversation` | Internal detail conversation read, public replies, internal notes, RBAC and first-response transaction | Localized timeline and accessible reply/note composer | Passing | Yes | Tip is contained in `master`; browser capture verification was not completed. |
 | Agent Dashboard | ✅ COMPLETE | `feature/agent-dashboard` | Role-scoped overview, real metrics, SLA derivation, bounded lists and status grouping | Localized KPI, chart, attention/recent desktop and mobile states | 144 total passing | Yes | Includes Customer Management authorization/support-context refinements; uncommitted and not merged; visual verification is incomplete. |
-| Customer Portal | ⚪ NOT STARTED | — | Authentication identity exists; ticket scoping absent | Placeholder protected route only | Auth routing only | Partial | Requires customer-owned ticket APIs and portal pages. |
+| Customer Portal | ✅ COMPLETE | `feature/customer-portal` | Customer-owned Portal APIs, IDOR-safe ownership, creation, public replies, and reopening | Responsive English/Arabic Portal shell, overview, list, creation, and detail | 82 client / 87 server passing | Yes | Complete on branch; not merged. |
 | SLA / Automation | 🟡 PARTIAL | `feature/ticket-management`, `feature/ticket-conversation` | Deadline snapshots and one-time first-response recording | SLA deadlines shown in ticket context | Passing | Yes | No scheduler, warning/breach automation, notifications, or automatic escalation. |
 | Knowledge Base | ⚪ NOT STARTED | — | Schema only | Not implemented | Schema only | Schema only | P1 after the P0 demo flow. |
 | Reports | ⚪ NOT STARTED | — | Not implemented | Not implemented | None | No | Depends on meaningful ticket/SLA/feedback data. |
@@ -117,7 +117,7 @@ This follows the P0 roadmap and the dependency order in `docs/01-scope-and-prior
 ## 7. Known Limitations
 
 - No refresh-token, token-revocation, or production session infrastructure.
-- No customer-owned ticket APIs, Customer Portal conversation, or customer-triggered reopening behavior.
+- Customer Portal Knowledge Base, attachments, feedback, notifications, profile editing, and external messaging integrations remain deferred.
 - No attachment upload/storage provider; attachment contexts still require service-level presence and ownership validation.
 - No real-time messaging or provider-backed communication channel.
 - SLA deadlines and first-response recording exist, but background warning/breach processing does not.
@@ -222,3 +222,11 @@ After completing or materially changing a feature:
 7. Add new limitations only if they are real.
 8. Never mark work merged unless Git history confirms it.
 9. Do not use this file as a replacement for feature/domain documentation.
+
+## Customer Portal
+
+- Status: complete on `feature/customer-portal`; not merged.
+- Delivered: isolated owned Portal API, overview, active categories, paginated list, server-owned creation/SLA snapshot, safe public detail, reply transitions, and responsive English/Arabic UI.
+- Deferred: attachments, Knowledge Base, feedback, notifications, realtime updates, profile editing, and external channels.
+- Verification: 82 client and 87 server tests pass (169 total); lint, typecheck, client/server builds, whitespace, translations, and OpenWolf JSON pass. Real PostgreSQL verification passed for two-customer isolation, IDOR-safe reads/replies, server-derived defaults, creation history, WAITING_CUSTOMER/RESOLVED/CLOSED reply behavior, and unchanged first response/deadline preservation. No active MEDIUM SLA rule existed, so the documented null-deadline fallback was observed rather than a non-null SLA snapshot.
+- UI polish: the legacy customer AppShell no longer wraps PortalShell; active navigation is route-exact; forms, filters, request tables/cards, and page actions have visible accessible responsive treatment. Authenticated English/Arabic desktop captures covered all four routes, and English/Arabic mobile captures covered home, list, and creation with one header, one active item, visible controls, RTL, and no overflow.

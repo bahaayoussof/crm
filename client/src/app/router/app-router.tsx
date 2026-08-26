@@ -1,6 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { LoginPage } from "@/features/auth/login-page";
-import { ProtectedPlaceholderPage } from "@/features/auth/protected-placeholder-page";
 import { RegisterPage } from "@/features/auth/register-page";
 import { CustomerDetailPage } from "@/features/customers/customer-detail-page";
 import { CustomerFormPage } from "@/features/customers/customer-form-page";
@@ -11,6 +10,8 @@ import { TicketListPage } from "@/features/tickets/ticket-list-page";
 import { ProtectedRoute } from "./protected-route";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { CustomerManageRoute } from "./customer-manage-route";
+import { PortalHomePage, PortalNewTicketPage, PortalTicketDetailPage, PortalTicketsPage } from "@/features/portal/portal-pages";
+import { PortalShell } from "@/features/portal/portal-ui";
 
 export function AppRouter() {
   return <BrowserRouter><Routes>
@@ -29,7 +30,7 @@ export function AppRouter() {
       </Route>
       <Route path="/customers/:id" element={<CustomerDetailPage />} />
     </Route>
-    <Route element={<ProtectedRoute audience="customer" />}><Route path="/portal" element={<ProtectedPlaceholderPage area="portal" />} /></Route>
+    <Route element={<ProtectedRoute audience="customer" />}><Route path="/portal" element={<PortalShell />}><Route index element={<PortalHomePage />} /><Route path="tickets" element={<PortalTicketsPage />} /><Route path="tickets/new" element={<PortalNewTicketPage />} /><Route path="tickets/:id" element={<PortalTicketDetailPage />} /></Route></Route>
     <Route path="*" element={<Navigate to="/login" replace />} />
   </Routes></BrowserRouter>;
 }

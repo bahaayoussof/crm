@@ -197,3 +197,16 @@ Portal routes may reuse ticket APIs with customer-scoped authorization rather th
 - List endpoints should support pagination when practical.
 - Ticket list should support filters such as status, priority, category, assignee, and server-side search across the exact ticket ID, subject, description, customer name, and customer email.
 - Never trust a customer-provided customerId for access control.
+
+## Customer Portal API
+
+All `/api/portal/*` endpoints require an authenticated `CUSTOMER` and derive ownership from the user's linked Customer profile. Missing profiles return `403 CUSTOMER_PROFILE_REQUIRED`; missing and non-owned tickets both return `404 TICKET_NOT_FOUND`.
+
+- `GET /portal/overview`: owned open/waiting/resolved counts and up to five recent requests.
+- `GET /portal/categories`: active `{ id, name }` category summaries only.
+- `GET /portal/tickets`: owned pagination, search, and customer-facing status filtering.
+- `GET /portal/tickets/:id`: safe details and public `TicketMessage` records only.
+- `POST /portal/tickets`: strict subject, description, and optional category creation.
+- `POST /portal/tickets/:id/messages`: strict customer reply, maximum 20,000 characters.
+
+Portal responses exclude priority, assignee, organization, SLA, notes, history, attachments, staff roles/emails, audit data, and escalation semantics.

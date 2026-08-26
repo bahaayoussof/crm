@@ -10,6 +10,7 @@ import { categoryRouter } from "./modules/categories/category.routes.js";
 import { ticketRouter } from "./modules/tickets/ticket.routes.js";
 import { userRouter } from "./modules/users/user.routes.js";
 import { dashboardRouter } from "./modules/dashboard/dashboard.routes.js";
+import { portalRouter } from "./modules/portal/portal.routes.js";
 
 
 const allowedOrigins = new Set(env.CLIENT_URLS ?? [env.CLIENT_URL]);
@@ -51,6 +52,7 @@ app.use("/api/categories", categoryRouter);
 app.use("/api/users", userRouter);
 app.use("/api/tickets", ticketRouter);
 app.use("/api/dashboard", dashboardRouter);
+app.use("/api/portal", portalRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

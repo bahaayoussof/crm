@@ -68,3 +68,9 @@ Important actions should create ticket history records:
 - ticket closed
 
 History stores the actor plus old and new values when useful. It is an operational lifecycle record, not event sourcing.
+
+## Customer replies
+
+Customer replies create public `TicketMessage` records only. A reply changes `WAITING_CUSTOMER` to `IN_PROGRESS`; a reply to `RESOLVED` reopens as `OPEN` and clears `resolvedAt`. Both changes and their history records are atomic with the message. CLOSED returns `409 TICKET_CLOSED`; other statuses do not change automatically.
+
+Portal mapping: NEW/OPEN to OPEN, IN_PROGRESS/ESCALATED to IN_PROGRESS, WAITING_CUSTOMER to WAITING_FOR_YOU, and RESOLVED/CLOSED unchanged.
