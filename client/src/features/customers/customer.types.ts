@@ -21,7 +21,7 @@ export interface CustomerRecord {
 
 export interface CustomerDetail extends CustomerRecord {
   user: { id: string; name: string; email: string; role: string } | null;
-  attachments: Array<{ id: string; fileName: string; mimeType: string; storageKey: string; createdAt: string }>;
+  attachments: Array<{ id: string; fileName: string; mimeType: string; createdAt: string }>;
   supportSummary: { openTicketCount: number; totalTicketCount: number; lastInteractionAt: string };
 }
 

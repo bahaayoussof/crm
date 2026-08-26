@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { MessageAttachmentList } from "@/features/attachments/attachment-ui";
 import { getTicketError } from "./ticket-error";
 import { formatTicketDate } from "./ticket-format";
 import { useCreateTicketMessage, useCreateTicketNote } from "./ticket-hooks";
 import type { TicketConversationItem } from "./ticket.types";
 
 type Mode = "reply" | "note";
+type MessageAttachment = { id: string; fileName: string; mimeType: string; createdAt: string };
 
-export function TicketConversation({ ticketId, items, canMutate }: { ticketId: string; items: TicketConversationItem[]; canMutate: boolean }) {
+export function TicketConversation({ ticketId, items, canMutate, messageAttachments }: { ticketId: string; items: TicketConversationItem[]; canMutate: boolean; messageAttachments?: Map<string, MessageAttachment[]> }) {
   const { t } = useTranslation();
   const [mode, setMode] = useState<Mode>("reply");
   const [reply, setReply] = useState("");
@@ -33,7 +35,7 @@ export function TicketConversation({ ticketId, items, canMutate }: { ticketId: s
   return <section className="overflow-hidden rounded-md border bg-white" aria-labelledby="ticket-conversation-heading">
     <div className="border-b px-5 py-4"><h2 className="text-base font-semibold" id="ticket-conversation-heading">{t("tickets.conversation.title")}</h2><p className="mt-1 text-sm text-muted-foreground">{t("tickets.conversation.description")}</p></div>
     <div className="min-h-48 px-4 py-2 sm:px-5">
-      {items.length ? <ol className="divide-y" aria-label={t("tickets.conversation.timelineLabel")}>{items.map((item) => <ConversationItem item={item} key={`${item.kind}-${item.id}`} />)}</ol> : <div className="flex min-h-44 flex-col items-center justify-center text-center"><p className="text-sm font-medium">{t("tickets.conversation.emptyTitle")}</p><p className="mt-1 max-w-md text-sm text-muted-foreground">{t("tickets.conversation.emptyDescription")}</p></div>}
+      {items.length ? <ol className="divide-y" aria-label={t("tickets.conversation.timelineLabel")}>{items.map((item) => <ConversationItem item={item} key={`${item.kind}-${item.id}`} attachments={item.kind === "PUBLIC_MESSAGE" ? messageAttachments?.get(item.id) ?? [] : []} />)}</ol> : <div className="flex min-h-44 flex-col items-center justify-center text-center"><p className="text-sm font-medium">{t("tickets.conversation.emptyTitle")}</p><p className="mt-1 max-w-md text-sm text-muted-foreground">{t("tickets.conversation.emptyDescription")}</p></div>}
     </div>
     <div className="border-t bg-muted/20 p-4 sm:p-5">
       <div className="flex w-full border-b" role="tablist" aria-label={t("tickets.conversation.composerMode")}>{(["reply", "note"] as Mode[]).map((value) => <button type="button" role="tab" aria-selected={mode === value} aria-controls="conversation-composer-panel" className={`min-h-11 border-b-2 px-4 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${mode === value ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`} onClick={() => { setMode(value); setError(null); setSuccess(null); }} key={value}>{t(`tickets.conversation.${value}Tab`)}</button>)}</div>
@@ -50,11 +52,12 @@ export function TicketConversation({ ticketId, items, canMutate }: { ticketId: s
   </section>;
 }
 
-function ConversationItem({ item }: { item: TicketConversationItem }) {
+function ConversationItem({ item, attachments }: { item: TicketConversationItem; attachments: MessageAttachment[] }) {
   const { t, i18n } = useTranslation(); const internal = item.kind === "INTERNAL_NOTE";
   return <li className="py-4"><article className={internal ? "rounded-md border border-amber-200 bg-amber-50/70 p-4" : "px-1 py-2"}>
     <header className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between"><div className="flex flex-wrap items-center gap-2"><span className="text-sm font-semibold">{item.author.name}</span><span className="text-xs text-muted-foreground">{t(`tickets.conversation.roles.${item.author.role}`, { defaultValue: item.author.role })}</span>{internal && <span className="rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">{t("tickets.conversation.internalLabel")}</span>}</div><time className="text-xs text-muted-foreground" dir="ltr" dateTime={item.createdAt}>{formatTicketDate(item.createdAt, i18n.language)}</time></header>
     <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6">{item.body}</p>
+    {!internal && <MessageAttachmentList attachments={attachments} scope="internal" />}
     {!internal && <p className="mt-2 text-xs text-muted-foreground">{t("tickets.conversation.publicLabel")}</p>}
   </article></li>;
 }

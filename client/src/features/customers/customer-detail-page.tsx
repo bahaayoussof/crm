@@ -9,6 +9,8 @@ import { customerNoteSchema, type CustomerNoteValues } from "./customer.schemas"
 import { formatDate, formatNumber } from "./customer-format";
 import { CustomerPage, LoadingRows, PageHeader, StatePanel } from "./customer-ui";
 import { useAuth } from "@/features/auth/auth-state";
+import { AttachmentPanel } from "@/features/attachments/attachment-ui";
+import { useCustomerAttachments, useUploadCustomerAttachment } from "@/features/attachments/attachment-hooks";
 import { canManageCustomers } from "./customer-permissions";
 import { CustomerTickets } from "./customer-tickets";
 
@@ -52,7 +54,7 @@ export function CustomerDetailPage() {
       {activeTab === "tickets" && <CustomerTickets customerId={profile.id} />}
       {activeTab === "activity" && <Activity profile={profile} notes={notes.data ?? []} locale={i18n.language} />}
       {activeTab === "notes" && <Notes customerId={profile.id} canManage={canManage} />}
-      {activeTab === "attachments" && <Attachments attachments={profile.attachments} locale={i18n.language} />}
+      {activeTab === "attachments" && <CustomerAttachments customerId={profile.id} canManage={canManage} locale={i18n.language} />}
     </section>
   </CustomerPage>;
 }
@@ -90,9 +92,21 @@ function Activity({ profile, notes, locale }: { profile: NonNullable<ReturnType<
   return <ol className="relative ms-1 max-w-2xl border-s">{events.map((event) => <li className="relative pb-6 ps-6 last:pb-0" key={event.id}><span className="absolute -start-1.5 top-1.5 size-3 rounded-full border-2 border-white bg-border-strong" aria-hidden="true" /><p className="text-sm font-medium">{event.label}</p><p className="mt-1 text-xs text-muted-foreground">{formatDate(event.date, locale)}</p></li>)}</ol>;
 }
 
-function Attachments({ attachments, locale }: { attachments: NonNullable<ReturnType<typeof useCustomer>["data"]>["attachments"]; locale: string }) {
+function CustomerAttachments({ customerId, canManage, locale }: { customerId: string; canManage: boolean; locale: string }) {
   const { t } = useTranslation();
-  return attachments.length ? <div className="divide-y border-y bg-white">{attachments.map((attachment) => <div className="flex items-center justify-between gap-4 py-4" key={attachment.id}><div className="min-w-0"><p className="truncate text-sm font-medium" dir="auto">{attachment.fileName}</p><p className="mt-0.5 text-xs text-muted-foreground" dir="ltr">{attachment.mimeType}</p></div><time className="shrink-0 text-xs text-muted-foreground">{formatDate(attachment.createdAt, locale)}</time></div>)}</div> : <StatePanel>{t("customers.noAttachments")}</StatePanel>;
+  const query = useCustomerAttachments(customerId);
+  const upload = useUploadCustomerAttachment(customerId);
+  return <AttachmentPanel
+    attachments={query.data}
+    isLoading={query.isLoading}
+    isError={query.isError}
+    onRetry={() => query.refetch()}
+    scope="internal"
+    locale={locale}
+    canUpload={canManage}
+    upload={canManage ? { mutateAsync: (file) => upload.mutateAsync(file), isPending: upload.isPending } : undefined}
+    emptyText={t("customers.noAttachments")}
+  />;
 }
 
 function InfoSection({ title, children }: { title: string; children: React.ReactNode }) { return <section className="rounded-md border bg-white"><h2 className="border-b px-5 py-3.5 text-sm font-semibold">{title}</h2><dl className="divide-y px-5">{children}</dl></section>; }

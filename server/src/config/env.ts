@@ -18,6 +18,9 @@ const envSchema = z.object({
     .string()
     .min(32, "JWT_SECRET must be at least 32 characters")
     .default("development-jwt-secret-key-must-be-at-least-32-characters-long"),
+  // Private Vercel Blob store token for secure attachment storage (feature/attachments).
+  // Optional: when unset, attachment upload/download return a structured STORAGE_UNAVAILABLE error.
+  BLOB_READ_WRITE_TOKEN: z.string().min(1).optional(),
 });
 
 const result = envSchema.safeParse(process.env);

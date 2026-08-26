@@ -10,6 +10,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock("./ticket-hooks", () => ({ useTickets: mocks.useTickets, useTicket: mocks.useTicket, useCategories: mocks.useCategories, useAgents: mocks.useAgents, useCreateTicket: mocks.useCreateTicket, useUpdateTicket: mocks.useUpdateTicket, useCreateTicketMessage: mocks.useCreateTicketMessage, useCreateTicketNote: mocks.useCreateTicketNote }));
 vi.mock("@/features/customers/customer-hooks", () => ({ useCustomers: mocks.useCustomers }));
 vi.mock("@/features/auth/auth-state", () => ({ useAuth: mocks.useAuth }));
+vi.mock("@/features/attachments/attachment-hooks", () => ({
+  useTicketAttachments: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
+  useUploadTicketAttachment: () => ({ mutateAsync: vi.fn().mockResolvedValue({}), isPending: false }),
+}));
 
 import { TicketDetailPage } from "./ticket-detail-page";
 import { TicketFormPage } from "./ticket-form-page";

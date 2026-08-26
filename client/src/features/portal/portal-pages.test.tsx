@@ -6,6 +6,10 @@ import { changeAppLanguage } from "@/lib/i18n";
 const mocks = vi.hoisted(() => ({ overview: vi.fn(), tickets: vi.fn(), detail: vi.fn(), categories: vi.fn(), create: vi.fn(), reply: vi.fn(), auth: vi.fn(), refetch: vi.fn(), mutate: vi.fn() }));
 vi.mock("./portal-hooks", () => ({ usePortalOverview: mocks.overview, usePortalTickets: mocks.tickets, usePortalTicket: mocks.detail, usePortalCategories: mocks.categories, useCreatePortalTicket: mocks.create, useReplyPortalTicket: mocks.reply }));
 vi.mock("@/features/auth/auth-state", () => ({ useAuth: mocks.auth }));
+vi.mock("@/features/attachments/attachment-hooks", () => ({
+  usePortalTicketAttachments: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
+  useUploadPortalTicketAttachment: () => ({ mutateAsync: vi.fn().mockResolvedValue({}), isPending: false }),
+}));
 import { PortalHomePage, PortalNewTicketPage, PortalTicketDetailPage, PortalTicketsPage } from "./portal-pages";
 
 const ticket = { id: "ticket-12345678", subject: "Payment help", status: "OPEN" as const, category: { id: "cat", name: "Billing" }, createdAt: "2026-08-25T10:00:00Z", updatedAt: "2026-08-25T11:00:00Z" };

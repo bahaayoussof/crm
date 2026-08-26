@@ -3,6 +3,8 @@ import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "@/features/auth/auth-state";
+import { AttachmentPanel } from "@/features/attachments/attachment-ui";
+import { useTicketAttachments, useUploadTicketAttachment } from "@/features/attachments/attachment-hooks";
 import { TicketPriorityText, TicketStatusBadge } from "./ticket-badges";
 import { TicketConversation } from "./ticket-conversation";
 import { getTicketError, getTicketErrorStatus } from "./ticket-error";
@@ -14,7 +16,7 @@ import { canCloseTicket, canManageTicketDefinition, canOperateAssignedTicket } f
 
 const normalTransitions: Record<TicketStatus, TicketStatus[]> = { NEW: ["OPEN"], OPEN: ["IN_PROGRESS"], IN_PROGRESS: ["WAITING_CUSTOMER", "RESOLVED"], WAITING_CUSTOMER: ["IN_PROGRESS", "RESOLVED"], RESOLVED: [], CLOSED: [], ESCALATED: [] };
 export function TicketDetailPage() {
-  const { t, i18n } = useTranslation(); const { id = "" } = useParams(); const { user } = useAuth(); const ticket = useTicket(id); const update = useUpdateTicket(id); const categories = useCategories(); const agents = useAgents();
+  const { t, i18n } = useTranslation(); const { id = "" } = useParams(); const { user } = useAuth(); const ticket = useTicket(id); const update = useUpdateTicket(id); const categories = useCategories(); const agents = useAgents(); const attachments = useTicketAttachments(id); const uploadAttachment = useUploadTicketAttachment(id);
   const [status, setStatus] = useState<TicketStatus | "">(""); const [priority, setPriority] = useState<TicketPriority | "">(""); const [categoryId, setCategoryId] = useState(""); const [assignedAgentId, setAssignedAgentId] = useState(""); const [error, setError] = useState<string | null>(null); const [confirmingClose, setConfirmingClose] = useState(false); const confirmCloseRef = useRef<HTMLButtonElement>(null);
   useEffect(() => { if (ticket.data) { setStatus(ticket.data.status); setPriority(ticket.data.priority); setCategoryId(ticket.data.category?.id ?? ""); setAssignedAgentId(ticket.data.assignedAgent?.id ?? ""); } }, [ticket.data]);
   useEffect(() => { if (confirmingClose) confirmCloseRef.current?.focus(); }, [confirmingClose]);
@@ -27,10 +29,14 @@ export function TicketDetailPage() {
     if (!Object.keys(changes).length) return; try { await update.mutateAsync(changes); } catch (caught) { setError(getTicketError(caught, t("tickets.updateError"), t)); }
   };
   const closeTicket = async () => { setError(null); try { await update.mutateAsync({ status: "CLOSED" }); setConfirmingClose(false); } catch (caught) { setError(getTicketError(caught, t("tickets.closeError"), t)); } };
+  const ticketLevelAttachments = attachments.data?.filter((item) => item.messageId === null) ?? [];
+  const messageAttachments = new Map<string, typeof ticketLevelAttachments>();
+  for (const item of attachments.data ?? []) if (item.messageId) messageAttachments.set(item.messageId, [...(messageAttachments.get(item.messageId) ?? []), item]);
   return <TicketPage>
     <header className="border-b pb-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><Link className="text-sm font-medium text-primary" to="/tickets">{t("tickets.backToList")}</Link><p className="mt-4 text-xs text-muted-foreground" dir="ltr">{ticketReference(record.id)}</p><h1 className="mt-1 text-2xl font-semibold tracking-tight">{record.subject}</h1><div className="mt-3 flex flex-wrap items-center gap-3"><TicketStatusBadge status={record.status} /><TicketPriorityText priority={record.priority} /><span className="text-xs text-muted-foreground">{t(`tickets.channel.${record.channel}`)}</span></div></div>{canManage && <Link className="button-secondary" to={`/tickets/${record.id}/edit`}>{t("common.edit")}</Link>}</div></header>
     <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-      <div className="space-y-6"><TicketConversation ticketId={record.id} items={record.conversation} canMutate={canWorkflow} /><section className="rounded-md border bg-white p-5"><h2 className="text-base font-semibold">{t("tickets.descriptionLabel")}</h2><p className="mt-3 whitespace-pre-wrap text-sm leading-6">{record.description}</p></section>
+      <div className="space-y-6"><TicketConversation ticketId={record.id} items={record.conversation} canMutate={canWorkflow} messageAttachments={messageAttachments} /><section className="rounded-md border bg-white p-5"><h2 className="text-base font-semibold">{t("tickets.descriptionLabel")}</h2><p className="mt-3 whitespace-pre-wrap text-sm leading-6">{record.description}</p></section>
+        <div className="rounded-md border bg-white p-5"><AttachmentPanel attachments={ticketLevelAttachments} isLoading={attachments.isLoading} isError={attachments.isError} onRetry={() => attachments.refetch()} scope="internal" locale={i18n.language} canUpload={canWorkflow} upload={{ mutateAsync: (file) => uploadAttachment.mutateAsync(file), isPending: uploadAttachment.isPending }} disabledReason={!canWorkflow ? t("attachments.uploadRequiresAssignment") : undefined} /></div>
         <section className="rounded-md border bg-white"><div className="border-b px-5 py-4"><h2 className="text-base font-semibold">{t("tickets.history")}</h2></div>{record.history.length ? <ol className="divide-y">{record.history.map((event) => <li className="px-5 py-4" key={event.id}><div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between"><p className="text-sm font-medium">{t(`tickets.historyActions.${event.action}`, { defaultValue: event.action })}</p><time className="text-xs text-muted-foreground">{formatTicketDate(event.createdAt, i18n.language)}</time></div><p className="mt-1 text-xs text-muted-foreground">{event.actor?.name ?? t("tickets.systemActor")}{event.oldValue || event.newValue ? `: ${event.oldValue ? displayValue(event.oldValue, t) : t("common.notProvided")} → ${event.newValue ? displayValue(event.newValue, t) : t("common.notProvided")}` : ""}</p></li>)}</ol> : <p className="p-5 text-sm text-muted-foreground">{t("tickets.noHistory")}</p>}</section>
       </div>
       <aside className="space-y-5"><section className="rounded-md border bg-white p-5"><h2 className="text-base font-semibold">{t("tickets.operations")}</h2>{error && <p className="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">{error}</p>}{!canWorkflow && <p className="mt-3 rounded-md border bg-muted p-3 text-sm text-muted-foreground">{t("tickets.unassignedReadOnly")}</p>}{canWorkflow && <div className="mt-4 space-y-4">

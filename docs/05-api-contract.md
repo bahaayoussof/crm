@@ -14,7 +14,9 @@ This contract mixes live and planned endpoints. Each section is tagged:
 - `PARTIAL` — only part of the listed surface is registered; the rest is planned.
 - `PLANNED` — documented target with no registered route yet. Do not consume as a live API.
 
-Registered routers as of `master` `ef647ef`: `/api/auth`, `/api/customers`, `/api/categories`, `/api/users` (lookup only), `/api/tickets`, `/api/dashboard`, `/api/knowledge-articles`, `/api/portal/knowledge-articles`, `/api/portal`, `/api/health`. There is no registered `/api/reports`, `/api/notifications`, `/api/feedback`, `/api/quick-replies`, `/api/settings`, or attachment upload/download route.
+Registered routers as of `master` `ef647ef`: `/api/auth`, `/api/customers`, `/api/categories`, `/api/users` (lookup only), `/api/tickets`, `/api/dashboard`, `/api/knowledge-articles`, `/api/portal/knowledge-articles`, `/api/portal`, `/api/health`. There is no registered `/api/reports`, `/api/notifications`, `/api/feedback`, `/api/quick-replies`, or `/api/settings` route.
+
+On the uncommitted `feature/attachments` branch (not in `master`): `/api/attachments`, `/api/portal/attachments`, plus attachment sub-routes appended to `/api/tickets` and `/api/customers` and the portal ticket router. See "Attachments — LIVE" below.
 
 ## Authentication
 
@@ -240,9 +242,64 @@ GET /reports/sla           PLANNED
 
 No route is registered. This is the `feature/reports` contract for `ADMIN`/`MANAGER`: created/resolved volume, status distribution, SLA compliance, average first-response time, agent performance, and customer satisfaction, all from real persisted data with an explicit date-range and timezone definition. `GET /dashboard/overview` (LIVE, below) is an operational snapshot, not the Reports feature. Satisfaction metrics depend on `feature/customer-feedback`. Do not invent fabricated analytics.
 
-## Attachments — PLANNED
+## Attachments — LIVE (on `feature/attachments`, not integrated into `master`)
 
-No upload or download route is registered. `Attachment` exists in `schema.prisma` with optional `ticketId`, `messageId`, and `customerId` context. `GET /customers/:id` (LIVE) returns customer-level attachment metadata only; there is no way to upload or retrieve file bytes. `feature/attachments` must first resolve: storage provider and Vercel/serverless compatibility, allowed MIME types, maximum file size, upload/download authorization per context, Portal ownership, orphan cleanup, and the absence of malware scanning. See `docs/18-ui-pages-spec.md` and `docs/19-progress-tracking.md` for the decision list. Do not invent the endpoint shape before those decisions.
+Backed by `server/src/modules/attachments/*` and registered in `server/src/app.ts`. `Attachment` is used as-is (no schema change, no migration). Bytes live in a **private Vercel Blob store** through an `AttachmentStorage` interface (`@vercel/blob@2.x` server SDK adapter + an in-memory test adapter). The provider token (`BLOB_READ_WRITE_TOKEN`) is server-side only; a raw provider URL or token is never returned. When the token is unset every upload/download returns `503 STORAGE_UNAVAILABLE` — there is no fallback to public or local-disk storage.
+
+```text
+GET  /api/tickets/:ticketId/attachments
+POST /api/tickets/:ticketId/attachments
+GET  /api/tickets/:ticketId/messages/:messageId/attachments
+POST /api/tickets/:ticketId/messages/:messageId/attachments
+GET  /api/customers/:customerId/attachments
+POST /api/customers/:customerId/attachments
+GET  /api/attachments/:attachmentId/download
+
+GET  /api/portal/tickets/:ticketId/attachments
+POST /api/portal/tickets/:ticketId/attachments
+GET  /api/portal/attachments/:attachmentId/download
+```
+
+**Upload.** Server-proxied `multipart/form-data`. The request must contain **exactly one part: a file named `file`**. **No textual multipart fields are accepted** — any `field` event is rejected deterministically (the field value is never read, logged, or echoed). Max **4 MiB**. Allowed types (validated by file **signature/content**, not the client MIME type, extension, or multipart filename): `image/jpeg`, `image/png`, `image/webp`, `application/pdf`, `text/plain`. `text/plain` is validated over the whole buffer (reject NUL bytes, invalid UTF-8, any binary signature, and `<!doctype`/`<html`/`<head`/`<body`/`<script`/`<svg`/`<?xml`/`<!--` markup starts). On any rejection the multipart stream is drained, no provider upload and no database write occur, and exactly one response is returned. `storageKey` is `attachments/<random uuid>`, generated server-side, never from the filename or the request. The original filename is kept only as sanitized display metadata (path components across `/` and `\`, control characters, and leading dots stripped; length bounded to 200; `"file"` fallback).
+
+Exactly one documented code per condition:
+
+| Condition | Code | Status |
+| --- | --- | --- |
+| No file part | `NO_FILE` | 422 |
+| A file part under a field name other than `file` | `NO_FILE` | 422 |
+| More than one file part | `MULTIPLE_FILES` | 422 |
+| The file part has zero bytes | `EMPTY_FILE` | 422 |
+| The file part exceeds 4 MiB (upload **and** a stored object larger than 4 MiB on download) | `FILE_TOO_LARGE` | 413 |
+| Detected content type not in the allowlist / MIME spoof | `UNSUPPORTED_FILE_TYPE` | 415 |
+| A **reserved** textual field is submitted (`storageKey`, `ticketId`, `messageId`, `customerId`, `mimeType`, `fileName`, `createdAt`) | `INVALID_ATTACHMENT_CONTEXT` | 422 |
+| Any other unexpected textual field, malformed multipart, a stream error, or an aborted request | `INVALID_UPLOAD` | 422 |
+| Storage not configured (`BLOB_READ_WRITE_TOKEN` unset) or provider unavailable | `STORAGE_UNAVAILABLE` | 503 |
+| Provider upload succeeded but the metadata row could not be created | `ATTACHMENT_UPLOAD_FAILED` | 500 |
+| Missing attachment record, unauthorized attachment, or missing stored object (no provider detail) | `ATTACHMENT_NOT_FOUND` | 404 |
+| Missing/hidden ticket | `TICKET_NOT_FOUND` | 404 |
+| Message not found under the supplied ticket | `MESSAGE_NOT_FOUND` | 404 |
+| Portal upload to a `CLOSED` ticket | `TICKET_CLOSED` | 409 |
+| Portal caller has no linked `Customer` profile | `CUSTOMER_PROFILE_REQUIRED` | 403 |
+| Role/assignment/authorship violation (incl. attaching to another user's message — enforced for `ADMIN`/`MANAGER` too) | `FORBIDDEN` | 403 |
+
+No alternate aliases exist in code (no `VALIDATION_ERROR`, `UNEXPECTED_FILE_FIELD`, `ATTACHMENT_TOO_LARGE`, or `MESSAGE_NOT_OWNED`). Backend, the frontend `attachments.errors.*` map, English/Arabic strings, and tests use these exact codes.
+
+**Context invariants** (service-enforced; `docs/04`): ticket-level = `ticketId` set, `messageId`/`customerId` null; message-level = `ticketId` + `messageId` set (the message must belong to the ticket), `customerId` null; customer-level = `customerId` set, others null.
+
+**Metadata projections.** Internal: `{ id, fileName, mimeType, createdAt, ticketId, messageId, customerId }`. Portal (distinct serializer): `{ id, fileName, mimeType, createdAt, messageId }` only — no `ticketId`, `customerId`, `storageKey`, provider URL, or staff identity. `GET /api/tickets/:ticketId/attachments` returns ticket-level plus message-level rows whose message belongs to the ticket, each once (`OR: [{ ticketId, messageId: null }, { message: { ticketId } }]`); the focused message route returns that message's rows only.
+
+**Listing / upload authorization.** `GET` routes require `ADMIN`/`MANAGER`/`AGENT`; `CUSTOMER` and unauthenticated callers are rejected (`403` / `401`). Ticket and message listing/download follow the existing ticket visibility predicate (`AGENT` sees assigned or unassigned only; a hidden ticket → `404 TICKET_NOT_FOUND`, and a hidden/foreign attachment → `404 ATTACHMENT_NOT_FOUND`). Ticket/message **upload** additionally requires an `AGENT` to be the assigned agent (`403 FORBIDDEN` otherwise); message upload also requires `message.authorUserId ===` the authenticated user — enforced for `ADMIN`/`MANAGER` too (`403 FORBIDDEN`). Customer-profile listing/download is available to every internal read role; customer-profile **upload** is `ADMIN`/`MANAGER` only (`AGENT` → `403 FORBIDDEN`).
+
+**Download / Preview transport.** Both the Download action and the frontend in-browser **Preview** use the **same** authenticated download endpoints (`GET /api/attachments/:id/download` and `GET /api/portal/attachments/:id/download`). Preview is a client-side presentation of that authorized private response as a temporary in-memory browser Blob URL — there is **no** preview endpoint, no public Blob access, and no storage key / provider URL / token in the response.
+
+**Download.** Always through the authenticated app endpoint. Order: load metadata → resolve context → enforce internal visibility / Portal ownership → `storage.head` (missing object → `404 ATTACHMENT_NOT_FOUND` with no provider detail; `size > 4 MiB` → `413 FILE_TOO_LARGE`) → `storage.get`. Authorization always runs before any provider call. Response uses the stored validated MIME type and sends `Content-Disposition: attachment; filename="<ascii>"; filename*=UTF-8''<pct>`, `X-Content-Type-Options: nosniff`, and `Cache-Control: private, no-store`. The browser is never redirected to a provider URL.
+
+**Orphan cleanup.** Creation order: authenticate → authorize context → parse multipart → validate signature → generate key → provider `put` → DB `create`. If `put` succeeds but `create` fails, the provider object is deleted immediately and `500 ATTACHMENT_UPLOAD_FAILED` is returned; if the cleanup delete also fails, the original failure is preserved and the orphan `storageKey` is logged (no tokens or file contents). There is **no** background orphan-cleanup worker and no cross-provider transaction.
+
+**No deletion.** There is no attachment DELETE endpoint. No malware scanning is configured; signature validation is not a malware guarantee.
+
+**Portal.** `CUSTOMER` only. Identity and ticket ownership derive from `User -> Customer.userId`; `customerId` is never accepted from the browser. Missing and non-owned tickets both return the existing `404 TICKET_NOT_FOUND`; missing, non-owned, and customer-profile attachments all return `404 ATTACHMENT_NOT_FOUND`. Upload is allowed only for an owned non-`CLOSED` ticket; a `CLOSED` ticket returns `409 TICKET_CLOSED`. A Portal upload alone never creates a `TicketMessage` and never reopens the ticket.
 
 ## Feedback — PLANNED
 
@@ -300,4 +357,6 @@ All `/api/portal/*` endpoints require an authenticated `CUSTOMER` and derive own
 - `POST /portal/tickets`: strict subject, description, and optional category creation.
 - `POST /portal/tickets/:id/messages`: strict customer reply, maximum 20,000 characters.
 
-Portal responses exclude priority, assignee, organization, SLA state, SLA targets, SLA deadlines, notes, history, attachments, staff roles/emails, audit data, and escalation semantics. In particular, Portal serializers never expose `slaState`, `effectiveSlaDueAt`, `effectiveSlaTarget`, `firstResponseDueAt`, `firstRespondedAt`, or `resolutionDueAt`.
+Portal responses exclude priority, assignee, organization, SLA state, SLA targets, SLA deadlines, notes, history, staff roles/emails, audit data, and escalation semantics. In particular, Portal serializers never expose `slaState`, `effectiveSlaDueAt`, `effectiveSlaTarget`, `firstResponseDueAt`, `firstRespondedAt`, or `resolutionDueAt`.
+
+The Portal ticket detail (`GET /portal/tickets/:id`) itself still carries no attachment data. `feature/attachments` adds a **separate** owned-ticket attachment surface (`GET/POST /portal/tickets/:id/attachments`, `GET /portal/attachments/:id/download`) with its own minimal `{ id, fileName, mimeType, createdAt, messageId }` projection — no ticket/customer ids, storage keys, staff identity, or SLA/notes/history. See "Attachments — LIVE".

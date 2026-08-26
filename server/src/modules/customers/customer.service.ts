@@ -65,7 +65,7 @@ export async function getCustomer(customerId: string) {
     select: {
       id: true, name: true, email: true, phone: true, createdAt: true, updatedAt: true,
       user: { select: { id: true, name: true, email: true, role: true } },
-      attachments: { orderBy: { createdAt: "desc" }, select: { id: true, fileName: true, mimeType: true, storageKey: true, createdAt: true } },
+      attachments: { orderBy: { createdAt: "desc" }, select: { id: true, fileName: true, mimeType: true, createdAt: true } },
       tickets: { orderBy: { updatedAt: "desc" }, take: 1, select: { updatedAt: true } },
       _count: { select: { tickets: true } },
     },
