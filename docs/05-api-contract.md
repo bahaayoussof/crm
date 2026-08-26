@@ -6,6 +6,16 @@ Base path:
 /api
 ```
 
+## Implementation status legend
+
+This contract mixes live and planned endpoints. Each section is tagged:
+
+- `LIVE` — route is registered in `server/src/app.ts` and backed by a controller/service.
+- `PARTIAL` — only part of the listed surface is registered; the rest is planned.
+- `PLANNED` — documented target with no registered route yet. Do not consume as a live API.
+
+Registered routers as of `master` `e387667`: `/api/auth`, `/api/customers`, `/api/categories`, `/api/users` (lookup only), `/api/tickets`, `/api/dashboard`, `/api/portal`, `/api/health`. There is no registered `/api/knowledge-articles`, `/api/reports`, `/api/notifications`, `/api/feedback`, `/api/quick-replies`, `/api/settings`, or attachment upload/download route.
+
 ## Authentication
 
 ```text
@@ -33,17 +43,19 @@ GET  /auth/me
 
 `GET /auth/me` requires `Authorization: Bearer <token>` and returns `{ "data": { "user": ... } }`. Internal users have `customer: null`. Password hashes are never returned. Authentication errors use `{ "error": { "code": "...", "message": "..." } }`.
 
-## Users
+## Users — PARTIAL
 
 ```text
-GET    /users
-GET    /users/:id
-POST   /users
-PATCH  /users/:id
-GET    /users/agents
+GET    /users/agents      LIVE
+GET    /users             PLANNED
+GET    /users/:id         PLANNED
+POST   /users             PLANNED
+PATCH  /users/:id         PLANNED
 ```
 
-`GET /users/agents` is an internal-only Ticket Management lookup that returns safe summaries of `AGENT` users. It never returns password hashes or customer identities.
+`GET /users/agents` is the only registered users route. It is an internal-only Ticket Management lookup that returns safe summaries of `AGENT` users (`id`, `name`, `email`) to `ADMIN`, `MANAGER`, and `AGENT`. It never returns password hashes or customer identities.
+
+The list/detail/create/update routes are the planned `feature/user-management` contract for ADMIN-managed internal users and roles. They are not implemented. When built they must not allow public creation of `ADMIN`, `MANAGER`, or `AGENT` accounts; internal-user administration is separate from public customer registration. Exact request/response shapes and the MANAGER capability boundary are resolved during that feature.
 
 ## Categories
 
@@ -160,34 +172,58 @@ Both mutations accept the strict body `{ body: string }`, trim it, reject empty 
 ### Later Ticket Actions
 
 ```text
-POST /tickets/:id/assign
-POST /tickets/:id/status
-POST /tickets/:id/attachments
-GET  /tickets/:id/history
+POST /tickets/:id/assign          PLANNED (superseded)
+POST /tickets/:id/status          PLANNED (superseded)
+POST /tickets/:id/attachments     PLANNED (feature/attachments)
+GET  /tickets/:id/history         PLANNED (optional focused read)
 ```
 
-For core Ticket Management, history is included in `GET /tickets/:id`; `GET /tickets/:id/history` may also be implemented as a focused read endpoint. Assignment, status, and attachment action endpoints remain outside this branch because existing ticket updates own the implemented assignment and status behavior.
+None of these are registered. Assignment and status changes are already implemented through `PATCH /tickets/:id` (LIVE), so the dedicated `assign`/`status` action endpoints are not planned for implementation. History is currently included in `GET /tickets/:id`; a focused `GET /tickets/:id/history` read endpoint is optional. `POST /tickets/:id/attachments` belongs to `feature/attachments` and has no storage backend yet.
 
-## Knowledge Base
+## Knowledge Base — PLANNED
 
 ```text
-GET    /knowledge-articles
-GET    /knowledge-articles/:id
-POST   /knowledge-articles
-PATCH  /knowledge-articles/:id
-DELETE /knowledge-articles/:id
+GET    /knowledge-articles          PLANNED
+GET    /knowledge-articles/:id      PLANNED
+POST   /knowledge-articles          PLANNED
+PATCH  /knowledge-articles/:id      PLANNED
+DELETE /knowledge-articles/:id      PLANNED
 ```
 
-## Reports
+No route is registered. `KnowledgeArticle` and `KnowledgeArticleStatus` (`DRAFT`, `PUBLISHED`) exist in `schema.prisma` only. This is the `feature/knowledge-base` contract: internal list/search and article detail for `ADMIN`/`MANAGER`/`AGENT`, management (create/update/delete) for `ADMIN`/`MANAGER`, and a published-only customer read path reused by `GET /portal/knowledge-articles`. Response shapes, search parameters, and category handling are resolved during that feature.
+
+## Reports — PLANNED
 
 ```text
-GET /reports/overview
-GET /reports/tickets
-GET /reports/agents
-GET /reports/sla
+GET /reports/overview      PLANNED
+GET /reports/tickets       PLANNED
+GET /reports/agents        PLANNED
+GET /reports/sla           PLANNED
 ```
 
-## Dashboard
+No route is registered. This is the `feature/reports` contract for `ADMIN`/`MANAGER`: created/resolved volume, status distribution, SLA compliance, average first-response time, agent performance, and customer satisfaction, all from real persisted data with an explicit date-range and timezone definition. `GET /dashboard/overview` (LIVE, below) is an operational snapshot, not the Reports feature. Satisfaction metrics depend on `feature/customer-feedback`. Do not invent fabricated analytics.
+
+## Attachments — PLANNED
+
+No upload or download route is registered. `Attachment` exists in `schema.prisma` with optional `ticketId`, `messageId`, and `customerId` context. `GET /customers/:id` (LIVE) returns customer-level attachment metadata only; there is no way to upload or retrieve file bytes. `feature/attachments` must first resolve: storage provider and Vercel/serverless compatibility, allowed MIME types, maximum file size, upload/download authorization per context, Portal ownership, orphan cleanup, and the absence of malware scanning. See `docs/18-ui-pages-spec.md` and `docs/19-progress-tracking.md` for the decision list. Do not invent the endpoint shape before those decisions.
+
+## Feedback — PLANNED
+
+No route is registered. `Feedback` (`ticketId`, `customerId`, `rating`, `comment?`) exists in `schema.prisma` only. `feature/customer-feedback` must define: eligible ticket statuses (expected `RESOLVED`/`CLOSED`), customer ownership, one feedback record per ticket, rating validation range, optional comment, whether a submission can be updated, Portal UX, and how the rating feeds `GET /reports/*`.
+
+## Notifications — PLANNED
+
+No route is registered. `Notification` (`userId`, `type`, `title`, `message`, `readAt?`) exists in `schema.prisma` only. `feature/notifications` covers in-app notifications and a read/unread workflow. It must distinguish event-driven in-app notifications from SLA request-time derivation and from any scheduled monitoring; serverless scheduling constraints apply.
+
+## Quick Replies — PLANNED
+
+No route is registered. `QuickReply` (`title`, `body`, `createdById`) exists in `schema.prisma` only. `feature/quick-replies` covers management permissions, list/search where practical, and insertion of editable content into the Ticket composer. A quick reply is never sent automatically.
+
+## Settings / Configuration management — PLANNED
+
+No route is registered. `feature/settings` exposes configuration only for resources with real persistence and APIs: categories (currently read-only via `GET /categories`), `SlaRule` rows (currently seeded/managed directly), quick replies, and bounded branding once `feature/custom-branding` exists. No dead settings surface. SLA-rule and category administration CRUD shapes are resolved during that feature.
+
+## Dashboard — LIVE
 
 ```text
 GET /dashboard/overview
@@ -203,7 +239,9 @@ Active metrics include `NEW`, `OPEN`, `IN_PROGRESS`, `WAITING_CUSTOMER`, and `ES
 
 ## Customer Portal
 
-Portal routes may reuse ticket APIs with customer-scoped authorization rather than duplicate business logic.
+Portal routes may reuse ticket APIs with customer-scoped authorization rather than duplicate business logic. The implemented Portal namespace uses dedicated isolated routes (see "Customer Portal API" below).
+
+Planned Portal additions (no route registered): `GET /portal/knowledge-articles` (published-only read, `feature/knowledge-base`) and `POST /portal/tickets/:id/feedback` (`feature/customer-feedback`).
 
 ## API Rules
 

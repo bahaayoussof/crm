@@ -1667,6 +1667,59 @@ or another documented admin section.
 
 ---
 
+# 23b. Underdefined Original Requirements — Planning Only
+
+The following original-assignment areas have no implementation and no complete specification. They are recorded here so they are not forgotten. Do not invent final schemas, endpoints, permissions, or screen layouts for them during unrelated work. Existing frontend design rules, English/Arabic behavior, RTL, responsive behavior, and role navigation rules still apply once each is specified.
+
+## Tasks (Agent Dashboard)
+
+Status: product decision required before implementation. Branch: `feature/tasks-reminders`.
+
+Required decision points:
+- data model and storage
+- ownership (creator vs assignee) and whether a task can be assigned to another user
+- optional linkage to a ticket and/or a customer
+- due date and completion model
+- role visibility (own only, team, manager oversight)
+- relationship to Notifications
+- placement: Dashboard section, ticket workspace panel, or dedicated route
+
+## Reminders (Agent Dashboard)
+
+Status: product decision required before implementation. Branch: `feature/tasks-reminders`.
+
+Required decision points:
+- whether a reminder is a lightweight variant of a Task or a separate model
+- time trigger and how it surfaces without background workers on serverless
+- snooze / dismiss behavior
+- ticket/customer linkage
+- relationship to Notifications and to SLA alerts
+
+## Team Collaboration
+
+Status: product decision required before implementation. Branch: `feature/team-collaboration`.
+
+Existing building blocks: internal `TicketNote` and `CustomerNote`, ticket history, assignment.
+
+Required decision points:
+- what "collaboration" means here: @mentions, watchers/followers, explicit handoff, shared comments, or task delegation
+- notification behavior for each
+- role visibility and whether customers ever see any of it (they must not for internal notes)
+- whether it introduces new models or extends notes/history
+
+## Custom Branding
+
+Status: product decision required before implementation. Branch: `feature/custom-branding`.
+
+Required decision points:
+- configurable fields: application name, logo, primary accent color, Portal-specific branding
+- persistence location (Settings-backed) and who may edit
+- logo upload/storage (depends on `feature/attachments` storage decisions)
+- safe CSS/color boundaries so branding cannot break contrast, layout, or RTL
+- fallback behavior when unset or invalid
+
+---
+
 # 24. Common Components
 
 Prefer domain components when repeated.

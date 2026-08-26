@@ -2,19 +2,23 @@
 
 Last Updated: 2026-08-26
 
-Current Integration Branch: `master` at `e7d9b14` (`e7d9b14842b270278fe337d22a8bdbd2a4a19386`), equal to the `origin/master` tracking ref (local/remote ahead 0, behind 0). The developer committed `feature/sla` as `e7d9b14 feat: complete basic SLA presentation` and fast-forward merged it into `master`; `feature/sla` is contained in `master`.
+Current Integration Branch: `master` at `e387667` (`e38766795a8e08561c6aad3457fddd709be03606`), equal to the `origin/master` tracking ref (local/remote ahead 0, behind 0). `e387667 update progress tracking` is a documentation-only commit on top of `e7d9b14 feat: complete basic SLA presentation`; it changed `docs/19-progress-tracking.md` only. `feature/sla` (`e7d9b14`) is contained in `master`.
 
-Current Working Branch: `master`. The only uncommitted change is this progress-tracker synchronization; the developer commits it manually.
+Current Working Branch: `docs/task-coverage-roadmap`, created from clean synchronized `master` at `e387667` for the task-coverage audit and roadmap reconciliation. Working tree was clean at task start. This branch changes documentation only; no application code, Prisma schema, migration, package file, or test is modified.
 
-> This file is a status summary. Requirements, architecture, API contracts, RBAC rules, workflows, UI specifications, and architecture decisions remain authoritative in their respective documents.
+> This file is a status summary and the single authoritative status-and-roadmap document. Requirements, architecture, API contracts, RBAC rules, workflows, UI specifications, and architecture decisions remain authoritative in their respective documents.
+
+> Status terms are not interchangeable. `Integrated into master` = Git ancestry confirms containment. `Automated-verified` = automated tests were run and passed (historically, during the cited feature). `PostgreSQL-verified` / `Browser-verified` = a live check was actually performed. This audit reran nothing: all test counts, PostgreSQL results, and browser results below are preserved historical evidence from prior feature work.
 
 ## 1. Overall Status
 
-- `master` at `e7d9b14` contains Project Foundation, Database Schema, Authentication, Customer Management, Localization and RTL, Frontend Design Polish, TanStack Table adoption, Bilingual Typography, Ticket Management, Ticket Conversation, Agent Dashboard, Customer Portal, the reviewed Ticket authorization/workflow fix, the reviewed Dashboard ticket-queue fix, and basic SLA presentation.
+- `master` at `e387667` contains Project Foundation, Database Schema, Authentication, Customer Management, Localization and RTL, Frontend Design Polish, TanStack Table adoption, Bilingual Typography, Ticket Management, Ticket Conversation, Agent Dashboard, Customer Portal, the reviewed Ticket authorization/workflow fix, the reviewed Dashboard ticket-queue fix, and basic SLA presentation (`e7d9b14`). `e387667` is a docs-only tracker update on top of `e7d9b14`.
 - Basic SLA presentation is integrated: one shared request-time derivation helper (`server/src/shared/sla/derive-sla.ts`) consumed by both the Agent Dashboard and authorized internal Ticket Details, an explicit `effectiveSlaTarget`, derived Ticket Details response fields, a compact localized Ticket Details SLA subsection, and Portal SLA-free regression assertions.
 - The end-to-end customer/agent support loop is implemented: customers can create, list, inspect, reply to, and reopen eligible requests through the owned Portal boundary, while internal staff can manage, converse on, and resolve tickets with customer context, Dashboard visibility, and clear SLA state.
-- The project is not finished or production-ready: SLA monitoring/automation, realistic demo data, final integrated QA, unresolved Dashboard and SLA visual verification, deployment verification, and deferred/P1 features remain.
-- Provider-backed channels and other production external integrations remain intentionally deferred.
+- This document now carries an original-task coverage audit (section 2A). Against the full original assignment: **18 COMPLETE, 8 PARTIAL, 23 NOT_STARTED, 9 ARCHITECTURE_ONLY, 1 INTENTIONALLY_DEFERRED** — 59 requirement rows. The strong P0 loop is a minority of total assignment scope; most non-P0 areas are `NOT_STARTED`, not intentionally cut.
+- The project is not finished or production-ready: Knowledge Base, Attachments upload/download, Quick Replies, Customer Feedback, Reports, Users Management, Settings, Notifications, SLA automation, Tasks/Reminders, Team Collaboration, AI assistance, Custom Branding, realistic demo data, final integrated QA, unresolved Dashboard and SLA visual verification, and deployment verification all remain.
+- Provider-backed channels and other production external integrations remain architecture/demo-only (ADR-002, ADR-019).
+- Next implementation feature: `feature/knowledge-base` (section 5). Final demo seed data is **not** the next task (section 6A).
 
 ## 2. Feature Progress
 
@@ -32,17 +36,161 @@ Current Working Branch: `master`. The only uncommitted change is this progress-t
 | Agent Dashboard | ✅ COMPLETE | `fix/dashboard-ticket-queues`, SLA helper extraction on `feature/sla` (both contained in `master`) | Explicit role-derived primary queues; AGENT active assigned-only work; backend Recent exclusion after primary selection; now uses the shared SLA derivation helper without response-shape change | Localized role-aware headings, non-duplicate sections, fixed-width scrollable tables, overflow-safe mobile cards, and stale-response crash protection | 103 client / 126 server passing | Yes, prior verified run | Dashboard queue fix and the SLA helper extraction are integrated into `master` at `e7d9b14`; dashboard regression tests confirm unchanged counts, visibility, ranking, response shape, and boundaries. Browser visual verification remains incomplete. |
 | Customer Portal | ✅ COMPLETE | `feature/customer-portal` | Customer-owned Portal APIs, IDOR-safe ownership, creation, public replies, and reopening | Final responsive English/Arabic Portal shell, overview, list, creation, detail, and navigation polish | 82 client / 87 server passing | Yes, prior verified run | Commit `458af2e` ancestry confirms integration into `master`. Authenticated English/Arabic desktop and mobile visual verification and final navigation regression verification were completed previously. |
 | SLA / Automation | ✅ BASIC PRESENTATION COMPLETE | `feature/sla` (commit `e7d9b14`, contained in `master`) | Deadline snapshots/recalculation, one-time first-response recording, Portal-safe behavior, and one shared request-time derivation helper (`SlaState` + `SlaTarget` + fixed 60-minute window) consumed by Dashboard and authorized internal Ticket Details | Dashboard SLA presentation unchanged; internal Ticket Details gains a compact localized English/Arabic SLA subsection (state, effective target, effective deadline, raw first-response/resolution deadlines, first-response completion) using derived API fields, text-not-color-alone, LTR-isolated dates, no countdown | 103 client / 126 server passing | Not verified against PostgreSQL this session; 18 deterministic boundary tests cover all states | Basic SLA presentation and shared derivation are integrated into `master` at `e7d9b14`. Deferred: background workers, scheduled monitoring, persisted SLA state/breach events, notifications, automatic escalation/assignment, SLA reports, and SLA administration. PostgreSQL and authenticated browser verification of the Ticket Details SLA subsection remain outstanding. |
-| Knowledge Base | ⚪ NOT STARTED | — | Schema only | Not implemented | Schema only | Schema only | P1 after the P0 demo flow. |
-| Reports | ⚪ NOT STARTED | — | Not implemented | Not implemented | None | No | Depends on meaningful ticket/SLA/feedback data. |
-| AI Assistant | 🟣 DEFERRED | — | Not implemented | Not implemented | None | No | P2; must require human review when promoted. |
-| Notifications | ⚪ NOT STARTED | — | Schema only | Not implemented | Schema only | Schema only | P1 in-app notifications only. |
-| Attachments | ⚪ NOT STARTED | — | Schema and customer metadata read path only | Customer metadata display only | Partial customer coverage | Schema only | No upload/storage provider or ownership validation service. |
-| Audit Logs | 🟣 DEFERRED | — | Ticket history schema is not a general audit log | Not implemented | Schema only | Schema only | P2. |
+| Knowledge Base | ⚪ NOT_STARTED | `feature/knowledge-base` (planned, order 1) | Schema only (`KnowledgeArticle`) | Not implemented | Schema only | Schema only | No route/page/nav. Next feature. Unblocks AI suggested-solution and Reports content. |
+| Quick Replies | ⚪ NOT_STARTED | `feature/quick-replies` (planned, order 3) | Schema only (`QuickReply`) | Not implemented | Schema only | Schema only | No management API, no composer insertion. |
+| Customer Feedback | ⚪ NOT_STARTED | `feature/customer-feedback` (planned, order 4) | Schema only (`Feedback`) | Not implemented | Schema only | Schema only | Primary demo journey depends on it (satisfaction reporting). |
+| Reports | ⚪ NOT_STARTED | `feature/reports` (planned, order 5) | Not implemented | Not implemented | None | No | Operational Dashboard is not Reports. Depends on feedback for satisfaction. |
+| Users Management | 🟡 PARTIAL | `feature/user-management` (planned, order 6) | `GET /users/agents` lookup only; RBAC enforced elsewhere | Role-aware guards only | `auth.test.ts`, `middleware/auth.test.ts` | Prior PostgreSQL | No user CRUD, no `/users` page. |
+| Settings | ⚪ NOT_STARTED | `feature/settings` (planned, order 7) | Not implemented | Not implemented | None | No | Nothing editable in-app; categories read-only, SLA rules managed directly. |
+| Notifications | ⚪ NOT_STARTED | `feature/notifications` (planned, order 8) | Schema only (`Notification`) | Not implemented | Schema only | Schema only | In-app read/unread only when built. |
+| SLA Automation | ⚪ NOT_STARTED | `feature/sla-automation` (planned, order 9) | Manual escalation only; no monitoring/auto-assign/alerts | Not implemented | None | No | Distinct from request-time SLA derivation, which is done. |
+| Attachments | 🟡 PARTIAL | `feature/attachments` (planned, order 2) | Schema + customer metadata read path only | Customer metadata display only | Partial customer coverage | Schema only | No upload/storage provider or ownership-validation service. |
+| Tasks / Reminders | ⚪ NOT_STARTED | `feature/tasks-reminders` (planned, order 10) | Not implemented | Not implemented | None | No | Product decision required before implementation. |
+| Team Collaboration | 🟡 PARTIAL | `feature/team-collaboration` (planned, order 11) | Internal notes + history + assignment | Note composer/rendering | `ticket.test.ts` | Automated | Scope (mentions/watchers/handoff) undefined; product decision required. |
+| AI Assistant | 🟣 DEFERRED | `feature/ai-assistant` (planned, order 12) | Not implemented | Not implemented | None | No | P2; summary → reply → categorization → KB solution. No AI output mutates a ticket or sends without human approval. Chatbot deferred (P3). |
+| Custom Branding | ⚪ NOT_STARTED | `feature/custom-branding` (planned, order 13) | Not implemented | Not implemented | None | No | Product decision required before implementation. |
+| Audit Logs | 🟣 DEFERRED | roadmap tail (P2) | No `AuditLog` model; `TicketHistory` is ticket-lifecycle only | Not implemented | Schema only (`TicketHistory`) | Schema only | Not a general cross-entity audit log. |
 | Multi-Department | 🟣 DEFERRED | — | Schema only | Not implemented | Schema only | Schema only | P2 behavior. |
 | Multi-Branch | 🟣 DEFERRED | — | Schema only | Not implemented | Schema only | Schema only | P2 behavior. |
 | External Integrations | 🟣 DEFERRED | — | Channel enum representation only | Not implemented | Schema only | Schema only | WhatsApp, SMS, inbound email, live transport, ERP, and arbitrary systems are demonstration/architecture only. |
-| Deployment | ⚪ NOT STARTED | — | No deployed API evidence | No deployed frontend evidence | Local build passing | Development DB only | Deployment targets are documented but not configured or verified. |
-| Final QA | 🟡 INCOMPLETE | — | `master` at `e7d9b14` passes automated checks | `master` at `e7d9b14` passes automated checks | 16 client files / 103 tests; 9 server files / 126 tests; 229 total passed, 0 failed, 0 skipped, 0 todo | Outstanding | Lint, typecheck, and builds pass; the non-failing Vite chunk-size warning remains. PostgreSQL and authenticated English/Arabic browser verification for the SLA presentation and the Dashboard were not performed; deterministic boundary tests cover every SLA state. |
+| Deployment | ⚪ NOT_STARTED | deployment branch (planned, order 16) | No deployed API evidence | No deployed frontend evidence | Local build passing | Development DB only | Deployment targets are documented but not configured or verified. |
+| Final QA | 🟡 INCOMPLETE | `test/core-flows` (planned, order 15) | Automated checks passed during `feature/sla` (code unchanged since `e7d9b14`; `e387667` is docs-only) | Same | 16 client files / 103 tests; 9 server files / 126 tests; 229 total passed, 0 failed, 0 skipped, 0 todo (historical, not rerun in this audit) | Outstanding | Lint, typecheck, and builds passed historically; the non-failing Vite chunk-size warning remains. PostgreSQL and authenticated English/Arabic browser verification for the SLA presentation and the Dashboard were not performed. Broader-scope QA also depends on features in the roadmap. |
+
+## 2A. Original-Task Coverage Matrix
+
+Every bullet from the original assignment appears exactly once. `Status` is the primary implementation state (`COMPLETE` / `PARTIAL` / `NOT_STARTED` / `ARCHITECTURE_ONLY` / `INTENTIONALLY_DEFERRED`). Verification is recorded separately in the `DB/browser evidence` column and in section 9; a `COMPLETE` row can still have outstanding live verification. Evidence paths are relative to repo root.
+
+### 1. Customer Management
+
+| Requirement | Status | Backend evidence | Frontend evidence | Tests | DB/browser evidence | Gap | Planned branch |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Customer profiles | COMPLETE | `server/src/modules/customers/*` — `GET/POST/PATCH/DELETE /customers`, `GET /customers/:id` | `client/src/features/customers/*` — list, detail, form pages; router `/customers*` | `customer.test.ts`, `customer-pages.test.tsx`, `customer.schemas.test.ts` | PostgreSQL-verified (prior); browser partial (prior) | — | — |
+| Contact details | COMPLETE | Customer `name`/`email`/`phone`; detail representation w/ safe linked-user fields | Contact info in detail Overview | `customer.test.ts` | PostgreSQL-verified (prior) | — | — |
+| Interaction history | PARTIAL | Activity derived from customer timestamps + `CustomerNote` only; no unified lifecycle event feed | Customer Details Activity tab (derived) | `customer-pages.test.tsx` | Not verified this cycle | No ticket-created/replied/feedback events in one timeline; "Recent Tickets" on Overview may still be placeholder | `feature/reports` context + later activity feed |
+| Notes | COMPLETE | `CustomerNote` model; `GET/POST /customers/:id/notes`; internal-only, RBAC-gated | Notes tab; agent read-only explanation | `customer.test.ts`, `customer-pages.test.tsx` | PostgreSQL-verified (prior) | — | — |
+| Attachments | PARTIAL | `Attachment` model; metadata only in `GET /customers/:id`; no upload/download route | Customer attachment metadata display only | Partial coverage in `customer.test.ts` | Schema only | No storage provider, no upload/download, no ownership-validation service | `feature/attachments` |
+
+### 2. Ticket Management
+
+| Requirement | Status | Backend evidence | Frontend evidence | Tests | DB/browser evidence | Gap | Planned branch |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Create and track tickets | COMPLETE | `ticket.routes.ts` — `GET/POST /tickets`, `GET/PATCH /tickets/:id`; pagination/filter | `features/tickets/*` — list, form, detail; router `/tickets*` | `ticket.test.ts` (26 cases), `ticket-pages.test.tsx` | PostgreSQL happy-path (prior) | — | — |
+| Categories and priorities | COMPLETE | `GET /categories` lookup; `TicketPriority` enum; create/update validation | Category + priority selectors; badges | `ticket.test.ts` | PostgreSQL-verified (prior) | Category administration (CRUD) not built — see Settings | `feature/settings` (category admin) |
+| Assign tickets to agents | COMPLETE | `PATCH /tickets/:id` assignment; `GET /users/agents`; ADMIN/MANAGER only; agent-created self-assign + history | Assignee control (ADMIN/MANAGER); agent create flow | `ticket.test.ts`, `ticket-edit-route.test.tsx` | PostgreSQL-verified (prior) | No automatic assignment | `feature/sla-automation` (auto-assign) |
+| Status and escalation | COMPLETE | Transition matrix enforced; `ESCALATED` status; ADMIN/MANAGER enter/leave escalation | Status control, confirmed Close action | `ticket.test.ts` | PostgreSQL-verified (prior) | Automatic escalation rules not built | `feature/sla-automation` |
+| Ticket history | COMPLETE | `TicketHistory` writes on create/assign/status/priority; in `GET /tickets/:id` | History section in workspace | `ticket.test.ts` | PostgreSQL-verified (prior) | Not a general audit log | — |
+
+### 3. Communication Channels
+
+| Requirement | Status | Backend evidence | Frontend evidence | Tests | DB/browser evidence | Gap | Planned branch |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Email | ARCHITECTURE_ONLY | `Channel.EMAIL` enum only | Channel value display | — | N/A | No inbound email ingestion, no outbound email | demo-only (ADR-002) |
+| WhatsApp | ARCHITECTURE_ONLY | `Channel.WHATSAPP` enum only | Channel value display | — | N/A | No provider integration | demo-only (ADR-002) |
+| Live chat | ARCHITECTURE_ONLY | `Channel.LIVE_CHAT` enum only | Channel value display | — | N/A | No realtime transport | demo-only (ADR-002) |
+| SMS | ARCHITECTURE_ONLY | `Channel.SMS` enum only | Channel value display | — | N/A | No provider integration | demo-only (ADR-002) |
+| Web forms | COMPLETE | `Channel.WEB` default; internal `POST /tickets` and `POST /portal/tickets` | Internal create form; Portal create form | `ticket.test.ts`, `portal.test.ts` | PostgreSQL-verified (prior) | — | — |
+
+### 4. Agent Dashboard
+
+| Requirement | Status | Backend evidence | Frontend evidence | Tests | DB/browser evidence | Gap | Planned branch |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Assigned tickets | COMPLETE | `GET /dashboard/overview` — `MY_ASSIGNED_TICKETS` primary queue for AGENT | `features/dashboard/dashboard-page.tsx` | `dashboard.test.ts`, `dashboard-page.test.tsx` | Automated-verified; browser outstanding | — | — |
+| Customer information | COMPLETE | Dashboard safe customer summary; ticket workspace customer context panel | Customer context panel in ticket detail | `ticket-pages.test.tsx` | Automated-verified | — | — |
+| Tasks | NOT_STARTED | none | none | none | N/A | No model, no code, no spec | `feature/tasks-reminders` (product decision required) |
+| Reminders | NOT_STARTED | none | none | none | N/A | No model, no code, no spec | `feature/tasks-reminders` (product decision required) |
+| Quick replies | NOT_STARTED | `QuickReply` model only | none | none | Schema only | No management API, no composer insertion | `feature/quick-replies` |
+| Team collaboration | PARTIAL | Internal `TicketNote` + `CustomerNote`; assignment; history | Internal note composer; notes rendering | `ticket.test.ts` | Automated-verified (notes) | No mentions/watchers/handoff/shared-comment model; scope undefined | `feature/team-collaboration` (product decision required) |
+
+### 5. SLA and Automation
+
+| Requirement | Status | Backend evidence | Frontend evidence | Tests | DB/browser evidence | Gap | Planned branch |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Response targets | COMPLETE | `SlaRule` per priority; `firstResponseDueAt` snapshot; one-time `firstRespondedAt`; `deriveSla` | Ticket Details SLA subsection (first-response deadline + completion) | `derive-sla.test.ts` (18), `ticket.test.ts` | Automated-verified; PostgreSQL + browser of derivation outstanding | Presentation/derivation only | verification: `test/core-flows` |
+| Resolution targets | COMPLETE | `resolutionDueAt` snapshot; `MET` on RESOLVED/CLOSED; `deriveSla` | SLA subsection (resolution deadline, effective target) | `derive-sla.test.ts`, `ticket.test.ts` | Automated-verified; PostgreSQL + browser outstanding | Presentation/derivation only | verification: `test/core-flows` |
+| Automatic assignment | NOT_STARTED | none (docs: manual only) | none | none | N/A | No load-based assignment | `feature/sla-automation` |
+| Escalation rules | PARTIAL | Manual `ESCALATED` transitions (ADMIN/MANAGER) enforced | Escalation via status control | `ticket.test.ts` | Automated-verified (manual path) | No automatic/time-based escalation engine | `feature/sla-automation` |
+| Alerts | NOT_STARTED | none | none | none | N/A | No SLA warning/breach alerting | `feature/sla-automation` |
+| Notifications | NOT_STARTED | `Notification` model only | none | none | Schema only | No notification API/UI/read-unread | `feature/notifications` |
+
+### 6. Knowledge Base
+
+| Requirement | Status | Backend evidence | Frontend evidence | Tests | DB/browser evidence | Gap | Planned branch |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| FAQs | NOT_STARTED | `KnowledgeArticle` + `KnowledgeArticleStatus` schema only | none | none | Schema only | No route, no page, no nav | `feature/knowledge-base` |
+| Help articles | NOT_STARTED | schema only | none | none | Schema only | As above | `feature/knowledge-base` |
+| Solutions and guides | NOT_STARTED | schema only | none | none | Schema only | As above | `feature/knowledge-base` |
+| Search | NOT_STARTED | schema only | none | none | Schema only | No KB search backend or UI | `feature/knowledge-base` |
+
+### 7. AI Features
+
+| Requirement | Status | Backend evidence | Frontend evidence | Tests | DB/browser evidence | Gap | Planned branch |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Ticket summaries | NOT_STARTED | no `ai` module | none | none | N/A | No provider service; P2 | `feature/ai-assistant` (1st) |
+| Suggested replies | NOT_STARTED | none | none | none | N/A | P2; must require human review | `feature/ai-assistant` (2nd) |
+| Automatic categorization | NOT_STARTED | none | none | none | N/A | Suggestion only; never auto-mutates category | `feature/ai-assistant` (3rd) |
+| Suggested solutions | NOT_STARTED | none | none | none | N/A | Depends on Knowledge Base | `feature/ai-assistant` (4th) |
+| AI chatbot | INTENTIONALLY_DEFERRED | none | none | none | N/A | Explicit P3 deferral (docs 01, 11); still in roadmap as last/deferred | `feature/ai-assistant` (deferred tail) |
+
+### 8. Customer Portal
+
+| Requirement | Status | Backend evidence | Frontend evidence | Tests | DB/browser evidence | Gap | Planned branch |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Submit tickets | COMPLETE | `POST /portal/tickets` — CUSTOMER-only, owned, SLA snapshot | Portal New Request page | `portal.test.ts`, `portal-pages.test.tsx` | PostgreSQL-verified (prior); 14 captures (prior) | — | — |
+| Track requests | COMPLETE | `GET /portal/tickets`, `GET /portal/tickets/:id`; public status mapping | Portal list + detail | `portal.test.ts`, `portal-routing.test.tsx` | PostgreSQL + browser-verified (prior) | — | — |
+| View history | COMPLETE | `GET /portal/overview` recent + owned list pagination | Portal Home + My Requests | `portal.test.ts` | PostgreSQL-verified (prior) | — | — |
+| Access FAQs | NOT_STARTED | no `/portal/knowledge-articles` route | no `/portal/knowledge-base` page | none | N/A | Deferred with Knowledge Base | `feature/knowledge-base` |
+| Submit feedback | NOT_STARTED | `Feedback` model only; no route | none | none | Schema only | No eligibility, ownership, one-per-ticket, rating validation | `feature/customer-feedback` |
+
+### 9. Reports and Management
+
+| Requirement | Status | Backend evidence | Frontend evidence | Tests | DB/browser evidence | Gap | Planned branch |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Ticket reports | NOT_STARTED | no `/reports` route or module | no `/reports` page/nav | none | N/A | Operational Dashboard is not the Reports feature | `feature/reports` |
+| SLA performance | NOT_STARTED | none | none | none | N/A | No compliance %, met/breached aggregation | `feature/reports` |
+| Agent performance | NOT_STARTED | none | none | none | N/A | No per-agent assigned/resolved/SLA-met report | `feature/reports` |
+| Customer satisfaction | NOT_STARTED | none | none | none | N/A | Depends on `feature/customer-feedback` | `feature/reports` |
+| Management dashboards | PARTIAL | `GET /dashboard/overview` — KPIs, status distribution, role-scoped queues, request-time SLA | Dashboard page with KPI cards + distribution chart | `dashboard.test.ts`, `dashboard-page.test.tsx` | Automated-verified; browser outstanding | Operational only; no date-range analytics, no trends, no agent-performance summary | `feature/reports` |
+
+### 10. Security and Administration
+
+| Requirement | Status | Backend evidence | Frontend evidence | Tests | DB/browser evidence | Gap | Planned branch |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Users and roles | PARTIAL | `Role` enum; JWT; `requireAuth`/`requireRole` on all live routers; CUSTOMER-only registration | Role-aware nav/route guards; login/register | `auth.test.ts`, `auth-context.test.tsx`, `middleware/auth.test.ts` | PostgreSQL-verified (prior) | No user administration beyond `GET /users/agents` lookup; no create/list/update users, no `/users` page | `feature/user-management` |
+| Permissions | PARTIAL | Server-side `requireRole` groups per route; customer read/write split; agent allowlist; portal boundary | UI hides unauthorized controls; redirect guards | `customer.test.ts`, `ticket.test.ts`, `portal.test.ts` | PostgreSQL-verified (prior) | Permission model for KB, Reports, Users mgmt, Settings, Feedback, Notifications, Tasks not implemented (see `06-auth-rbac.md`) | multiple (per feature) |
+| Audit logs | NOT_STARTED | no `AuditLog` model; `TicketHistory` covers ticket lifecycle only | none | none | N/A | No general audit log across entities | deferred P2 (roadmap tail) |
+| System configuration | NOT_STARTED | no `/settings` route; no config API | no `/settings` page/nav | none | N/A | Categories read-only; SLA rules managed directly; nothing editable in-app | `feature/settings` |
+
+### 11. Integrations
+
+| Requirement | Status | Backend evidence | Frontend evidence | Tests | DB/browser evidence | Gap | Planned branch |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| APIs | PARTIAL | Internal REST API (`/api/*`) for implemented domains; consistent error shape | Axios client consumes it | route/controller tests | PostgreSQL-verified (prior) | No external/public API program, API keys, webhooks, or versioning | not scheduled |
+| ERP | ARCHITECTURE_ONLY | none | none | none | N/A | Documented only (ADR-002) | demo-only |
+| Email, SMS, and WhatsApp | ARCHITECTURE_ONLY | `Channel` enum values only | none | none | N/A | No provider adapters | demo-only (ADR-002) |
+| External systems | ARCHITECTURE_ONLY | none | none | none | N/A | No integration framework | demo-only |
+
+### 12. Platform
+
+| Requirement | Status | Backend evidence | Frontend evidence | Tests | DB/browser evidence | Gap | Planned branch |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Arabic and English | COMPLETE | localized API error support where implemented | i18next; `locales/en`, `locales/ar`; persisted `crm-language`; `lang`/`dir` sync | `i18n.test.ts`, `language.test.ts`, `language-switcher.test.tsx` | Browser-verified for Portal (prior) | Each new feature must add its own translations + RTL check | per feature |
+| Responsive web / mobile-friendly | COMPLETE | N/A | Tailwind; desktop tables + mobile cards; responsive Portal shell | page tests assert both variants | Portal browser-verified (prior); Dashboard + SLA subsection browser outstanding | Visual verification incomplete for Dashboard and SLA subsection | verification: `test/core-flows` |
+| Multi-department | ARCHITECTURE_ONLY | `Department` model + optional FKs on `User`/`Ticket`; `(branchId, name)` constraint | none | `prisma-schema.test.ts` | Schema only | No admin, no scoping, no UI | deferred P2 |
+| Multi-branch | ARCHITECTURE_ONLY | `Branch` model + optional FKs | none | `prisma-schema.test.ts` | Schema only | No admin, no scoping, no UI | deferred P2 |
+| Custom branding | NOT_STARTED | none | none | none | N/A | No model, no settings, no persistence | `feature/custom-branding` (product decision required) |
+
+### Coverage totals
+
+| Status | Count |
+| --- | ---: |
+| COMPLETE | 18 |
+| PARTIAL | 8 |
+| NOT_STARTED | 23 |
+| ARCHITECTURE_ONLY | 9 |
+| INTENTIONALLY_DEFERRED | 1 |
+| **Total requirement rows** | **59** |
+
+Verification outstanding on implemented work: 4 areas — basic SLA derivation/presentation (PostgreSQL + browser), Agent Dashboard (browser), Ticket Conversation workspace (browser capture), responsive visual review of Dashboard + SLA subsection (browser). Automated boundary/regression tests cover these; live checks were not rerun in this audit.
 
 ## 3. Completed Work
 
@@ -116,9 +264,9 @@ Current Working Branch: `master`. The only uncommitted change is this progress-t
 - Verification: current 82-client/87-server suite passes; prior two-customer PostgreSQL verification covered ownership, IDOR, creation, replies, transitions, and SLA-safe behavior, while 14 authenticated English/Arabic desktop/mobile captures and final navigation regression checks verified the Portal UI.
 - Limitation: Portal Knowledge Base, attachments, feedback, notifications, realtime updates, profile editing, and external channels remain deferred.
 
-## 4. Current Work
+## 4. Last Integrated Feature — Basic SLA Presentation (historical detail)
 
-- Basic SLA presentation was implemented on `feature/sla` from synchronized `master`, then committed by the developer as `e7d9b14 feat: complete basic SLA presentation` and fast-forward merged into `master`. `feature/sla` is contained in `master`; the only uncommitted change now is this progress-tracker synchronization.
+- Basic SLA presentation was implemented on `feature/sla` from synchronized `master`, then committed by the developer as `e7d9b14 feat: complete basic SLA presentation` and fast-forward merged into `master`. `feature/sla` is contained in `master`. A later docs-only commit `e387667 update progress tracking` sits on top of `e7d9b14` and is the current `master` tip. The prior "only uncommitted change is this tracker" note is superseded: that synchronization was committed as `e387667`.
 - Shared derivation: the Dashboard's local SLA derivation moved to a pure `server/src/shared/sla/derive-sla.ts` module owning `SlaState`, `SlaTarget`, the fixed 60-minute `SLA_WARNING_MINUTES` constant, and `deriveSla(ticket, now)`. `now` is injected; terminal (`RESOLVED`/`CLOSED`/`resolvedAt`/`closedAt`) returns `MET` with null target and deadline; while `firstRespondedAt` is null the first-response deadline applies, the resolution deadline applies while non-terminal, the earlier deadline wins, and an exact tie prefers `FIRST_RESPONSE`; `dueAt <= now` is `BREACHED`, `0 < remaining <= 60min` is `AT_RISK` (60 minutes exactly is `AT_RISK`), `> 60min` is `ON_TRACK`; a configured-and-completed first response with no resolution deadline returns `MET`; otherwise `NOT_CONFIGURED` with null target and deadline. Boundaries use millisecond UTC `Date` math with no minute rounding.
 - Dashboard: `getDashboardOverview` now calls the shared helper; the `GET /api/dashboard/overview` response shape, role visibility, active-ticket definitions, KPI meanings, warning window, Needs Attention / Recent ordering, list sizes, and safe summaries are unchanged. `effectiveSlaTarget` is not added to Dashboard items.
 - Ticket Details: `GET /api/tickets/:id` adds `slaState`, `effectiveSlaDueAt`, and `effectiveSlaTarget`, derived only after existing authorization/visibility succeeds, alongside the unchanged raw `firstResponseDueAt`, `firstRespondedAt`, `resolutionDueAt`, `resolvedAt`, and `closedAt`. No Ticket List or Portal contract change; `CUSTOMER` and unauthenticated callers remain rejected.
@@ -126,18 +274,49 @@ Current Working Branch: `master`. The only uncommitted change is this progress-t
 - Frontend: a compact bordered SLA subsection inside the existing Ticket Details metadata surface (not a nested card) shows the localized state with a text label plus restrained semantic accent (state never conveyed by color alone), the localized effective target, the effective deadline when applicable, and the raw first-response deadline, first-response completion, and resolution deadline. Dates use the existing locale formatter with `<bdi dir="ltr">` isolation. No countdown, interval, polling, or client-side state derivation. Full English and Arabic strings added; RTL mirrors through document direction.
 - Verification: 103 client and 126 server tests pass (229 total, 0 failed/skipped/todo), including 18 shared-helper boundary tests, ADMIN/MANAGER/AGENT Ticket Details derived-field coverage, unauthenticated/CUSTOMER rejection, raw-snapshot presence, Portal SLA-free server and client assertions, Dashboard response-shape regression, and 5 Ticket Details SLA-state UI tests plus target-label, deadline-formatting, missing-deadline, first-response-completion, English, Arabic, and RTL tests. Client/server lint, typecheck, builds, translation JSON, `git diff --check`, and OpenWolf validation pass. The existing Vite chunk-size warning remains.
 - PostgreSQL verification and authenticated English/Arabic desktop/mobile browser verification of the SLA presentation were not performed; deterministic boundary tests cover every SLA state. Prior feature verification evidence is preserved unchanged below.
-- The SLA implementation is committed at `e7d9b14` and contained in `master`. The local `origin/master` tracking ref also points at `e7d9b14` (ahead 0, behind 0); a push was performed by the developer, not by the AI.
+- The SLA implementation is committed at `e7d9b14` and contained in `master`. `master` and `origin/master` now both point at `e387667` (docs-only, on top of `e7d9b14`; ahead 0, behind 0); all pushes were performed by the developer, not by the AI.
 
 ## 5. Next Recommended Work
 
-1. PostgreSQL spot-check and authenticated English/Arabic desktop/mobile visual verification of the Ticket Details SLA subsection (BREACHED / AT_RISK / ON_TRACK / MET / NOT_CONFIGURED where data permits).
-2. Add realistic demo seed data and demo accounts covering the critical support journey and a range of live SLA states.
-3. Run final end-to-end QA, accessibility, responsive, English/Arabic, and RTL review.
-4. Complete deployment preparation and verification.
+Next implementation feature: **`feature/knowledge-base`**. No blocking dependency was found in repository evidence.
 
-This follows the P0 roadmap and the dependency order in `docs/01-scope-and-priorities.md`, `docs/14-implementation-plan.md`, and `docs/18-ui-pages-spec.md`.
+Full dependency-aware sequence (one isolated branch per feature; ADR-019; mirrored in `docs/14-implementation-plan.md`):
+
+| Order | Branch | Feature |
+| ----: | ------ | ------- |
+| 1 | `feature/knowledge-base` | Internal KB CRUD/search, published customer read, Portal FAQs |
+| 2 | `feature/attachments` | Secure attachment upload/download and per-context ownership |
+| 3 | `feature/quick-replies` | Quick Reply management and composer insertion |
+| 4 | `feature/customer-feedback` | Portal feedback workflow and eligibility |
+| 5 | `feature/reports` | Ticket, SLA, agent, and satisfaction reports |
+| 6 | `feature/user-management` | ADMIN-managed internal users and roles |
+| 7 | `feature/settings` | Real configuration pages for existing configurable resources |
+| 8 | `feature/notifications` | In-app notifications and read/unread workflow |
+| 9 | `feature/sla-automation` | Bounded monitoring, assignment/escalation rules, and alerts |
+| 10 | `feature/tasks-reminders` | Agent Tasks and Reminders after product decisions |
+| 11 | `feature/team-collaboration` | Explicit collaboration scope beyond existing notes/history |
+| 12 | `feature/ai-assistant` | Summary, suggested reply, categorization, suggested KB solution |
+| 13 | `feature/custom-branding` | Persisted, bounded CRM/Portal branding |
+| 14 | `feature/demo-seed-data` | Final realistic dataset covering implemented features |
+| 15 | `test/core-flows` | Final integrated QA, accessibility, responsive, English/Arabic, RTL |
+| 16 | deployment branch (project convention) | Deployment preparation and verification |
+
+Independent of the feature sequence, these verification follow-ups on already-integrated work can be done at any time and are also folded into `test/core-flows`:
+
+- PostgreSQL spot-check of `deriveSla` against real tickets, and authenticated English/Arabic desktop/mobile visual verification of the Ticket Details SLA subsection (BREACHED / AT_RISK / ON_TRACK / MET / NOT_CONFIGURED where data permits).
+- Authenticated ADMIN/MANAGER and AGENT English/Arabic desktop/mobile Dashboard visual verification.
+
+This follows `docs/01-scope-and-priorities.md`, `docs/14-implementation-plan.md`, and `docs/18-ui-pages-spec.md`.
 
 ## 6. Remaining Scope
+
+### 6A. Demo seed data timing (explicit)
+
+Final Demo Seed Data must not be treated as the next completion task.
+
+The final comprehensive demo dataset (`feature/demo-seed-data`, order 14) is implemented only after the features whose schema and data the demo must show are stable, including at least Knowledge Base, Customer Feedback, Reports, Quick Replies, and Notifications. Seeding earlier would produce a dataset that does not exercise those features and would need rework.
+
+A minimal temporary developer fixture may be introduced by an earlier feature branch when required for that feature's own testing (for example a few `SlaRule` rows to exercise `deriveSla`). Such a fixture is explicitly not the final demo dataset and must not be presented as it.
 
 ### Core Remaining
 
@@ -220,7 +399,8 @@ These results cover implemented features, not the unimplemented project scope.
 
 | Branch / area | Purpose | Integration state | Ancestry evidence |
 | --- | --- | --- | --- |
-| `master` | Synchronized integration branch | `e7d9b14`; equals the `origin/master` tracking ref | Local/remote ahead 0, behind 0. |
+| `master` | Synchronized integration branch | `e387667` (docs-only, on top of `e7d9b14`); equals the `origin/master` tracking ref | Local/remote ahead 0, behind 0. |
+| `docs/task-coverage-roadmap` | Task-coverage audit and roadmap reconciliation (this document) | Not merged; docs-only; created from `master` `e387667` | Branched from clean synchronized `master`. |
 | Project Foundation | Client/server foundation | Contained in `master` | Local feature ref is an ancestor of `master`. |
 | Database Schema | CRM Prisma schema and migration | Contained in `master` | Local feature ref is an ancestor of `master`. |
 | Authentication | Authentication and RBAC | Contained in `master` | Local feature ref is an ancestor of `master`. |
@@ -233,7 +413,7 @@ These results cover implemented features, not the unimplemented project scope.
 | Agent Dashboard and customer refinements | Operational Dashboard and Customer Management authorization/support context | Contained in `master` | Commit `d12067b` is an ancestor of `master`. |
 | Customer Portal | Owned customer support journey and final Portal polish | Contained in `master` | Commit `458af2e` is an ancestor of `master`. |
 | Dashboard ticket-queue fix | Role-aware primary queues and Recent exclusion | Contained in `master` | Commit `3c4ba49` is an ancestor of `master`. |
-| SLA presentation | Shared request-time `deriveSla` helper, Ticket Details derived fields and UI, Portal SLA-free assertions | Contained in `master` | Commit `e7d9b14` is `master` tip; `feature/sla` is an ancestor of `master` (fast-forward merge). |
+| SLA presentation | Shared request-time `deriveSla` helper, Ticket Details derived fields and UI, Portal SLA-free assertions | Contained in `master` | Commit `e7d9b14` (`feature/sla`) is an ancestor of `master`; `master` tip is the later docs-only `e387667`. |
 
 “Contained in `master`” means Git ancestry confirms the cited commit or local branch ref is an ancestor of `master`; it does not infer how integration occurred.
 
@@ -276,13 +456,35 @@ Coverage means a governing document exists; it does not mean the feature is impl
 
 ## 13. Definition of Project Completion
 
-### MVP / Core Assessment Completion
+Three distinct completion bars. Do not conflate them.
 
-The P0 journey is complete when authenticated internal users can manage customers and tickets, assign and progress tickets, exchange public replies, add private notes, see basic SLA state, use an agent dashboard, and securely complete the customer-side ticket journey. Relevant authorization, validation, loading/empty/error states, responsive behavior, RTL, tests, real database verification, build checks, and a realistic demo dataset must also pass.
+### Core support loop complete (achieved)
 
-### Optional Stretch Completion
+Authenticated internal users can manage customers and tickets, assign and progress tickets, exchange public replies, add private notes, see basic SLA state, use an agent dashboard, and securely complete the customer-side Portal ticket journey. Authorization, validation, loading/empty/error states, responsive behavior, RTL, and automated tests are in place. Integrated into `master` at `e7d9b14` / `e387667`. Outstanding: PostgreSQL and browser verification of the SLA subsection and Dashboard; a realistic demo dataset.
 
-P1 work adds attachments, ticket history, knowledge base, in-app notifications, reports, quick replies, feedback, and broader bilingual coverage. P2 AI, automation, audit, department, and branch behavior is optional and must not delay P0. P3 provider integrations remain demonstration/architecture scope unless explicitly promoted.
+### Broader original-task demo complete (target)
+
+Requires the core loop plus the features promoted by the coverage audit (ADR-019), expected to include at least:
+
+- Knowledge Base
+- Attachments (upload/download with ownership)
+- Quick Replies
+- Customer Feedback
+- Reports
+- Users Management
+- functional Settings
+- Notifications
+- agreed SLA automation scope
+- agreed Tasks / Reminders scope
+- final comprehensive demo data (`feature/demo-seed-data`)
+- final integrated QA (`test/core-flows`)
+- deployment preparation and verification
+
+Each with its own authorization, validation, state handling, English/Arabic, RTL, responsive behavior, and tests.
+
+### Architecture / demo-only (not part of "production-ready")
+
+Inbound email ingestion, WhatsApp / SMS providers, production live chat transport, ERP, arbitrary external systems, the full AI chatbot, and multi-department / multi-branch behavior are represented but not production-connected. The complete original assignment must not be called production-ready while these limitations remain (ADR-002, ADR-019).
 
 ## 14. Progress Tracking Update Protocol
 

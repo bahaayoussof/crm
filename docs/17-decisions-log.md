@@ -343,9 +343,39 @@ Customer Details uses `GET /customers/:id/tickets` for complete customer history
 
 Support staff need complete customer history context without gaining another agent's operational ticket workspace or private content. A separate response shape makes that distinction explicit and prevents rich Ticket list/detail fields from leaking into customer context.
 
-## ADR-011: Isolated Customer Portal boundary
+## ADR-018: Isolated Customer Portal boundary
+
+**Date:** 2026-08-25
+
+> Renumbered from a second `ADR-011` heading that collided with "ADR-011: Operational Dashboard and Fixed SLA Warning Window". Substance is unchanged; the identifier is now unique.
 
 The Customer Portal uses dedicated routes, schemas, response types, Prisma selects, query keys, and pages. Ownership comes from the linked Customer profile. Public status mapping hides ESCALATED, staff authors become SUPPORT, and Portal reads never query notes, history, attachments, SLA, or assignment data.
+
+---
+
+## ADR-019: Final Demo Targets Broader Original-Task Coverage
+
+**Date:** 2026-08-26
+
+**Context**
+
+The delivered system implements a coherent P0 support loop (customers, tickets, conversation, Portal, operational Dashboard, basic SLA presentation), all integrated into `master`. The original assignment, however, contains broader feature areas — Knowledge Base, Attachments upload/download, Quick Replies, Customer Feedback, Reports, Users Management, Settings, Notifications, SLA automation, Tasks/Reminders, Team Collaboration, AI assistance, and Custom Branding — that are documented but not implemented. A coverage audit (`docs/19-progress-tracking.md`) reconciled documented status against repository evidence and produced a dependency-aware roadmap.
+
+**Decision**
+
+The final demo target is broader original-assignment coverage, not only the time-boxed three-day P0 scope. Provider-backed external integrations (inbound email, WhatsApp, SMS, production live chat, ERP, arbitrary external systems) and the full AI chatbot remain architecture/demo-only unless explicitly promoted. Features are delivered one isolated branch each, in the order recorded in `docs/19-progress-tracking.md`, beginning with `feature/knowledge-base`. Final comprehensive demo seed data (`feature/demo-seed-data`) is sequenced after the features whose schema and data it must exercise, not treated as the next task.
+
+**Reason**
+
+The three-day P0 assessment constraint is historical. The assignment scope is larger than P0, and the coverage matrix shows most non-P0 areas are `NOT_STARTED` rather than intentionally cut. Sequencing seed data last keeps the demo dataset aligned with a stable feature model.
+
+**Alternatives Considered**
+
+Freezing scope at the current P0 loop and shipping demo seed immediately; implementing remaining areas without a fixed dependency order; bundling multiple features per branch.
+
+**Consequences**
+
+`docs/01-scope-and-priorities.md`, `docs/14-implementation-plan.md`, `docs/18-ui-pages-spec.md`, `docs/05-api-contract.md`, and `docs/06-auth-rbac.md` distinguish implemented behavior from planned and unresolved scope. Tasks, Reminders, Team Collaboration, and Custom Branding still require product decisions before implementation and are documented as decision points, not specified contracts. External-provider limitations must not be described as functional because a channel enum exists.
 
 ---
 

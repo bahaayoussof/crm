@@ -12,6 +12,40 @@ Customer registration normalizes the email by trimming and lowercasing it, hashe
 
 The API issues an eight-hour bearer access token containing only the user identifier and role. It does not issue refresh tokens. The client persists this token locally for the assessment, attaches it centrally through Axios, loads the current identity from `/auth/me`, and removes the token on logout or an authenticated `401` response.
 
+## Permission implementation status
+
+The role descriptions below include capabilities that are not yet built. As of `master` `e387667`:
+
+### Enforced server-side today
+
+- Authentication: customer-only registration, all-role login, eight-hour JWT, `/auth/me`, role middleware.
+- Customer Management: `ADMIN`/`MANAGER` full; `AGENT` read-only (list/search/detail/notes-read); `CUSTOMER` rejected.
+- Ticket Management: `ADMIN`/`MANAGER` all tickets and transitions; `AGENT` assigned-or-unassigned visibility with assignment-gated `status`/`priority` mutation and conversation; `CUSTOMER` rejected. Assignment and escalation are `ADMIN`/`MANAGER` only.
+- Ticket conversation and history: same visibility/mutation boundary as Ticket Management.
+- Dashboard: `ADMIN`/`MANAGER`/`AGENT` only, role-scoped queues; `CUSTOMER` rejected.
+- Customer Portal: `CUSTOMER` only, ownership derived from `User -> Customer.userId`; internal roles receive `403` from `/api/portal/*`.
+- `GET /users/agents` and `GET /categories`: `ADMIN`/`MANAGER`/`AGENT` lookup only.
+
+### Planned — permission model known, not implemented
+
+- `ADMIN`/`MANAGER` Knowledge Base management and `AGENT`/published-customer read (`feature/knowledge-base`).
+- `CUSTOMER` attachment upload and staff attachment access per context (`feature/attachments`).
+- `AGENT` quick-reply use and `ADMIN` quick-reply management (`feature/quick-replies`).
+- `CUSTOMER` feedback submission for own eligible tickets (`feature/customer-feedback`).
+- `ADMIN`/`MANAGER` Reports access (`feature/reports`).
+- `ADMIN`-managed internal user creation and role changes (`feature/user-management`).
+- Per-user Notifications read/unread (`feature/notifications`).
+
+### Unresolved — require a product decision before a permission can be written
+
+- Tasks and Reminders: ownership, assignment, and role visibility are undefined (`feature/tasks-reminders`).
+- Team Collaboration: scope (mentions, watchers, handoff, shared comments, or tasks) is undefined (`feature/team-collaboration`).
+- Settings: which configurable resources `ADMIN` (and possibly `MANAGER`) may edit (`feature/settings`).
+- Custom Branding: who may change application/Portal branding and within what bounds (`feature/custom-branding`).
+- General Audit Logs: whether a dedicated `AuditLog` beyond `TicketHistory` is introduced, and who reads it.
+
+Do not describe Users Management, Knowledge Base management, Feedback, Notifications, Tasks, Settings, or Reports permissions as implemented. The role lists below are the target model.
+
 ## Roles
 
 ### ADMIN
