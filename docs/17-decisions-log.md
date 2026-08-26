@@ -438,3 +438,35 @@ Duplicate calculation in Ticket service; derive state in the browser; persist cu
 **Consequences**
 
 Both internal consumers share exact 60-minute and zero-time boundaries plus the first-response tie rule. State remains a request-time snapshot. Deferred workers, events, notifications, escalation, and reporting are unchanged.
+
+---
+
+## ADR-020: Knowledge Base on the Existing `KnowledgeArticle` Model
+
+**Date:** 2026-08-26
+
+**Context**
+
+`feature/knowledge-base` is the first post-P0 roadmap branch. `KnowledgeArticle` (`id`, `title`, `content`, `category?`, `status` [`DRAFT`/`PUBLISHED`], `createdById`, timestamps) and `KnowledgeArticleStatus` already exist in `schema.prisma` with no consuming code. `docs/05-api-contract.md` left response shapes, search parameters, and category handling to be resolved during this feature; `docs/18-ui-pages-spec.md` §11–13 fixed the page structure and permitted a plain textarea editor.
+
+**Decision**
+
+Use the model as-is: no schema change, no migration, no category table/relation, no slug/excerpt/popularity/publishing-date field, no revision history, no rich-text dependency. `category` stays optional free-text.
+
+- Internal routes `GET/POST/PATCH/DELETE /api/knowledge-articles` in a new `server/src/modules/knowledge-base/` module. `GET` allows `ADMIN`/`MANAGER`/`AGENT`; mutations allow `ADMIN`/`MANAGER`. `createdById` is server-derived; unknown fields and client `createdById` are rejected. List projection omits `content` and author email; detail includes `content` and a `{ id, name, role }` author summary. Ordering `updatedAt DESC, id ASC`; case-insensitive search over title/content/category; bounded `page`/`limit` (≤ 100).
+- Portal routes `GET /api/portal/knowledge-articles` and `/:id`, mounted at `/api/portal/knowledge-articles` before the ticket portal router, `CUSTOMER`-only. `status = PUBLISHED` is always forced server-side; a requested status is rejected. The list projection adds a server-derived `excerpt` (whitespace-collapsed, ≤ 200 chars) instead of an `excerpt` column; the detail projection is `{ id, title, content, category, updatedAt }` only. A `DRAFT` id and a missing id return the identical `404 KNOWLEDGE_ARTICLE_NOT_FOUND`.
+- The published-article query rule (`status = PUBLISHED` + search/category) lives once in the service and is shared by both Portal handlers; internal and Portal handlers do not duplicate it.
+- Frontend: internal routes `/knowledge-base`, `/knowledge-base/new`, `/knowledge-base/:id`, `/knowledge-base/:id/edit`; nav item for `ADMIN`/`MANAGER`/`AGENT`. A `KnowledgeArticleManageRoute` guard (mirroring `CustomerManageRoute`) redirects `AGENT` from the editor routes to `/knowledge-base` with replace navigation. Content renders as plain text with preserved paragraphs (`whitespace-pre-wrap`, `break-words`) — no `dangerouslySetInnerHTML`, no Markdown. Delete uses an inline accessible confirmation region (Confirm/Cancel), not a new dialog dependency. Portal routes `/portal/knowledge-base` and `/portal/knowledge-base/:id` with a "Help Center" nav item; the Portal list is labelled "Help articles" (neutral) because no popularity data exists.
+- TanStack Query feature-local keys (`knowledgeArticleKeys`, `portalKeys.knowledgeArticles`). Every create/update/delete invalidates internal list + detail queries and the Portal `["portal","knowledge-articles"]` subtree so publish/unpublish changes Portal visibility without a reload.
+
+**Reason**
+
+The model already carries every field the feature needs. Free-text `category` avoids a category-admin surface out of scope here. A shared published-only service function keeps the internal/Portal boundary in one place. Plain-text rendering and an inline confirmation avoid new dependencies for a time-boxed assessment.
+
+**Alternatives Considered**
+
+Adding `slug`/`excerpt`/`publishedAt` columns; a `KnowledgeCategory` table; a Markdown or rich-text editor; a shared serializer across internal and Portal reads; reusing the ticket portal router for the KB routes; popularity-based ordering for the Portal list.
+
+**Consequences**
+
+No popularity/view tracking, no article versioning, no rich-text editing, and no related-article recommendations exist. `excerpt` is presentation-only and not persisted. Category values are unnormalized free text, so filtering is exact-match on the stored string. The Portal list uses recency ("Help articles"), not popularity. `feature/attachments` is the next roadmap branch.

@@ -11,7 +11,12 @@ import { ProtectedRoute } from "./protected-route";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { CustomerManageRoute } from "./customer-manage-route";
 import { PortalHomePage, PortalNewTicketPage, PortalTicketDetailPage, PortalTicketsPage } from "@/features/portal/portal-pages";
+import { PortalKnowledgeArticlePage, PortalKnowledgeBasePage } from "@/features/portal/portal-knowledge-pages";
 import { PortalShell } from "@/features/portal/portal-ui";
+import { KnowledgeArticleFormPage } from "@/features/knowledge-base/knowledge-article-form-page";
+import { KnowledgeBaseDetailPage } from "@/features/knowledge-base/knowledge-base-detail-page";
+import { KnowledgeBaseListPage } from "@/features/knowledge-base/knowledge-base-list-page";
+import { KnowledgeArticleManageRoute } from "./knowledge-article-manage-route";
 import { TicketEditRoute } from "./ticket-edit-route";
 
 export function AppRouter() {
@@ -30,8 +35,14 @@ export function AppRouter() {
         <Route path="/customers/:id/edit" element={<CustomerFormPage />} />
       </Route>
       <Route path="/customers/:id" element={<CustomerDetailPage />} />
+      <Route path="/knowledge-base" element={<KnowledgeBaseListPage />} />
+      <Route element={<KnowledgeArticleManageRoute />}>
+        <Route path="/knowledge-base/new" element={<KnowledgeArticleFormPage />} />
+        <Route path="/knowledge-base/:id/edit" element={<KnowledgeArticleFormPage />} />
+      </Route>
+      <Route path="/knowledge-base/:id" element={<KnowledgeBaseDetailPage />} />
     </Route>
-    <Route element={<ProtectedRoute audience="customer" />}><Route path="/portal" element={<PortalShell />}><Route index element={<PortalHomePage />} /><Route path="tickets" element={<PortalTicketsPage />} /><Route path="tickets/new" element={<PortalNewTicketPage />} /><Route path="tickets/:id" element={<PortalTicketDetailPage />} /></Route></Route>
+    <Route element={<ProtectedRoute audience="customer" />}><Route path="/portal" element={<PortalShell />}><Route index element={<PortalHomePage />} /><Route path="tickets" element={<PortalTicketsPage />} /><Route path="tickets/new" element={<PortalNewTicketPage />} /><Route path="tickets/:id" element={<PortalTicketDetailPage />} /><Route path="knowledge-base" element={<PortalKnowledgeBasePage />} /><Route path="knowledge-base/:id" element={<PortalKnowledgeArticlePage />} /></Route></Route>
     <Route path="*" element={<Navigate to="/login" replace />} />
   </Routes></BrowserRouter>;
 }

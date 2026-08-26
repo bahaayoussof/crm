@@ -1,7 +1,7 @@
 {
   "app": { "title": "نظام إدارة دعم العملاء", "foundationReady": "البنية الأساسية للمشروع جاهزة." },
   "navigation": {
-    "languageSwitcher": "اختيار اللغة", "primary": "التنقل الرئيسي", "dashboard": "لوحة التحكم", "tickets": "التذاكر", "customers": "العملاء",
+    "languageSwitcher": "اختيار اللغة", "primary": "التنقل الرئيسي", "dashboard": "لوحة التحكم", "tickets": "التذاكر", "customers": "العملاء", "knowledgeBase": "قاعدة المعرفة",
     "portalHome": "الصفحة الرئيسية للبوابة", "portalContext": "بوابة الدعم", "workspaceContext": "مساحة عمل الدعم", "openCustomers": "فتح سجلات العملاء"
   },
   "common": {
@@ -71,8 +71,38 @@
     "validation": { "name": "يجب ألا يقل الاسم عن حرفين", "email": "أدخل بريدًا إلكترونيًا صحيحًا", "phone": "يجب ألا يزيد الهاتف عن 30 حرفًا", "note": "الملاحظة مطلوبة" },
     "errors": { "CUSTOMER_EMAIL_EXISTS": "يوجد عميل بهذا البريد الإلكتروني بالفعل.", "CUSTOMER_HAS_SUPPORT_HISTORY": "لا يمكن حذف هذا العميل لوجود سجل دعم أو حساب دخول مرتبط.", "CUSTOMER_NOT_FOUND": "العميل غير موجود." }
   },
+  "knowledgeBase": {
+    "title": "قاعدة المعرفة", "description": "إنشاء وإدارة وثائق الدعم الداخلية.", "create": "إنشاء مقالة",
+    "search": "ابحث في المقالات بالعنوان أو المحتوى أو التصنيف…", "statusFilter": "تصفية الحالة", "categoryFilter": "تصفية التصنيف",
+    "allStatuses": "كل الحالات", "clearFilters": "مسح عوامل التصفية",
+    "empty": "لا توجد مقالات في قاعدة المعرفة بعد.", "noMatches": "لا توجد مقالات تطابق البحث أو عوامل التصفية الحالية.",
+    "loadError": "تعذر تحميل مقالات قاعدة المعرفة.", "notFound": "المقالة غير موجودة.", "backToList": "العودة إلى قاعدة المعرفة",
+    "pagination": "صفحات مقالات قاعدة المعرفة", "page": "الصفحة {{page}} من {{total}}",
+    "updatedOn": "آخر تحديث", "authorName": "الكاتب: {{name}}", "edit": "تعديل المقالة", "delete": "حذف المقالة",
+    "deleteTitle": "حذف المقالة", "deleteConfirm": "سيؤدي هذا إلى حذف المقالة نهائيًا. كما تُزال المقالات المنشورة من مركز مساعدة العملاء. هل تريد حذف هذه المقالة؟",
+    "cancelDelete": "إلغاء", "confirmDelete": "تأكيد الحذف", "deleting": "جارٍ الحذف…", "deleteError": "تعذر حذف المقالة.",
+    "createArticle": "إنشاء مقالة", "editArticle": "تعديل المقالة", "formDescription": "عنوان المقالة وتصنيفها ومحتواها وحالة النشر.",
+    "articleTitle": "عنوان المقالة", "articleCategory": "تصنيف المقالة", "articleContent": "محتوى المقالة",
+    "statusLabel": "الحالة", "statusHelp": "المسودات داخلية فقط. أما المقالات المنشورة فتظهر أيضًا في مركز مساعدة العملاء.",
+    "saveError": "تعذر حفظ المقالة.",
+    "columns": { "title": "العنوان", "category": "التصنيف", "status": "الحالة", "updated": "آخر تحديث", "author": "الكاتب" },
+    "status": { "DRAFT": "مسودة", "PUBLISHED": "منشورة" },
+    "validation": {
+      "title": "يجب ألا يقل العنوان عن 3 أحرف", "titleMax": "يجب ألا يزيد العنوان عن 200 حرف",
+      "content": "المحتوى مطلوب", "contentMax": "يجب ألا يزيد المحتوى عن 50000 حرف",
+      "categoryMax": "يجب ألا يزيد التصنيف عن 100 حرف"
+    },
+    "errors": { "KNOWLEDGE_ARTICLE_NOT_FOUND": "المقالة غير موجودة.", "VALIDATION_ERROR": "راجع بيانات النموذج وحاول مرة أخرى.", "FORBIDDEN": "ليست لديك صلاحية لتنفيذ هذا الإجراء." }
+  },
   "portal": {
-    "brand": "بوابة الدعم", "navigation": "التنقل في البوابة", "nav": { "home": "الرئيسية", "requests": "طلباتي", "newRequest": "طلب جديد" },
+    "brand": "بوابة الدعم", "navigation": "التنقل في البوابة", "nav": { "home": "الرئيسية", "requests": "طلباتي", "newRequest": "طلب جديد", "knowledgeBase": "مركز المساعدة" },
+    "knowledgeBase": {
+      "title": "مركز المساعدة", "description": "ابحث عن إجابات في مقالات المساعدة المنشورة.", "filters": "عوامل تصفية مقالات المساعدة",
+      "search": "ابحث عن مساعدة…", "categoryFilter": "التصفية حسب التصنيف", "latestArticles": "مقالات المساعدة",
+      "loading": "جارٍ تحميل مقالات المساعدة…", "loadError": "تعذر تحميل مقالات المساعدة.",
+      "noMatches": "لا توجد مقالات مساعدة تطابق بحثك.", "empty": "لا توجد مقالات مساعدة متاحة بعد.",
+      "back": "العودة إلى مركز المساعدة", "loadingDetail": "جارٍ تحميل المقالة…", "notFound": "لم يتم العثور على هذه المقالة.", "detailError": "تعذر تحميل هذه المقالة."
+    },
     "welcome": "مرحبًا، {{name}}", "homeDescription": "أنشئ طلبات الدعم وتابعها.", "createAction": "إنشاء طلب جديد", "summary": "ملخص الطلبات",
     "metrics": { "open": "مفتوحة", "waitingForYou": "بانتظارك", "resolved": "تم حلها" }, "recent": "أحدث الطلبات", "viewAll": "عرض طلباتي",
     "loadingOverview": "جارٍ تحميل ملخص الدعم…", "overviewError": "تعذر تحميل ملخص الدعم.", "myRequests": "طلباتي", "requestsDescription": "راجع طلبات الدعم وتابعها.", "newRequest": "طلب جديد",

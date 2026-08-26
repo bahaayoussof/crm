@@ -9,6 +9,7 @@ const navigation = [
   { to: "/portal", key: "home" },
   { to: "/portal/tickets", key: "requests" },
   { to: "/portal/tickets/new", key: "newRequest" },
+  { to: "/portal/knowledge-base", key: "knowledgeBase" },
 ] as const;
 
 export function PortalShell() {

@@ -1,7 +1,7 @@
 {
   "app": { "title": "Customer Support CRM", "foundationReady": "Project foundation is ready." },
   "navigation": {
-    "languageSwitcher": "Choose language", "primary": "Primary navigation", "dashboard": "Dashboard", "tickets": "Tickets", "customers": "Customers",
+    "languageSwitcher": "Choose language", "primary": "Primary navigation", "dashboard": "Dashboard", "tickets": "Tickets", "customers": "Customers", "knowledgeBase": "Knowledge Base",
     "portalHome": "Portal home", "portalContext": "Support portal", "workspaceContext": "Support workspace", "openCustomers": "Open customer records"
   },
   "common": {
@@ -71,8 +71,38 @@
     "validation": { "name": "Name must be at least 2 characters", "email": "Enter a valid email address", "phone": "Phone must be 30 characters or fewer", "note": "Note is required" },
     "errors": { "CUSTOMER_EMAIL_EXISTS": "A customer with this email already exists.", "CUSTOMER_HAS_SUPPORT_HISTORY": "This customer cannot be deleted because support history or a login identity exists.", "CUSTOMER_NOT_FOUND": "Customer not found." }
   },
+  "knowledgeBase": {
+    "title": "Knowledge Base", "description": "Create and manage internal support documentation.", "create": "Create article",
+    "search": "Search articles by title, content, or category…", "statusFilter": "Status filter", "categoryFilter": "Category filter",
+    "allStatuses": "All statuses", "clearFilters": "Clear filters",
+    "empty": "No knowledge base articles yet.", "noMatches": "No articles match the current search or filters.",
+    "loadError": "Unable to load knowledge base articles.", "notFound": "Article not found.", "backToList": "Back to Knowledge Base",
+    "pagination": "Knowledge base article pages", "page": "Page {{page}} of {{total}}",
+    "updatedOn": "Updated", "authorName": "Author: {{name}}", "edit": "Edit article", "delete": "Delete article",
+    "deleteTitle": "Delete article", "deleteConfirm": "This permanently deletes the article. Published articles are also removed from the customer Help Center. Delete this article?",
+    "cancelDelete": "Cancel", "confirmDelete": "Confirm delete", "deleting": "Deleting…", "deleteError": "Unable to delete the article.",
+    "createArticle": "Create article", "editArticle": "Edit article", "formDescription": "Article title, category, content, and publication status.",
+    "articleTitle": "Article title", "articleCategory": "Article category", "articleContent": "Article content",
+    "statusLabel": "Status", "statusHelp": "Draft articles are internal only. Published articles also appear in the customer Help Center.",
+    "saveError": "Unable to save the article.",
+    "columns": { "title": "Title", "category": "Category", "status": "Status", "updated": "Updated", "author": "Author" },
+    "status": { "DRAFT": "Draft", "PUBLISHED": "Published" },
+    "validation": {
+      "title": "Title must be at least 3 characters", "titleMax": "Title must be 200 characters or fewer",
+      "content": "Content is required", "contentMax": "Content must be 50,000 characters or fewer",
+      "categoryMax": "Category must be 100 characters or fewer"
+    },
+    "errors": { "KNOWLEDGE_ARTICLE_NOT_FOUND": "Article not found.", "VALIDATION_ERROR": "Check the form and try again.", "FORBIDDEN": "You do not have permission to perform this action." }
+  },
   "portal": {
-    "brand": "Support Portal", "navigation": "Portal navigation", "nav": { "home": "Home", "requests": "My Requests", "newRequest": "New Request" },
+    "brand": "Support Portal", "navigation": "Portal navigation", "nav": { "home": "Home", "requests": "My Requests", "newRequest": "New Request", "knowledgeBase": "Help Center" },
+    "knowledgeBase": {
+      "title": "Help Center", "description": "Find answers in our published help articles.", "filters": "Help article filters",
+      "search": "Search for help…", "categoryFilter": "Filter by category", "latestArticles": "Help articles",
+      "loading": "Loading help articles…", "loadError": "Unable to load help articles.",
+      "noMatches": "No help articles match your search.", "empty": "No help articles are available yet.",
+      "back": "Back to Help Center", "loadingDetail": "Loading article…", "notFound": "This article was not found.", "detailError": "Unable to load this article."
+    },
     "welcome": "Welcome, {{name}}", "homeDescription": "Create and track your support requests.", "createAction": "Create New Request", "summary": "Request summary",
     "metrics": { "open": "Open", "waitingForYou": "Waiting for You", "resolved": "Resolved" }, "recent": "Recent requests", "viewAll": "View My Requests",
     "loadingOverview": "Loading your support overview…", "overviewError": "Unable to load your support overview.", "myRequests": "My Requests", "requestsDescription": "Review and follow your support requests.", "newRequest": "New Request",

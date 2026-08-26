@@ -9,6 +9,7 @@ const internalNavigation = [
   { to: "/dashboard", key: "dashboard" },
   { to: "/tickets", key: "tickets" },
   { to: "/customers", key: "customers" },
+  { to: "/knowledge-base", key: "knowledgeBase" },
 ] as const;
 
 export function AppShell({ audience, children }: PropsWithChildren<{ audience: ProtectedAudience }>) {

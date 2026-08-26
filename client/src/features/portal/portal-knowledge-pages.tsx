@@ -1,0 +1,97 @@
+import axios from "axios";
+import { useTranslation } from "react-i18next";
+import { Link, useParams, useSearchParams } from "react-router-dom";
+import { formatTicketDate } from "@/features/tickets/ticket-format";
+import { usePortalKnowledgeArticle, usePortalKnowledgeArticles } from "./portal-hooks";
+import type { PortalKnowledgeArticle } from "./portal.types";
+import { PortalPage, PortalPageHeader, PortalState } from "./portal-ui";
+
+const errorCode = (error: unknown) => (axios.isAxiosError(error) ? (error.response?.data?.error?.code as string | undefined) : undefined);
+
+function ArticleCard({ article }: { article: PortalKnowledgeArticle }) {
+  const { t, i18n } = useTranslation();
+  return <Link
+    className="block rounded-md border bg-white p-4 transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+    to={`/portal/knowledge-base/${article.id}`}
+  >
+    <div className="flex items-start justify-between gap-3">
+      <h2 className="min-w-0 break-words text-sm font-semibold" dir="auto">{article.title}</h2>
+      {article.category && <span className="shrink-0 rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground" dir="auto">{article.category}</span>}
+    </div>
+    {article.excerpt && <p className="mt-2 line-clamp-3 text-sm leading-6 text-muted-foreground" dir="auto">{article.excerpt}</p>}
+    <p className="mt-3 text-xs text-muted-foreground">{t("portal.updated")}: <bdi dir="ltr">{formatTicketDate(article.updatedAt, i18n.language)}</bdi></p>
+  </Link>;
+}
+
+export function PortalKnowledgeBasePage() {
+  const { t } = useTranslation();
+  const [params, setParams] = useSearchParams();
+  const page = Math.max(1, Number(params.get("page")) || 1);
+  const search = params.get("search") ?? "";
+  const category = params.get("category") ?? "";
+  const query = usePortalKnowledgeArticles({ page, limit: 10, search, category: category.trim() || undefined });
+
+  const update = (key: string, value: string) => {
+    const next = new URLSearchParams(params);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    if (key !== "page") next.delete("page");
+    setParams(next);
+  };
+
+  return <PortalPage>
+    <PortalPageHeader title={t("portal.knowledgeBase.title")} description={t("portal.knowledgeBase.description")} />
+    <section aria-label={t("portal.knowledgeBase.filters")} className="mt-5 grid gap-3 rounded-md border bg-white p-4 sm:grid-cols-[minmax(0,1fr)_15rem]">
+      <label className="block" htmlFor="portal-kb-search">
+        <span className="sr-only">{t("portal.knowledgeBase.search")}</span>
+        <input className="input" id="portal-kb-search" dir="auto" value={search} onChange={(event) => update("search", event.target.value)} placeholder={t("portal.knowledgeBase.search")} />
+      </label>
+      <label className="block" htmlFor="portal-kb-category">
+        <span className="sr-only">{t("portal.knowledgeBase.categoryFilter")}</span>
+        <input className="input" id="portal-kb-category" dir="auto" value={category} onChange={(event) => update("category", event.target.value)} placeholder={t("portal.knowledgeBase.categoryFilter")} />
+      </label>
+    </section>
+
+    <h2 className="mt-8 text-lg font-semibold">{t("portal.knowledgeBase.latestArticles")}</h2>
+    {query.isLoading ? <PortalState>{t("portal.knowledgeBase.loading")}</PortalState>
+      : query.isError ? <PortalState retry={() => query.refetch()}>{t("portal.knowledgeBase.loadError")}</PortalState>
+      : query.data && query.data.data.length ? <>
+        <div className="mt-4 grid gap-3">{query.data.data.map((article) => <ArticleCard article={article} key={article.id} />)}</div>
+        {query.data.meta.totalPages > 1 && <nav aria-label={t("portal.pagination")} className="mt-5 flex items-center justify-between gap-3">
+          <button className="button-secondary" disabled={page <= 1} onClick={() => update("page", String(page - 1))}>{t("common.previous")}</button>
+          <span className="text-center text-sm text-muted-foreground">{t("portal.page", { page, total: query.data.meta.totalPages || 1 })}</span>
+          <button className="button-secondary" disabled={page >= query.data.meta.totalPages} onClick={() => update("page", String(page + 1))}>{t("common.next")}</button>
+        </nav>}
+      </>
+      : <PortalState>{search || category.trim() ? t("portal.knowledgeBase.noMatches") : t("portal.knowledgeBase.empty")}</PortalState>}
+  </PortalPage>;
+}
+
+export function PortalKnowledgeArticlePage() {
+  const { id = "" } = useParams();
+  const { t, i18n } = useTranslation();
+  const query = usePortalKnowledgeArticle(id);
+
+  const back = <Link className="rounded-sm text-sm font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" to="/portal/knowledge-base">{t("portal.knowledgeBase.back")}</Link>;
+
+  if (query.isLoading) return <PortalPage><PortalState>{t("portal.knowledgeBase.loadingDetail")}</PortalState></PortalPage>;
+  if (query.isError) return <PortalPage>
+    <div className="mb-4">{back}</div>
+    <PortalState retry={errorCode(query.error) === "KNOWLEDGE_ARTICLE_NOT_FOUND" ? undefined : () => query.refetch()}>
+      {errorCode(query.error) === "KNOWLEDGE_ARTICLE_NOT_FOUND" ? t("portal.knowledgeBase.notFound") : t("portal.knowledgeBase.detailError")}
+    </PortalState>
+  </PortalPage>;
+
+  const article = query.data!;
+  return <PortalPage>
+    <div className="mb-4">{back}</div>
+    <header className="border-b pb-5">
+      <h1 className="text-2xl font-semibold tracking-tight" dir="auto">{article.title}</h1>
+      <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+        <span dir="auto">{article.category ?? t("common.notProvided")}</span>
+        <span>{t("portal.updated")}: <bdi dir="ltr">{formatTicketDate(article.updatedAt, i18n.language)}</bdi></span>
+      </p>
+    </header>
+    <article className="mt-6 max-w-3xl whitespace-pre-wrap break-words text-sm leading-7" dir="auto">{article.content}</article>
+  </PortalPage>;
+}

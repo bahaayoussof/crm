@@ -11,6 +11,8 @@ import { ticketRouter } from "./modules/tickets/ticket.routes.js";
 import { userRouter } from "./modules/users/user.routes.js";
 import { dashboardRouter } from "./modules/dashboard/dashboard.routes.js";
 import { portalRouter } from "./modules/portal/portal.routes.js";
+import { knowledgeArticleRouter } from "./modules/knowledge-base/knowledge-article.routes.js";
+import { portalKnowledgeArticleRouter } from "./modules/knowledge-base/knowledge-article.portal.routes.js";
 
 
 const allowedOrigins = new Set(env.CLIENT_URLS ?? [env.CLIENT_URL]);
@@ -52,6 +54,8 @@ app.use("/api/categories", categoryRouter);
 app.use("/api/users", userRouter);
 app.use("/api/tickets", ticketRouter);
 app.use("/api/dashboard", dashboardRouter);
+app.use("/api/knowledge-articles", knowledgeArticleRouter);
+app.use("/api/portal/knowledge-articles", portalKnowledgeArticleRouter);
 app.use("/api/portal", portalRouter);
 
 app.use(notFoundHandler);

@@ -25,10 +25,10 @@ The role descriptions below include capabilities that are not yet built. As of `
 - Dashboard: `ADMIN`/`MANAGER`/`AGENT` only, role-scoped queues; `CUSTOMER` rejected.
 - Customer Portal: `CUSTOMER` only, ownership derived from `User -> Customer.userId`; internal roles receive `403` from `/api/portal/*`.
 - `GET /users/agents` and `GET /categories`: `ADMIN`/`MANAGER`/`AGENT` lookup only.
+- Knowledge Base (`feature/knowledge-base`): `ADMIN`/`MANAGER`/`AGENT` may list/search and read internal articles (`DRAFT` and `PUBLISHED`); `ADMIN`/`MANAGER` may create, update, publish/unpublish, and delete; `AGENT` is read-only (`403` on create/update/delete); `CUSTOMER` and unauthenticated callers are rejected from `/api/knowledge-articles/*`. `createdById` is server-derived from the authenticated `ADMIN`/`MANAGER`. `CUSTOMER` may read `PUBLISHED` articles only through `/api/portal/knowledge-articles`; internal roles receive `403` there. A `DRAFT` id returns the same `404` as a missing id in the Portal path.
 
 ### Planned — permission model known, not implemented
 
-- `ADMIN`/`MANAGER` Knowledge Base management and `AGENT`/published-customer read (`feature/knowledge-base`).
 - `CUSTOMER` attachment upload and staff attachment access per context (`feature/attachments`).
 - `AGENT` quick-reply use and `ADMIN` quick-reply management (`feature/quick-replies`).
 - `CUSTOMER` feedback submission for own eligible tickets (`feature/customer-feedback`).
@@ -44,7 +44,7 @@ The role descriptions below include capabilities that are not yet built. As of `
 - Custom Branding: who may change application/Portal branding and within what bounds (`feature/custom-branding`).
 - General Audit Logs: whether a dedicated `AuditLog` beyond `TicketHistory` is introduced, and who reads it.
 
-Do not describe Users Management, Knowledge Base management, Feedback, Notifications, Tasks, Settings, or Reports permissions as implemented. The role lists below are the target model.
+Do not describe Users Management, Feedback, Notifications, Tasks, Settings, or Reports permissions as implemented. Knowledge Base management is implemented (`feature/knowledge-base`); the other role-list items below remain the target model.
 
 ## Roles
 
@@ -115,6 +115,22 @@ Customer identities cannot access internal ticket-management APIs or pages. Cust
 | Add customer-profile notes | Yes | Yes | No | No |
 
 Customer-route middleware is authoritative. The client keeps Customers navigation and read pages available to `AGENT`, hides mutation actions, and redirects direct visits to customer create/edit forms back to `/customers` with replace navigation.
+
+## Internal Knowledge Base Permissions
+
+| Capability | ADMIN | MANAGER | AGENT | CUSTOMER |
+| --- | --- | --- | --- | --- |
+| List/search internal articles, filter by status/category | Yes | Yes | Yes | No |
+| Read `DRAFT` and `PUBLISHED` article detail | Yes | Yes | Yes | No |
+| Create articles | Yes | Yes | No | No |
+| Edit articles | Yes | Yes | No | No |
+| Publish / unpublish (`DRAFT` ↔ `PUBLISHED`) | Yes | Yes | No | No |
+| Delete articles | Yes | Yes | No | No |
+| Read `PUBLISHED` articles via Customer Portal Help Center | No | No | No | Yes |
+
+`/api/knowledge-articles/*` middleware is authoritative: `requireAuth` then a read role group (`ADMIN`/`MANAGER`/`AGENT`) on `GET` and a manage role group (`ADMIN`/`MANAGER`) on `POST`/`PATCH`/`DELETE`. `AGENT` and `CUSTOMER` receive the standard `403 FORBIDDEN` on mutations. `createdById` is assigned from the authenticated user and never accepted from the client; unknown request fields are rejected. `/api/portal/knowledge-articles/*` is `CUSTOMER`-only, always filters `status = PUBLISHED`, and returns an identical `404` for a `DRAFT` id and a missing id so draft existence cannot be probed.
+
+The client shows the internal Knowledge Base navigation item to `ADMIN`/`MANAGER`/`AGENT` (never `CUSTOMER`), shows the Create/Edit/Delete controls only to `ADMIN`/`MANAGER`, and guards `/knowledge-base/new` and `/knowledge-base/:id/edit` with replace navigation to `/knowledge-base` for `AGENT`. `/knowledge-base` and `/knowledge-base/:id` remain available to `AGENT`. These guards are UX only; backend middleware is authoritative.
 
 - Never enforce permissions only in the UI.
 - CUSTOMER must never read another customer's ticket.

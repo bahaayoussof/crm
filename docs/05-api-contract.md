@@ -14,7 +14,7 @@ This contract mixes live and planned endpoints. Each section is tagged:
 - `PARTIAL` — only part of the listed surface is registered; the rest is planned.
 - `PLANNED` — documented target with no registered route yet. Do not consume as a live API.
 
-Registered routers as of `master` `e387667`: `/api/auth`, `/api/customers`, `/api/categories`, `/api/users` (lookup only), `/api/tickets`, `/api/dashboard`, `/api/portal`, `/api/health`. There is no registered `/api/knowledge-articles`, `/api/reports`, `/api/notifications`, `/api/feedback`, `/api/quick-replies`, `/api/settings`, or attachment upload/download route.
+Registered routers as of `master` `d89cf47` plus `feature/knowledge-base`: `/api/auth`, `/api/customers`, `/api/categories`, `/api/users` (lookup only), `/api/tickets`, `/api/dashboard`, `/api/knowledge-articles` (`feature/knowledge-base`), `/api/portal/knowledge-articles` (`feature/knowledge-base`), `/api/portal`, `/api/health`. There is no registered `/api/reports`, `/api/notifications`, `/api/feedback`, `/api/quick-replies`, `/api/settings`, or attachment upload/download route.
 
 ## Authentication
 
@@ -180,17 +180,54 @@ GET  /tickets/:id/history         PLANNED (optional focused read)
 
 None of these are registered. Assignment and status changes are already implemented through `PATCH /tickets/:id` (LIVE), so the dedicated `assign`/`status` action endpoints are not planned for implementation. History is currently included in `GET /tickets/:id`; a focused `GET /tickets/:id/history` read endpoint is optional. `POST /tickets/:id/attachments` belongs to `feature/attachments` and has no storage backend yet.
 
-## Knowledge Base — PLANNED
+## Knowledge Base — LIVE
 
 ```text
-GET    /knowledge-articles          PLANNED
-GET    /knowledge-articles/:id      PLANNED
-POST   /knowledge-articles          PLANNED
-PATCH  /knowledge-articles/:id      PLANNED
-DELETE /knowledge-articles/:id      PLANNED
+GET    /knowledge-articles          LIVE
+GET    /knowledge-articles/:id      LIVE
+POST   /knowledge-articles          LIVE
+PATCH  /knowledge-articles/:id      LIVE
+DELETE /knowledge-articles/:id      LIVE
 ```
 
-No route is registered. `KnowledgeArticle` and `KnowledgeArticleStatus` (`DRAFT`, `PUBLISHED`) exist in `schema.prisma` only. This is the `feature/knowledge-base` contract: internal list/search and article detail for `ADMIN`/`MANAGER`/`AGENT`, management (create/update/delete) for `ADMIN`/`MANAGER`, and a published-only customer read path reused by `GET /portal/knowledge-articles`. Response shapes, search parameters, and category handling are resolved during that feature.
+Backed by `server/src/modules/knowledge-base/*` and registered in `server/src/app.ts` (`feature/knowledge-base`). `KnowledgeArticle` and `KnowledgeArticleStatus` (`DRAFT`, `PUBLISHED`) are used as-is; no schema, migration, category table, slug, excerpt, popularity, or versioning field was added. `category` remains an optional free-text string.
+
+All internal routes require authentication; `CUSTOMER` and unauthenticated callers are rejected. `GET` routes allow `ADMIN`/`MANAGER`/`AGENT`. `POST`/`PATCH`/`DELETE` allow `ADMIN`/`MANAGER` only; `AGENT` receives the standard structured `403 FORBIDDEN`.
+
+### Internal list
+
+`GET /knowledge-articles` (`ADMIN`/`MANAGER`/`AGENT`). Query: `page` (int ≥ 1, default 1), `limit` (int 1–100, default 20), `search` (trimmed, ≤ 100), `status` (`DRAFT` | `PUBLISHED`), `category` (trimmed, 1–100, exact match). `search` is case-insensitive (PostgreSQL `mode: "insensitive"`) across `title`, `content`, and `category`. Ordering is `updatedAt DESC`, then `id ASC`. Response: `{ data, meta: { page, limit, total, totalPages } }`. Row projection is `{ id, title, category, status, createdAt, updatedAt, createdBy: { id, name, role } }` — no `content`, no author email.
+
+### Internal detail
+
+`GET /knowledge-articles/:id` (`ADMIN`/`MANAGER`/`AGENT`). Returns `{ id, title, content, category, status, createdAt, updatedAt, createdBy: { id, name, role } }` for any status. Missing article → `404 KNOWLEDGE_ARTICLE_NOT_FOUND`.
+
+### Create
+
+`POST /knowledge-articles` (`ADMIN`/`MANAGER`). Strict body `{ title, content, category?: string | null, status?: "DRAFT" | "PUBLISHED" }`. `title` trimmed 3–200, `content` trimmed 1–50000, `category` trimmed ≤ 100 with empty/whitespace normalized to `null`, `status` defaults to `DRAFT`. `createdById` is derived from the authenticated user server-side; a client-supplied `createdById` or any unknown field is rejected with `400 VALIDATION_ERROR`. Returns `201 { data: <detail projection> }`.
+
+### Update
+
+`PATCH /knowledge-articles/:id` (`ADMIN`/`MANAGER`). Strict partial body over `{ title?, content?, category?: string | null, status? }`; at least one field required (empty body → `400`). `createdById`, `id`, timestamps, and unknown fields are rejected with `400`. Supports `DRAFT -> PUBLISHED` and `PUBLISHED -> DRAFT`. The original `createdById` is never modified. Missing article → `404 KNOWLEDGE_ARTICLE_NOT_FOUND`. Returns `200 { data: <detail projection> }`.
+
+### Delete
+
+`DELETE /knowledge-articles/:id` (`ADMIN`/`MANAGER`). Permanent delete (no soft-delete field, no dependent Knowledge Base records). Returns `204` with no body. Missing article → `404 KNOWLEDGE_ARTICLE_NOT_FOUND`.
+
+### Portal Knowledge Base
+
+```text
+GET /portal/knowledge-articles          LIVE
+GET /portal/knowledge-articles/:id      LIVE
+```
+
+Registered at `/api/portal/knowledge-articles` (`feature/knowledge-base`), `CUSTOMER` only; internal roles and unauthenticated callers are rejected, matching the established Portal boundary. `status = PUBLISHED` is always enforced server-side and a requested `status` is not accepted (`400`).
+
+`GET /portal/knowledge-articles` query: `page`, `limit` (1–100), `search` (≤ 100), `category` (1–100, exact). Search/category filtering stay published-only. Ordering is `updatedAt DESC`, then `id ASC`. Row projection: `{ id, title, category, updatedAt, excerpt }`; `excerpt` is derived server-side from `content` (whitespace-collapsed, ≤ 200 chars, ellipsis when truncated) — there is no `excerpt` column. Internal status and author data are omitted.
+
+`GET /portal/knowledge-articles/:id` returns only `{ id, title, content, category, updatedAt }`. A `DRAFT` id and a nonexistent id both return the identical `404 KNOWLEDGE_ARTICLE_NOT_FOUND`, so a customer cannot distinguish a hidden draft from a missing article.
+
+Known limitations: no popularity/view tracking, no article versioning/revision history, no rich-text or Markdown rendering, no related-article recommendations.
 
 ## Reports — PLANNED
 
@@ -241,7 +278,7 @@ Active metrics include `NEW`, `OPEN`, `IN_PROGRESS`, `WAITING_CUSTOMER`, and `ES
 
 Portal routes may reuse ticket APIs with customer-scoped authorization rather than duplicate business logic. The implemented Portal namespace uses dedicated isolated routes (see "Customer Portal API" below).
 
-Planned Portal additions (no route registered): `GET /portal/knowledge-articles` (published-only read, `feature/knowledge-base`) and `POST /portal/tickets/:id/feedback` (`feature/customer-feedback`).
+`GET /portal/knowledge-articles` and `GET /portal/knowledge-articles/:id` are LIVE (published-only read, `feature/knowledge-base`); see "Portal Knowledge Base" above. Planned Portal addition (no route registered): `POST /portal/tickets/:id/feedback` (`feature/customer-feedback`).
 
 ## API Rules
 

@@ -2,9 +2,9 @@
 
 Last Updated: 2026-08-26
 
-Current Integration Branch: `master` at `e387667` (`e38766795a8e08561c6aad3457fddd709be03606`), equal to the `origin/master` tracking ref (local/remote ahead 0, behind 0). `e387667 update progress tracking` is a documentation-only commit on top of `e7d9b14 feat: complete basic SLA presentation`; it changed `docs/19-progress-tracking.md` only. `feature/sla` (`e7d9b14`) is contained in `master`.
+Current Integration Branch: `master` at `d89cf47` (`d89cf4745158c78a0533252cdffc4e52e971ffb0`), equal to the `origin/master` tracking ref (local/remote ahead 0, behind 0). `d89cf47 docs: reconcile task coverage and implementation roadmap` is a documentation-only commit (docs 01/05/06/14/17/18/19) on top of `e387667` / `e7d9b14 feat: complete basic SLA presentation`. `feature/sla` (`e7d9b14`) is contained in `master`.
 
-Current Working Branch: `docs/task-coverage-roadmap`, created from clean synchronized `master` at `e387667` for the task-coverage audit and roadmap reconciliation. Working tree was clean at task start. This branch changes documentation only; no application code, Prisma schema, migration, package file, or test is modified.
+Current Working Branch: `feature/knowledge-base`, created from clean synchronized `master` at `d89cf47`. Working tree and index were clean at task start. Knowledge Base is implemented and automated-verified on this branch; changes are unstaged and uncommitted, and nothing has been staged, committed, pushed, merged, rebased, amended, or tagged.
 
 > This file is a status summary and the single authoritative status-and-roadmap document. Requirements, architecture, API contracts, RBAC rules, workflows, UI specifications, and architecture decisions remain authoritative in their respective documents.
 
@@ -15,10 +15,11 @@ Current Working Branch: `docs/task-coverage-roadmap`, created from clean synchro
 - `master` at `e387667` contains Project Foundation, Database Schema, Authentication, Customer Management, Localization and RTL, Frontend Design Polish, TanStack Table adoption, Bilingual Typography, Ticket Management, Ticket Conversation, Agent Dashboard, Customer Portal, the reviewed Ticket authorization/workflow fix, the reviewed Dashboard ticket-queue fix, and basic SLA presentation (`e7d9b14`). `e387667` is a docs-only tracker update on top of `e7d9b14`.
 - Basic SLA presentation is integrated: one shared request-time derivation helper (`server/src/shared/sla/derive-sla.ts`) consumed by both the Agent Dashboard and authorized internal Ticket Details, an explicit `effectiveSlaTarget`, derived Ticket Details response fields, a compact localized Ticket Details SLA subsection, and Portal SLA-free regression assertions.
 - The end-to-end customer/agent support loop is implemented: customers can create, list, inspect, reply to, and reopen eligible requests through the owned Portal boundary, while internal staff can manage, converse on, and resolve tickets with customer context, Dashboard visibility, and clear SLA state.
-- This document now carries an original-task coverage audit (section 2A). Against the full original assignment: **18 COMPLETE, 8 PARTIAL, 23 NOT_STARTED, 9 ARCHITECTURE_ONLY, 1 INTENTIONALLY_DEFERRED** — 59 requirement rows. The strong P0 loop is a minority of total assignment scope; most non-P0 areas are `NOT_STARTED`, not intentionally cut.
-- The project is not finished or production-ready: Knowledge Base, Attachments upload/download, Quick Replies, Customer Feedback, Reports, Users Management, Settings, Notifications, SLA automation, Tasks/Reminders, Team Collaboration, AI assistance, Custom Branding, realistic demo data, final integrated QA, unresolved Dashboard and SLA visual verification, and deployment verification all remain.
+- This document now carries an original-task coverage audit (section 2A). Against the full original assignment, with `feature/knowledge-base` implemented on its branch (not yet integrated): **23 COMPLETE, 8 PARTIAL, 18 NOT_STARTED, 9 ARCHITECTURE_ONLY, 1 INTENTIONALLY_DEFERRED** — 59 requirement rows (5 Knowledge Base / Portal-FAQ rows moved from NOT_STARTED to COMPLETE-on-branch). Most remaining non-P0 areas are still `NOT_STARTED`, not intentionally cut.
+- The project is not finished or production-ready: Attachments upload/download, Quick Replies, Customer Feedback, Reports, Users Management, Settings, Notifications, SLA automation, Tasks/Reminders, Team Collaboration, AI assistance, Custom Branding, realistic demo data, final integrated QA, unresolved Dashboard and SLA visual verification, and deployment verification all remain.
+- Knowledge Base (`feature/knowledge-base`, roadmap order 1) is implemented and automated-verified on its branch, not yet committed or integrated: internal `/api/knowledge-articles` CRUD (`ADMIN`/`MANAGER` manage, `AGENT` read-only, `CUSTOMER`/anon rejected), published-only `/api/portal/knowledge-articles`, internal `/knowledge-base` routes + nav item + `AGENT` editor guard, `/portal/knowledge-base` Help Center, English/Arabic + RTL, full state handling, and backend + frontend regression tests. No schema/migration change.
 - Provider-backed channels and other production external integrations remain architecture/demo-only (ADR-002, ADR-019).
-- Next implementation feature: `feature/knowledge-base` (section 5). Final demo seed data is **not** the next task (section 6A).
+- Next implementation feature: `feature/attachments` (section 5, roadmap order 2). Final demo seed data is **not** the next task (section 6A).
 
 ## 2. Feature Progress
 
@@ -36,7 +37,7 @@ Current Working Branch: `docs/task-coverage-roadmap`, created from clean synchro
 | Agent Dashboard | ✅ COMPLETE | `fix/dashboard-ticket-queues`, SLA helper extraction on `feature/sla` (both contained in `master`) | Explicit role-derived primary queues; AGENT active assigned-only work; backend Recent exclusion after primary selection; now uses the shared SLA derivation helper without response-shape change | Localized role-aware headings, non-duplicate sections, fixed-width scrollable tables, overflow-safe mobile cards, and stale-response crash protection | 103 client / 126 server passing | Yes, prior verified run | Dashboard queue fix and the SLA helper extraction are integrated into `master` at `e7d9b14`; dashboard regression tests confirm unchanged counts, visibility, ranking, response shape, and boundaries. Browser visual verification remains incomplete. |
 | Customer Portal | ✅ COMPLETE | `feature/customer-portal` | Customer-owned Portal APIs, IDOR-safe ownership, creation, public replies, and reopening | Final responsive English/Arabic Portal shell, overview, list, creation, detail, and navigation polish | 82 client / 87 server passing | Yes, prior verified run | Commit `458af2e` ancestry confirms integration into `master`. Authenticated English/Arabic desktop and mobile visual verification and final navigation regression verification were completed previously. |
 | SLA / Automation | ✅ BASIC PRESENTATION COMPLETE | `feature/sla` (commit `e7d9b14`, contained in `master`) | Deadline snapshots/recalculation, one-time first-response recording, Portal-safe behavior, and one shared request-time derivation helper (`SlaState` + `SlaTarget` + fixed 60-minute window) consumed by Dashboard and authorized internal Ticket Details | Dashboard SLA presentation unchanged; internal Ticket Details gains a compact localized English/Arabic SLA subsection (state, effective target, effective deadline, raw first-response/resolution deadlines, first-response completion) using derived API fields, text-not-color-alone, LTR-isolated dates, no countdown | 103 client / 126 server passing | Not verified against PostgreSQL this session; 18 deterministic boundary tests cover all states | Basic SLA presentation and shared derivation are integrated into `master` at `e7d9b14`. Deferred: background workers, scheduled monitoring, persisted SLA state/breach events, notifications, automatic escalation/assignment, SLA reports, and SLA administration. PostgreSQL and authenticated browser verification of the Ticket Details SLA subsection remain outstanding. |
-| Knowledge Base | ⚪ NOT_STARTED | `feature/knowledge-base` (planned, order 1) | Schema only (`KnowledgeArticle`) | Not implemented | Schema only | Schema only | No route/page/nav. Next feature. Unblocks AI suggested-solution and Reports content. |
+| Knowledge Base | 🟢 IMPLEMENTED ON BRANCH (not integrated) | `feature/knowledge-base` (roadmap order 1) | `server/src/modules/knowledge-base/*`: internal `GET/POST/PATCH/DELETE /api/knowledge-articles` (ADMIN/MANAGER manage, AGENT read-only), published-only `GET /api/portal/knowledge-articles(/:id)`; server-derived `createdById`; safe projections; both routers registered in `app.ts` | `client/src/features/knowledge-base/*` list/detail/editor + `/knowledge-base*` routes, nav item, AGENT editor guard; `client/src/features/portal/portal-knowledge-pages.tsx` + `/portal/knowledge-base*` Help Center | 37 server (`knowledge-article.test.ts` 31, `knowledge-article.portal.test.ts` 6) + 32 client (`knowledge-base.test.tsx` 23, `knowledge-article-hooks.test.tsx` 3, `portal-knowledge.test.tsx` 6) + guard/routing coverage | Not PostgreSQL/browser verified this branch; deterministic mocked tests cover every path | No schema change. Limitations: no popularity/view tracking, no article versioning, no rich-text editing, no related-article recommendations. Unblocks AI suggested-solution and Reports content. |
 | Quick Replies | ⚪ NOT_STARTED | `feature/quick-replies` (planned, order 3) | Schema only (`QuickReply`) | Not implemented | Schema only | Schema only | No management API, no composer insertion. |
 | Customer Feedback | ⚪ NOT_STARTED | `feature/customer-feedback` (planned, order 4) | Schema only (`Feedback`) | Not implemented | Schema only | Schema only | Primary demo journey depends on it (satisfaction reporting). |
 | Reports | ⚪ NOT_STARTED | `feature/reports` (planned, order 5) | Not implemented | Not implemented | None | No | Operational Dashboard is not Reports. Depends on feedback for satisfaction. |
@@ -116,10 +117,10 @@ Every bullet from the original assignment appears exactly once. `Status` is the 
 
 | Requirement | Status | Backend evidence | Frontend evidence | Tests | DB/browser evidence | Gap | Planned branch |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| FAQs | NOT_STARTED | `KnowledgeArticle` + `KnowledgeArticleStatus` schema only | none | none | Schema only | No route, no page, no nav | `feature/knowledge-base` |
-| Help articles | NOT_STARTED | schema only | none | none | Schema only | As above | `feature/knowledge-base` |
-| Solutions and guides | NOT_STARTED | schema only | none | none | Schema only | As above | `feature/knowledge-base` |
-| Search | NOT_STARTED | schema only | none | none | Schema only | No KB search backend or UI | `feature/knowledge-base` |
+| FAQs | COMPLETE (on branch) | `GET/POST/PATCH/DELETE /api/knowledge-articles` (`server/src/modules/knowledge-base/*`) | `/knowledge-base` list/detail/editor; nav item; `/portal/knowledge-base` Help Center | `knowledge-article.test.ts`, `knowledge-article.portal.test.ts`, `knowledge-base.test.tsx`, `portal-knowledge.test.tsx` | Automated-verified on `feature/knowledge-base`; PostgreSQL/browser outstanding | Not integrated into `master` | `feature/knowledge-base` |
+| Help articles | COMPLETE (on branch) | Published-only `GET /api/portal/knowledge-articles(/:id)` | Portal Help Center list + article view | `knowledge-article.portal.test.ts`, `portal-knowledge.test.tsx` | Automated-verified on branch | Neutral "Help articles" label — no popularity data | `feature/knowledge-base` |
+| Solutions and guides | COMPLETE (on branch) | Free-text `category`; DRAFT/PUBLISHED lifecycle | Editor (title/category/content/status), plain-text detail rendering | `knowledge-article.test.ts`, `knowledge-base.test.tsx` | Automated-verified on branch | No rich-text/Markdown, no versioning | `feature/knowledge-base` |
+| Search | COMPLETE (on branch) | Case-insensitive server search over title/content/category; status + exact category filter; bounded pagination | URL-backed search + status + category filters on list; Portal search | `knowledge-article.test.ts`, `knowledge-article.portal.test.ts`, `knowledge-base.test.tsx` | Automated-verified on branch | Category filter is exact-match on free text | `feature/knowledge-base` |
 
 ### 7. AI Features
 
@@ -138,7 +139,7 @@ Every bullet from the original assignment appears exactly once. `Status` is the 
 | Submit tickets | COMPLETE | `POST /portal/tickets` — CUSTOMER-only, owned, SLA snapshot | Portal New Request page | `portal.test.ts`, `portal-pages.test.tsx` | PostgreSQL-verified (prior); 14 captures (prior) | — | — |
 | Track requests | COMPLETE | `GET /portal/tickets`, `GET /portal/tickets/:id`; public status mapping | Portal list + detail | `portal.test.ts`, `portal-routing.test.tsx` | PostgreSQL + browser-verified (prior) | — | — |
 | View history | COMPLETE | `GET /portal/overview` recent + owned list pagination | Portal Home + My Requests | `portal.test.ts` | PostgreSQL-verified (prior) | — | — |
-| Access FAQs | NOT_STARTED | no `/portal/knowledge-articles` route | no `/portal/knowledge-base` page | none | N/A | Deferred with Knowledge Base | `feature/knowledge-base` |
+| Access FAQs | COMPLETE (on branch) | `GET /api/portal/knowledge-articles(/:id)` — CUSTOMER-only, published-only, DRAFT/missing return identical 404 | `/portal/knowledge-base` Help Center list + article view; Help Center nav item | `knowledge-article.portal.test.ts`, `portal-knowledge.test.tsx`, `portal-routing.test.tsx` | Automated-verified on `feature/knowledge-base` | Not integrated into `master` | `feature/knowledge-base` |
 | Submit feedback | NOT_STARTED | `Feedback` model only; no route | none | none | Schema only | No eligibility, ownership, one-per-ticket, rating validation | `feature/customer-feedback` |
 
 ### 9. Reports and Management
@@ -183,14 +184,16 @@ Every bullet from the original assignment appears exactly once. `Status` is the 
 
 | Status | Count |
 | --- | ---: |
-| COMPLETE | 18 |
+| COMPLETE | 23 |
 | PARTIAL | 8 |
-| NOT_STARTED | 23 |
+| NOT_STARTED | 18 |
 | ARCHITECTURE_ONLY | 9 |
 | INTENTIONALLY_DEFERRED | 1 |
 | **Total requirement rows** | **59** |
 
-Verification outstanding on implemented work: 4 areas — basic SLA derivation/presentation (PostgreSQL + browser), Agent Dashboard (browser), Ticket Conversation workspace (browser capture), responsive visual review of Dashboard + SLA subsection (browser). Automated boundary/regression tests cover these; live checks were not rerun in this audit.
+COMPLETE includes 5 rows delivered on `feature/knowledge-base` (Knowledge Base FAQs / Help articles / Solutions and guides / Search, and Customer Portal "Access FAQs") that are implemented and automated-verified on that branch but not yet integrated into `master`.
+
+Verification outstanding on implemented work: 5 areas — basic SLA derivation/presentation (PostgreSQL + browser), Agent Dashboard (browser), Ticket Conversation workspace (browser capture), responsive visual review of Dashboard + SLA subsection (browser), and Knowledge Base (PostgreSQL + authenticated English/Arabic browser). Automated boundary/regression tests cover these; live checks were not rerun.
 
 ## 3. Completed Work
 
@@ -278,13 +281,15 @@ Verification outstanding on implemented work: 4 areas — basic SLA derivation/p
 
 ## 5. Next Recommended Work
 
-Next implementation feature: **`feature/knowledge-base`**. No blocking dependency was found in repository evidence.
+Roadmap order 1 (`feature/knowledge-base`) is implemented and automated-verified on its branch, awaiting developer review, commit, and integration.
+
+Next implementation feature: **`feature/attachments`** (roadmap order 2). No blocking dependency was found in repository evidence.
 
 Full dependency-aware sequence (one isolated branch per feature; ADR-019; mirrored in `docs/14-implementation-plan.md`):
 
 | Order | Branch | Feature |
 | ----: | ------ | ------- |
-| 1 | `feature/knowledge-base` | Internal KB CRUD/search, published customer read, Portal FAQs |
+| 1 | `feature/knowledge-base` | Internal KB CRUD/search, published customer read, Portal FAQs — **implemented on branch, not integrated** |
 | 2 | `feature/attachments` | Secure attachment upload/download and per-context ownership |
 | 3 | `feature/quick-replies` | Quick Reply management and composer insertion |
 | 4 | `feature/customer-feedback` | Portal feedback workflow and eligibility |
@@ -330,7 +335,7 @@ A minimal temporary developer fixture may be introduced by an earlier feature br
 
 ### Secondary
 
-- Attachments, knowledge base, in-app notifications, reports, quick replies, customer feedback, and richer ticket history.
+- Attachments, in-app notifications, reports, quick replies, customer feedback, and richer ticket history. (Knowledge Base is implemented on `feature/knowledge-base`, pending integration.)
 - Complete demo seed data for users, customers, tickets, conversations, articles, SLA states, and feedback.
 
 ### Deferred / Demonstration Only
@@ -341,11 +346,11 @@ A minimal temporary developer fixture may be introduced by an earlier feature br
 ## 7. Known Limitations
 
 - No refresh-token, token-revocation, or production session infrastructure.
-- Customer Portal Knowledge Base, attachments, feedback, notifications, profile editing, and external messaging integrations remain deferred.
+- Customer Portal attachments, feedback, notifications, profile editing, and external messaging integrations remain deferred. The Customer Portal Knowledge Base (Help Center) is implemented on `feature/knowledge-base`.
 - No attachment upload/storage provider; attachment contexts still require service-level presence and ownership validation.
 - No real-time messaging or provider-backed communication channel.
 - Basic SLA presentation exists: deadline snapshots on creation, eligible priority-change recalculation, one-time first-response recording, and one shared request-time `deriveSla` helper (`ON_TRACK` / `AT_RISK` / `BREACHED` / `MET` / `NOT_CONFIGURED` plus an explicit `FIRST_RESPONSE` / `RESOLUTION` / null target) consumed by the Agent Dashboard and authorized internal Ticket Details. Integrated into `master` at `e7d9b14`: internal Ticket Details renders a compact localized SLA subsection; Portal behavior remains SLA-safe without exposing raw or derived internal fields. Background workers, scheduled monitoring, persisted SLA state or breach events, notifications, automatic escalation/assignment, SLA reports, and SLA administration do not exist.
-- No knowledge base, notifications, reports, feedback workflow, or AI actions.
+- No notifications, reports, feedback workflow, or AI actions. Knowledge Base is implemented on `feature/knowledge-base` (not integrated) with no popularity/view tracking, no article versioning, no rich-text editing, and no related-article recommendations.
 - No seed script or realistic required demo dataset.
 - No automated visual regression suite; current visual evidence is manual/headless-browser verification from prior feature work.
 - Production build succeeds with a Vite warning for a JavaScript chunk larger than 500 kB.
@@ -361,7 +366,27 @@ A minimal temporary developer fixture may be introduced by an earlier feature br
 
 ## 9. Testing Status
 
-Verified during `feature/sla` implementation; that work is now committed at `e7d9b14` and contained in `master`. Counts below are the post-integration `master` state on 2026-08-26.
+### `feature/knowledge-base` (2026-08-26, on branch, not integrated)
+
+Full suites run on `feature/knowledge-base` (working tree). Baseline before this branch was 103 client / 126 server / 229 total.
+
+| Command / category | Files | Passed | Failed | Skipped | Todo | Exit code | Evidence |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| Client tests: `npm --prefix client run test` | 20 | 141 | 0 | 0 | 0 | 0 | +38 vs baseline: `knowledge-base.test.tsx` (23), `knowledge-article-hooks.test.tsx` (3), `portal-knowledge.test.tsx` (6), `knowledge-article-manage-route.test.tsx` (4), `portal-routing.test.tsx` (+2). |
+| Server tests: `npm --prefix server run test` | 11 | 163 | 0 | 0 | 0 | 0 | +37 vs baseline: `knowledge-article.test.ts` (31), `knowledge-article.portal.test.ts` (6). Pre-existing intentional handled stderr from the negative CORS / simulated failed-write ticket tests still does not fail the suite. |
+| Combined/root tests: `npm run test` | 31 | 304 | 0 | 0 | 0 | 0 | Root command ran both suites successfully. |
+| Client lint / Server lint | — | — | — | — | — | 0 | ESLint passed both packages. |
+| Client typecheck / Server typecheck | — | — | — | — | — | 0 | `tsc -b` and `tsc --noEmit` passed. |
+| Client build / Server build | — | — | — | — | — | 0 | Passed; Vite retained the pre-existing non-failing >500 kB chunk warning (~1,042 kB / gzip ~308 kB). |
+| Translation JSON validation | 2 files | 418 / 418 keys | 0 | — | — | 0 | `en` and `ar` parse; identical flattened key sets including `knowledgeBase.*` and `portal.knowledgeBase.*`. |
+| Whitespace: `git diff --check` | — | — | — | — | — | 0 | No trailing-whitespace or conflict markers. |
+| OpenWolf validation | 10 core files / 7 hooks | — | 0 | — | — | 0 | `openwolf status`: all core files, hook scripts, and registered matchers present. |
+
+Knowledge Base test scope: unauthenticated 401 and CUSTOMER 403 on every internal route; ADMIN/MANAGER/AGENT list all articles; internal DRAFT + PUBLISHED detail reads; bounded/correct pagination; search over title/content/category; status + trimmed-category filters; deterministic `updatedAt DESC, id ASC` ordering; safe list projection (no `content`, no author email); structured 404; ADMIN/MANAGER create DRAFT/PUBLISHED with server-derived `createdById`; rejection of client `createdById` and unknown fields; AGENT/CUSTOMER create 403; length/required validation; ADMIN/MANAGER update + publish/unpublish with creator preserved; empty-PATCH and forbidden-field rejection; AGENT update 403; update/delete 404; ADMIN/MANAGER delete 204; AGENT delete 403. Portal: CUSTOMER published-only list/detail; DRAFT excluded; search/category stay published-only; status-free author-free projections; DRAFT id and missing id return identical 404; internal-role and unauthenticated rejection. Frontend: nav item for all internal roles; semantic desktop columns + mobile cards; URL-backed search/status/category server queries; server-backed pagination; loading/error-retry/empty/no-results; long-title containment; Create-article visibility by role; AGENT editor route guard; form required-field validation; create omits `createdById` and navigates to detail; edit loads values and sends only approved fields; pending-save duplicate prevention; safe plain-text content render; AGENT read without Edit/Delete; ADMIN/MANAGER Edit+Delete with inline confirmation, cancel-no-mutation, pending-delete guard, failure preserves view; mutation hooks invalidate internal + `["portal","knowledge-articles"]` queries; English + Arabic + RTL; Portal Help Center list/detail with no author/management controls and correct search API.
+
+### `master` state (historical, `feature/sla`, contained in `master`)
+
+Verified during `feature/sla` implementation; that work is committed at `e7d9b14` and contained in `master`. Counts below are the `master` state on 2026-08-26 and were not rerun for this branch.
 
 | Command / category | Files | Passed | Failed | Skipped | Todo | Exit code | Evidence |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
@@ -384,6 +409,8 @@ Verified during `feature/sla` implementation; that work is now committed at `e7d
 
 Current verification evidence:
 
+- Knowledge Base PostgreSQL/API: not performed. The configured default `DATABASE_URL` (local `crm`) was not reachable in this environment and no Neon credentials are recorded; `prisma generate` also hit a Windows file-lock (`EPERM`) on the query-engine binary. The existing generated client already contains `KnowledgeArticle`, so typecheck/build/tests are unaffected. Deterministic mocked Supertest coverage exercises every route, role, projection, filter, ordering, and 404 path.
+- Knowledge Base visual verification: not performed; no authenticated dev-server browser session was available in this environment. Responsive/RTL behaviour is asserted structurally in the client tests (both desktop-table and mobile-card variants render in JSDOM; Arabic switches `document.documentElement.dir` to `rtl`).
 - PostgreSQL/API: not performed for the SLA presentation. Deterministic automated coverage exercises every SLA state and boundary.
 - SLA presentation visual verification: not performed; authenticated browser verification of the Ticket Details SLA subsection in English/Arabic desktop/mobile remains outstanding despite the code being integrated.
 
@@ -400,7 +427,8 @@ These results cover implemented features, not the unimplemented project scope.
 | Branch / area | Purpose | Integration state | Ancestry evidence |
 | --- | --- | --- | --- |
 | `master` | Synchronized integration branch | `e387667` (docs-only, on top of `e7d9b14`); equals the `origin/master` tracking ref | Local/remote ahead 0, behind 0. |
-| `docs/task-coverage-roadmap` | Task-coverage audit and roadmap reconciliation (this document) | Not merged; docs-only; created from `master` `e387667` | Branched from clean synchronized `master`. |
+| `docs/task-coverage-roadmap` | Task-coverage audit and roadmap reconciliation | Contained in `master` at `d89cf47` (`docs: reconcile task coverage and implementation roadmap`) | Docs-only. |
+| `feature/knowledge-base` | Knowledge Base: internal `/api/knowledge-articles` CRUD, published-only `/api/portal/knowledge-articles`, internal `/knowledge-base*` routes + nav + AGENT editor guard, `/portal/knowledge-base` Help Center, EN/AR/RTL, tests | Not merged; created from clean `master` `d89cf47`; changes unstaged and uncommitted | Implemented and automated-verified on branch; no schema/migration change. |
 | Project Foundation | Client/server foundation | Contained in `master` | Local feature ref is an ancestor of `master`. |
 | Database Schema | CRM Prisma schema and migration | Contained in `master` | Local feature ref is an ancestor of `master`. |
 | Authentication | Authentication and RBAC | Contained in `master` | Local feature ref is an ancestor of `master`. |
@@ -452,6 +480,7 @@ Coverage means a governing document exists; it does not mean the feature is impl
 - The production client build retains a non-failing JavaScript chunk-size warning above 500 kB.
 - Prisma CLI's development dependency tree retains the reported high-severity advisory; the suggested forced downgrade remains intentionally unapplied.
 - No automated visual regression suite exists.
+- `feature/knowledge-base` is implemented and automated-verified but not committed or integrated; its PostgreSQL and authenticated English/Arabic browser verification were not performed and rely on deterministic mocked tests until a developer completes them. `KnowledgeArticle.category` is unnormalized free text, so category filtering is exact-match on the stored string.
 - Advanced integrations are intentionally deferred and must not be represented as functional.
 
 ## 13. Definition of Project Completion

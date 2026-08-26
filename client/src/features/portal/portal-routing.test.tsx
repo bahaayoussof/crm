@@ -18,6 +18,8 @@ describe("Portal shell routing", () => {
     ["/portal/tickets", "My Requests"],
     ["/portal/tickets/new", "New Request"],
     ["/portal/tickets/ticket-1", "My Requests"],
+    ["/portal/knowledge-base", "Help Center"],
+    ["/portal/knowledge-base/article-1", "Help Center"],
   ])("activates only the expected navigation item at %s", (path, activeLabel) => {
     renderPortal(path);
     expect(screen.getAllByTestId("portal-header")).toHaveLength(1);
@@ -43,5 +45,5 @@ describe("Portal shell routing", () => {
 });
 
 function renderPortal(path: string) {
-  return render(<AuthContext.Provider value={auth}><MemoryRouter initialEntries={[path]}><Routes><Route element={<ProtectedRoute audience="customer" />}><Route path="/portal" element={<PortalShell />}><Route index element={<h1>Portal home content</h1>} /><Route path="tickets" element={<h1>Requests content</h1>} /><Route path="tickets/new" element={<h1>New request content</h1>} /><Route path="tickets/:id" element={<h1>Request detail content</h1>} /></Route></Route></Routes></MemoryRouter></AuthContext.Provider>);
+  return render(<AuthContext.Provider value={auth}><MemoryRouter initialEntries={[path]}><Routes><Route element={<ProtectedRoute audience="customer" />}><Route path="/portal" element={<PortalShell />}><Route index element={<h1>Portal home content</h1>} /><Route path="tickets" element={<h1>Requests content</h1>} /><Route path="tickets/new" element={<h1>New request content</h1>} /><Route path="tickets/:id" element={<h1>Request detail content</h1>} /><Route path="knowledge-base" element={<h1>Help center content</h1>} /><Route path="knowledge-base/:id" element={<h1>Help article content</h1>} /></Route></Route></Routes></MemoryRouter></AuthContext.Provider>);
 }
