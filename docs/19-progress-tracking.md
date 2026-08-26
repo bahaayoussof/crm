@@ -2,15 +2,15 @@
 
 Last Updated: 2026-08-26
 
-Current Integration Branch: `master` at `4499494` (`44994949ac81d3e78973e94e35ba2eaa57ebbeb6`), synchronized with `origin/master` before this fix branch was created
+Current Integration Branch: `master` at `19fbedde` (`19fbedde3da4249ed68e4fd79b65fe61e3a210e4`), synchronized with `origin/master` before this fix branch was created
 
-Current Working Branch: `fix/ticket-agent-permissions` - implementation and verification are unstaged and uncommitted
+Current Working Branch: `fix/dashboard-ticket-queues` - implementation and automated/PostgreSQL verification are unstaged and uncommitted
 
 > This file is a status summary. Requirements, architecture, API contracts, RBAC rules, workflows, UI specifications, and architecture decisions remain authoritative in their respective documents.
 
 ## 1. Overall Status
 
-- `master` at `bc25a02` contains Project Foundation, Database Schema, Authentication, Customer Management, Localization and RTL, Frontend Design Polish, TanStack Table adoption, Bilingual Typography, Ticket Management, Ticket Conversation, Agent Dashboard, the related customer support-context and AGENT authorization refinements, and Customer Portal.
+- `master` at `19fbedde` contains Project Foundation, Database Schema, Authentication, Customer Management, Localization and RTL, Frontend Design Polish, TanStack Table adoption, Bilingual Typography, Ticket Management, Ticket Conversation, Agent Dashboard, Customer Portal, and the reviewed Ticket authorization/workflow fix.
 - The end-to-end customer/agent support loop is implemented: customers can create, list, inspect, reply to, and reopen eligible requests through the owned Portal boundary, while internal staff can manage, converse on, and resolve tickets with customer context and Dashboard visibility.
 - The project is not finished or production-ready: final SLA presentation/monitoring scope, realistic demo data, final integrated QA, unresolved Dashboard visual verification, deployment verification, and deferred/P1 features remain.
 - Provider-backed channels and other production external integrations remain intentionally deferred.
@@ -26,9 +26,9 @@ Current Working Branch: `fix/ticket-agent-permissions` - implementation and veri
 | Frontend Localization / RTL | ✅ COMPLETE | `fix/frontend-localization` | Localized API error support where implemented | Persisted English/Arabic and document direction | Passing | N/A | Commit ancestry confirms it is contained in `master`. |
 | Frontend Design Polish | ✅ COMPLETE | `fix/frontend-design-polish` | No material backend scope | Shared auth/protected shells and responsive refinement | Passing | N/A | Tip is contained in `master`. |
 | TanStack Table Refactor | ✅ COMPLETE | `fix/frontend-design-polish` | Existing server pagination retained | Typed customer and ticket tables with responsive cards | Passing | N/A | Tip is contained in `master`. |
-| Ticket Management authorization/workflow fix | ✅ IMPLEMENTED AND VERIFIED | `fix/ticket-agent-permissions` | AGENT update allowlist, actor-derived creation assignment/history, and unchanged close transition enforcement | Protected edit route, role-scoped controls, confirmed close action, explicit Ticket/Customer column containment | 89 client / 102 server passing | Not rerun | Changes remain unstaged and uncommitted; not integrated into `master`. |
+| Ticket Management authorization/workflow fix | ✅ COMPLETE | `fix/ticket-agent-permissions` | AGENT update allowlist, actor-derived creation assignment/history, and unchanged close transition enforcement | Protected edit route, role-scoped controls, confirmed close action, explicit Ticket/Customer column containment | Passing | Prior verification | Commit `19fbedde` is integrated into `master`. |
 | Ticket Conversation | ✅ COMPLETE | `feature/ticket-conversation` | Internal detail conversation read, public replies, internal notes, RBAC and first-response transaction | Localized timeline and accessible reply/note composer | Passing | Yes | Tip is contained in `master`; browser capture verification was not completed. |
-| Agent Dashboard | ✅ COMPLETE | `feature/agent-dashboard` | Role-scoped overview, real metrics, SLA derivation, bounded lists and status grouping | Localized KPI, chart, attention/recent desktop and mobile states | 82 client / 87 server passing | Yes, prior verified run | Commit `d12067b` ancestry confirms integration into `master`, including Customer Management authorization/support-context refinements. Automated and PostgreSQL verification completed previously; authenticated Dashboard visual verification remains incomplete. |
+| Agent Dashboard | ✅ FIX IMPLEMENTED AND VERIFIED | `fix/dashboard-ticket-queues` | Explicit role-derived primary queues; AGENT active assigned-only work; backend Recent exclusion after primary selection | Localized role-aware headings, non-duplicate sections, fixed-width scrollable tables, overflow-safe mobile cards | 92 client / 104 server passing | Yes | Changes are unstaged/uncommitted. Browser matrix remained blocked by blank/loading headless captures, so visual verification is incomplete. |
 | Customer Portal | ✅ COMPLETE | `feature/customer-portal` | Customer-owned Portal APIs, IDOR-safe ownership, creation, public replies, and reopening | Final responsive English/Arabic Portal shell, overview, list, creation, detail, and navigation polish | 82 client / 87 server passing | Yes, prior verified run | Commit `458af2e` ancestry confirms integration into `master`. Authenticated English/Arabic desktop and mobile visual verification and final navigation regression verification were completed previously. |
 | SLA / Automation | 🟡 PARTIAL | `feature/ticket-management`, `feature/ticket-conversation`, `feature/agent-dashboard`, `feature/customer-portal` | Deadline snapshots/recalculation, one-time first-response recording, Dashboard derivation, and Portal-safe behavior | Implemented SLA presentation uses `ON_TRACK`, `AT_RISK`, `BREACHED`, `MET`, and `NOT_CONFIGURED` where applicable | Passing | Yes, prior verified run | Basic SLA tracking implemented; automation remains partial/deferred. No background workers, scheduled monitoring, persisted breach events, notifications, or automatic escalation. |
 | Knowledge Base | ⚪ NOT STARTED | — | Schema only | Not implemented | Schema only | Schema only | P1 after the P0 demo flow. |
@@ -41,7 +41,7 @@ Current Working Branch: `fix/ticket-agent-permissions` - implementation and veri
 | Multi-Branch | 🟣 DEFERRED | — | Schema only | Not implemented | Schema only | Schema only | P2 behavior. |
 | External Integrations | 🟣 DEFERRED | — | Channel enum representation only | Not implemented | Schema only | Schema only | WhatsApp, SMS, inbound email, live transport, ERP, and arbitrary systems are demonstration/architecture only. |
 | Deployment | ⚪ NOT STARTED | — | No deployed API evidence | No deployed frontend evidence | Local build passing | Development DB only | Deployment targets are documented but not configured or verified. |
-| Final QA | 🟡 INCOMPLETE | — | Current working scope passes automated checks | Current working scope passes automated checks | 16 client files / 89 tests; 8 server files / 102 tests; 191 total passed, 0 failed | Prior PostgreSQL verification preserved; not rerun for this fix | This fix still requires representative authenticated English/Arabic desktop/mobile browser verification and optional live PostgreSQL verification before integration. |
+| Final QA | 🟡 INCOMPLETE | — | Current working scope passes automated and PostgreSQL checks | Current working scope passes automated checks | 16 client files / 92 tests; 8 server files / 104 tests; 196 total passed, 0 failed | Yes for this fix | Representative authenticated English/Arabic Dashboard browser verification remains incomplete because headless captures never advanced beyond blank/loading output. |
 
 ## 3. Completed Work
 
@@ -117,16 +117,17 @@ Current Working Branch: `fix/ticket-agent-permissions` - implementation and veri
 
 ## 4. Current Work
 
-- `fix/ticket-agent-permissions` is implemented and automatically verified from synchronized `master` at `4499494`.
-- Backend: AGENT create derives assignment from the authenticated actor and writes assignment history atomically; AGENT PATCH accepts only assigned-ticket status/priority updates; resolved close permissions and transition rules are preserved.
-- Frontend: AGENT creation omits assignment, edit is restricted to `ADMIN`/`MANAGER`, assigned/unassigned operations match the authorization policy, close has confirmation, and long Subject/Customer values remain in deliberately sized cells/cards across LTR/RTL structures.
-- Verification: 89 client and 102 server tests passed (191 total), with zero failed/skipped/todo tests; client/server lint, typecheck, builds, translation JSON, and focused route/Ticket regressions passed. The existing Vite chunk-size warning remains.
-- PostgreSQL verification was not rerun, and the requested authenticated representative browser matrix was not completed; no visual pass is claimed.
+- `fix/dashboard-ticket-queues` is implemented from synchronized `master` at `19fbedde`.
+- Backend: role-derived `primaryQueueType`/`primaryTickets`; AGENT primary work is active and assigned-only; Recent Tickets excludes primary IDs before its eight-item limit while retaining role visibility.
+- Frontend: auth-context role headings, localized assigned/recent empty states, explicit Dashboard column sizing, bounded horizontal table overflow, two-line long-value containment, LTR ticket IDs, and compact mobile cards.
+- Verification: 92 client and 104 server tests passed (196 total); focused Dashboard tests are 10/10 client and 10/10 server; Ticket visibility regression is 39/39. Client/server lint, typecheck, builds, translation JSON, and PostgreSQL role checks passed. The existing Vite chunk-size warning remains.
+- PostgreSQL observed AGENT `MY_ASSIGNED_TICKETS` with 2 primary, 3 recent, 0 duplicates, 0 unassigned primary, and 0 terminal primary; ADMIN observed `NEEDS_ATTENTION` with 5 primary and 0 duplicates.
+- Six authenticated headless browser attempts covered the requested breakpoint/language matrix, but the captures remained blank or on loading output even against a healthy isolated API. No visual verification is claimed.
 - All changes remain unstaged and uncommitted; the fix is not integrated into `master` and is not pushed.
 
 ## 5. Next Recommended Work
 
-1. Developer review, representative browser/database verification if required, and manual commit/integration of `fix/ticket-agent-permissions`.
+1. Developer review and manual browser verification of `fix/dashboard-ticket-queues`, then manual commit/integration if accepted.
 2. Continue with `feature/sla` only after this fix is integrated.
 3. Add realistic seed/demo data and demo accounts.
 4. Run final end-to-end QA, accessibility, responsive, English/Arabic, and RTL review.
@@ -178,28 +179,34 @@ This follows the P0 roadmap and the dependency order in `docs/01-scope-and-prior
 
 ## 9. Testing Status
 
-Verified on synchronized `master` at `bc25a028276d7a2aad2096d6ae4ca0f311baeccc` on 2026-08-26. These commands were executed during this documentation reconciliation; database and browser checks were not rerun.
+Verified on unstaged/uncommitted `fix/dashboard-ticket-queues` based on synchronized `master` at `19fbedde3da4249ed68e4fd79b65fe61e3a210e4` on 2026-08-26.
 
 | Command / category | Files | Passed | Failed | Skipped | Todo | Exit code | Evidence |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| Client tests: `npm --prefix client run test` | 15 | 82 | 0 | 0 | 0 | 0 | Complete Vitest client suite passed. |
-| Server tests: `npm --prefix server run test` | 8 | 87 | 0 | 0 | 0 | 0 | Complete Vitest server suite passed. Expected handled stderr from the negative CORS and simulated failed-write tests did not fail the suite. |
-| Combined tests | 23 | 169 | 0 | 0 | 0 | 0 | Sum of the independently executed configured client and server suites. |
+| Client tests: `npm --prefix client run test` | 16 | 92 | 0 | 0 | 0 | 0 | Complete Vitest client suite passed. |
+| Server tests: `npm --prefix server run test` | 8 | 104 | 0 | 0 | 0 | 0 | Complete Vitest server suite passed. Expected handled stderr from the negative CORS and simulated failed-write tests did not fail the suite. |
+| Combined/root tests: `npm run test` | 24 | 196 | 0 | 0 | 0 | 0 | Root command reran both configured suites successfully. |
 | Client lint: `npm --prefix client run lint` | — | — | — | — | — | 0 | ESLint passed. |
 | Server lint: `npm --prefix server run lint` | — | — | — | — | — | 0 | ESLint passed. |
 | Client typecheck: `npm --prefix client run typecheck` | — | — | — | — | — | 0 | TypeScript project check passed. |
 | Server typecheck: `npm --prefix server run typecheck` | — | — | — | — | — | 0 | TypeScript no-emit check passed. |
 | Client build: `npm --prefix client run build` | — | — | — | — | — | 0 | Production build passed; Vite retained the non-failing warning for a minified JavaScript chunk larger than 500 kB. |
 | Server build: `npm --prefix server run build` | — | — | — | — | — | 0 | TypeScript production build passed. |
-| Whitespace: `git diff --check` | 1 changed file | — | 0 | — | — | 0 | Tracker diff passed whitespace validation. |
+| Focused Dashboard client/server | 2 | 20 | 0 | 0 | 0 | 0 | Role headings, queue scope/order, exclusion, safe projection, localization, semantics, and overflow behavior passed. |
+| Ticket visibility regression | 1 | 39 | 0 | 0 | 0 | 0 | Existing internal Ticket visibility and authorization suite passed unchanged. |
 | Translation JSON validation | 2 files | 2 | 0 | — | — | 0 | English and Arabic translation JSON parsed successfully. |
 | OpenWolf validation | 10 core files / 7 hooks | — | 0 | — | — | 0 | All `.wolf/*.json` files parsed; `openwolf status` reported all core files, hook scripts, and registered hook matchers present. |
+
+Current verification evidence:
+
+- PostgreSQL/API: isolated-port requests using real ADMIN and AGENT identities passed queue type, active assigned-only AGENT primary scope, system-wide ADMIN scope, and zero cross-section duplicate checks.
+- Dashboard visual verification: incomplete; six authenticated English/Arabic captures at 1440, 1280, 1024, 768, and 375 pixels stayed blank or on structured loading output despite a healthy isolated API, so no visual pass is claimed.
 
 Prior verification evidence preserved without claiming a rerun:
 
 - PostgreSQL/API: Ticket Management, Ticket Conversation, Agent Dashboard, AGENT Customer Management boundaries, and two-customer Portal ownership/IDOR/workflow checks were previously completed. The Portal database run observed the documented null-deadline fallback because no active MEDIUM SLA rule existed.
 - Portal visual verification: 14 authenticated English/Arabic desktop/mobile captures and the final route-exact navigation regression verification were previously completed.
-- Dashboard visual verification: incomplete; authenticated English/Arabic desktop/mobile capture attempts redirected to login, so no Dashboard visual pass is claimed.
+- Earlier Dashboard visual verification was also incomplete because authenticated capture attempts redirected to login.
 
 These results cover implemented features, not the unimplemented project scope.
 

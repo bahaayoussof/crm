@@ -364,3 +364,21 @@ This removes the unassigned creation dead end, prevents partial or unintended co
 **Consequences**
 
 The client protects ticket edit routes for `ADMIN`/`MANAGER`, renders unassigned agent views read-only, and invalidates rich detail plus related list, dashboard, and customer-context queries after updates. Customer Portal behavior and ticket visibility remain unchanged.
+
+---
+
+## ADR-016: Role-Aware Dashboard Primary Queues
+
+**Date:** 2026-08-26
+
+**Decision**
+
+Keep the shared Ticket visibility predicate unchanged, but derive an explicit Dashboard primary queue from the authenticated server-side role. `ADMIN` and `MANAGER` receive `NEEDS_ATTENTION`; `AGENT` receives `MY_ASSIGNED_TICKETS`, limited to active tickets assigned to that agent. Return this as `primaryQueueType` plus `primaryTickets`, then query Recent Tickets from the complete role-visible dataset while excluding primary IDs before applying its limit.
+
+**Reason**
+
+Ticket visibility and an operational work queue answer different questions. Explicit response naming prevents an agent's complete assigned workload from being mislabeled as SLA attention, while backend exclusion keeps Recent Tickets full and non-duplicative without weakening visibility.
+
+**Consequences**
+
+AGENT metrics and Recent Tickets may still include eligible unassigned tickets. No claiming, assignment, workflow, schema, background processing, or Portal behavior changes. Dashboard clients must use the explicit primary response and preserve role-aware localized headings.

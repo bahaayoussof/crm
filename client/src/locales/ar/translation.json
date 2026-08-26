@@ -20,7 +20,7 @@
     "title": "لوحة دعم العملاء", "description": "عبء العمل الحالي وضغط اتفاقيات الخدمة والتذاكر التي تحتاج إلى اهتمام.", "metricsLabel": "مؤشرات لوحة التحكم", "loadError": "تعذر تحميل لوحة التحكم.",
     "metrics": { "openTickets": "التذاكر المفتوحة", "assignedToMe": "المسندة إليّ", "unassignedTickets": "التذاكر غير المسندة", "slaAtRisk": "اتفاقية الخدمة معرضة للخطر", "slaBreached": "اتفاقية الخدمة متجاوزة", "resolvedToday": "تم حلها اليوم", "waitingCustomer": "بانتظار العميل" },
     "chartTitle": "التذاكر حسب الحالة", "chartDescription": "عدد التذاكر المرئية مجمّعًا حسب الحالة الحالية.", "ticketsCount": "التذاكر", "emptyDistribution": "لا توجد بيانات لحالات التذاكر بعد.",
-    "summaryTitle": "الملخص التشغيلي", "generatedAt": "وقت الإنشاء", "needsAttention": "تحتاج إلى اهتمام", "recentTickets": "أحدث التذاكر", "emptyAttention": "لا توجد تذاكر مرئية تحتاج إلى اهتمام حاليًا.", "emptyRecent": "لا توجد تذاكر مرئية حديثة.", "viewAll": "عرض كل التذاكر", "sla": "حالة اتفاقية الخدمة",
+    "summaryTitle": "الملخص التشغيلي", "generatedAt": "وقت الإنشاء", "needsAttention": "تحتاج إلى اهتمام", "myAssignedTickets": "التذاكر المسندة إليّ", "recentTickets": "أحدث التذاكر", "emptyAttention": "لا توجد تذاكر مرئية تحتاج إلى اهتمام حاليًا.", "emptyAssigned": "لا توجد تذاكر نشطة مسندة إليك حاليًا.", "emptyRecent": "لا توجد تذاكر مرئية حديثة خارج قائمة الانتظار الأساسية.", "viewAll": "عرض كل التذاكر", "sla": "حالة اتفاقية الخدمة",
     "slaStates": { "ON_TRACK": "ضمن المسار", "AT_RISK": "معرضة للخطر", "BREACHED": "متجاوزة", "MET": "مستوفاة", "NOT_CONFIGURED": "غير مهيأة" }
   },
   "tickets": {

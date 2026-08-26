@@ -272,6 +272,12 @@ Assignee
 Updated time
 ```
 
+For `ADMIN` and `MANAGER`, this section remains **Needs Attention** across their system-wide visibility. For `AGENT`, it becomes **My Assigned Tickets** and contains only active tickets assigned to the authenticated agent. Unassigned tickets remain visible in the Unassigned KPI and may appear in Recent Tickets, but do not appear in the agent's primary queue.
+
+Recent Tickets contains the newest role-visible tickets after excluding every identifier already shown in the primary queue. It may therefore include eligible unassigned or terminal tickets for an agent, but never a ticket assigned exclusively to another agent.
+
+Both Dashboard desktop tables use an explicit minimum table width, horizontally scrollable bounded container, fixed column sizing, non-touching headers, and contained long Subject, Customer, assignee, date, and technical values. Mobile continues to use compact cards with overflow-safe content. Ticket identifiers remain locally LTR in English and Arabic.
+
 ## Charts
 
 Preferred:

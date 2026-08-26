@@ -66,6 +66,7 @@ Customer identities cannot access internal ticket-management APIs or pages. Cust
 - Unassigned tickets remain read-only for agent workflow mutations. Claiming an unassigned ticket is outside the Ticket Management feature.
 - Ticket conversation follows the same mutation boundary: an `AGENT` may add a public reply or internal ticket note only when the ticket is assigned to that agent. `ADMIN` and `MANAGER` may add replies and notes to any visible ticket. Unassigned tickets remain read-only for agent conversation mutations.
 - Ticket history is visible wherever the caller is authorized to view the ticket.
+- Dashboard visibility continues to include assigned and unassigned tickets for AGENT metrics, distribution, and Recent Tickets. The Dashboard primary work queue is a presentation-specific subset containing only that agent's active assigned tickets; it does not change Ticket Management access or add claiming.
 - `ADMIN` and `MANAGER` may close any `RESOLVED` ticket. An `AGENT` may close only a `RESOLVED` ticket assigned to that agent. Closing continues through `PATCH /tickets/:id` with `{ "status": "CLOSED" }`.
 
 ## Security Rules
