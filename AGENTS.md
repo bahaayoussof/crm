@@ -19,6 +19,12 @@ For every implementation task, read:
 5. `docs/16-definition-of-done.md`
 6. `docs/17-decisions-log.md`
 
+### Progress Tracking Preflight
+
+For every task that may affect implementation or project status, also read `docs/19-progress-tracking.md`. This includes features, fixes, refactors, UI/UX, authorization, infrastructure, deployment, tests that change project status, and documentation that materially changes the roadmap or completion state.
+
+Before implementation, reconcile the tracker with the actual repository, current branch, working tree, Git history, implemented code, automated tests, database checks, and browser or visual evidence. Repository evidence is authoritative when it conflicts with the tracker. Report material inconsistencies during the preflight instead of copying stale status forward.
+
 ### Then Read the Relevant Domain Documents
 
 The AI MUST determine the task type and read all applicable documents before touching code.
@@ -177,7 +183,7 @@ Existing code does not override documented product rules automatically. If exist
 
 For tasks involving project planning, progress review, roadmap status, feature completion, or deciding what to work on next, read `docs/19-progress-tracking.md`.
 
-The progress tracker is a status summary only and does not override feature or domain documentation. Normal implementation tasks do not need to read the full tracker unless they depend on overall project status.
+The progress tracker is a status summary only and does not override feature or domain documentation. Implementation tasks follow the mandatory preflight and synchronization rules in this file.
 
 ---
 
@@ -261,6 +267,36 @@ Before declaring a task complete:
 3. Report files changed.
 4. Report known limitations.
 5. Show suggested commit message, but DO NOT commit.
+
+### Progress Tracking Synchronization
+
+After implementation and verification, but before the final report, update `docs/19-progress-tracking.md` when the task materially changes project status. Update only affected sections, such as the current branch; completed, integrated, uncommitted, or in-progress work; next work; deferred scope; known limitations; authorization or workflow decisions; exact test counts; lint, typecheck, and build results; PostgreSQL, browser, visual, or deployment verification; and existing build warnings.
+
+Before editing the tracker, inspect its current diff and preserve unrelated developer edits, history, and completed milestones. Make the smallest accurate change, avoid whole-file rewrites and formatting-only churn, and resolve apparent contradictions from repository evidence. Stop and report if overlapping edits cannot be reconciled safely.
+
+Use status terms precisely; they are not interchangeable:
+
+- `Implemented on branch`: code exists in the current working tree or branch.
+- `Verified`: the reported checks were actually run and passed.
+- `Unstaged`: working-tree changes are not in the Git index.
+- `Staged`: changes are in the Git index but not necessarily committed.
+- `Committed`: the change exists in Git history.
+- `Integrated into master`: Git ancestry confirms the commit is contained in `master`.
+- `Pushed`: the relevant remote branch contains the commit.
+- `Database verified`: the configured real database was safely checked.
+- `Visually verified`: required browser routes and viewports were manually inspected.
+
+Do not infer these states from prompts, folders, documentation, or previous reports. When applicable, say: `Implemented and verified on feature/customer-portal; changes remain unstaged and uncommitted.`
+
+If work stops early, do not mark it complete. Record it as blocked or in progress only when project status materially changed, state the exact blocker, preserve the last confirmed verification results, and never replace them with unrun checks or claim database or visual verification.
+
+The tracker is a project status summary only. It must not override authoritative domain documentation, redefine requirements, replace API/RBAC/workflow/SLA/frontend/UI/decision contracts, contain large implementation specifications, treat planned work as complete, invent verification, remove limitations without evidence, or erase unrelated developer updates. Detailed rules remain in `docs/05-api-contract.md`, `docs/06-auth-rbac.md`, `docs/07-ticket-workflow.md`, `docs/08-sla-automation.md`, `docs/09-frontend-guidelines.md`, `docs/18-ui-pages-spec.md`, and `docs/17-decisions-log.md`.
+
+A tracker update is normally unnecessary for read-only questions, explanations, prompt writing, planning without implementation, review without changes, diagnosis-only work, repository inspection with no status change, or minor wording/formatting changes that do not affect project status. State that no progress update was required when relevant.
+
+For every implementation-task final report, state whether the tracker was updated and which sections changed; the exact Git state and whether work is unstaged, staged, committed, integrated, or pushed; completed and incomplete verification; and newly documented limitations.
+
+Updating the tracker never authorizes staging, committing, pushing, merging, rebasing, amending, tagging, or otherwise altering Git history.
 
 
 ## Frontend Design Skill
