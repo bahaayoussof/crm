@@ -2,17 +2,17 @@
 
 Last Updated: 2026-08-26
 
-Current Integration Branch: `master` at `879762e`
+Current Integration Branch: `master` at `bc25a02` (`bc25a028276d7a2aad2096d6ae4ca0f311baeccc`), synchronized with `origin/master`
 
-Current Working Branch: `feature/agent-dashboard` (unstaged implementation based on clean `master` at `879762e`)
+Current Working Branch: `master` — progress-tracking reconciliation; this documentation change remains unstaged and uncommitted
 
 > This file is a status summary. Requirements, architecture, API contracts, RBAC rules, workflows, UI specifications, and architecture decisions remain authoritative in their respective documents.
 
 ## 1. Overall Status
 
-- `master` at `879762e` contains the foundation through Ticket Management and Ticket Conversation.
-- Agent Dashboard is implemented but uncommitted on `feature/agent-dashboard`, including its role-scoped API, real metrics, derived SLA state, bounded ticket lists, localized responsive UI, and status chart.
-- The core demo journey, including the Customer Portal, is complete on its feature branches pending developer integration.
+- `master` at `bc25a02` contains Project Foundation, Database Schema, Authentication, Customer Management, Localization and RTL, Frontend Design Polish, TanStack Table adoption, Bilingual Typography, Ticket Management, Ticket Conversation, Agent Dashboard, the related customer support-context and AGENT authorization refinements, and Customer Portal.
+- The end-to-end customer/agent support loop is implemented: customers can create, list, inspect, reply to, and reopen eligible requests through the owned Portal boundary, while internal staff can manage, converse on, and resolve tickets with customer context and Dashboard visibility.
+- The project is not finished or production-ready: final SLA presentation/monitoring scope, realistic demo data, final integrated QA, unresolved Dashboard visual verification, deployment verification, and deferred/P1 features remain.
 - Provider-backed channels and other production external integrations remain intentionally deferred.
 
 ## 2. Feature Progress
@@ -23,14 +23,14 @@ Current Working Branch: `feature/agent-dashboard` (unstaged implementation based
 | Database Schema | ✅ COMPLETE | `feature/database-schema` | 16 Prisma domain models and five enums | N/A | Schema contract passing | Yes, prior verified run | Initial migration exists and was previously confirmed current. Seed data is absent. |
 | Authentication | ✅ COMPLETE | `feature/authentication` | Registration, login, `/auth/me`, JWT and role middleware | Login, registration, protected routing and logout | Passing | Yes, prior verified run | No refresh-token or revocation infrastructure. |
 | Customer Management | ✅ COMPLETE | `feature/customer-management`, authorization/support-context refinements on `feature/agent-dashboard` | ADMIN/MANAGER mutations; AGENT read-only customer data; complete safe ticket-summary history | Role-aware actions/forms plus FULL/SUMMARY_ONLY customer Tickets tab | Passing | Yes | Attachments are metadata-only; summary visibility is separate from Ticket Management access. |
-| Frontend Localization / RTL | ✅ COMPLETE | `fix/frontend-localization` | Localized API error support where implemented | Persisted English/Arabic and document direction | Passing | N/A | Tip is the current `master`. |
+| Frontend Localization / RTL | ✅ COMPLETE | `fix/frontend-localization` | Localized API error support where implemented | Persisted English/Arabic and document direction | Passing | N/A | Commit ancestry confirms it is contained in `master`. |
 | Frontend Design Polish | ✅ COMPLETE | `fix/frontend-design-polish` | No material backend scope | Shared auth/protected shells and responsive refinement | Passing | N/A | Tip is contained in `master`. |
 | TanStack Table Refactor | ✅ COMPLETE | `fix/frontend-design-polish` | Existing server pagination retained | Typed customer and ticket tables with responsive cards | Passing | N/A | Tip is contained in `master`. |
 | Ticket Management | ✅ COMPLETE | `feature/ticket-management` | Protected CRUD, assignment, workflow, history and SLA snapshots | Queue, forms, detail controls and responsive views | Passing | Yes | Tip is contained in `master`. |
 | Ticket Conversation | ✅ COMPLETE | `feature/ticket-conversation` | Internal detail conversation read, public replies, internal notes, RBAC and first-response transaction | Localized timeline and accessible reply/note composer | Passing | Yes | Tip is contained in `master`; browser capture verification was not completed. |
-| Agent Dashboard | ✅ COMPLETE | `feature/agent-dashboard` | Role-scoped overview, real metrics, SLA derivation, bounded lists and status grouping | Localized KPI, chart, attention/recent desktop and mobile states | 144 total passing | Yes | Includes Customer Management authorization/support-context refinements; uncommitted and not merged; visual verification is incomplete. |
-| Customer Portal | ✅ COMPLETE | `feature/customer-portal` | Customer-owned Portal APIs, IDOR-safe ownership, creation, public replies, and reopening | Responsive English/Arabic Portal shell, overview, list, creation, and detail | 82 client / 87 server passing | Yes | Complete on branch; not merged. |
-| SLA / Automation | 🟡 PARTIAL | `feature/ticket-management`, `feature/ticket-conversation` | Deadline snapshots and one-time first-response recording | SLA deadlines shown in ticket context | Passing | Yes | No scheduler, warning/breach automation, notifications, or automatic escalation. |
+| Agent Dashboard | ✅ COMPLETE | `feature/agent-dashboard` | Role-scoped overview, real metrics, SLA derivation, bounded lists and status grouping | Localized KPI, chart, attention/recent desktop and mobile states | 82 client / 87 server passing | Yes, prior verified run | Commit `d12067b` ancestry confirms integration into `master`, including Customer Management authorization/support-context refinements. Automated and PostgreSQL verification completed previously; authenticated Dashboard visual verification remains incomplete. |
+| Customer Portal | ✅ COMPLETE | `feature/customer-portal` | Customer-owned Portal APIs, IDOR-safe ownership, creation, public replies, and reopening | Final responsive English/Arabic Portal shell, overview, list, creation, detail, and navigation polish | 82 client / 87 server passing | Yes, prior verified run | Commit `458af2e` ancestry confirms integration into `master`. Authenticated English/Arabic desktop and mobile visual verification and final navigation regression verification were completed previously. |
+| SLA / Automation | 🟡 PARTIAL | `feature/ticket-management`, `feature/ticket-conversation`, `feature/agent-dashboard`, `feature/customer-portal` | Deadline snapshots/recalculation, one-time first-response recording, Dashboard derivation, and Portal-safe behavior | Implemented SLA presentation uses `ON_TRACK`, `AT_RISK`, `BREACHED`, `MET`, and `NOT_CONFIGURED` where applicable | Passing | Yes, prior verified run | Basic SLA tracking implemented; automation remains partial/deferred. No background workers, scheduled monitoring, persisted breach events, notifications, or automatic escalation. |
 | Knowledge Base | ⚪ NOT STARTED | — | Schema only | Not implemented | Schema only | Schema only | P1 after the P0 demo flow. |
 | Reports | ⚪ NOT STARTED | — | Not implemented | Not implemented | None | No | Depends on meaningful ticket/SLA/feedback data. |
 | AI Assistant | 🟣 DEFERRED | — | Not implemented | Not implemented | None | No | P2; must require human review when promoted. |
@@ -41,7 +41,7 @@ Current Working Branch: `feature/agent-dashboard` (unstaged implementation based
 | Multi-Branch | 🟣 DEFERRED | — | Schema only | Not implemented | Schema only | Schema only | P2 behavior. |
 | External Integrations | 🟣 DEFERRED | — | Channel enum representation only | Not implemented | Schema only | Schema only | WhatsApp, SMS, inbound email, live transport, ERP, and arbitrary systems are demonstration/architecture only. |
 | Deployment | ⚪ NOT STARTED | — | No deployed API evidence | No deployed frontend evidence | Local build passing | Development DB only | Deployment targets are documented but not configured or verified. |
-| Final QA | ⚪ NOT STARTED | — | Current implemented scope passes checks | Current implemented scope passes checks | 144 passing | Dashboard, conversation, and AGENT customer-history boundaries DB verified | Full demo-flow, manual responsive/RTL visual review, and deployment QA remain. |
+| Final QA | 🟡 INCOMPLETE | — | Current integrated scope passes automated checks | Current integrated scope passes automated checks | 15 client files / 82 tests; 8 server files / 87 tests; 169 total passed, 0 failed | Prior PostgreSQL verification preserved; not rerun in this documentation task | Complete demo-data verification, authenticated Dashboard visual verification, final end-to-end assessment review, remaining accessibility/responsive review, and deployment verification remain. |
 
 ## 3. Completed Work
 
@@ -75,22 +75,59 @@ Current Working Branch: `feature/agent-dashboard` (unstaged implementation based
 
 ### Frontend Localization / RTL
 
-- Branch: `fix/frontend-localization` (tip equals `master`).
+- Branch: `fix/frontend-localization` (contained in `master`).
 - Delivered: persisted English/Arabic switching, root `lang`/`dir`, localized implemented screens, locale formatting, and direction isolation for technical values.
 - Tests: localization, language-switcher, and relevant page tests pass; prior browser verification covered English and Arabic.
 - Limitation: future features still require their own translations and RTL checks.
 
+### Bilingual Typography
+
+- Branch: `fix/bilingual-typography` (contained in `master`; commit `4d188bd` ancestry verified).
+- Delivered: self-hosted Inter Latin and Cairo Arabic subsets, four production weights, one mixed-script font stack, inherited form typography, and semantic language labels.
+- Verification: current client tests, lint, typecheck, and production build pass; prior English/Arabic checks confirmed localization and RTL behavior remained intact.
+- Limitation: the production bundle still has the separate non-failing Vite chunk-size warning.
+
+### Ticket Management
+
+- Branch: `feature/ticket-management` (contained in `master`; commit `0165f50` ancestry verified).
+- Delivered: protected ticket queue/detail/create/update flows, assignment, priority/category/status workflow, history, server-scoped AGENT visibility, SLA snapshots, responsive TanStack Table/cards, and localized forms/details.
+- Verification: current client/server suites and quality gates pass; a prior PostgreSQL happy-path verified the implemented workflow and SLA snapshot behavior.
+- Limitation: attachments and background SLA automation remain unimplemented.
+
+### Ticket Conversation
+
+- Branch: `feature/ticket-conversation` (contained in `master`; commit `879762e` ancestry verified).
+- Delivered: internal public-message/private-note timeline, authorized reply/note mutations, and transactional one-time first-response recording.
+- Verification: current client/server suites and quality gates pass; prior PostgreSQL verification covered conversation and first-response behavior.
+- Limitation: no separate browser capture was completed for the internal conversation workspace.
+
+### Agent Dashboard
+
+- Branch: `feature/agent-dashboard` (contained in `master`; commit `d12067b` ancestry verified).
+- Delivered: role-scoped overview API, real KPIs/status distribution, request-time SLA derivation, bounded Needs Attention/recent lists, responsive localized UI, and the integrated AGENT customer-authorization/support-context refinements.
+- Verification: current automated suites and quality gates pass; prior read-only PostgreSQL/API verification covered Dashboard scoping and the Customer Management refinements.
+- Limitation: authenticated ADMIN/MANAGER and AGENT English/Arabic desktop/mobile Dashboard visual verification was not completed.
+
+### Customer Portal
+
+- Branch: `feature/customer-portal` (contained in `master`; commit `458af2e` ancestry verified).
+- Delivered: CUSTOMER-only ownership boundary, IDOR-safe overview/list/detail/create/reply APIs, resolved-ticket reopening, public-only conversation, and final responsive English/Arabic Portal navigation and page polish.
+- Verification: current 82-client/87-server suite passes; prior two-customer PostgreSQL verification covered ownership, IDOR, creation, replies, transitions, and SLA-safe behavior, while 14 authenticated English/Arabic desktop/mobile captures and final navigation regression checks verified the Portal UI.
+- Limitation: Portal Knowledge Base, attachments, feedback, notifications, realtime updates, profile editing, and external channels remain deferred.
+
 ## 4. Current Work
 
-- Current branch: `feature/agent-dashboard`.
-- Current feature state: ✅ implementation, automated verification, build, and read-only PostgreSQL verification complete; changes are unstaged and not committed or merged.
-- Delivered: role-scoped overview API, real KPIs and distribution, fixed-window SLA derivation, deterministic bounded lists, Recharts status chart, localized responsive states, and a small shared Ticket Management visibility helper.
-- Remaining before integration: manual ADMIN/MANAGER and AGENT English/Arabic desktop/mobile visual review, developer code review, and developer-controlled stage/commit/merge/push.
+- All product work through Customer Portal is committed and integrated into synchronized `master` at `bc25a02`.
+- No product feature is currently active.
+- The current task is a documentation-only reconciliation on `master`; the `docs/19-progress-tracking.md` change remains unstaged and uncommitted until the developer reviews and handles it.
 
 ## 5. Next Recommended Work
 
-1. Review and manually commit/integrate `feature/agent-dashboard` after completing visual review.
-2. Implement customer-owned portal requests, ticket details/replies, and customer-triggered reopening to complete the P0 demo journey.
+1. Finish and formalize the remaining SLA scope.
+2. Add realistic seed/demo data and demo accounts.
+3. Run final end-to-end QA, accessibility, responsive, English/Arabic, and RTL review.
+4. Complete deployment preparation and verification.
+5. Continue with approved P1 features, beginning with Knowledge Base when P0 delivery is stable.
 
 This follows the P0 roadmap and the dependency order in `docs/01-scope-and-priorities.md`, `docs/14-implementation-plan.md`, and `docs/18-ui-pages-spec.md`.
 
@@ -98,11 +135,12 @@ This follows the P0 roadmap and the dependency order in `docs/01-scope-and-prior
 
 ### Core Remaining
 
-- Agent dashboard backed by real ticket data.
-- Customer portal request creation, list, detail, and replies.
-- Customer ownership scoping and customer-triggered resolved-ticket reopening.
-- Remaining SLA warning/breach presentation and automation beyond existing snapshots/first-response recording.
-- Responsive, accessible, bilingual states for every new P0 screen.
+- Final SLA presentation or monitoring scope beyond the implemented snapshots, first-response timestamp, and request-time Dashboard derivation; background automation remains deferred unless separately promoted.
+- Realistic seed/demo data and demo accounts covering the critical support journey.
+- Final integrated end-to-end assessment QA.
+- Authenticated ADMIN/MANAGER and AGENT English/Arabic desktop/mobile Dashboard visual verification.
+- Deployment preparation and verification.
+- Remaining responsive and accessibility checks across the integrated journey.
 
 ### Secondary
 
@@ -120,7 +158,7 @@ This follows the P0 roadmap and the dependency order in `docs/01-scope-and-prior
 - Customer Portal Knowledge Base, attachments, feedback, notifications, profile editing, and external messaging integrations remain deferred.
 - No attachment upload/storage provider; attachment contexts still require service-level presence and ownership validation.
 - No real-time messaging or provider-backed communication channel.
-- SLA deadlines and first-response recording exist, but background warning/breach processing does not.
+- Basic SLA tracking exists: deadline snapshots on creation, eligible priority-change recalculation, one-time first-response recording, and Dashboard request-time `ON_TRACK` / `AT_RISK` / `BREACHED` / `MET` / `NOT_CONFIGURED` derivation. Portal behavior remains SLA-safe without exposing internal fields. Background workers, scheduled monitoring, persisted breach events, notifications, and automatic escalation do not exist.
 - No knowledge base, notifications, reports, feedback workflow, or AI actions.
 - No seed script or realistic required demo dataset.
 - No automated visual regression suite; current visual evidence is manual/headless-browser verification from prior feature work.
@@ -137,37 +175,49 @@ This follows the P0 roadmap and the dependency order in `docs/01-scope-and-prior
 
 ## 9. Testing Status
 
-Verified on uncommitted `feature/agent-dashboard` based on `879762e` on 2026-08-25:
+Verified on synchronized `master` at `bc25a028276d7a2aad2096d6ae4ca0f311baeccc` on 2026-08-26. These commands were executed during this documentation reconciliation; database and browser checks were not rerun.
 
-| Category | Status | Evidence |
-| --- | --- | --- |
-| Lint | ✅ COMPLETE | Root client and server lint commands passed. |
-| Typecheck | ✅ COMPLETE | Root client and server typechecks passed. |
-| Unit/integration tests | ✅ COMPLETE | 20 test files and 144 tests passed: 68 client, 76 server. Server service/API suites mock Prisma. |
-| Frontend tests | ✅ COMPLETE | 13 test files and 68 tests passed. |
-| Real DB verification | ✅ COMPLETE | The real AGENT received both other-agent summaries (`SUMMARY_ONLY`) for a two-ticket customer while normal Queue returned zero and restricted detail returned `404`; the existing unassigned ticket received `FULL`. Dashboard remained `200` and all customer mutations remained `403`. The dataset has no ticket assigned directly to this test AGENT, so that live case was unavailable. |
-| Manual UI verification | 🟠 INCOMPLETE | Two authenticated English/Arabic desktop/mobile CDP attempts redirected to login; no dashboard visual pass is claimed. Focused RTL, chart-mapping, technical-direction, responsive representation, loading, error, and empty tests pass. |
-| Build | ✅ COMPLETE | Client and server builds passed; client emitted a non-failing 500 kB chunk-size warning after adding Recharts. |
+| Command / category | Files | Passed | Failed | Skipped | Todo | Exit code | Evidence |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| Client tests: `npm --prefix client run test` | 15 | 82 | 0 | 0 | 0 | 0 | Complete Vitest client suite passed. |
+| Server tests: `npm --prefix server run test` | 8 | 87 | 0 | 0 | 0 | 0 | Complete Vitest server suite passed. Expected handled stderr from the negative CORS and simulated failed-write tests did not fail the suite. |
+| Combined tests | 23 | 169 | 0 | 0 | 0 | 0 | Sum of the independently executed configured client and server suites. |
+| Client lint: `npm --prefix client run lint` | — | — | — | — | — | 0 | ESLint passed. |
+| Server lint: `npm --prefix server run lint` | — | — | — | — | — | 0 | ESLint passed. |
+| Client typecheck: `npm --prefix client run typecheck` | — | — | — | — | — | 0 | TypeScript project check passed. |
+| Server typecheck: `npm --prefix server run typecheck` | — | — | — | — | — | 0 | TypeScript no-emit check passed. |
+| Client build: `npm --prefix client run build` | — | — | — | — | — | 0 | Production build passed; Vite retained the non-failing warning for a minified JavaScript chunk larger than 500 kB. |
+| Server build: `npm --prefix server run build` | — | — | — | — | — | 0 | TypeScript production build passed. |
+| Whitespace: `git diff --check` | 1 changed file | — | 0 | — | — | 0 | Tracker diff passed whitespace validation. |
+| Translation JSON validation | 2 files | 2 | 0 | — | — | 0 | English and Arabic translation JSON parsed successfully. |
+| OpenWolf validation | 10 core files / 7 hooks | — | 0 | — | — | 0 | All `.wolf/*.json` files parsed; `openwolf status` reported all core files, hook scripts, and registered hook matchers present. |
+
+Prior verification evidence preserved without claiming a rerun:
+
+- PostgreSQL/API: Ticket Management, Ticket Conversation, Agent Dashboard, AGENT Customer Management boundaries, and two-customer Portal ownership/IDOR/workflow checks were previously completed. The Portal database run observed the documented null-deadline fallback because no active MEDIUM SLA rule existed.
+- Portal visual verification: 14 authenticated English/Arabic desktop/mobile captures and the final route-exact navigation regression verification were previously completed.
+- Dashboard visual verification: incomplete; authenticated English/Arabic desktop/mobile capture attempts redirected to login, so no Dashboard visual pass is claimed.
 
 These results cover implemented features, not the unimplemented project scope.
 
 ## 10. Branch Tracking
 
-| Branch | Purpose | Status | Merged? |
+| Branch / area | Purpose | Integration state | Ancestry evidence |
 | --- | --- | --- | --- |
-| `master` | Integration branch | At `879762e`; base of current feature | N/A |
-| `feature/project-foundation` | Client/server foundation | ✅ COMPLETE; tip contained in `master` | Yes |
-| `feature/database-schema` | CRM Prisma schema and migration | ✅ COMPLETE; tip contained in `master` | Yes |
-| `feature/authentication` | Authentication and RBAC | ✅ COMPLETE; tip contained in `master` | Yes |
-| `feature/customer-management` | Customer APIs and UI | ✅ COMPLETE; tip contained in `master` | Yes |
-| `fix/frontend-localization` | English/Arabic localization and RTL | ✅ COMPLETE; tip equals `master` | Yes |
-| `fix/frontend-design-polish` | Shell/design polish, edit-cache fix, and customer table refactor | ✅ COMPLETE; tip contained in `master` | Yes |
-| `feature/ticket-management` | Ticket CRUD, queue, assignment, workflow, history and SLA snapshots | ✅ COMPLETE; tip contained in `master` | Yes |
-| `fix/bilingual-typography` | Inter/Cairo typography system | ✅ COMPLETE; tip equals `master` | Yes |
-| `feature/ticket-conversation` | Internal public replies, internal ticket notes, timeline and first-response recording | ✅ COMPLETE; tip contained in `master` | Yes |
-| `feature/agent-dashboard` | Role-scoped operational dashboard API and localized responsive UI | ✅ COMPLETE; unstaged and uncommitted | No |
+| `master` | Synchronized integration branch | `bc25a02`; equals `origin/master` before this documentation edit | Local/remote ahead 0, behind 0. |
+| Project Foundation | Client/server foundation | Contained in `master` | Local feature ref is an ancestor of `master`. |
+| Database Schema | CRM Prisma schema and migration | Contained in `master` | Local feature ref is an ancestor of `master`. |
+| Authentication | Authentication and RBAC | Contained in `master` | Local feature ref is an ancestor of `master`. |
+| Customer Management | Customer APIs, UI, and later authorization/support-context refinements | Contained in `master` | Base feature ref and commit `d12067b` are ancestors of `master`. |
+| Frontend Localization / RTL | English/Arabic localization and RTL | Contained in `master` | Local fix ref is an ancestor of `master`. |
+| Frontend Design Polish | Shell/design polish, edit-cache fix, and TanStack Table adoption | Contained in `master` | Local fix ref is an ancestor of `master`. |
+| Bilingual Typography | Inter/Cairo typography system | Contained in `master` | Commit `4d188bd` is an ancestor of `master`. |
+| Ticket Management | Ticket queue, create/detail/update, assignment, workflow, history, and SLA snapshots | Contained in `master` | Commit `0165f50` is an ancestor of `master`. |
+| Ticket Conversation | Public replies, internal notes, timeline, and first-response recording | Contained in `master` | Commit `879762e` is an ancestor of `master`. |
+| Agent Dashboard and customer refinements | Operational Dashboard and Customer Management authorization/support context | Contained in `master` | Commit `d12067b` is an ancestor of `master`. |
+| Customer Portal | Owned customer support journey and final Portal polish | Contained in `master` | Commit `458af2e` is an ancestor of `master`. |
 
-“Yes” means Git ancestry confirms the branch tip is contained in `master`; it does not infer how integration occurred.
+“Contained in `master`” means Git ancestry confirms the cited commit or local branch ref is an ancestor of `master`; it does not infer how integration occurred.
 
 ## 11. Documentation Coverage
 
@@ -192,11 +242,17 @@ Coverage means a governing document exists; it does not mean the feature is impl
 
 ## 12. Risks / Watch Items
 
-- The current polish/refactor commit is not in `master`; starting another feature from the wrong base could omit or duplicate its changes.
-- The full P0 product core still depends on ticket, conversation, dashboard, portal, and SLA implementation.
 - The customer PATCH response is intentionally narrower than customer detail; future mutations must preserve the established invalidate/refetch cache pattern.
 - Live database and manual UI verification are not part of the default automated test command and must remain explicit completion checks.
 - Missing demo seed data will make end-to-end assessment and report/dashboard verification harder.
+- Authenticated Dashboard browser visual verification remains incomplete.
+- Deployment preparation and deployed frontend/API verification have not been completed.
+- Background SLA workers, scheduled monitoring, persisted breach events, notifications, and automatic escalation are not implemented.
+- No upload/storage provider or complete attachment ownership-validation service exists.
+- Authentication has no refresh-token or server-side revocation infrastructure.
+- The production client build retains a non-failing JavaScript chunk-size warning above 500 kB.
+- Prisma CLI's development dependency tree retains the reported high-severity advisory; the suggested forced downgrade remains intentionally unapplied.
+- No automated visual regression suite exists.
 - Advanced integrations are intentionally deferred and must not be represented as functional.
 
 ## 13. Definition of Project Completion
@@ -225,8 +281,8 @@ After completing or materially changing a feature:
 
 ## Customer Portal
 
-- Status: complete on `feature/customer-portal`; not merged.
+- Status: complete and integrated into `master`; commit `458af2e` ancestry confirms containment.
 - Delivered: isolated owned Portal API, overview, active categories, paginated list, server-owned creation/SLA snapshot, safe public detail, reply transitions, and responsive English/Arabic UI.
 - Deferred: attachments, Knowledge Base, feedback, notifications, realtime updates, profile editing, and external channels.
-- Verification: 82 client and 87 server tests pass (169 total); lint, typecheck, client/server builds, whitespace, translations, and OpenWolf JSON pass. Real PostgreSQL verification passed for two-customer isolation, IDOR-safe reads/replies, server-derived defaults, creation history, WAITING_CUSTOMER/RESOLVED/CLOSED reply behavior, and unchanged first response/deadline preservation. No active MEDIUM SLA rule existed, so the documented null-deadline fallback was observed rather than a non-null SLA snapshot.
+- Verification: the 2026-08-26 rerun passed 82 client and 87 server tests (169 total), with client/server lint, typecheck, and builds, translation JSON, and OpenWolf integrity passing. Prior real PostgreSQL verification passed for two-customer isolation, IDOR-safe reads/replies, server-derived defaults, creation history, WAITING_CUSTOMER/RESOLVED/CLOSED reply behavior, and unchanged first response/deadline preservation. No active MEDIUM SLA rule existed, so that prior run observed the documented null-deadline fallback rather than a non-null SLA snapshot.
 - UI polish: the legacy customer AppShell no longer wraps PortalShell; the complete Home, My Requests, and New Request navigation is route-exact, geometrically centered on desktop, centered in a full-width mobile row, and presented as conventional text links with an active underline and accessible focus state. Forms, filters, request tables/cards, and page actions have visible accessible responsive treatment. Authenticated English/Arabic desktop captures covered all four routes, and English/Arabic mobile captures covered home, list, and creation with one header, one active item, visible controls, RTL, and no overflow. The final navigation regression suite passes 6/6 with client typecheck and whitespace validation passing.
