@@ -1,5 +1,6 @@
 {
   "app": { "title": "Customer Support CRM", "foundationReady": "Project foundation is ready." },
+  "notifications": { "title": "Notifications", "bellLabel": "Notifications, {{count}} unread", "markAllRead": "Mark all as read", "empty": "You're all caught up.", "error": "Notifications could not be loaded.", "unread": "Unread" },
   "theme": { "title": "Theme", "light": "Light", "dark": "Dark", "system": "System", "mode": "Appearance" },
   "navigation": {
     "languageSwitcher": "Choose language", "primary": "Primary navigation", "dashboard": "Dashboard", "tickets": "Tickets", "customers": "Customers", "knowledgeBase": "Knowledge Base", "reports": "Reports", "quickReplies": "Quick Replies", "users": "Users", "settings": "Settings",

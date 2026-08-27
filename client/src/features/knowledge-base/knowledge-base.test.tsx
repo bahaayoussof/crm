@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/features/auth/auth-state", () => ({
   useAuth: () => ({ user: { id: "user-1", name: "User", email: "user@example.com", role: mocks.role, customer: null }, isLoading: false, logout: vi.fn() }),
 }));
+vi.mock("@/features/notifications/notification-bell", () => ({ NotificationBell: () => null }));
 
 vi.mock("./knowledge-article-hooks", () => ({
   useKnowledgeArticles: mocks.useKnowledgeArticles,

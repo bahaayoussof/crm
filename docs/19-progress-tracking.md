@@ -1,10 +1,10 @@
 # Customer Support CRM — Progress Tracking
 
-Last Updated: 2026-08-27 (`master`/`origin/master` reconciled at `e528aa4`; Reports, User Management, shared AppSelect, the UI design-system enhancement, and the Lucide icon refactor are integrated. `feature/settings` is implemented and automated-verified on its uncommitted branch; Notifications follows after developer integration.)
+Last Updated: 2026-08-27 (`master`/`origin/master` reconciled at `c846d96`; Settings and visual-system follow-ups are integrated. Notifications is implemented and automated-verified on uncommitted `feature/notifications-roadmap`.)
 
-Current Integration Branch: `master` at `e528aa4`, equal to the `origin/master` tracking ref (ahead 0, behind 0). Git ancestry confirms Reports at `827b3ff`, User Management at `8db4a83`, shared AppSelect at `18e44a0`, the UI design-system enhancement at `ae88e64`, and the Lucide icon refactor at `e528aa4` are contained in `master`. Historical verification evidence below is preserved without claiming reruns.
+Current Integration Branch: `master` at `c846d96`, equal to the `origin/master` tracking ref (ahead 0, behind 0). Historical verification evidence below is preserved without claiming reruns.
 
-Current Working Branch: `feature/settings`, branched from `master` at `e528aa4`. Settings is implemented and automated-verified: client 346, server 314, root 660 tests; both typechecks and builds plus server lint pass; translation parity is 688/688; OpenWolf and `git diff --check` pass. Client lint is blocked by seven pre-existing unused-symbol errors already present at `e528aa4`. PostgreSQL and authenticated browser verification were not performed. Changes are unstaged and uncommitted; nothing was pushed, merged, rebased, amended, or tagged.
+Current Working Branch: `feature/notifications-roadmap`, branched from `origin/master` at `c846d96`. Notifications is implemented and automated-verified: client 356, server 338, root 694 tests pass; both package typechecks and builds pass; server lint and focused Notifications client lint pass. Repository-wide client lint remains blocked by 11 pre-existing errors outside Notifications plus one existing warning. The existing Vite chunk-size warning remains. PostgreSQL migration `20260827161500_add_notification_ticket_id` was successfully deployed to the configured Neon development database after the UI exposed the missing-column failure; authenticated browser verification was not performed. Changes are unstaged and uncommitted; nothing was pushed, merged, rebased, amended, or tagged.
 
 > This file is a status summary and the single authoritative status-and-roadmap document. Requirements, architecture, API contracts, RBAC rules, workflows, UI specifications, and architecture decisions remain authoritative in their respective documents.
 
@@ -309,8 +309,8 @@ Full dependency-aware sequence (one isolated branch per feature; ADR-019; mirror
 | 4 | `feature/customer-feedback` | Portal feedback workflow and eligibility — **implemented on branch, not integrated** |
 | 5 | `feature/reports` | Ticket, SLA, agent, and satisfaction reports — **integrated at `827b3ff`** |
 | 6 | `feature/user-management` | ADMIN-managed internal users and roles — **integrated at `8db4a83`; AppSelect at `18e44a0`** |
-| 7 | `feature/settings` | Real configuration pages for existing configurable resources — **implemented on branch, uncommitted** |
-| 8 | `feature/notifications` | In-app notifications and read/unread workflow |
+| 7 | `feature/settings` | Real configuration pages for existing configurable resources — **integrated at `9d6beb0`** |
+| 8 | `feature/notifications-roadmap` | In-app notifications and read/unread workflow — **implemented on branch, unstaged and uncommitted** |
 | 9 | `feature/sla-automation` | Bounded monitoring, assignment/escalation rules, and alerts |
 | 10 | `feature/tasks-reminders` | Agent Tasks and Reminders after product decisions |
 | 11 | `feature/team-collaboration` | Explicit collaboration scope beyond existing notes/history |

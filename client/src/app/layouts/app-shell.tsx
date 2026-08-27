@@ -5,6 +5,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { useAuth } from "@/features/auth/auth-state";
+import { NotificationBell } from "@/features/notifications/notification-bell";
 import type { ProtectedAudience } from "@/features/auth/auth-routing";
 import { canManageQuickReplies } from "@/features/quick-replies/quick-reply-permissions";
 import { canViewReports } from "@/features/reports/reports-permissions";
@@ -198,11 +199,13 @@ export function AppShell({ audience, children }: PropsWithChildren<{ audience: P
 
             {/* Desktop Header Right Controls */}
             <div className="hidden lg:flex shrink-0 items-center gap-3">
+              <NotificationBell />
               <LanguageSwitcher />
             </div>
 
             {/* Mobile Header Right Profile Avatar Button */}
-            <div className="lg:hidden flex shrink-0 items-center">
+            <div className="lg:hidden flex shrink-0 items-center gap-2">
+              <NotificationBell />
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(true)}

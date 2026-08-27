@@ -46,8 +46,10 @@ describe("ticket API", () => {
       ticket: { findFirst: mocks.ticketFindFirst, create: mocks.ticketCreate, update: mocks.ticketUpdate, updateMany: mocks.ticketUpdateMany },
       ticketMessage: { create: mocks.messageCreate }, ticketNote: { create: mocks.noteCreate },
       ticketHistory: { create: mocks.historyCreate, createMany: mocks.historyCreateMany }, customer: { findUnique: mocks.customerFind },
-      user: { findFirst: mocks.userFindFirst }, category: { findFirst: mocks.categoryFindFirst }, department: { findUnique: mocks.departmentFind },
+      user: { findFirst: mocks.userFindFirst, findMany: mocks.userFindMany },
+      category: { findFirst: mocks.categoryFindFirst }, department: { findUnique: mocks.departmentFind },
       branch: { findUnique: mocks.branchFind }, slaRule: { findFirst: mocks.slaFind },
+      notification: { createMany: vi.fn().mockResolvedValue({ count: 0 }) },
     }) : Promise.all(value as Promise<unknown>[]));
     mocks.customerFind.mockResolvedValue({ id: "customer-1" }); mocks.userFindFirst.mockResolvedValue({ id: "agent-1", name: "Assigned Agent" });
     mocks.categoryFindFirst.mockResolvedValue({ id: "category-1", name: "Billing" }); mocks.departmentFind.mockResolvedValue(null);

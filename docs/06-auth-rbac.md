@@ -46,9 +46,9 @@ The role descriptions below include capabilities that are not yet built. As of `
   - **Active-session enforcement:** `requireActiveUser` reads the caller's current `role`/`isActive` from the database before `requireRole`, so a demotion or deactivation takes effect on the next `/api/users` request rather than after the 8-hour JWT expiry. A deactivated caller gets `401 ACCOUNT_DEACTIVATED`. `/auth/me` already re-reads the database. Other routers still authorize from the JWT role until expiry — this is a deliberate, bounded scope (no per-request user lookup on every endpoint; no refresh-token infrastructure).
   - New `User.isActive` (default `true`): a deactivated user cannot log in (`403 ACCOUNT_DEACTIVATED`), fails `GET /auth/me` mid-session (`401 ACCOUNT_DEACTIVATED`), fails `/api/users` admin requests (`401`), and is excluded from `/users/agents` results.
 
-### Planned — permission model known, not implemented
+### Implemented on feature branch
 
-- Per-user Notifications read/unread (`feature/notifications`).
+- Per-user Notifications read/unread: `ADMIN`, `MANAGER`, and `AGENT` can list and mutate only their own records; `CUSTOMER` is rejected (`feature/notifications-roadmap`, not integrated).
 
 ### Unresolved — require a product decision before a permission can be written
 

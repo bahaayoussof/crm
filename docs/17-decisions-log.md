@@ -4,6 +4,12 @@ Use this file for decisions not already fixed by the project documentation.
 
 Do not record trivial implementation details.
 
+### ADR-029: Bounded internal in-app notifications
+
+**Date:** 2026-08-27
+
+`feature/notifications-roadmap` uses the existing `Notification` model with one optional `ticketId` relation for safe navigation. Internal `ADMIN`, `MANAGER`, and `AGENT` users may list and mark only their own records; the Portal is excluded. Notifications are inserted inside the existing ticket transaction for assignment, customer reply, and escalation events, deduplicating recipients and excluding the actor where applicable. The header polls unread count every 30 seconds and exposes the latest 20 records; there is no websocket/realtime infrastructure, separate full-list page, external delivery, scheduled SLA monitoring, or notification for every database update. SLA warning/breach generation remains owned by `feature/sla-automation`.
+
 ### ADR-026: Functional Settings scope and contracts
 
 **Date:** 2026-08-27

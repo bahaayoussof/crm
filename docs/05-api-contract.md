@@ -354,9 +354,16 @@ GET  /api/portal/tickets/:id/feedback   read own submitted feedback (CUSTOMER) �
 
 Satisfaction reporting (`GET /reports/*`, ADMIN/MANAGER) consumes `Feedback.rating` and is implemented on the `feature/reports` branch — see "Reports — LIVE" above.
 
-## Notifications — PLANNED
+## Notifications — LIVE (on `feature/notifications-roadmap`, not integrated)
 
-No route is registered. `Notification` (`userId`, `type`, `title`, `message`, `readAt?`) exists in `schema.prisma` only. `feature/notifications` covers in-app notifications and a read/unread workflow. It must distinguish event-driven in-app notifications from SLA request-time derivation and from any scheduled monitoring; serverless scheduling constraints apply.
+```text
+GET   /api/notifications                  list current user's notifications
+GET   /api/notifications/unread-count     current user's unread count
+PATCH /api/notifications/read-all         mark all current user's notifications read
+PATCH /api/notifications/:id/read         mark one owned notification read
+```
+
+All routes require `ADMIN`, `MANAGER`, or `AGENT`; `CUSTOMER` is rejected. List query supports bounded `page`, `limit`, and `read=true|false`; every operation is scoped to `request.auth.userId`, and a missing or wrong-owner id returns the same `404 NOTIFICATION_NOT_FOUND`. Assignment, customer-reply, and escalation notifications are written atomically with their ticket transaction and may carry an optional `ticketId` link. Unread count polls every 30 seconds in the internal client. There is no Portal notification surface, realtime transport, scheduled SLA monitoring, email/push delivery, or arbitrary-update notification fan-out.
 
 ## Quick Replies — LIVE (on `feature/quick-replies`, not yet integrated)
 

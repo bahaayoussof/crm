@@ -1,6 +1,7 @@
 import { Channel, Prisma, Role, TicketPriority, TicketStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
+import { createNotifications } from "../notifications/notification.service.js";
 import type { PortalCreateTicketInput, PortalReplyInput, PortalStatus, PortalTicketListQuery } from "./portal.schema.js";
 
 const listSelect = { id: true, subject: true, status: true, category: { select: { id: true, name: true } }, createdAt: true, updatedAt: true } satisfies Prisma.TicketSelect;
@@ -86,7 +87,7 @@ export async function createTicket(input: PortalCreateTicketInput, userId: strin
 export async function reply(id: string, input: PortalReplyInput, userId: string) {
   const customerId = await customerIdFor(userId);
   return prisma.$transaction(async (tx) => {
-    const ticket = await tx.ticket.findFirst({ where: { id, customerId }, select: { id: true, status: true } });
+    const ticket = await tx.ticket.findFirst({ where: { id, customerId }, select: { id: true, status: true, subject: true, assignedAgentId: true } });
     if (!ticket) throw new AppError(404, "TICKET_NOT_FOUND", "Ticket not found");
     if (ticket.status === TicketStatus.CLOSED) throw new AppError(409, "TICKET_CLOSED", "Closed tickets do not accept replies");
     const message = await tx.ticketMessage.create({ data: { ticketId: id, authorUserId: userId, body: input.body }, select: messageSelect });
@@ -95,6 +96,22 @@ export async function reply(id: string, input: PortalReplyInput, userId: string)
       await tx.ticket.update({ where: { id }, data: { status: next, ...(ticket.status === TicketStatus.RESOLVED && { resolvedAt: null }) } });
       await tx.ticketHistory.create({ data: { ticketId: id, actorUserId: userId, action: "STATUS_CHANGED", oldValue: ticket.status, newValue: next } });
     }
+
+    // Fan-out notifications to assigned agent + all active ADMIN/MANAGER
+    const recipientIds: string[] = [];
+    if (ticket.assignedAgentId) {
+      const agent = await tx.user.findFirst({ where: { id: ticket.assignedAgentId, isActive: true }, select: { id: true } });
+      if (agent) recipientIds.push(agent.id);
+    }
+    const adminsManagers = await tx.user.findMany({
+      where: { role: { in: [Role.ADMIN, Role.MANAGER] }, isActive: true },
+      select: { id: true },
+    });
+    for (const u of adminsManagers) recipientIds.push(u.id);
+    // Exclude the customer (userId) from the recipient list — they are the author
+    const filtered = recipientIds.filter((rid) => rid !== userId);
+    await createNotifications(tx, filtered, "CUSTOMER_REPLY", "Customer replied", `Customer replied to ticket #${id}: ${ticket.subject}`, id);
+
     return { id: message.id, body: message.body, createdAt: message.createdAt, author: { id: message.author.id, name: message.author.name, kind: "CUSTOMER" as const } };
   });
 }

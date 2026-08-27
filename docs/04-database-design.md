@@ -122,6 +122,7 @@ Suggested fields:
 - type
 - title
 - message
+- ticketId optional (link target; `SetNull` if the ticket is removed)
 - readAt optional
 - createdAt
 

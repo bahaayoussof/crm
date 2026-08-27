@@ -1662,6 +1662,10 @@ Display:
 
 Do not create noisy notifications for every database update.
 
+### Implemented behavior (feature branch)
+
+The internal desktop and mobile headers show one compact bell with a capped unread badge. It polls the unread count every 30 seconds and opens a portalled, viewport-clamped dialog containing the latest 20 notifications with loading, empty, error/retry, read/unread, relative-time, mark-one-read, mark-all-read, and ticket-navigation behavior. The control uses localized English/Arabic chrome and logical alignment under RTL. Notification payload text is persisted event text. Portal notifications, a dedicated full-list page, realtime delivery, browser/email/push delivery, and scheduled SLA alerts are not included.
+
 ---
 
 # 23. Quick Replies

@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   customer: { findUnique: vi.fn() }, ticket: { count: vi.fn(), findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
   category: { findMany: vi.fn(), findFirst: vi.fn() }, slaRule: { findFirst: vi.fn() }, ticketMessage: { create: vi.fn() }, ticketHistory: { create: vi.fn() },
+  user: { findFirst: vi.fn().mockResolvedValue(null), findMany: vi.fn().mockResolvedValue([]) },
+  notification: { createMany: vi.fn().mockResolvedValue({ count: 0 }) },
 }));
 vi.mock("../../config/prisma.js", () => ({ prisma: { ...mocks, $transaction: vi.fn(async (value: unknown) => typeof value === "function" ? (value as (tx: typeof mocks) => unknown)(mocks) : Promise.all(value as Promise<unknown>[])) } }));
 

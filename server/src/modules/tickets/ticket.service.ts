@@ -2,6 +2,7 @@ import { Prisma, Role, TicketStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import { deriveSla } from "../../shared/sla/derive-sla.js";
+import { createNotifications } from "../notifications/notification.service.js";
 import type { CreateTicketInput, TicketConversationInput, TicketListQuery, UpdateTicketInput } from "./ticket.schema.js";
 import { ticketVisibilityWhere, type TicketActor as Actor } from "./ticket-visibility.js";
 
@@ -117,6 +118,13 @@ export async function createTicket(input: CreateTicketInput, actor: Actor) {
     await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorUserId: actor.userId, action: "TICKET_CREATED", newValue: TicketStatus.NEW } });
     if (creationInput.assignedAgentId) await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorUserId: actor.userId, action: "ASSIGNMENT_CHANGED", newValue: relations.agent?.name ?? creationInput.assignedAgentId } });
     if (creationInput.categoryId) await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorUserId: actor.userId, action: "CATEGORY_CHANGED", newValue: relations.category?.name ?? creationInput.categoryId } });
+    // Notify newly assigned agent (only when the assignee is different from the actor)
+    if (creationInput.assignedAgentId && creationInput.assignedAgentId !== actor.userId) {
+      const assignee = await tx.user.findFirst({ where: { id: creationInput.assignedAgentId, isActive: true }, select: { id: true } });
+      if (assignee) {
+        await createNotifications(tx, [assignee.id], "TICKET_ASSIGNED", "New ticket assigned", `You have been assigned ticket #${ticket.id}: ${ticket.subject}`, ticket.id);
+      }
+    }
     return ticket;
   });
 }
@@ -159,6 +167,29 @@ export async function updateTicket(ticketId: string, input: UpdateTicketInput, a
     if (input.assignedAgentId !== undefined && input.assignedAgentId !== current.assignedAgentId) events.push(history(ticketId, actor.userId, "ASSIGNMENT_CHANGED", current.assignedAgent?.name ?? null, relations.agent?.name ?? null));
     if (input.categoryId !== undefined && input.categoryId !== current.categoryId) events.push(history(ticketId, actor.userId, "CATEGORY_CHANGED", current.category?.name ?? null, relations.category?.name ?? null));
     if (events.length) await tx.ticketHistory.createMany({ data: events });
+
+    // Assignment notification: new assignee changed, non-null, not the actor
+    const assigneeChanged = input.assignedAgentId !== undefined && input.assignedAgentId !== current.assignedAgentId;
+    if (assigneeChanged && input.assignedAgentId && input.assignedAgentId !== actor.userId) {
+      const assignee = await tx.user.findFirst({ where: { id: input.assignedAgentId, isActive: true }, select: { id: true } });
+      if (assignee) {
+        await createNotifications(tx, [assignee.id], "TICKET_ASSIGNED", "New ticket assigned", `You have been assigned ticket #${ticketId}: ${current.subject}`, ticketId);
+      }
+    }
+
+    // Escalation notification: status transitions INTO ESCALATED
+    const escalated = input.status === TicketStatus.ESCALATED && current.status !== TicketStatus.ESCALATED;
+    if (escalated) {
+      const adminsManagers = await tx.user.findMany({
+        where: { role: { in: [Role.ADMIN, Role.MANAGER] }, isActive: true, id: { not: actor.userId } },
+        select: { id: true },
+      });
+      const recipientIds = adminsManagers.map((u) => u.id);
+      if (recipientIds.length > 0) {
+        await createNotifications(tx, recipientIds, "TICKET_ESCALATED", "Ticket escalated", `Ticket #${ticketId}: ${current.subject} has been escalated`, ticketId);
+      }
+    }
+
     return updated;
   });
 }

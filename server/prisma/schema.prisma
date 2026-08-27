@@ -119,6 +119,7 @@ model Ticket {
   attachments   Attachment[]
   history       TicketHistory[]
   feedback      Feedback?
+  notifications Notification[]
 
   @@index([customerId])
   @@index([assignedAgentId])
@@ -254,12 +255,15 @@ model Notification {
   type      String
   title     String
   message   String
+  ticketId  String?
   readAt    DateTime?
   createdAt DateTime  @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  user   User    @relation(fields: [userId], references: [id], onDelete: Restrict)
+  ticket Ticket? @relation(fields: [ticketId], references: [id], onDelete: SetNull)
 
   @@index([userId, readAt, createdAt])
+  @@index([ticketId])
 }
 
 model Feedback {

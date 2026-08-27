@@ -1,5 +1,6 @@
 {
   "app": { "title": "نظام إدارة دعم العملاء", "foundationReady": "البنية الأساسية للمشروع جاهزة." },
+  "notifications": { "title": "الإشعارات", "bellLabel": "الإشعارات، {{count}} غير مقروءة", "markAllRead": "تحديد الكل كمقروء", "empty": "لا توجد إشعارات جديدة.", "error": "تعذر تحميل الإشعارات.", "unread": "غير مقروء" },
   "theme": { "title": "المظهر", "light": "فاتح", "dark": "داكن", "system": "تلقائي", "mode": "المظهر" },
   "navigation": {
     "languageSwitcher": "اختيار اللغة", "primary": "التنقل الرئيسي", "dashboard": "لوحة التحكم", "tickets": "التذاكر", "customers": "العملاء", "knowledgeBase": "قاعدة المعرفة", "reports": "التقارير", "quickReplies": "الردود السريعة", "users": "المستخدمون", "settings": "الإعدادات",
