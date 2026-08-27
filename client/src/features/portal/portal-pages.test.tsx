@@ -1,10 +1,10 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { changeAppLanguage } from "@/lib/i18n";
 
-const mocks = vi.hoisted(() => ({ overview: vi.fn(), tickets: vi.fn(), detail: vi.fn(), categories: vi.fn(), create: vi.fn(), reply: vi.fn(), auth: vi.fn(), refetch: vi.fn(), mutate: vi.fn() }));
-vi.mock("./portal-hooks", () => ({ usePortalOverview: mocks.overview, usePortalTickets: mocks.tickets, usePortalTicket: mocks.detail, usePortalCategories: mocks.categories, useCreatePortalTicket: mocks.create, useReplyPortalTicket: mocks.reply }));
+const mocks = vi.hoisted(() => ({ overview: vi.fn(), tickets: vi.fn(), detail: vi.fn(), categories: vi.fn(), create: vi.fn(), reply: vi.fn(), feedback: vi.fn(), auth: vi.fn(), refetch: vi.fn(), mutate: vi.fn() }));
+vi.mock("./portal-hooks", () => ({ usePortalOverview: mocks.overview, usePortalTickets: mocks.tickets, usePortalTicket: mocks.detail, usePortalCategories: mocks.categories, useCreatePortalTicket: mocks.create, useReplyPortalTicket: mocks.reply, useSubmitPortalFeedback: mocks.feedback }));
 vi.mock("@/features/auth/auth-state", () => ({ useAuth: mocks.auth }));
 vi.mock("@/features/attachments/attachment-hooks", () => ({
   usePortalTicketAttachments: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
@@ -22,6 +22,7 @@ describe("portal pages", () => {
     mocks.categories.mockReturnValue({ data: [{ id: "cat", name: "Billing" }] });
     mocks.create.mockReturnValue({ mutateAsync: mocks.mutate, isPending: false });
     mocks.reply.mockReturnValue({ mutateAsync: mocks.mutate, isPending: false });
+    mocks.feedback.mockReturnValue({ mutateAsync: mocks.mutate, isPending: false });
   });
   it("shows overview metrics and responsive recent requests", () => { renderPage(<PortalHomePage />); expect(screen.getByRole("heading", { name: "Welcome, Ahmed" })).toBeInTheDocument(); expect(screen.getByText("Waiting for You")).toBeInTheDocument(); expect(screen.getAllByText("Payment help")).toHaveLength(2); expect(screen.getByRole("table")).toBeInTheDocument(); });
   it("renders loading and retry states", () => { mocks.overview.mockReturnValue({ isLoading: true }); const view = renderPage(<PortalHomePage />); expect(screen.getByText(/Loading your support overview/)).toBeInTheDocument(); view.unmount(); mocks.overview.mockReturnValue({ isError: true, refetch: mocks.refetch }); renderPage(<PortalHomePage />); fireEvent.click(screen.getByRole("button", { name: "Retry" })); expect(mocks.refetch).toHaveBeenCalled(); });
@@ -32,7 +33,7 @@ describe("portal pages", () => {
   it("shows safe authors and preserves a failed reply", () => {
     mocks.detail.mockReturnValue({ data: { ...ticket, status: "RESOLVED", description: "Details", messages: [{ id: "m", body: "We can help", createdAt: ticket.updatedAt, author: { id: "a", name: "Mariam", kind: "SUPPORT" } }] } });
     mocks.reply.mockReturnValue({ mutateAsync: mocks.mutate, isPending: false, isError: true }); renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
-    expect(screen.getByText("Support")).toBeInTheDocument(); expect(screen.getByText("Replying will reopen this request.")).toBeInTheDocument();
+    expect(screen.getByText("Support Team")).toBeInTheDocument(); expect(screen.getByText("Replying will reopen this request.")).toBeInTheDocument();
     const field = screen.getByRole("textbox"); fireEvent.change(field, { target: { value: "Still broken" } }); expect(field).toHaveValue("Still broken"); expect(screen.getByText(/message has been preserved/)).toBeInTheDocument();
   });
   it("never renders internal SLA state, target, or deadlines even if present in the payload", () => {
@@ -41,6 +42,167 @@ describe("portal pages", () => {
     for (const text of [/SLA/i, /Breached/i, /At risk/i, /On track/i, /First response due/i, /Resolution due/i, /Effective deadline/i]) expect(screen.queryByText(text)).not.toBeInTheDocument();
     expect(container.textContent).not.toMatch(/BREACHED|FIRST_RESPONSE/);
   });
+  it("collects a rating and comment for an eligible resolved ticket and blocks submit until a rating is chosen", async () => {
+    mocks.detail.mockReturnValue({ data: { ...ticket, status: "RESOLVED", description: "Details", messages: [], feedbackEligible: true, feedback: null } });
+    renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
+    fireEvent.click(screen.getByRole("button", { name: "Submit Feedback" }));
+    expect(screen.getByText("Select a rating before submitting.")).toBeInTheDocument();
+    expect(mocks.mutate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByLabelText("4 out of 5"));
+    fireEvent.change(screen.getByLabelText("Additional comments (optional)"), { target: { value: "Fast and helpful" } });
+    fireEvent.click(screen.getByRole("button", { name: "Submit Feedback" }));
+    await waitFor(() => expect(mocks.mutate).toHaveBeenCalledWith({ rating: 4, comment: "Fast and helpful" }));
+  });
+  it("renders submitted feedback read-only without a form", () => {
+    mocks.detail.mockReturnValue({ data: { ...ticket, status: "CLOSED", description: "Details", messages: [], feedbackEligible: true, feedback: { rating: 5, comment: "Excellent", createdAt: ticket.updatedAt } } });
+    renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
+    expect(screen.getByText("Your feedback")).toBeInTheDocument();
+    expect(screen.getByText("Excellent")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "5 out of 5" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Submit Feedback" })).not.toBeInTheDocument();
+  });
+  it("omits the feedback section for a ticket that is not eligible", () => {
+    mocks.detail.mockReturnValue({ data: { ...ticket, status: "OPEN", description: "Details", messages: [], feedbackEligible: false, feedback: null } });
+    renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
+    expect(screen.queryByText("Rate your experience")).not.toBeInTheDocument();
+  });
   it("hides closed composer and localizes RTL", async () => { await changeAppLanguage("ar"); mocks.detail.mockReturnValue({ data: { ...ticket, status: "CLOSED", description: "Details", messages: [] } }); renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678"); expect(screen.getByText("هذا الطلب مغلق ولم يعد يقبل الردود.")).toBeInTheDocument(); expect(screen.queryByRole("button", { name: "إرسال الرد" })).not.toBeInTheDocument(); expect(document.documentElement).toHaveAttribute("dir", "rtl"); expect(document.querySelector('bdi[dir="ltr"]')).toBeInTheDocument(); });
+});
+
+// Portal Ticket Details is refactored to share the internal Ticket Details visual
+// language (bordered conversation card, side-aligned message bubbles, long-content
+// containment, Show more disclosure, content-sized Send) while exposing only
+// customer-safe data through the ownership-safe Portal APIs.
+describe("portal ticket details shares the internal ticket design", () => {
+  afterEach(cleanup);
+  const LONG_URL = `https://example.com/${"segment-".repeat(40)}end?token=${"x".repeat(160)}`;
+  const MARKER = "MARKER_PORTAL_LONG_MESSAGE";
+  const longMessage = `${MARKER} ${LONG_URL}\n`.concat(
+    Array.from({ length: 14 }, (_, i) => `paragraph ${i} of a long support reply`).join("\n"),
+  );
+  const detail = (overrides: Record<string, unknown> = {}) => ({
+    ...ticket,
+    description: `Repro with a long url ${LONG_URL}`,
+    feedbackEligible: false,
+    feedback: null,
+    messages: [
+      { id: "m1", body: "Hi, my card was charged twice.", createdAt: ticket.createdAt, author: { id: "c1", name: "Ahmed", kind: "CUSTOMER" } },
+      { id: "m2", body: longMessage, createdAt: ticket.updatedAt, author: { id: "s1", name: "Mariam", kind: "SUPPORT" } },
+    ],
+    ...overrides,
+  });
+  const longBody = () => screen.getByText(new RegExp(MARKER), { selector: "p" });
+  const bubble = (text: string) => screen.getByText(text, { selector: "p" }).closest("article") as HTMLElement;
+
+  beforeEach(async () => {
+    await changeAppLanguage("en"); vi.clearAllMocks(); mocks.auth.mockReturnValue({ user: { name: "Ahmed" } });
+    mocks.reply.mockReturnValue({ mutateAsync: mocks.mutate, isPending: false });
+    mocks.feedback.mockReturnValue({ mutateAsync: mocks.mutate, isPending: false });
+  });
+
+  it("renders the conversation inside the shared bordered card shell with a timeline list", () => {
+    mocks.detail.mockReturnValue({ data: detail() });
+    const { container } = renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
+    const list = screen.getByRole("list", { name: "Request conversation" });
+    const card = list.closest("section.overflow-hidden.rounded-md.border") as HTMLElement;
+    expect(card).toBeTruthy();
+    expect(within(card).getByRole("heading", { name: "Conversation" })).toBeInTheDocument();
+    expect(container.querySelector(".grid.gap-6")).toBeNull(); // no internal sidebar grid
+  });
+
+  it("aligns customer messages to the start and support messages to the end as width-bounded bubbles", () => {
+    mocks.detail.mockReturnValue({ data: detail() });
+    renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
+    const customer = bubble("Hi, my card was charged twice.");
+    const support = longBody().closest("article") as HTMLElement;
+    for (const b of [customer, support]) {
+      expect(b.className).toMatch(/max-w-\[min\(85%,46rem\)\]/);
+      expect(b.className).toMatch(/min-w-0/);
+    }
+    expect((customer.closest("li") as HTMLElement).className).toMatch(/justify-start/);
+    expect((support.closest("li") as HTMLElement).className).toMatch(/justify-end/);
+  });
+
+  it("contains long unbroken message content and preserves newlines", () => {
+    mocks.detail.mockReturnValue({ data: detail() });
+    renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
+    expect(longBody().className).toMatch(/\[overflow-wrap:anywhere\]/);
+    expect(longBody().className).toMatch(/whitespace-pre-wrap/);
+    // description card too
+    expect(screen.getByText(/Repro with a long url/, { selector: "p" }).className).toMatch(/\[overflow-wrap:anywhere\]/);
+  });
+
+  it("progressively discloses a long message and keeps a short one fully visible", () => {
+    mocks.detail.mockReturnValue({ data: detail() });
+    renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
+    expect(within(bubble("Hi, my card was charged twice.")).queryByRole("button", { name: /show more/i })).not.toBeInTheDocument();
+    const support = longBody().closest("article") as HTMLElement;
+    const toggle = within(support).getByRole("button", { name: "Show more" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(longBody().className).toMatch(/line-clamp-\[10\]/);
+    fireEvent.click(toggle);
+    expect(within(support).getByRole("button", { name: "Show less" })).toHaveAttribute("aria-expanded", "true");
+    expect(longBody().className).not.toMatch(/line-clamp/);
+  });
+
+  it("labels authors as You / Support Team and never exposes internal roles, notes, or controls", () => {
+    mocks.detail.mockReturnValue({ data: detail({ status: "IN_PROGRESS", slaState: "BREACHED", priority: "URGENT" }) });
+    const { container } = renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
+    expect(screen.getByText("You")).toBeInTheDocument();
+    expect(screen.getByText("Support Team")).toBeInTheDocument();
+    expect(screen.queryByText(/internal note/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/visible to customer/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/quick repl/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /insert quick reply/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/manage ticket|assigned agent|priority|escalat/i)).not.toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/BREACHED|URGENT|SLA/);
+  });
+
+  it("gives the reply composer the shared footer layout with a content-sized Send on desktop", () => {
+    mocks.detail.mockReturnValue({ data: detail({ status: "OPEN" }) });
+    renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
+    const send = screen.getByRole("button", { name: "Send Reply" });
+    expect(send.className).toMatch(/\bbutton-primary\b/);
+    expect(send.className).toMatch(/sm:w-auto/);
+    expect(send.className).toMatch(/sm:ms-auto/);
+    const footer = send.parentElement as HTMLElement;
+    expect(footer.className).toMatch(/flex-col/);
+    expect(footer.className).toMatch(/sm:flex-row/);
+    expect(screen.getByLabelText("Your message")).toHaveClass("input");
+  });
+
+  it("replaces the composer with a calm localized notice on a closed ticket", () => {
+    mocks.detail.mockReturnValue({ data: detail({ status: "CLOSED" }) });
+    renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
+    const notice = screen.getByText("This request is closed and no longer accepts replies.");
+    expect(notice.className).toMatch(/rounded-md/);
+    expect(notice.className).toMatch(/border/);
+    expect(screen.queryByRole("button", { name: "Send Reply" })).not.toBeInTheDocument();
+  });
+
+  it("shows the status as a bordered colour-coded badge like the internal view", () => {
+    mocks.detail.mockReturnValue({ data: detail({ status: "WAITING_FOR_YOU" }) });
+    renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
+    const badge = screen.getByText("Waiting for you");
+    expect(badge.className).toMatch(/\bborder\b/);
+    expect(badge.className).not.toMatch(/bg-muted/);
+  });
+
+  it("wraps the attachments panel in the shared card treatment", () => {
+    mocks.detail.mockReturnValue({ data: detail() });
+    renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
+    const heading = screen.getByRole("heading", { name: "Attachments" });
+    const card = heading.closest("section.rounded-md.border.bg-white") as HTMLElement;
+    expect(card).toBeTruthy();
+  });
+
+  it("keeps Arabic author labels and RTL", async () => {
+    await changeAppLanguage("ar");
+    mocks.detail.mockReturnValue({ data: detail() });
+    renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
+    expect(screen.getByText("أنت")).toBeInTheDocument();
+    expect(screen.getByText("فريق الدعم")).toBeInTheDocument();
+    expect(document.documentElement).toHaveAttribute("dir", "rtl");
+  });
 });
 function renderPage(element: React.ReactNode, path = "/portal") { return render(<MemoryRouter initialEntries={[path]}><Routes><Route path="/portal/*" element={element}/></Routes></MemoryRouter>); }

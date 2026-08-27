@@ -535,3 +535,38 @@ The model already carries every needed field. ADMIN/MANAGER management matches t
 **Consequences**
 
 `docs/06` gains a MANAGER capability it previously reserved to ADMIN. The composer combobox fetches a bounded page (`limit` 10) per debounced search rather than a full list; every quick reply is reachable by title/body text. PostgreSQL and authenticated English/Arabic browser verification were not performed and rely on deterministic mocked/integration tests until a developer completes them. `feature/customer-feedback` is the next roadmap branch.
+
+---
+
+## ADR-023: Customer Feedback on the Existing `Feedback` Model as a One-Shot Portal Rating
+
+**Date:** 2026-08-27
+
+**Context**
+
+`feature/customer-feedback` (roadmap order 4) needed a way for a `CUSTOMER` to rate the support they received. `Feedback` (`id`, `ticketId @unique`, `customerId`, `rating Int`, `comment String?`, `createdAt`) already existed with no consuming code. `docs/05` "Feedback — PLANNED" listed the open questions: eligible ticket statuses (expected `RESOLVED`/`CLOSED`), customer ownership, one record per ticket, rating range, optional comment, whether a submission can be updated, Portal UX, and how the rating feeds `GET /reports/*` (`feature/reports`, order 5, not built yet). `docs/18` §31 shows a "Customer submits feedback if implemented" step in the critical demo flow and a "Feedback submitted" line in the Activity timeline.
+
+**Decision**
+
+- **Model as-is:** no schema change, no migration. `ticketId @unique` already enforces one feedback record per ticket. `customerId` is server-derived from `User -> Customer.userId` (the established Portal identity pattern); it is never accepted from the browser.
+- **Eligibility:** the ticket must be owned by the authenticated customer and its stored status must be `RESOLVED` or `CLOSED`. A missing or non-owned ticket returns the existing IDOR-safe `404 TICKET_NOT_FOUND`; an owned ticket in any other status returns `409 TICKET_NOT_ELIGIBLE_FOR_FEEDBACK`.
+- **One-shot, immutable:** there is no update or delete endpoint. A second `POST` for a ticket that already has feedback returns `409 FEEDBACK_ALREADY_SUBMITTED` (checked inside the same transaction as the create). Resolves the "whether a submission can be updated" question as *no* — the simplest contract, and a rating captured at resolution time is the datum reports want.
+- **Rating / comment:** `rating` is a JSON number, integer, `1`–`5` (out-of-range / non-integer / string → `400 VALIDATION_ERROR`). `comment` is an optional trimmed string, 1–2,000 chars; omitted or blank stores `NULL`. Strict Zod schema rejects unknown fields.
+- **Endpoints (Portal only):** `POST /api/portal/tickets/:id/feedback` → `201 { data: { rating, comment, createdAt } }`; `GET /api/portal/tickets/:id/feedback` → the same shape or `404 FEEDBACK_NOT_FOUND`. Both are sub-routes on the existing `portalRouter` (`requireAuth` + `requireRole(CUSTOMER)`), mirroring the `feature/attachments` Portal sub-route pattern — **no new `app.ts` registration, no internal route**.
+- **Ticket-detail integration:** `GET /api/portal/tickets/:id` now also returns `feedbackEligible: boolean` (status `RESOLVED`/`CLOSED`) and `feedback: { rating, comment, createdAt } | null`, so the Portal ticket page renders the rating form, the read-only submitted state, or nothing without a second request.
+- **History:** submission writes one `TicketHistory` row (`action: "FEEDBACK_SUBMITTED"`, `actorUserId` = the customer's user id, `newValue` = the rating as a string) inside the create transaction, satisfying the `docs/18` Activity "Feedback submitted" line.
+- **Reports:** no `GET /reports/*` work in this branch. The rating is persisted and queryable; `feature/reports` (ADR to come) owns the satisfaction metric.
+- **Portal UI:** an accessible star control (`role="radiogroup"` of five `1`–`5` radio inputs for input; `role="img"` with a localized summary label for the read-only state), an optional comment textarea (`maxLength=2000`), and a submit button that is blocked with a localized `role="alert"` until a rating is chosen. On success the invalidated ticket query refetches and the section switches to the read-only submitted state — that switch is the confirmation. EN/AR strings under `portal.feedback.*` (520/520 key parity), RTL-safe.
+- **Out of scope (explicit):** no editing/withdrawing feedback, no agent/internal feedback view, no per-message or CSAT-vs-NPS distinction, no follow-up prompts, no reminder emails, no reports surface.
+
+**Reason**
+
+The model already carries every field. Eligibility on `RESOLVED`/`CLOSED` matches `docs/05`'s stated expectation and the demo flow (feedback after "Agent resolves Ticket"). One-shot immutability is the least surprising contract and keeps the reports datum stable. Folding `feedbackEligible`/`feedback` into the existing ticket-detail payload avoids an extra round trip and a separate loading state on the Portal page. Portal sub-routes with no internal endpoint keep the surface minimal, exactly as `feature/attachments` did.
+
+**Alternatives Considered**
+
+Updatable feedback (rejected — unstable reports datum, no product need); a dedicated `GET`-only internal feedback view this cycle (deferred to `feature/reports`); accepting feedback for any status or only `CLOSED` (rejected — `RESOLVED` is when the customer's experience is freshest and the demo flow resolves, not closes); a separate `/portal/feedback` collection route (rejected — feedback is per-ticket, the ticket route already scopes ownership); a numeric `<select>` instead of stars (rejected — stars are the expected CSAT affordance and the radiogroup is equally accessible); a `feature/reports`-style internal `app.ts` router (rejected — nothing internal consumes it yet).
+
+**Consequences**
+
+`GET /api/portal/tickets/:id` gains two fields; the Portal ticket-detail type and its tests are updated. A new `TicketHistory` `action` string value (`FEEDBACK_SUBMITTED`) joins `TICKET_CREATED` / `STATUS_CHANGED`; any future exhaustive history-action rendering must handle it. PostgreSQL and authenticated English/Arabic browser verification were not performed and rely on deterministic mocked tests until a developer completes them. `feature/reports` is the next roadmap branch and will consume `Feedback.rating`.

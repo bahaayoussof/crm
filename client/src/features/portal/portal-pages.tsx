@@ -6,11 +6,12 @@ import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/features/auth/auth-state";
 import { formatTicketDate } from "@/features/tickets/ticket-format";
+import { ConversationMessage, ConversationSection } from "@/features/tickets/ticket-conversation-ui";
 import { AttachmentPanel, MessageAttachmentList } from "@/features/attachments/attachment-ui";
 import { usePortalTicketAttachments, useUploadPortalTicketAttachment } from "@/features/attachments/attachment-hooks";
 import { portalTicketSchema, type PortalTicketForm } from "./portal.schemas";
-import { useCreatePortalTicket, usePortalCategories, usePortalOverview, usePortalTicket, usePortalTickets, useReplyPortalTicket } from "./portal-hooks";
-import type { PortalTicket, PortalTicketStatus } from "./portal.types";
+import { useCreatePortalTicket, usePortalCategories, usePortalOverview, usePortalTicket, usePortalTickets, useReplyPortalTicket, useSubmitPortalFeedback } from "./portal-hooks";
+import type { PortalTicket, PortalTicketDetail, PortalTicketStatus } from "./portal.types";
 import { PortalPage, PortalPageHeader, PortalState, PortalStatus, TicketRef } from "./portal-ui";
 
 const statuses: PortalTicketStatus[] = ["OPEN", "IN_PROGRESS", "WAITING_FOR_YOU", "RESOLVED", "CLOSED"];
@@ -125,6 +126,62 @@ export function PortalNewTicketPage() {
   </PortalPage>;
 }
 
+const StarIcon = ({ filled }: { filled: boolean }) => (
+  <svg aria-hidden="true" className={`h-6 w-6 ${filled ? "fill-amber-400 text-amber-400" : "fill-none text-muted-foreground"}`} stroke="currentColor" strokeWidth="1.5" viewBox="0 0 20 20">
+    <path d="M10 1.6l2.6 5.27 5.82.85-4.21 4.1.99 5.8L10 15.9l-5.2 2.73.99-5.8L1.58 8.72l5.82-.85z" strokeLinejoin="round" />
+  </svg>
+);
+
+function StarRating({ name, value, onChange, readOnly }: { name: string; value: number; onChange?: (value: number) => void; readOnly?: boolean }) {
+  const { t } = useTranslation();
+  if (readOnly) {
+    return <div aria-label={t("portal.feedback.ratingSummary", { rating: value })} className="flex items-center gap-1" role="img">
+      {[1, 2, 3, 4, 5].map((star) => <StarIcon filled={star <= value} key={star} />)}
+    </div>;
+  }
+  return <div aria-label={t("portal.feedback.ratingLabel")} className="flex items-center gap-1" role="radiogroup">
+    {[1, 2, 3, 4, 5].map((star) => <label className="cursor-pointer rounded-sm p-0.5 [&:has(:focus-visible)]:ring-2 [&:has(:focus-visible)]:ring-primary/30" key={star}>
+      <input checked={value === star} className="sr-only" name={name} onChange={() => onChange?.(star)} type="radio" value={star} />
+      <span className="sr-only">{t("portal.feedback.starValue", { value: star })}</span>
+      <StarIcon filled={star <= value} />
+    </label>)}
+  </div>;
+}
+
+function TicketFeedback({ ticket }: { ticket: PortalTicketDetail }) {
+  const { t, i18n } = useTranslation();
+  const mutation = useSubmitPortalFeedback(ticket.id);
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState("");
+  const [showRequired, setShowRequired] = useState(false);
+
+  if (ticket.feedback) {
+    return <section className="mt-7 max-w-3xl rounded-md border bg-white p-5">
+      <h2 className="text-lg font-semibold">{t("portal.feedback.submittedTitle")}</h2>
+      <div className="mt-3"><StarRating name="submitted-rating" readOnly value={ticket.feedback.rating} /></div>
+      {ticket.feedback.comment && <p className="mt-3 whitespace-pre-wrap text-sm leading-6">{ticket.feedback.comment}</p>}
+      <p className="mt-3 text-xs text-muted-foreground">{t("portal.feedback.submittedOn", { date: formatTicketDate(ticket.feedback.createdAt, i18n.language) })}</p>
+    </section>;
+  }
+  if (!ticket.feedbackEligible) return null;
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (mutation.isPending) return;
+    if (rating < 1) { setShowRequired(true); return; }
+    await mutation.mutateAsync({ rating, comment: comment.trim() || undefined });
+  };
+  return <form className="mt-7 max-w-3xl rounded-md border bg-white p-5" onSubmit={submit}>
+    <h2 className="text-lg font-semibold">{t("portal.feedback.title")}</h2>
+    <p className="mt-1.5 text-sm text-muted-foreground">{t("portal.feedback.prompt")}</p>
+    <div className="mt-4"><span className="mb-1.5 block text-sm font-medium">{t("portal.feedback.ratingLabel")}</span><StarRating name="feedback-rating" onChange={(value) => { setRating(value); setShowRequired(false); }} value={rating} /></div>
+    {showRequired && <p className="mt-2 text-sm text-red-700" role="alert">{t("portal.feedback.ratingRequired")}</p>}
+    <label className="mt-4 block" htmlFor="portal-feedback-comment"><span className="text-sm font-medium">{t("portal.feedback.commentLabel")}</span><textarea className="input mt-1.5 min-h-24 resize-y" id="portal-feedback-comment" maxLength={2000} onChange={(event) => setComment(event.target.value)} value={comment} /></label>
+    {mutation.isError && <p className="mt-2 text-sm text-red-700" role="alert">{t("portal.feedback.error")}</p>}
+    <div className="mt-4 flex justify-end"><button className="button-primary w-full sm:w-auto" disabled={mutation.isPending} type="submit">{mutation.isPending ? t("portal.feedback.submitting") : t("portal.feedback.submit")}</button></div>
+  </form>;
+}
+
 function Field({ id, label, error, children }: { id: string; label: string; error?: string; children: React.ReactNode }) {
   const errorId = `${id}-error`;
   return <div><label className="mb-1.5 block text-sm font-medium" htmlFor={id}>{label}</label>{children}{error && <p className="mt-1.5 text-sm text-red-700" id={errorId} role="alert">{error}</p>}</div>;
@@ -144,12 +201,64 @@ export function PortalTicketDetailPage() {
   const ticketLevelAttachments = attachments.data?.filter((item) => item.messageId === null) ?? [];
   const messageAttachments = new Map<string, NonNullable<typeof attachments.data>>();
   for (const item of attachments.data ?? []) if (item.messageId) messageAttachments.set(item.messageId, [...(messageAttachments.get(item.messageId) ?? []), item]);
+  const closed = ticket.status === "CLOSED";
   const send = async (event: React.FormEvent) => { event.preventDefault(); if (!body.trim() || reply.isPending) return; await reply.mutateAsync(body); setBody(""); };
+  const composer = closed ? (
+    <p className="rounded-md border bg-muted p-3 text-sm text-muted-foreground">{t("portal.closedNotice")}</p>
+  ) : (
+    <form onSubmit={send}>
+      <h2 className="text-base font-semibold">{t("portal.reply")}</h2>
+      {ticket.status === "RESOLVED" && <p className="mt-2 rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">{t("portal.reopenNotice")}</p>}
+      <label className="mt-3 block text-sm font-medium" htmlFor="portal-reply">{t("portal.replyLabel")}</label>
+      <p className="mt-1 text-xs text-muted-foreground" id="portal-reply-help">{t("portal.replyHelp")}</p>
+      <textarea aria-describedby="portal-reply-help" className="input mt-3 min-h-28 resize-y py-3" id="portal-reply" value={body} onChange={(event) => setBody(event.target.value)} />
+      {reply.isError && <p className="mt-2 text-sm text-red-700" role="alert">{t("portal.replyError")}</p>}
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <button className="button-primary sm:ms-auto sm:w-auto" disabled={reply.isPending || !body.trim()}>{reply.isPending ? t("portal.sending") : t("portal.sendReply")}</button>
+      </div>
+    </form>
+  );
   return <PortalPage>
     <Link className="rounded-sm text-sm font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" to="/portal/tickets">{t("portal.back")}</Link>
-    <header className="mt-4 border-b pb-5"><TicketRef id={ticket.id} /><div className="mt-2 flex flex-wrap items-center gap-3"><h1 className="min-w-0 break-words text-2xl font-semibold tracking-tight">{ticket.subject}</h1><PortalStatus status={ticket.status} /></div><p className="mt-3 max-w-3xl whitespace-pre-wrap text-sm leading-6">{ticket.description}</p><dl className="mt-4 flex flex-wrap gap-x-8 gap-y-3 text-sm text-muted-foreground"><div><dt className="font-medium text-foreground">{t("portal.category")}</dt><dd>{ticket.category?.name ?? t("common.notProvided")}</dd></div><div><dt className="font-medium text-foreground">{t("portal.created")}</dt><dd><bdi dir="ltr">{formatTicketDate(ticket.createdAt, i18n.language)}</bdi></dd></div><div><dt className="font-medium text-foreground">{t("portal.updated")}</dt><dd><bdi dir="ltr">{formatTicketDate(ticket.updatedAt, i18n.language)}</bdi></dd></div></dl></header>
-    <section className="mt-7"><h2 className="text-lg font-semibold">{t("portal.conversation")}</h2>{ticket.messages.length ? <ol className="mt-4 max-w-3xl space-y-3">{ticket.messages.map((message) => <li className="rounded-md border bg-white p-4" key={message.id}><div className="flex flex-wrap justify-between gap-3 text-xs text-muted-foreground"><strong className="text-foreground">{t(`portal.author.${message.author.kind}`)}</strong><time><bdi dir="ltr">{formatTicketDate(message.createdAt, i18n.language)}</bdi></time></div><p className="mt-2 whitespace-pre-wrap text-sm leading-6">{message.body}</p><MessageAttachmentList attachments={messageAttachments.get(message.id) ?? []} scope="portal" /></li>)}</ol> : <PortalState>{t("portal.noMessages")}</PortalState>}</section>
-    <section className="mt-7 max-w-3xl"><AttachmentPanel attachments={ticketLevelAttachments} isLoading={attachments.isLoading} isError={attachments.isError} onRetry={() => attachments.refetch()} scope="portal" locale={i18n.language} canUpload={ticket.status !== "CLOSED"} upload={{ mutateAsync: (file) => uploadAttachment.mutateAsync(file), isPending: uploadAttachment.isPending }} disabledReason={ticket.status === "CLOSED" ? t("attachments.closedTicketUpload") : undefined} /></section>
-    {ticket.status === "CLOSED" ? <p className="mt-7 max-w-3xl rounded-md border bg-muted p-4 text-sm">{t("portal.closedNotice")}</p> : <form className="mt-7 max-w-3xl border-t pt-6" onSubmit={send}><h2 className="text-lg font-semibold">{t("portal.reply")}</h2>{ticket.status === "RESOLVED" && <p className="mt-3 rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">{t("portal.reopenNotice")}</p>}<label className="mt-4 block" htmlFor="portal-reply"><span className="text-sm font-medium">{t("portal.replyLabel")}</span><textarea aria-describedby="reply-help" className="input mt-1.5 min-h-32 resize-y" id="portal-reply" value={body} onChange={(event) => setBody(event.target.value)} /><span className="mt-1.5 block text-xs text-muted-foreground" id="reply-help">{t("portal.replyHelp")}</span></label>{reply.isError && <p className="mt-2 text-sm text-red-700" role="alert">{t("portal.replyError")}</p>}<div className="mt-4 flex justify-end"><button className="button-primary w-full sm:w-auto" disabled={reply.isPending || !body.trim()}>{reply.isPending ? t("portal.sending") : t("portal.sendReply")}</button></div></form>}
+    <header className="mt-4 border-b pb-5">
+      <TicketRef id={ticket.id} />
+      <h1 className="mt-1 break-words text-2xl font-semibold tracking-tight [overflow-wrap:anywhere]">{ticket.subject}</h1>
+      <div className="mt-3 flex flex-wrap items-center gap-3"><PortalStatus status={ticket.status} /></div>
+      <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-3 text-sm text-muted-foreground">
+        <div><dt className="font-medium text-foreground">{t("portal.category")}</dt><dd>{ticket.category?.name ?? t("common.notProvided")}</dd></div>
+        <div><dt className="font-medium text-foreground">{t("portal.created")}</dt><dd><bdi dir="ltr">{formatTicketDate(ticket.createdAt, i18n.language)}</bdi></dd></div>
+        <div><dt className="font-medium text-foreground">{t("portal.updated")}</dt><dd><bdi dir="ltr">{formatTicketDate(ticket.updatedAt, i18n.language)}</bdi></dd></div>
+      </dl>
+    </header>
+    <div className="mt-6 space-y-6">
+      <section className="rounded-md border bg-white p-5">
+        <h2 className="text-base font-semibold">{t("portal.descriptionLabel")}</h2>
+        <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 [overflow-wrap:anywhere]">{ticket.description}</p>
+      </section>
+      <ConversationSection
+        heading={t("portal.conversation")}
+        description={t("portal.conversationDescription")}
+        timelineLabel={t("portal.timelineLabel")}
+        isEmpty={ticket.messages.length === 0}
+        emptyTitle={t("portal.noMessages")}
+        footer={composer}
+      >
+        {ticket.messages.map((message) => (
+          <ConversationMessage
+            key={message.id}
+            side={message.author.kind === "CUSTOMER" ? "start" : "end"}
+            title={t(`portal.author.${message.author.kind}`)}
+            timestamp={message.createdAt}
+            language={i18n.language}
+            body={message.body}
+            attachmentsSlot={<MessageAttachmentList attachments={messageAttachments.get(message.id) ?? []} scope="portal" />}
+          />
+        ))}
+      </ConversationSection>
+      <section className="rounded-md border bg-white p-5">
+        <AttachmentPanel attachments={ticketLevelAttachments} isLoading={attachments.isLoading} isError={attachments.isError} onRetry={() => attachments.refetch()} scope="portal" locale={i18n.language} canUpload={!closed} upload={{ mutateAsync: (file) => uploadAttachment.mutateAsync(file), isPending: uploadAttachment.isPending }} disabledReason={closed ? t("attachments.closedTicketUpload") : undefined} />
+      </section>
+      <TicketFeedback ticket={ticket} />
+    </div>
   </PortalPage>;
 }

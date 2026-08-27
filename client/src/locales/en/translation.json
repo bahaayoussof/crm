@@ -203,9 +203,23 @@
     "loadingRequests": "Loading your requests…", "requestsError": "Unable to load your requests.", "empty": "You have no support requests yet.", "noMatches": "No requests match your search or filter.", "pagination": "Request pages", "page": "Page {{page}} of {{total}}",
     "newDescription": "Tell us what you need help with.", "selectCategory": "Select a category (optional)", "categoriesError": "Categories could not be loaded", "descriptionLabel": "Description", "createError": "Unable to create this request. Your content has been preserved.", "creating": "Creating…",
     "validation": { "subject": "Subject must be between 3 and 200 characters.", "description": "Description is required and must be 20,000 characters or fewer." },
-    "loadingDetail": "Loading request details…", "notFound": "This request was not found.", "detailError": "Unable to load this request.", "back": "Back to My Requests", "conversation": "Conversation", "noMessages": "No public replies yet.",
-    "author": { "CUSTOMER": "Customer", "SUPPORT": "Support" }, "reply": "Reply", "replyLabel": "Your message", "replyHelp": "Your reply will be visible to the support team.", "sendReply": "Send Reply", "sending": "Sending…", "replyError": "Unable to send your reply. Your message has been preserved.",
-    "reopenNotice": "Replying will reopen this request.", "closedNotice": "This request is closed and no longer accepts replies."
+    "loadingDetail": "Loading request details…", "notFound": "This request was not found.", "detailError": "Unable to load this request.", "back": "Back to My Requests", "conversation": "Conversation", "conversationDescription": "Messages between you and the support team.", "timelineLabel": "Request conversation", "noMessages": "No public replies yet.",
+    "author": { "CUSTOMER": "You", "SUPPORT": "Support Team" }, "reply": "Reply", "replyLabel": "Your message", "replyHelp": "Your reply will be visible to the support team.", "sendReply": "Send Reply", "sending": "Sending…", "replyError": "Unable to send your reply. Your message has been preserved.",
+    "reopenNotice": "Replying will reopen this request.", "closedNotice": "This request is closed and no longer accepts replies.",
+    "feedback": {
+      "title": "Rate your experience",
+      "submittedTitle": "Your feedback",
+      "prompt": "How satisfied are you with the support you received?",
+      "ratingLabel": "Rating",
+      "ratingSummary": "{{rating}} out of 5",
+      "starValue": "{{value}} out of 5",
+      "commentLabel": "Additional comments (optional)",
+      "submit": "Submit Feedback",
+      "submitting": "Submitting…",
+      "error": "Unable to submit your feedback. Please try again.",
+      "ratingRequired": "Select a rating before submitting.",
+      "submittedOn": "Submitted {{date}}"
+    }
   },
   "auth": {
     "loginTitle": "Sign in", "loginDescription": "Access your customer support account.",

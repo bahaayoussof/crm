@@ -14,7 +14,7 @@ This contract mixes live and planned endpoints. Each section is tagged:
 - `PARTIAL` — only part of the listed surface is registered; the rest is planned.
 - `PLANNED` — documented target with no registered route yet. Do not consume as a live API.
 
-Registered routers as of `master` `e34818b` plus the uncommitted `feature/quick-replies` branch: `/api/auth`, `/api/customers`, `/api/categories`, `/api/users` (lookup only), `/api/tickets`, `/api/dashboard`, `/api/knowledge-articles`, `/api/quick-replies` (on `feature/quick-replies`, not yet integrated), `/api/attachments`, `/api/portal/knowledge-articles`, `/api/portal/attachments`, `/api/portal`, `/api/health`, plus attachment sub-routes on `/api/tickets`, `/api/customers`, and the portal ticket router (`feature/attachments`, integrated at `8e24d22`). There is no registered `/api/reports`, `/api/notifications`, `/api/feedback`, or `/api/settings` route.
+Registered routers as of `master` `79c7067` plus the uncommitted `feature/customer-feedback` branch: `/api/auth`, `/api/customers`, `/api/categories`, `/api/users` (lookup only), `/api/tickets`, `/api/dashboard`, `/api/knowledge-articles`, `/api/quick-replies` (integrated at `79c7067`), `/api/attachments`, `/api/portal/knowledge-articles`, `/api/portal/attachments`, `/api/portal`, `/api/health`, plus attachment sub-routes on `/api/tickets`, `/api/customers`, and the portal ticket router (`feature/attachments`, integrated at `8e24d22`), and feedback sub-routes on the portal ticket router (`feature/customer-feedback`, on branch). There is no registered `/api/reports`, `/api/notifications`, `/api/feedback` (feedback is Portal-only), or `/api/settings` route.
 
 ## Authentication
 
@@ -299,9 +299,23 @@ No alternate aliases exist in code (no `VALIDATION_ERROR`, `UNEXPECTED_FILE_FIEL
 
 **Portal.** `CUSTOMER` only. Identity and ticket ownership derive from `User -> Customer.userId`; `customerId` is never accepted from the browser. Missing and non-owned tickets both return the existing `404 TICKET_NOT_FOUND`; missing, non-owned, and customer-profile attachments all return `404 ATTACHMENT_NOT_FOUND`. Upload is allowed only for an owned non-`CLOSED` ticket; a `CLOSED` ticket returns `409 TICKET_CLOSED`. A Portal upload alone never creates a `TicketMessage` and never reopens the ticket.
 
-## Feedback — PLANNED
+## Feedback — LIVE (Portal only)
 
-No route is registered. `Feedback` (`ticketId`, `customerId`, `rating`, `comment?`) exists in `schema.prisma` only. `feature/customer-feedback` must define: eligible ticket statuses (expected `RESOLVED`/`CLOSED`), customer ownership, one feedback record per ticket, rating validation range, optional comment, whether a submission can be updated, Portal UX, and how the rating feeds `GET /reports/*`.
+```text
+POST /api/portal/tickets/:id/feedback   submit rating (CUSTOMER, own RESOLVED/CLOSED ticket) → 201
+GET  /api/portal/tickets/:id/feedback   read own submitted feedback (CUSTOMER) → 200 or 404
+```
+
+`feature/customer-feedback` uses the existing `Feedback` model (`ticketId @unique`, `customerId`, `rating`, `comment?`) unchanged — no schema or migration change. Both routes are sub-routes on the existing `portalRouter` (`requireAuth` + `requireRole(CUSTOMER)`); there is **no internal `/api/feedback` route** and no `app.ts` change. Identity and ticket ownership derive from `User -> Customer.userId`; `customerId` is never accepted from the browser.
+
+- **Eligibility:** owned ticket with stored status `RESOLVED` or `CLOSED`. Missing/non-owned ticket → `404 TICKET_NOT_FOUND` (IDOR-safe); owned ticket in any other status → `409 TICKET_NOT_ELIGIBLE_FOR_FEEDBACK`.
+- **One-shot, immutable:** one `Feedback` row per ticket (enforced by `@unique` and a pre-create check in the same transaction). No update or delete endpoint. A repeat submission → `409 FEEDBACK_ALREADY_SUBMITTED`.
+- **Body:** `rating` is a JSON number, integer `1`–`5` (else `400 VALIDATION_ERROR`); `comment` is an optional trimmed string 1–2,000 chars, stored `NULL` when omitted/blank. Strict schema rejects unknown fields.
+- **Response:** `{ data: { rating, comment, createdAt } }`. `GET` returns the same shape or `404 FEEDBACK_NOT_FOUND`.
+- **Side effect:** submission writes one `TicketHistory` row (`action: "FEEDBACK_SUBMITTED"`, `actorUserId` = customer's user id, `newValue` = rating string) inside the create transaction.
+- **Ticket detail:** `GET /api/portal/tickets/:id` additionally returns `feedbackEligible: boolean` and `feedback: { rating, comment, createdAt } | null` so the Portal page needs no extra request.
+
+Satisfaction reporting (`GET /reports/*`) is still `feature/reports` and consumes `Feedback.rating`; no reports route is registered yet.
 
 ## Notifications — PLANNED
 
@@ -347,7 +361,7 @@ Active metrics include `NEW`, `OPEN`, `IN_PROGRESS`, `WAITING_CUSTOMER`, and `ES
 
 Portal routes may reuse ticket APIs with customer-scoped authorization rather than duplicate business logic. The implemented Portal namespace uses dedicated isolated routes (see "Customer Portal API" below).
 
-`GET /portal/knowledge-articles` and `GET /portal/knowledge-articles/:id` are LIVE (published-only read, `feature/knowledge-base`); see "Portal Knowledge Base" above. Planned Portal addition (no route registered): `POST /portal/tickets/:id/feedback` (`feature/customer-feedback`).
+`GET /portal/knowledge-articles` and `GET /portal/knowledge-articles/:id` are LIVE (published-only read, `feature/knowledge-base`); see "Portal Knowledge Base" above. `POST /portal/tickets/:id/feedback` and `GET /portal/tickets/:id/feedback` are LIVE on `feature/customer-feedback` (on branch); see "Feedback — LIVE (Portal only)" above.
 
 ## API Rules
 

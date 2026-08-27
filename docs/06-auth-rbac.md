@@ -31,14 +31,17 @@ The role descriptions below include capabilities that are not yet built. As of `
 
 - Attachment listing/download and upload per context. Internal routes require `ADMIN`/`MANAGER`/`AGENT`; `CUSTOMER`/anonymous rejected. Ticket and message listing/download follow the existing ticket visibility predicate; ticket/message upload also requires an `AGENT` to be the assigned agent, and message upload requires `message.authorUserId ===` the authenticated user for every role. Customer-profile listing/download is available to every internal read role; customer-profile upload is `ADMIN`/`MANAGER` only. Portal attachment routes are `CUSTOMER` only, ownership-scoped through `User -> Customer.userId`, upload blocked on `CLOSED` tickets, and never expose customer-profile attachments or another customer's data. See `docs/05-api-contract.md` "Attachments — LIVE" and the matrix below.
 
-### Implemented — `feature/quick-replies`, on branch, not yet integrated
+### Implemented — `feature/quick-replies`, integrated into `master` at `79c7067`
 
 - Quick Replies (`/api/quick-replies`): `ADMIN`/`MANAGER`/`AGENT` may list and read quick replies; `ADMIN`/`MANAGER` may create, update, and delete; `AGENT` is read/use-only (`403` on `POST`/`PATCH`/`DELETE`); `CUSTOMER` and unauthenticated callers are rejected from every route. `createdById` is server-derived from the authenticated `ADMIN`/`MANAGER`. There is no Portal route. The client shows the `/quick-replies` management workspace and nav item to `ADMIN`/`MANAGER` only and guards `/quick-replies*` with replace navigation to `/dashboard` for `AGENT`; `AGENT` reaches quick replies only through the `QuickReplyPicker` in the internal Ticket public-reply composer, which inserts editable text and never sends. See the matrix below.
 
+### Implemented — `feature/customer-feedback`, on branch, not yet integrated
+
+- Feedback (`POST`/`GET /api/portal/tickets/:id/feedback`): a `CUSTOMER` may submit and read exactly one rating (`1`–`5`, integer) plus an optional comment for their own ticket whose stored status is `RESOLVED` or `CLOSED`. Non-owned/missing ticket → `404 TICKET_NOT_FOUND`; other status → `409 TICKET_NOT_ELIGIBLE_FOR_FEEDBACK`; repeat submission → `409 FEEDBACK_ALREADY_SUBMITTED`. `customerId` is server-derived from `User -> Customer.userId`. Internal roles and unauthenticated callers are rejected (these are `portalRouter` sub-routes, `requireRole(CUSTOMER)`); there is no internal feedback route. See the matrix below.
+
 ### Planned — permission model known, not implemented
 
-- `CUSTOMER` feedback submission for own eligible tickets (`feature/customer-feedback`).
-- `ADMIN`/`MANAGER` Reports access (`feature/reports`).
+- `ADMIN`/`MANAGER` Reports access, including the satisfaction metric derived from `Feedback.rating` (`feature/reports`).
 - `ADMIN`-managed internal user creation and role changes (`feature/user-management`).
 - Per-user Notifications read/unread (`feature/notifications`).
 
@@ -50,7 +53,7 @@ The role descriptions below include capabilities that are not yet built. As of `
 - Custom Branding: who may change application/Portal branding and within what bounds (`feature/custom-branding`).
 - General Audit Logs: whether a dedicated `AuditLog` beyond `TicketHistory` is introduced, and who reads it.
 
-Do not describe Users Management, Feedback, Notifications, Tasks, Settings, or Reports permissions as implemented. Knowledge Base management (`feature/knowledge-base`) and Quick Replies management (`feature/quick-replies`, on branch) are implemented; the other role-list items below remain the target model.
+Do not describe Users Management, Notifications, Tasks, Settings, or Reports permissions as implemented. Knowledge Base management (`feature/knowledge-base`), Quick Replies management (`feature/quick-replies`, integrated), and `CUSTOMER` feedback submission (`feature/customer-feedback`, on branch) are implemented; the other role-list items below remain the target model.
 
 ## Roles
 
@@ -140,7 +143,16 @@ Customer-route middleware is authoritative. The client keeps Customers navigatio
 
 The client shows the internal Knowledge Base navigation item to `ADMIN`/`MANAGER`/`AGENT` (never `CUSTOMER`), shows the Create/Edit/Delete controls only to `ADMIN`/`MANAGER`, and guards `/knowledge-base/new` and `/knowledge-base/:id/edit` with replace navigation to `/knowledge-base` for `AGENT`. `/knowledge-base` and `/knowledge-base/:id` remain available to `AGENT`. These guards are UX only; backend middleware is authoritative.
 
-## Internal Quick Replies Permissions (`feature/quick-replies`, on branch)
+## Customer Feedback Permissions (`feature/customer-feedback`, on branch)
+
+| Capability | ADMIN | MANAGER | AGENT | CUSTOMER |
+| --- | --- | --- | --- | --- |
+| Submit feedback (`POST /api/portal/tickets/:id/feedback`) | No | No | No | Own `RESOLVED`/`CLOSED` ticket, once |
+| Read own submitted feedback (`GET /api/portal/tickets/:id/feedback`) | No | No | No | Own ticket only |
+
+`portalRouter` middleware is authoritative: `requireAuth` then `requireRole(CUSTOMER)`. Internal roles and unauthenticated callers are rejected. Ticket ownership derives from `User -> Customer.userId`; `customerId` is never accepted from the client. A non-owned or missing ticket returns `404 TICKET_NOT_FOUND` (IDOR-safe); an owned ticket in any status other than `RESOLVED`/`CLOSED` returns `409 TICKET_NOT_ELIGIBLE_FOR_FEEDBACK`; a second submission returns `409 FEEDBACK_ALREADY_SUBMITTED`. There is no internal `/api/feedback` route; internal staff will read satisfaction data through `feature/reports`.
+
+## Internal Quick Replies Permissions (`feature/quick-replies`, integrated at `79c7067`)
 
 | Capability | ADMIN | MANAGER | AGENT | CUSTOMER |
 | --- | --- | --- | --- | --- |

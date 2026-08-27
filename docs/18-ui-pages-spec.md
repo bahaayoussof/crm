@@ -1994,9 +1994,9 @@ At least 5 useful demo articles across multiple categories.
 
 ## Feedback
 
-Include enough data for reports when feedback is implemented.
+Implemented on `feature/customer-feedback` (on branch) — see "Customer Feedback implemented behavior" in §31. `POST`/`GET /api/portal/tickets/:id/feedback`: a `CUSTOMER` submits one immutable rating (`1`–`5`) plus an optional comment for an own `RESOLVED`/`CLOSED` ticket. The rating persists on `Feedback.rating` for `feature/reports` to aggregate.
 
-The UI should not look empty during assessment/demo.
+The demo seed (`feature/demo-seed-data`, roadmap order 14) is responsible for populating enough feedback rows that the reports UI does not look empty during assessment/demo.
 
 ---
 
@@ -2126,9 +2126,31 @@ Do not delay working ticket interactions to polish lower-priority screens.
 
 ### Customer Portal implemented behavior
 
-Routes are `/portal`, `/portal/tickets`, `/portal/tickets/new`, and `/portal/tickets/:id`. The responsive shell contains Home, My Requests, New Request, language switching, customer identity, and logout only. Home shows owned counts/recent requests; the list uses URL-backed server search/status/page state; creation exposes subject, optional active category, and description; details show safe metadata and public conversation. Resolved requests explain reopening and closed requests hide the composer. English, Arabic, RTL, locale dates, and LTR-isolated references are required.
+Routes are `/portal`, `/portal/tickets`, `/portal/tickets/new`, and `/portal/tickets/:id`. The responsive shell contains Home, My Requests, New Request, Help Center, language switching, customer identity, and logout only. Home shows owned counts/recent requests; the list uses URL-backed server search/status/page state; creation exposes subject, optional active category, and description; details show safe metadata and public conversation. Resolved requests explain reopening and closed requests hide the composer. English, Arabic, RTL, locale dates, and LTR-isolated references are required.
 
-Feedback, notifications, profile editing, and realtime updates remain deferred. Owned-ticket attachments are integrated into `master` at `8e24d22` — see "Attachments implemented behavior" below. The Portal Knowledge Base (Help Center) is implemented — see "Knowledge Base implemented behavior" below.
+**Ticket Details shares the internal Ticket Details visual language** (`feature/customer-feedback` cycle, pre-integration consistency correction). The Customer Portal keeps its own header/navigation shell, its ownership-safe Portal APIs, and its customer-only data, but the ticket-detail body now composes the same role-neutral presentational components as the internal view (`client/src/features/tickets/ticket-conversation-ui.tsx`: `ConversationSection`, `ConversationMessage`, `MessageBody`):
+
+- **Header/metadata:** back link, then Ticket ID (LTR-isolated, copyable), then the subject `h1` with `break-words [overflow-wrap:anywhere]`, then a badges row, then a wrapping definition list of category / created / updated. Customer-visible fields only. No priority, assignee, SLA target/state, escalation, or history.
+- **Status badge:** the same bordered, colour-coded pill shape as the internal `TicketStatusBadge`, keyed by the five customer-facing statuses (`OPEN` blue, `IN_PROGRESS` violet, `WAITING_FOR_YOU` amber, `RESOLVED` green, `CLOSED` grey).
+- **Description:** its own bordered white card (`rounded-md border bg-white p-5`) below the header, `whitespace-pre-wrap break-words [overflow-wrap:anywhere]`.
+- **Conversation:** one bordered `overflow-hidden` card with a `border-b` header (title + one-line description), a `min-h-48` body holding an `<ol>` timeline or a centered empty state, and the reply composer (or the closed notice) as a `border-t bg-muted/20` footer. Each message is a width-bounded card (`min-w-0 max-w-full sm:max-w-[min(85%,46rem)]`) aligned to the logical **start** for the customer ("You") and the logical **end** for support ("Support Team"); Arabic reverses this naturally via flex `justify-*`. No internal role names, agent emails, internal notes, or internal message metadata are shown. Internal notes never enter the Portal message list (the Portal API never returns them).
+- **Long-message handling:** message bodies use `whitespace-pre-wrap break-words [overflow-wrap:anywhere]`; a genuinely long body (over ~800 characters or ~10 lines) is clamped to `line-clamp-[10]` with a localized `Show more` / `Show less` toggle (`aria-expanded`), full text always in the DOM. Same deterministic threshold and control as the internal view. No page-level horizontal scrollbar.
+- **Attachments:** the shared `AttachmentPanel` inside a matching bordered card. Compact icon Preview/Download actions, long filenames truncated with the full value in `title`, the desktop Upload action content-sized (`sm:w-auto`) with a secondary Cancel, mobile actions stack. Customer attachment actions stay limited to the approved Preview/Download/Upload set; no Delete or management actions. Upload is blocked (with the localized closed-ticket reason) on a `CLOSED` ticket.
+- **Reply composer:** the shared footer structure — label, helper text, `input` textarea, inline `role="alert"` error, and a footer row that is `flex-col` on mobile and `sm:flex-row sm:items-center` on desktop with a content-sized `Send Reply` at the logical end (`sm:ms-auto sm:w-auto`). No Quick Reply selector and no Internal Note mode on the Portal. A `RESOLVED` ticket shows the reopen notice above the field; a `CLOSED` ticket replaces the whole composer with a calm bordered `bg-muted` notice.
+
+Notifications, profile editing, and realtime updates remain deferred. Owned-ticket attachments are integrated into `master` at `8e24d22` — see "Attachments implemented behavior" below. The Portal Knowledge Base (Help Center) is implemented — see "Knowledge Base implemented behavior" below. Customer feedback is implemented on `feature/customer-feedback` (on branch) — see "Customer Feedback implemented behavior" below.
+
+### Customer Feedback implemented behavior
+
+Implemented on `feature/customer-feedback` against the existing `Feedback` model (no schema change).
+
+Surface: a feedback section on the Portal ticket-detail page (`/portal/tickets/:id`), below the conversation and attachments and above the reply composer / closed notice. It is driven by two fields the ticket-detail response now returns — `feedbackEligible` (stored status `RESOLVED` or `CLOSED`) and `feedback` (`{ rating, comment, createdAt }` or `null`).
+
+- **Not eligible, no feedback:** the section renders nothing.
+- **Eligible, no feedback:** a form with a required star control (`role="radiogroup"` of five `1`–`5` radio inputs, each with an SR-only "N out of 5" label; the selected count is filled), an optional comment `textarea` (`maxLength` 2,000), and a submit button. Submitting with no rating shows a localized `role="alert"` and does not call the API. A failed submission shows a localized inline error and preserves the draft.
+- **Feedback present:** a read-only view — the rating as five stars (`role="img"` with a localized "N out of 5" summary), the comment when present, and a localized "Submitted {date}" line (LTR-isolated). No form, no edit or withdraw control.
+
+On success the ticket query is invalidated and refetched; the section switches to the read-only view — that switch is the only confirmation. One submission per ticket is permanent. English, Arabic, and RTL are supported; strings live under `portal.feedback.*`.
 
 ### Knowledge Base implemented behavior
 

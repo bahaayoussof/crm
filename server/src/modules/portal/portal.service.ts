@@ -55,9 +55,12 @@ export async function ticketDetail(id: string, userId: string) {
   const ticket = await prisma.ticket.findFirst({ where: { id, customerId }, select: {
     ...listSelect, description: true,
     messages: { orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: messageSelect },
+    feedback: { select: { rating: true, comment: true, createdAt: true } },
   } });
   if (!ticket) throw new AppError(404, "TICKET_NOT_FOUND", "Ticket not found");
-  return { ...ticketItem(ticket), messages: ticket.messages.map((message) => ({ ...message, author: { id: message.author.id, name: message.author.name, kind: message.author.role === Role.CUSTOMER ? "CUSTOMER" as const : "SUPPORT" as const } })) };
+  const feedbackEligible = ticket.status === TicketStatus.RESOLVED || ticket.status === TicketStatus.CLOSED;
+  return { ...ticketItem(ticket), feedbackEligible, feedback: ticket.feedback ?? null,
+    messages: ticket.messages.map((message) => ({ ...message, author: { id: message.author.id, name: message.author.name, kind: message.author.role === Role.CUSTOMER ? "CUSTOMER" as const : "SUPPORT" as const } })) };
 }
 
 export async function createTicket(input: PortalCreateTicketInput, userId: string) {

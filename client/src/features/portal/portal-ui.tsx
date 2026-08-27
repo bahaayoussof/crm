@@ -83,9 +83,19 @@ export function PortalPageHeader({ title, description, action }: { title: string
   </header>;
 }
 
+// Mirrors the internal `TicketStatusBadge` visual (bordered, colour-coded pill)
+// so the two ticket views read as one system. Keyed by the customer-facing
+// status vocabulary, not the internal `TicketStatus` enum.
+const portalStatusStyles: Record<PortalTicketStatus, string> = {
+  OPEN: "border-blue-200 bg-blue-50 text-blue-700",
+  IN_PROGRESS: "border-violet-200 bg-violet-50 text-violet-700",
+  WAITING_FOR_YOU: "border-amber-200 bg-amber-50 text-amber-800",
+  RESOLVED: "border-green-200 bg-green-50 text-green-700",
+  CLOSED: "border-gray-300 bg-gray-100 text-gray-800",
+};
 export function PortalStatus({ status }: { status: PortalTicketStatus }) {
   const { t } = useTranslation();
-  return <span className="inline-flex w-fit rounded-md bg-muted px-2 py-1 text-xs font-semibold text-foreground">{t(`portal.status.${status}`)}</span>;
+  return <span className={`inline-flex w-fit rounded-md border px-2 py-0.5 text-xs font-medium ${portalStatusStyles[status]}`}>{t(`portal.status.${status}`)}</span>;
 }
 
 export function PortalState({ children, retry }: { children: React.ReactNode; retry?: () => void }) {

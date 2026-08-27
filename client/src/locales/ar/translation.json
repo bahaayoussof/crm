@@ -203,9 +203,23 @@
     "loadingRequests": "جارٍ تحميل طلباتك…", "requestsError": "تعذر تحميل طلباتك.", "empty": "لا توجد لديك طلبات دعم بعد.", "noMatches": "لا توجد طلبات تطابق البحث أو التصفية.", "pagination": "صفحات الطلبات", "page": "الصفحة {{page}} من {{total}}",
     "newDescription": "أخبرنا بما تحتاج إلى مساعدة فيه.", "selectCategory": "اختر تصنيفًا (اختياري)", "categoriesError": "تعذر تحميل التصنيفات", "descriptionLabel": "الوصف", "createError": "تعذر إنشاء الطلب. تم الاحتفاظ بالمحتوى.", "creating": "جارٍ الإنشاء…",
     "validation": { "subject": "يجب أن يتراوح الموضوع بين 3 و200 حرف.", "description": "الوصف مطلوب ويجب ألا يزيد عن 20000 حرف." },
-    "loadingDetail": "جارٍ تحميل تفاصيل الطلب…", "notFound": "لم يتم العثور على هذا الطلب.", "detailError": "تعذر تحميل هذا الطلب.", "back": "العودة إلى طلباتي", "conversation": "المحادثة", "noMessages": "لا توجد ردود عامة بعد.",
-    "author": { "CUSTOMER": "العميل", "SUPPORT": "الدعم" }, "reply": "الرد", "replyLabel": "رسالتك", "replyHelp": "سيكون ردك ظاهرًا لفريق الدعم.", "sendReply": "إرسال الرد", "sending": "جارٍ الإرسال…", "replyError": "تعذر إرسال الرد. تم الاحتفاظ برسالتك.",
-    "reopenNotice": "سيؤدي الرد إلى إعادة فتح هذا الطلب.", "closedNotice": "هذا الطلب مغلق ولم يعد يقبل الردود."
+    "loadingDetail": "جارٍ تحميل تفاصيل الطلب…", "notFound": "لم يتم العثور على هذا الطلب.", "detailError": "تعذر تحميل هذا الطلب.", "back": "العودة إلى طلباتي", "conversation": "المحادثة", "conversationDescription": "الرسائل المتبادلة بينك وبين فريق الدعم.", "timelineLabel": "محادثة الطلب", "noMessages": "لا توجد ردود عامة بعد.",
+    "author": { "CUSTOMER": "أنت", "SUPPORT": "فريق الدعم" }, "reply": "الرد", "replyLabel": "رسالتك", "replyHelp": "سيكون ردك ظاهرًا لفريق الدعم.", "sendReply": "إرسال الرد", "sending": "جارٍ الإرسال…", "replyError": "تعذر إرسال الرد. تم الاحتفاظ برسالتك.",
+    "reopenNotice": "سيؤدي الرد إلى إعادة فتح هذا الطلب.", "closedNotice": "هذا الطلب مغلق ولم يعد يقبل الردود.",
+    "feedback": {
+      "title": "قيّم تجربتك",
+      "submittedTitle": "ملاحظاتك",
+      "prompt": "ما مدى رضاك عن الدعم الذي تلقيته؟",
+      "ratingLabel": "التقييم",
+      "ratingSummary": "{{rating}} من 5",
+      "starValue": "{{value}} من 5",
+      "commentLabel": "ملاحظات إضافية (اختياري)",
+      "submit": "إرسال الملاحظات",
+      "submitting": "جارٍ الإرسال…",
+      "error": "تعذّر إرسال ملاحظاتك. يرجى المحاولة مرة أخرى.",
+      "ratingRequired": "اختر تقييمًا قبل الإرسال.",
+      "submittedOn": "أُرسلت في {{date}}"
+    }
   },
   "auth": {
     "loginTitle": "تسجيل الدخول", "loginDescription": "الوصول إلى حساب دعم العملاء.",

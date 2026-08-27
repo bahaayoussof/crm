@@ -8,6 +8,8 @@ import {
   listPortalTicketAttachments,
   uploadPortalTicketAttachment,
 } from "../attachments/attachment.portal.controller.js";
+import * as feedbackController from "../feedback/feedback.controller.js";
+import { feedbackParamsSchema, submitFeedbackSchema } from "../feedback/feedback.schema.js";
 
 export const portalRouter = Router();
 portalRouter.use(requireAuth, requireRole(Role.CUSTOMER));
@@ -21,3 +23,7 @@ portalRouter.post("/tickets/:id/messages", validateParams(portalTicketParamsSche
 // feature/attachments — owned-ticket attachments (upload only while not CLOSED; never creates a message or reopens)
 portalRouter.get("/tickets/:id/attachments", validateParams(portalTicketParamsSchema), listPortalTicketAttachments);
 portalRouter.post("/tickets/:id/attachments", validateParams(portalTicketParamsSchema), uploadPortalTicketAttachment);
+
+// feature/customer-feedback — one immutable rating (1–5) + optional comment per owned RESOLVED/CLOSED ticket
+portalRouter.get("/tickets/:id/feedback", validateParams(feedbackParamsSchema), feedbackController.get);
+portalRouter.post("/tickets/:id/feedback", validateParams(feedbackParamsSchema), validateBody(submitFeedbackSchema), feedbackController.submit);
