@@ -1,6 +1,5 @@
-import { forwardRef, type PropsWithChildren, type ReactNode, type SelectHTMLAttributes } from "react";
+import { type PropsWithChildren, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronDownIcon } from "./user-icons";
 import type { ManageableRole } from "./user.types";
 
 export function UsersPage({ children }: PropsWithChildren) {
@@ -65,15 +64,4 @@ export function YouBadge() {
   </span>;
 }
 
-// One consistent Select treatment for User Management: the native control with
-// its platform arrow suppressed (`appearance-none`) and a single custom chevron
-// pinned to the logical end. `pe-9` keeps the value clear of the icon; `end-3`
-// + a non-rotated glyph place it correctly in both LTR and RTL.
-export const NativeSelect = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(
-  function NativeSelect({ className, children, ...props }, ref) {
-    return <span className="relative block">
-      <select ref={ref} className={`input appearance-none bg-none pe-9 ${className ?? ""}`} {...props}>{children}</select>
-      <ChevronDownIcon className="pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-    </span>;
-  },
-);
+

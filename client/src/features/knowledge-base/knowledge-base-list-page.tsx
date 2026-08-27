@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { Link, useSearchParams } from "react-router-dom";
+import { AppSelect } from "@/components/ui/app-select";
 import { useAuth } from "@/features/auth/auth-state";
 import { useDebouncedValue } from "@/features/customers/use-debounced-value";
 import { useKnowledgeArticles } from "./knowledge-article-hooks";
@@ -37,6 +38,11 @@ export function KnowledgeBaseListPage() {
 
   const hasFilters = Boolean(debouncedSearch || status || category);
 
+  const statusOptions = [
+    { value: "", label: t("knowledgeBase.allStatuses") },
+    ...statuses.map((value) => ({ value, label: t(`knowledgeBase.status.${value}`) })),
+  ];
+
   return <KnowledgeBasePage>
     <PageHeader
       title={t("knowledgeBase.title")}
@@ -48,13 +54,14 @@ export function KnowledgeBaseListPage() {
         <span className="sr-only">{t("knowledgeBase.search")}</span>
         <input className="input" type="search" dir="auto" value={search} onChange={(event) => setFilter("search", event.target.value)} placeholder={t("knowledgeBase.search")} />
       </label>
-      <label>
-        <span className="sr-only">{t("knowledgeBase.statusFilter")}</span>
-        <select className="input" aria-label={t("knowledgeBase.statusFilter")} value={status ?? ""} onChange={(event) => setFilter("status", event.target.value)}>
-          <option value="">{t("knowledgeBase.allStatuses")}</option>
-          {statuses.map((value) => <option key={value} value={value}>{t(`knowledgeBase.status.${value}`)}</option>)}
-        </select>
-      </label>
+      <div>
+        <AppSelect
+          ariaLabel={t("knowledgeBase.statusFilter")}
+          value={status ?? ""}
+          onValueChange={(value) => setFilter("status", value)}
+          options={statusOptions}
+        />
+      </div>
       <label>
         <span className="sr-only">{t("knowledgeBase.categoryFilter")}</span>
         <input className="input" dir="auto" value={params.get("category") ?? ""} onChange={(event) => setFilter("category", event.target.value)} placeholder={t("knowledgeBase.categoryFilter")} />

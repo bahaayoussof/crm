@@ -680,6 +680,27 @@ Ticket status and priority must not depend on color alone.
 
 ---
 
+## 19A. Form Controls and Shared Dropdowns (AppSelect)
+
+The CRM uses a shared, branded dropdown system built on `@radix-ui/react-select`:
+
+- `AppSelect`: strongly typed standalone single-choice select primitive for filters and controlled standalone selects.
+- `AppSelectField`: composite field pairing `AppSelect` with standard form labels, required asterisks, helper text, and validation error messages linked via `aria-describedby` and `aria-invalid`.
+
+### Design & Behavior Standards
+- **Single Branded Shell**: Closed trigger and opened options menu match CRM design tokens (neutral borders, surface styling, focus rings, and subtle elevation).
+- **Single Rotating Chevron**: The trigger displays exactly one chevron icon that smoothly rotates 180° when open.
+- **RTL & Alignment**: Chevron is placed at the logical end (`justify-between`), preserving orientation in English and Arabic.
+- **Check Indicator**: Active/selected options display a checkmark indicator.
+- **Portalled Floating Menu**: Dropdown menus render in a portal with Popper positioning so container overflow/clipping is never an issue.
+- **Empty Sentinel**: Empty string `""` values (e.g. "All statuses", "Unassigned") map cleanly to safe internal sentinels and back.
+- **Keyboard & Accessibility**: Full ARIA `combobox` / `listbox` compliance, arrow navigation, Enter/Space selection, and Escape key return of focus.
+- **React Hook Form Support**: Seamless integration with `Controller` or custom form state.
+
+All simple single-choice dropdowns across User Management, Tickets, Portal, and Knowledge Base use `AppSelect`. Searchable comboboxes (such as `CustomerCombobox`) remain specialized combobox components.
+
+---
+
 ## 20. Responsive Rules
 
 Responsive web is required.

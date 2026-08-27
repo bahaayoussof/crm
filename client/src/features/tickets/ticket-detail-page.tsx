@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
+import { AppSelectField } from "@/components/ui/app-select";
 import { useAuth } from "@/features/auth/auth-state";
 import { AttachmentPanel } from "@/features/attachments/attachment-ui";
 import { useTicketAttachments, useUploadTicketAttachment } from "@/features/attachments/attachment-hooks";
@@ -24,6 +25,29 @@ export function TicketDetailPage() {
   if (ticket.isError || !ticket.data) { const statusCode = getTicketErrorStatus(ticket.error); return <TicketPage><TicketState>{statusCode === 404 ? t("tickets.notFound") : statusCode === 403 ? t("tickets.unauthorized") : t("tickets.loadDetailError")} {statusCode !== 404 && statusCode !== 403 && <button className="button-secondary mt-4" onClick={() => ticket.refetch()}>{t("common.retry")}</button>}</TicketState></TicketPage>; }
   const record = ticket.data; const canManage = Boolean(user && canManageTicketDefinition(user.role)); const canWorkflow = Boolean(user && canOperateAssignedTicket(record, user)); const canClose = Boolean(user && canCloseTicket(record, user));
   const availableStatuses = [...normalTransitions[record.status], ...(canManage && ["NEW", "OPEN", "IN_PROGRESS", "WAITING_CUSTOMER"].includes(record.status) ? ["ESCALATED" as TicketStatus] : []), ...(canManage && record.status === "ESCALATED" ? ["IN_PROGRESS" as TicketStatus] : [])];
+
+  const statusOptions = [
+    { value: record.status, label: t(`tickets.status.${record.status}`) },
+    ...availableStatuses
+      .filter((value) => value !== record.status)
+      .map((value) => ({ value, label: t(`tickets.status.${value}`) })),
+  ];
+
+  const priorityOptions = (["LOW", "MEDIUM", "HIGH", "URGENT"] as TicketPriority[]).map((value) => ({
+    value,
+    label: t(`tickets.priority.${value}`),
+  }));
+
+  const categoryOptions = [
+    { value: "", label: t("common.notProvided") },
+    ...(categories.data?.map((item) => ({ value: item.id, label: item.name })) ?? []),
+  ];
+
+  const agentOptions = [
+    { value: "", label: t("tickets.unassigned") },
+    ...(agents.data?.map((item) => ({ value: item.id, label: item.name })) ?? []),
+  ];
+
   const saveOperations = async () => { setError(null); const changes: { status?: TicketStatus; priority?: TicketPriority; categoryId?: string | null; assignedAgentId?: string | null } = {};
     if (status && status !== record.status) changes.status = status; if (priority && priority !== record.priority) changes.priority = priority; if (canManage && categoryId !== (record.category?.id ?? "")) changes.categoryId = categoryId || null; if (canManage && assignedAgentId !== (record.assignedAgent?.id ?? "")) changes.assignedAgentId = assignedAgentId || null;
     if (!Object.keys(changes).length) return; try { await update.mutateAsync(changes); } catch (caught) { setError(getTicketError(caught, t("tickets.updateError"), t)); }
@@ -41,10 +65,10 @@ export function TicketDetailPage() {
       </div>
       <aside className="min-w-0 space-y-5"><section className="rounded-md border bg-white p-5"><h2 className="text-base font-semibold">{t("tickets.operations")}</h2>{error && <p className="mt-3 break-words rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 [overflow-wrap:anywhere]" role="alert">{error}</p>}{!canWorkflow && <p className="mt-3 rounded-md border bg-muted p-3 text-sm text-muted-foreground">{t("tickets.unassignedReadOnly")}</p>}{canWorkflow && <div className="mt-4">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
-        <Control label={t("tickets.statusLabel")}><select className="input" value={status} disabled={!canWorkflow || availableStatuses.length === 0} onChange={(event) => setStatus(event.target.value as TicketStatus)}><option value={record.status}>{t(`tickets.status.${record.status}`)}</option>{availableStatuses.filter((value) => value !== record.status).map((value) => <option value={value} key={value}>{t(`tickets.status.${value}`)}</option>)}</select></Control>
-        <Control label={t("tickets.priorityLabel")}><select className="input" value={priority} disabled={!canWorkflow} onChange={(event) => setPriority(event.target.value as TicketPriority)}>{["LOW", "MEDIUM", "HIGH", "URGENT"].map((value) => <option value={value} key={value}>{t(`tickets.priority.${value}`)}</option>)}</select></Control>
-        {canManage && <Control label={t("tickets.category")}><select className="input" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}><option value="">{t("common.notProvided")}</option>{categories.data?.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></Control>}
-        {canManage && <Control label={t("tickets.assignedAgent")}><select className="input" value={assignedAgentId} onChange={(event) => setAssignedAgentId(event.target.value)}><option value="">{t("tickets.unassigned")}</option>{agents.data?.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></Control>}
+        <AppSelectField id="ticket-detail-status" label={t("tickets.statusLabel")} labelClassName="block text-sm font-medium" value={status} disabled={!canWorkflow || availableStatuses.length === 0} onValueChange={(value) => setStatus(value as TicketStatus)} options={statusOptions} />
+        <AppSelectField id="ticket-detail-priority" label={t("tickets.priorityLabel")} labelClassName="block text-sm font-medium" value={priority} disabled={!canWorkflow} onValueChange={(value) => setPriority(value as TicketPriority)} options={priorityOptions} />
+        {canManage && <AppSelectField id="ticket-detail-category" label={t("tickets.category")} labelClassName="block text-sm font-medium" value={categoryId} onValueChange={setCategoryId} options={categoryOptions} />}
+        {canManage && <AppSelectField id="ticket-detail-agent" label={t("tickets.assignedAgent")} labelClassName="block text-sm font-medium" value={assignedAgentId} onValueChange={setAssignedAgentId} options={agentOptions} />}
         </div>
         <div className="mt-4 flex"><button className="button-primary sm:ms-auto sm:w-auto" disabled={update.isPending} onClick={saveOperations}>{update.isPending ? t("common.saving") : t("tickets.saveOperations")}</button></div></div>}{canClose && <div className="mt-5 border-t pt-5">{confirmingClose ? <div className="rounded-md border border-red-200 bg-red-50 p-4" role="group" aria-label={t("tickets.closeConfirmation")}><p className="text-sm text-red-900">{t("tickets.closeConfirmation")}</p><div className="mt-3 flex flex-wrap gap-2"><button ref={confirmCloseRef} className="button-primary bg-red-700 hover:bg-red-800 sm:w-auto" disabled={update.isPending} onClick={closeTicket}>{update.isPending ? t("tickets.closing") : t("tickets.confirmClose")}</button><button className="button-secondary" disabled={update.isPending} onClick={() => setConfirmingClose(false)}>{t("tickets.cancelClose")}</button></div></div> : <button className="button-secondary border-red-300 text-red-700" onClick={() => setConfirmingClose(true)}>{t("tickets.closeTicket")}</button>}</div>}</section>
         <section className="rounded-md border bg-white p-5"><h2 className="text-base font-semibold">{t("tickets.customer")}</h2><Link className="mt-3 block break-words font-medium text-primary" to={`/customers/${record.customer.id}`}>{record.customer.name}</Link><p className="mt-1 break-words text-sm text-muted-foreground [overflow-wrap:anywhere]"><bdi dir="ltr">{record.customer.email}</bdi></p>{record.customer.phone && <p className="break-words text-sm text-muted-foreground [overflow-wrap:anywhere]"><bdi dir="ltr">{record.customer.phone}</bdi></p>}</section>
@@ -53,7 +77,7 @@ export function TicketDetailPage() {
     </div>
   </TicketPage>;
 }
-function Control({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block"><span className="text-sm font-medium">{label}</span><span className="mt-2 block">{children}</span></label>; }
+
 function SlaDetails({ record, language }: { record: TicketDetail; language: string }) {
   const { t } = useTranslation();
   return <section className="mt-5 border-t pt-4" aria-labelledby="ticket-sla-heading">

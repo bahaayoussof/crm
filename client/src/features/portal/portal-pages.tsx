@@ -1,9 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { AppSelect, AppSelectField } from "@/components/ui/app-select";
 import { useAuth } from "@/features/auth/auth-state";
 import { formatTicketDate } from "@/features/tickets/ticket-format";
 import { ConversationMessage, ConversationSection } from "@/features/tickets/ticket-conversation-ui";
@@ -88,11 +89,23 @@ export function PortalTicketsPage() {
     if (key !== "page") next.delete("page");
     setParams(next);
   };
+
+  const statusOptions = [
+    { value: "", label: t("portal.allStatuses") },
+    ...statuses.map((value) => ({ value, label: t(`portal.status.${value}`) })),
+  ];
+
   return <PortalPage>
     <PortalPageHeader title={t("portal.myRequests")} description={t("portal.requestsDescription")} action={<Link className="button-link w-full sm:w-auto" to="/portal/tickets/new">{t("portal.newRequest")}</Link>} />
     <section aria-label={t("portal.filters")} className="mt-5 grid gap-3 rounded-md border bg-white p-4 sm:grid-cols-[minmax(0,1fr)_15rem]">
       <label className="block" htmlFor="portal-search"><span className="sr-only">{t("portal.search")}</span><input className="input" id="portal-search" value={search} onChange={(event) => update("search", event.target.value)} placeholder={t("portal.search")} /></label>
-      <label className="block" htmlFor="portal-status"><span className="sr-only">{t("portal.statusLabel")}</span><select className="input" id="portal-status" value={status ?? ""} onChange={(event) => update("status", event.target.value)}><option value="">{t("portal.allStatuses")}</option>{statuses.map((value) => <option key={value} value={value}>{t(`portal.status.${value}`)}</option>)}</select></label>
+      <AppSelect
+        id="portal-status"
+        ariaLabel={t("portal.statusLabel")}
+        value={status ?? ""}
+        onValueChange={(val) => update("status", val)}
+        options={statusOptions}
+      />
     </section>
     {query.isLoading ? <PortalState>{t("portal.loadingRequests")}</PortalState> : query.isError ? <PortalState retry={() => query.refetch()}>{t("portal.requestsError")}</PortalState> : query.data!.data.length ? <>
       <TicketRows tickets={query.data!.data} />
@@ -107,6 +120,12 @@ export function PortalNewTicketPage() {
   const categories = usePortalCategories();
   const mutation = useCreatePortalTicket();
   const form = useForm<PortalTicketForm>({ resolver: zodResolver(portalTicketSchema), defaultValues: { subject: "", categoryId: "", description: "" } });
+
+  const categoryOptions = [
+    { value: "", label: categories.isError ? t("portal.categoriesError") : t("portal.selectCategory") },
+    ...(categories.data?.map((category) => ({ value: category.id, label: category.name })) ?? []),
+  ];
+
   const submit = form.handleSubmit(async (values) => {
     if (mutation.isPending) return;
     const ticket = await mutation.mutateAsync({ ...values, categoryId: values.categoryId || null });
@@ -117,7 +136,21 @@ export function PortalNewTicketPage() {
     <form className="mt-6 max-w-3xl rounded-md border bg-white p-5 sm:p-6" noValidate onSubmit={submit}>
       <div className="space-y-5">
         <Field id="portal-subject" label={t("portal.subject")} error={form.formState.errors.subject ? t("portal.validation.subject") : undefined}><input aria-describedby={form.formState.errors.subject ? "portal-subject-error" : undefined} aria-invalid={Boolean(form.formState.errors.subject)} className="input" id="portal-subject" {...form.register("subject")} /></Field>
-        <Field id="portal-category" label={`${t("portal.category")} ${t("portal.optional")}`}><select className="input" disabled={categories.isLoading || categories.isError || mutation.isPending} id="portal-category" {...form.register("categoryId")}><option value="">{categories.isError ? t("portal.categoriesError") : t("portal.selectCategory")}</option>{categories.data?.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></Field>
+        <Controller
+          name="categoryId"
+          control={form.control}
+          render={({ field }) => (
+            <AppSelectField
+              id="portal-category"
+              label={`${t("portal.category")} ${t("portal.optional")}`}
+              labelClassName="mb-1.5 block text-sm font-medium"
+              disabled={categories.isLoading || mutation.isPending}
+              value={field.value}
+              onValueChange={field.onChange}
+              options={categoryOptions}
+            />
+          )}
+        />
         <Field id="portal-description" label={t("portal.descriptionLabel")} error={form.formState.errors.description ? t("portal.validation.description") : undefined}><textarea aria-describedby={form.formState.errors.description ? "portal-description-error" : undefined} aria-invalid={Boolean(form.formState.errors.description)} className="input min-h-44 resize-y" id="portal-description" {...form.register("description")} /></Field>
       </div>
       {mutation.isError && <p className="mt-4 text-sm text-red-700" role="alert">{t("portal.createError")}</p>}

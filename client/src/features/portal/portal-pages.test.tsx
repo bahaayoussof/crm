@@ -26,8 +26,20 @@ describe("portal pages", () => {
   });
   it("shows overview metrics and responsive recent requests", () => { renderPage(<PortalHomePage />); expect(screen.getByRole("heading", { name: "Welcome, Ahmed" })).toBeInTheDocument(); expect(screen.getByText("Waiting for You")).toBeInTheDocument(); expect(screen.getAllByText("Payment help")).toHaveLength(2); expect(screen.getByRole("table")).toBeInTheDocument(); });
   it("renders loading and retry states", () => { mocks.overview.mockReturnValue({ isLoading: true }); const view = renderPage(<PortalHomePage />); expect(screen.getByText(/Loading your support overview/)).toBeInTheDocument(); view.unmount(); mocks.overview.mockReturnValue({ isError: true, refetch: mocks.refetch }); renderPage(<PortalHomePage />); fireEvent.click(screen.getByRole("button", { name: "Retry" })); expect(mocks.refetch).toHaveBeenCalled(); });
-  it("owns filters in the URL and renders no results", () => { mocks.tickets.mockReturnValue({ data: { data: [], meta: { page: 1, totalPages: 0 } } }); renderPage(<PortalTicketsPage />, "/portal/tickets?search=missing&status=RESOLVED"); expect(screen.getByDisplayValue("missing")).toBeInTheDocument(); expect(screen.getByDisplayValue("Resolved")).toBeInTheDocument(); expect(screen.getByText("No requests match your search or filter.")).toBeInTheDocument(); });
-  it("renders visible accessible creation controls and only Portal fields", () => { renderPage(<PortalNewTicketPage />); expect(screen.getByLabelText("Subject")).toHaveClass("input"); expect(screen.getByLabelText(/Category/)).toHaveClass("input"); expect(screen.getByLabelText("Description")).toHaveClass("input"); expect(screen.queryByText(/priority|assignee/i)).not.toBeInTheDocument(); });
+  it("owns filters in the URL and renders no results", () => {
+    mocks.tickets.mockReturnValue({ data: { data: [], meta: { page: 1, totalPages: 0 } } });
+    renderPage(<PortalTicketsPage />, "/portal/tickets?search=missing&status=RESOLVED");
+    expect(screen.getByDisplayValue("missing")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Status" })).toHaveTextContent("Resolved");
+    expect(screen.getByText("No requests match your search or filter.")).toBeInTheDocument();
+  });
+  it("renders visible accessible creation controls and only Portal fields", () => {
+    renderPage(<PortalNewTicketPage />);
+    expect(screen.getByLabelText("Subject")).toHaveClass("input");
+    expect(screen.getByRole("combobox", { name: /Category/ })).toBeInTheDocument();
+    expect(screen.getByLabelText("Description")).toHaveClass("input");
+    expect(screen.queryByText(/priority|assignee/i)).not.toBeInTheDocument();
+  });
   it("keeps required validation associated with the fields", async () => { renderPage(<PortalNewTicketPage />); fireEvent.click(screen.getByRole("button", { name: "Create New Request" })); await waitFor(() => expect(screen.getByText(/Subject must be/)).toBeInTheDocument()); expect(screen.getByLabelText("Subject")).toHaveAttribute("aria-invalid", "true"); expect(screen.getByLabelText("Description")).toHaveAccessibleDescription(/Description is required/); });
   it("preserves failed form values and prevents repeated pending submission", () => { mocks.create.mockReturnValue({ mutateAsync: mocks.mutate, isPending: true, isError: true }); renderPage(<PortalNewTicketPage />); fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "Payment problem" } }); fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Still failing" } }); expect(screen.getByLabelText("Subject")).toHaveValue("Payment problem"); expect(screen.getByLabelText("Description")).toHaveValue("Still failing"); expect(screen.getByRole("button", { name: "Creating…" })).toBeDisabled(); expect(screen.getByText(/content has been preserved/)).toBeInTheDocument(); });
   it("shows safe authors and preserves a failed reply", () => {

@@ -1,12 +1,15 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { AppSelectField } from "@/components/ui/app-select";
 import { getKnowledgeArticleError, getLocalizedKnowledgeArticleError } from "./knowledge-article-error";
 import { useCreateKnowledgeArticle, useKnowledgeArticle, useUpdateKnowledgeArticle } from "./knowledge-article-hooks";
 import { knowledgeArticleFormSchema, type KnowledgeArticleFormValues } from "./knowledge-article.schemas";
 import { KnowledgeBasePage, LoadingRows, PageHeader, StatePanel } from "./knowledge-base-ui";
+
+const STATUSES = ["DRAFT", "PUBLISHED"] as const;
 
 export function KnowledgeArticleFormPage() {
   const { t } = useTranslation();
@@ -18,14 +21,27 @@ export function KnowledgeArticleFormPage() {
   const navigate = useNavigate();
   const [apiError, setApiError] = useState<string | null>(null);
 
-  const { register, reset, handleSubmit, formState: { errors, isSubmitting } } = useForm<KnowledgeArticleFormValues>({
+  const { register, control, handleSubmit, formState: { errors, isSubmitting } } = useForm<KnowledgeArticleFormValues>({
     resolver: zodResolver(knowledgeArticleFormSchema),
-    defaultValues: { title: "", category: "", content: "", status: "DRAFT" },
+    values: isEditing && article.data
+      ? {
+          title: article.data.title,
+          category: article.data.category ?? "",
+          content: article.data.content,
+          status: article.data.status,
+        }
+      : {
+          title: "",
+          category: "",
+          content: "",
+          status: "DRAFT",
+        },
   });
 
-  useEffect(() => {
-    if (isEditing && article.data) reset({ title: article.data.title, category: article.data.category ?? "", content: article.data.content, status: article.data.status });
-  }, [isEditing, article.data, reset]);
+  const statusOptions = STATUSES.map((value) => ({
+    value,
+    label: t(`knowledgeBase.status.${value}`),
+  }));
 
   const submit = handleSubmit(async (values) => {
     setApiError(null);
@@ -65,13 +81,21 @@ export function KnowledgeArticleFormPage() {
           <textarea id="kb-content" className="input min-h-64 resize-y" dir="auto" aria-invalid={Boolean(errors.content)} aria-describedby={errors.content ? "kb-content-error" : undefined} {...register("content")} />
         </Field>
 
-        <Field id="kb-status" label={t("knowledgeBase.statusLabel")}>
-          <select id="kb-status" className="input" {...register("status")}>
-            <option value="DRAFT">{t("knowledgeBase.status.DRAFT")}</option>
-            <option value="PUBLISHED">{t("knowledgeBase.status.PUBLISHED")}</option>
-          </select>
-          <span className="mt-1.5 block text-xs text-muted-foreground">{t("knowledgeBase.statusHelp")}</span>
-        </Field>
+        <Controller
+          name="status"
+          control={control}
+          render={({ field }) => (
+            <AppSelectField
+              id="kb-status"
+              label={t("knowledgeBase.statusLabel")}
+              labelClassName="block text-sm font-medium"
+              value={field.value}
+              onValueChange={field.onChange}
+              helperText={t("knowledgeBase.statusHelp")}
+              options={statusOptions}
+            />
+          )}
+        />
       </div>
       <div className="flex flex-col-reverse gap-3 border-t bg-muted/40 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
         <Link className="button-secondary text-center" to={isEditing ? `/knowledge-base/${id}` : "/knowledge-base"}>{t("common.cancel")}</Link>

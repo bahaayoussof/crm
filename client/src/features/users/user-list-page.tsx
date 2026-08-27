@@ -1,10 +1,11 @@
 import { useTranslation } from "react-i18next";
 import { Link, useSearchParams } from "react-router-dom";
+import { AppSelect } from "@/components/ui/app-select";
 import { useAuth } from "@/features/auth/auth-state";
 import { useDebouncedValue } from "@/features/customers/use-debounced-value";
 import { useUsers } from "./user-hooks";
 import { UserTable } from "./user-table";
-import { LoadingRows, NativeSelect, PageHeader, StatePanel, UsersPage } from "./users-ui";
+import { LoadingRows, PageHeader, StatePanel, UsersPage } from "./users-ui";
 import { MANAGEABLE_ROLES, type ManageableRole } from "./user.types";
 
 const STATUSES = ["active", "inactive"] as const;
@@ -35,6 +36,20 @@ export function UserListPage() {
 
   const hasFilters = Boolean(debouncedSearch || role || status);
 
+  const roleOptions = [
+    { value: "", label: t("users.allRoles") },
+    ...MANAGEABLE_ROLES.map((option) => ({
+      value: option,
+      label: t(`users.roles.${option}`),
+    })),
+  ];
+
+  const statusOptions = [
+    { value: "", label: t("users.allStatuses") },
+    { value: "active", label: t("users.status.active") },
+    { value: "inactive", label: t("users.status.inactive") },
+  ];
+
   return <UsersPage>
     <PageHeader
       title={t("users.title")}
@@ -46,21 +61,24 @@ export function UserListPage() {
         <span className="sr-only">{t("users.search")}</span>
         <input className="input" type="search" dir="auto" value={search} onChange={(event) => setFilter("search", event.target.value)} placeholder={t("users.search")} />
       </label>
-      <label className="block w-full sm:w-44">
+      <div className="w-full sm:w-44">
         <span className="mb-1 block text-xs font-medium text-muted-foreground">{t("users.filterRole")}</span>
-        <NativeSelect value={role ?? ""} onChange={(event) => setFilter("role", event.target.value)}>
-          <option value="">{t("users.allRoles")}</option>
-          {MANAGEABLE_ROLES.map((option) => <option key={option} value={option}>{t(`users.roles.${option}`)}</option>)}
-        </NativeSelect>
-      </label>
-      <label className="block w-full sm:w-44">
+        <AppSelect
+          ariaLabel={t("users.filterRole")}
+          value={role ?? ""}
+          onValueChange={(val) => setFilter("role", val)}
+          options={roleOptions}
+        />
+      </div>
+      <div className="w-full sm:w-44">
         <span className="mb-1 block text-xs font-medium text-muted-foreground">{t("users.filterStatus")}</span>
-        <NativeSelect value={status ?? ""} onChange={(event) => setFilter("status", event.target.value)}>
-          <option value="">{t("users.allStatuses")}</option>
-          <option value="active">{t("users.status.active")}</option>
-          <option value="inactive">{t("users.status.inactive")}</option>
-        </NativeSelect>
-      </label>
+        <AppSelect
+          ariaLabel={t("users.filterStatus")}
+          value={status ?? ""}
+          onValueChange={(val) => setFilter("status", val)}
+          options={statusOptions}
+        />
+      </div>
     </div>
     {users.isLoading ? <LoadingRows />
       : users.isError ? <StatePanel action={<button className="button-secondary" onClick={() => users.refetch()}>{t("common.retry")}</button>}>{t("users.loadError")}</StatePanel>

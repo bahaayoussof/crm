@@ -85,7 +85,10 @@ describe("knowledge base", () => {
 
   it("submits the correct server query for the status filter", async () => {
     renderAt("/knowledge-base", <Route path="/knowledge-base" element={<KnowledgeBaseListPage />} />);
-    fireEvent.change(screen.getByLabelText("Status filter"), { target: { value: "DRAFT" } });
+    const statusTrigger = screen.getByRole("combobox", { name: "Status filter" });
+    fireEvent.keyDown(statusTrigger, { key: "ArrowDown" });
+    await waitFor(() => expect(screen.getByRole("option", { name: "Draft" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("option", { name: "Draft" }));
     await waitFor(() => expect(mocks.useKnowledgeArticles).toHaveBeenLastCalledWith(expect.objectContaining({ status: "DRAFT" })));
   });
 

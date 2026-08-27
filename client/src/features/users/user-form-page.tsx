@@ -1,13 +1,14 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { AppSelectField } from "@/components/ui/app-select";
 import { useAuth } from "@/features/auth/auth-state";
 import { getLocalizedUserError, getUserError } from "./user-error";
 import { useCreateUser, useUpdateUser, useUser } from "./user-hooks";
 import { userCreateFormSchema, userEditFormSchema, type UserCreateFormValues, type UserEditFormValues } from "./user.schemas";
-import { LoadingRows, NativeSelect, PageHeader, StatePanel, UsersPage, YouBadge } from "./users-ui";
+import { LoadingRows, PageHeader, StatePanel, UsersPage, YouBadge } from "./users-ui";
 import { MANAGEABLE_ROLES } from "./user.types";
 
 export function UserFormPage() {
@@ -22,10 +23,15 @@ function CreateUserForm() {
   const navigate = useNavigate();
   const [apiError, setApiError] = useState<string | null>(null);
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<UserCreateFormValues>({
+  const { register, control, handleSubmit, formState: { errors, isSubmitting } } = useForm<UserCreateFormValues>({
     resolver: zodResolver(userCreateFormSchema),
     defaultValues: { name: "", email: "", password: "", role: "AGENT" },
   });
+
+  const roleOptions = MANAGEABLE_ROLES.map((option) => ({
+    value: option,
+    label: t(`users.roles.${option}`),
+  }));
 
   const submit = handleSubmit(async (values) => {
     setApiError(null);
@@ -58,11 +64,21 @@ function CreateUserForm() {
           <span className="mt-1.5 block text-xs text-muted-foreground" id="user-password-help">{t("users.passwordHelp")}</span>
         </Field>
 
-        <Field id="user-role" label={t("users.fieldRole")} required error={errors.role?.message ? t(errors.role.message) : undefined}>
-          <NativeSelect id="user-role" aria-invalid={Boolean(errors.role)} {...register("role")}>
-            {MANAGEABLE_ROLES.map((option) => <option key={option} value={option}>{t(`users.roles.${option}`)}</option>)}
-          </NativeSelect>
-        </Field>
+        <Controller
+          name="role"
+          control={control}
+          render={({ field, fieldState }) => (
+            <AppSelectField
+              id="user-role"
+              label={t("users.fieldRole")}
+              required
+              value={field.value}
+              onValueChange={field.onChange}
+              error={fieldState.error?.message ? t(fieldState.error.message) : undefined}
+              options={roleOptions}
+            />
+          )}
+        />
       </div>
       <FormFooter pending={pending} />
     </form>
@@ -79,14 +95,17 @@ function EditUserForm({ id }: { id: string }) {
 
   const isSelf = Boolean(user.data && currentUser && user.data.id === currentUser.id);
 
-  const { register, reset, handleSubmit, formState: { errors, isSubmitting } } = useForm<UserEditFormValues>({
+  const { register, control, handleSubmit, formState: { errors, isSubmitting } } = useForm<UserEditFormValues>({
     resolver: zodResolver(userEditFormSchema),
-    defaultValues: { name: "", email: "", role: "AGENT", isActive: true },
+    values: user.data
+      ? { name: user.data.name, email: user.data.email, role: user.data.role, isActive: user.data.isActive }
+      : undefined,
   });
 
-  useEffect(() => {
-    if (user.data) reset({ name: user.data.name, email: user.data.email, role: user.data.role, isActive: user.data.isActive });
-  }, [user.data, reset]);
+  const roleOptions = MANAGEABLE_ROLES.map((option) => ({
+    value: option,
+    label: t(`users.roles.${option}`),
+  }));
 
   const submit = handleSubmit(async (values) => {
     setApiError(null);
@@ -125,23 +144,23 @@ function EditUserForm({ id }: { id: string }) {
           <input id="user-email" type="email" className="input" dir="ltr" autoComplete="off" aria-invalid={Boolean(errors.email)} aria-describedby={errors.email ? "user-email-error" : undefined} {...register("email")} />
         </Field>
 
-        <Field
-          id="user-role"
-          label={t("users.fieldRole")}
-          required
-          error={errors.role?.message ? t(errors.role.message) : undefined}
-          hint={isSelf ? t("users.selfRoleReadonly") : undefined}
-        >
-          <NativeSelect
-            id="user-role"
-            disabled={isSelf}
-            aria-invalid={Boolean(errors.role)}
-            aria-describedby={isSelf ? "user-role-hint" : undefined}
-            {...register("role")}
-          >
-            {MANAGEABLE_ROLES.map((option) => <option key={option} value={option}>{t(`users.roles.${option}`)}</option>)}
-          </NativeSelect>
-        </Field>
+        <Controller
+          name="role"
+          control={control}
+          render={({ field, fieldState }) => (
+            <AppSelectField
+              id="user-role"
+              label={t("users.fieldRole")}
+              required
+              disabled={isSelf}
+              value={field.value}
+              onValueChange={field.onChange}
+              error={fieldState.error?.message ? t(fieldState.error.message) : undefined}
+              helperText={isSelf ? t("users.selfRoleReadonly") : undefined}
+              options={roleOptions}
+            />
+          )}
+        />
 
         <div className="rounded-md border bg-muted/20 p-4">
           <label className="flex items-start gap-3">

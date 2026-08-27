@@ -69,7 +69,10 @@ describe("ticket pages", () => {
   it("drives backend search and filters from URL state", async () => {
     renderAt("/tickets", <Route path="/tickets" element={<TicketListPage />} />);
     fireEvent.change(screen.getByPlaceholderText("Search tickets by ID, subject, or customer…"), { target: { value: "ticket-12345678" } });
-    fireEvent.change(screen.getByLabelText("Status"), { target: { value: "OPEN" } });
+    const statusTrigger = screen.getByRole("combobox", { name: "Status" });
+    fireEvent.keyDown(statusTrigger, { key: "ArrowDown" });
+    await waitFor(() => expect(screen.getByRole("option", { name: "Open" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("option", { name: "Open" }));
     await waitFor(() => expect(mocks.useTickets).toHaveBeenLastCalledWith(expect.objectContaining({ search: "ticket-12345678", status: "OPEN" })), { timeout: 1000 });
   });
 
@@ -121,7 +124,16 @@ describe("ticket pages", () => {
   it("creates a ticket and navigates to details", async () => {
     mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: undefined }); mocks.create.mockResolvedValue(listTicket);
     renderAt("/tickets/new", <><Route path="/tickets/new" element={<TicketFormPage />} /><Route path="/tickets/:id" element={<p>Created detail</p>} /></>);
-    fireEvent.focus(screen.getByRole("combobox", { name: "Customer" })); fireEvent.click(screen.getByRole("option", { name: /Ahmed Mohamed/ })); fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "Payment failed" } }); fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Card rejected" } }); fireEvent.change(screen.getByLabelText("Category"), { target: { value: "category-1" } });
+    fireEvent.focus(screen.getByRole("combobox", { name: "Customer" }));
+    fireEvent.click(screen.getByRole("option", { name: /Ahmed Mohamed/ }));
+    fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "Payment failed" } });
+    fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Card rejected" } });
+    
+    const categoryTrigger = screen.getByRole("combobox", { name: "Category" });
+    fireEvent.keyDown(categoryTrigger, { key: "ArrowDown" });
+    await waitFor(() => expect(screen.getByRole("option", { name: "Billing" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("option", { name: "Billing" }));
+
     fireEvent.click(screen.getByRole("button", { name: "Create ticket" }));
     await waitFor(() => expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ customerId: "customer-1", priority: "MEDIUM", categoryId: "category-1" })));
     expect(await screen.findByText("Created detail")).toBeInTheDocument();
@@ -131,8 +143,18 @@ describe("ticket pages", () => {
     mocks.useAuth.mockReturnValue({ user: { id: "agent-1", name: "Agent", email: "agent@example.com", role: "AGENT" } });
     mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: undefined }); mocks.create.mockResolvedValue(listTicket);
     renderAt("/tickets/new", <><Route path="/tickets/new" element={<TicketFormPage />} /><Route path="/tickets/:id" element={<p>Agent ticket detail</p>} /></>);
-    expect(screen.queryByLabelText("Assigned agent")).not.toBeInTheDocument();
-    fireEvent.focus(screen.getByRole("combobox", { name: "Customer" })); fireEvent.click(screen.getByRole("option", { name: /Ahmed Mohamed/ })); fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "Phone request" } }); fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Captured by agent" } }); fireEvent.change(screen.getByLabelText("Category"), { target: { value: "category-1" } }); fireEvent.click(screen.getByRole("button", { name: "Create ticket" }));
+    expect(screen.queryByRole("combobox", { name: "Assigned agent" })).not.toBeInTheDocument();
+    fireEvent.focus(screen.getByRole("combobox", { name: "Customer" }));
+    fireEvent.click(screen.getByRole("option", { name: /Ahmed Mohamed/ }));
+    fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "Phone request" } });
+    fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Captured by agent" } });
+    
+    const categoryTrigger = screen.getByRole("combobox", { name: "Category" });
+    fireEvent.keyDown(categoryTrigger, { key: "ArrowDown" });
+    await waitFor(() => expect(screen.getByRole("option", { name: "Billing" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("option", { name: "Billing" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Create ticket" }));
     await waitFor(() => expect(mocks.create).toHaveBeenCalled());
     expect(mocks.create.mock.calls[0][0]).not.toHaveProperty("assignedAgentId"); expect(await screen.findByText("Agent ticket detail")).toBeInTheDocument();
   });
@@ -223,17 +245,35 @@ describe("ticket pages", () => {
   });
 
   it("updates status and assignment through one safe mutation", async () => {
-    mocks.update.mockResolvedValue(listTicket); renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
-    fireEvent.change(screen.getByLabelText("Status"), { target: { value: "RESOLVED" } }); fireEvent.change(screen.getByLabelText("Assigned agent"), { target: { value: "" } }); fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    mocks.update.mockResolvedValue(listTicket);
+    renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
+    
+    const statusTrigger = screen.getByRole("combobox", { name: "Status" });
+    fireEvent.keyDown(statusTrigger, { key: "ArrowDown" });
+    await waitFor(() => expect(screen.getByRole("option", { name: "Resolved" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("option", { name: "Resolved" }));
+
+    const agentTrigger = screen.getByRole("combobox", { name: "Assigned agent" });
+    fireEvent.keyDown(agentTrigger, { key: "ArrowDown" });
+    await waitFor(() => expect(screen.getByRole("option", { name: "Unassigned" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("option", { name: "Unassigned" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({ status: "RESOLVED", assignedAgentId: null }));
   });
 
   it("limits assigned-agent details to operational controls and confirms close", async () => {
     mocks.useAuth.mockReturnValue({ user: { id: "agent-1", name: "Agent", email: "agent@example.com", role: "AGENT" } });
-    mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: { ...ticket, status: "RESOLVED", resolvedAt: "2026-08-25T10:00:00.000Z" } }); mocks.update.mockResolvedValue({ ...listTicket, status: "CLOSED" });
+    mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: { ...ticket, status: "RESOLVED", resolvedAt: "2026-08-25T10:00:00.000Z" } });
+    mocks.update.mockResolvedValue({ ...listTicket, status: "CLOSED" });
     renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
-    expect(screen.queryByRole("link", { name: "Edit" })).not.toBeInTheDocument(); expect(screen.queryByLabelText("Category")).not.toBeInTheDocument(); expect(screen.getByLabelText("Status")).toBeInTheDocument(); expect(screen.getByLabelText("Priority")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Close ticket" })); expect(screen.getByText(/Closing is final/)).toBeInTheDocument(); fireEvent.click(screen.getByRole("button", { name: "Confirm close" }));
+    expect(screen.queryByRole("link", { name: "Edit" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Category" })).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Status" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Priority" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Close ticket" }));
+    expect(screen.getByText(/Closing is final/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm close" }));
     await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({ status: "CLOSED" }));
   });
 

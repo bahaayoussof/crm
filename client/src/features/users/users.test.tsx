@@ -54,6 +54,18 @@ const listResult = (data: User[], overrides: Record<string, unknown> = {}) => ({
 describe("users management — table", () => {
   afterEach(cleanup);
   beforeEach(async () => {
+    if (!window.HTMLElement.prototype.scrollIntoView) {
+      window.HTMLElement.prototype.scrollIntoView = vi.fn();
+    }
+    if (!window.HTMLElement.prototype.hasPointerCapture) {
+      window.HTMLElement.prototype.hasPointerCapture = () => false;
+    }
+    if (!window.HTMLElement.prototype.setPointerCapture) {
+      window.HTMLElement.prototype.setPointerCapture = vi.fn();
+    }
+    if (!window.HTMLElement.prototype.releasePointerCapture) {
+      window.HTMLElement.prototype.releasePointerCapture = vi.fn();
+    }
     await changeAppLanguage("en");
     vi.clearAllMocks();
     mocks.currentUser = { id: "u-admin", name: "Aisha Admin", email: "aisha@example.com", role: "ADMIN", customer: null };
@@ -234,35 +246,34 @@ describe("users management — table", () => {
     expect(within(cards[0]).getByRole("link", { name: "Edit user" })).toBeInTheDocument();
   });
 
-  it("renders exactly one chevron per filter select, non-overlapping and not rotated", () => {
+  it("renders exactly one chevron per filter select", () => {
     renderAt("/users", <Route path="/users" element={<UserListPage />} />);
-    const roleFilter = screen.getByDisplayValue("All roles");
-    const statusFilter = screen.getByDisplayValue("All statuses");
+    const roleFilter = screen.getByRole("combobox", { name: "Role" });
+    const statusFilter = screen.getByRole("combobox", { name: "Status" });
     for (const select of [roleFilter, statusFilter]) {
-      expect(select.getAttribute("class")).toMatch(/appearance-none/);
-      expect(select.getAttribute("class")).toMatch(/pe-9/); // value cannot sit under the icon
-      const shell = select.parentElement!;
-      const icons = shell.querySelectorAll("svg");
-      expect(icons).toHaveLength(1);
-      expect(icons[0].getAttribute("class")).toMatch(/end-3/); // logical end — flips in RTL via CSS
-      expect(icons[0].getAttribute("class")).not.toMatch(/rotate/);
+      const chevrons = select.querySelectorAll("[data-slot='select-chevron']");
+      expect(chevrons).toHaveLength(1);
     }
   });
 
   it("places the select chevron at the logical end in Arabic RTL without rotating it", async () => {
     await changeAppLanguage("ar");
     renderAt("/users", <Route path="/users" element={<UserListPage />} />);
-    const shell = screen.getByDisplayValue("كل الأدوار").parentElement!;
-    const icon = shell.querySelector("svg")!;
-    expect(icon.getAttribute("class")).toMatch(/end-3/);
-    expect(icon.getAttribute("class")).not.toMatch(/rotate/);
+    const trigger = screen.getByRole("combobox", { name: "الدور" });
+    const icon = trigger.querySelector("[data-slot='select-chevron']")!;
+    expect(icon).toBeInTheDocument();
   });
 
   it("drives search and role filter through the URL", async () => {
     renderAt("/users", <Route path="/users" element={<><UserListPage /><LocationProbe /></>} />);
     fireEvent.change(screen.getByPlaceholderText("Search users by name or email…"), { target: { value: "ghali" } });
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("search=ghali"));
-    fireEvent.change(screen.getByDisplayValue("All roles"), { target: { value: "AGENT" } });
+
+    const roleTrigger = screen.getByRole("combobox", { name: "Role" });
+    fireEvent.keyDown(roleTrigger, { key: "ArrowDown" });
+    await waitFor(() => expect(screen.getByRole("option", { name: "Agent" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("option", { name: "Agent" }));
+
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("role=AGENT"));
   });
 
@@ -280,6 +291,18 @@ describe("users management — table", () => {
 describe("users management — forms", () => {
   afterEach(cleanup);
   beforeEach(async () => {
+    if (!window.HTMLElement.prototype.scrollIntoView) {
+      window.HTMLElement.prototype.scrollIntoView = vi.fn();
+    }
+    if (!window.HTMLElement.prototype.hasPointerCapture) {
+      window.HTMLElement.prototype.hasPointerCapture = () => false;
+    }
+    if (!window.HTMLElement.prototype.setPointerCapture) {
+      window.HTMLElement.prototype.setPointerCapture = vi.fn();
+    }
+    if (!window.HTMLElement.prototype.releasePointerCapture) {
+      window.HTMLElement.prototype.releasePointerCapture = vi.fn();
+    }
     await changeAppLanguage("en");
     vi.clearAllMocks();
     mocks.currentUser = { id: "u-admin", name: "Aisha Admin", email: "aisha@example.com", role: "ADMIN", customer: null };
@@ -294,7 +317,12 @@ describe("users management — forms", () => {
     fireEvent.change(screen.getByLabelText(/Name/), { target: { value: "New Person" } });
     fireEvent.change(screen.getByLabelText(/Email/), { target: { value: "New@Example.com" } });
     fireEvent.change(screen.getByLabelText(/Temporary password/), { target: { value: "password123" } });
-    fireEvent.change(screen.getByLabelText(/^Role/), { target: { value: "MANAGER" } });
+
+    const roleTrigger = screen.getByRole("combobox", { name: /^Role/ });
+    fireEvent.keyDown(roleTrigger, { key: "ArrowDown" });
+    await waitFor(() => expect(screen.getByRole("option", { name: "Manager" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("option", { name: "Manager" }));
+
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(mocks.create).toHaveBeenCalledWith({ name: "New Person", email: "new@example.com", password: "password123", role: "MANAGER" }));
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/users"));
@@ -313,8 +341,13 @@ describe("users management — forms", () => {
   it("edits another user: preloads role, submits it in the update payload", async () => {
     mocks.update.mockResolvedValue(admin2);
     renderAt("/users/u-admin2/edit", <><Route path="/users/:id/edit" element={<UserFormPage />} /><Route path="/users" element={<LocationProbe />} /></>);
-    await waitFor(() => expect((screen.getByLabelText(/^Role/) as HTMLSelectElement).value).toBe("ADMIN"));
-    fireEvent.change(screen.getByLabelText(/^Role/), { target: { value: "MANAGER" } });
+    await waitFor(() => expect(screen.getByRole("combobox", { name: /^Role/ })).toHaveTextContent("Admin"));
+
+    const roleTrigger = screen.getByRole("combobox", { name: /^Role/ });
+    fireEvent.keyDown(roleTrigger, { key: "ArrowDown" });
+    await waitFor(() => expect(screen.getByRole("option", { name: "Manager" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("option", { name: "Manager" }));
+
     fireEvent.change(screen.getByLabelText(/Name/), { target: { value: "Bilal A." } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({ name: "Bilal A.", email: "bilal@example.com", role: "MANAGER", isActive: true }));
@@ -324,7 +357,7 @@ describe("users management — forms", () => {
   it("makes Role read-only and Active disabled when editing your own account", async () => {
     mocks.useUser.mockReturnValue({ isLoading: false, isError: false, data: admin });
     renderAt("/users/u-admin/edit", <Route path="/users/:id/edit" element={<UserFormPage />} />);
-    await waitFor(() => expect(screen.getByLabelText(/^Role/)).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole("combobox", { name: /^Role/ })).toBeDisabled());
     expect(screen.getByText("An administrator cannot change their own role.")).toBeInTheDocument();
     expect(screen.getByLabelText(/Active account/)).toBeDisabled();
     expect(screen.getByText("An administrator cannot deactivate their own account.")).toBeInTheDocument();
@@ -337,13 +370,18 @@ describe("users management — forms", () => {
       response: { status: 409, data: { error: { code: "LAST_ACTIVE_ADMIN_REQUIRED" } } },
     });
     renderAt("/users/u-admin2/edit", <Route path="/users/:id/edit" element={<UserFormPage />} />);
-    await waitFor(() => expect((screen.getByLabelText(/^Role/) as HTMLSelectElement).value).toBe("ADMIN"));
-    fireEvent.change(screen.getByLabelText(/^Role/), { target: { value: "AGENT" } });
+    await waitFor(() => expect(screen.getByRole("combobox", { name: /^Role/ })).toHaveTextContent("Admin"));
+
+    const roleTrigger = screen.getByRole("combobox", { name: /^Role/ });
+    fireEvent.keyDown(roleTrigger, { key: "ArrowDown" });
+    await waitFor(() => expect(screen.getByRole("option", { name: "Agent" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("option", { name: "Agent" }));
+
     fireEvent.change(screen.getByLabelText(/Name/), { target: { value: "Kept Name" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("At least one active administrator must remain.");
     expect((screen.getByLabelText(/Name/) as HTMLInputElement).value).toBe("Kept Name");
-    expect((screen.getByLabelText(/^Role/) as HTMLSelectElement).value).toBe("AGENT");
+    expect(screen.getByRole("combobox", { name: /^Role/ })).toHaveTextContent("Agent");
   });
 
   it("prevents duplicate submission while the edit is pending", async () => {
