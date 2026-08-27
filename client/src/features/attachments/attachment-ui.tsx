@@ -46,11 +46,11 @@ export function AttachmentRows({
   };
   return (
     <div>
-      <ul className="divide-y border-y bg-white">
+      <ul className="divide-y divide-border-subtle border-y border-border bg-surface">
         {attachments.map((attachment) => (
-          <li className="flex items-center justify-between gap-3 px-4 py-3" key={attachment.id}>
+          <li className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-hover transition-colors" key={attachment.id}>
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium" title={attachment.fileName}>
+              <p className="truncate text-sm font-semibold text-foreground" title={attachment.fileName}>
                 <bdi dir="auto">{attachment.fileName}</bdi>
               </p>
               <p className="mt-0.5 whitespace-nowrap text-xs text-muted-foreground">
@@ -69,7 +69,7 @@ export function AttachmentRows({
         ))}
       </ul>
       {downloadCtl.error && (
-        <p className="mt-2 text-sm text-red-700" role="alert">
+        <p className="mt-2 text-sm text-danger" role="alert">
           {downloadCtl.error}
         </p>
       )}
@@ -150,8 +150,8 @@ export function AttachmentUploadForm({
   };
 
   return (
-    <div className="rounded-md border bg-muted/30 p-4">
-      <label className="block text-sm font-medium" htmlFor={inputId}>
+    <div className="rounded-xl border border-border bg-surface-subtle/50 p-4">
+      <label className="block text-sm font-medium text-foreground" htmlFor={inputId}>
         {t("attachments.selectFile")}
       </label>
       <p className="mt-1 text-xs text-muted-foreground" id={helpId}>
@@ -161,7 +161,7 @@ export function AttachmentUploadForm({
         ref={inputRef}
         id={inputId}
         type="file"
-        className="mt-2 block w-full text-sm file:me-3 file:rounded-md file:border file:border-border file:bg-white file:px-3 file:py-1.5 file:text-sm"
+        className="mt-2 block w-full text-sm file:me-3 file:rounded-md file:border file:border-border file:bg-surface file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-foreground hover:file:bg-surface-hover cursor-pointer"
         accept={ACCEPTED_INPUT_ACCEPT}
         aria-describedby={helpId}
         disabled={isPending}
@@ -169,17 +169,17 @@ export function AttachmentUploadForm({
       />
       {file && (
         <p className="mt-2 text-sm">
-          {t("attachments.selectedFile")}: <bdi dir="auto" className="font-medium">{file.name}</bdi>{" "}
+          {t("attachments.selectedFile")}: <bdi dir="auto" className="font-semibold text-foreground">{file.name}</bdi>{" "}
           <span className="text-muted-foreground">({formatBytes(file.size)})</span>
         </p>
       )}
       {error && (
-        <p className="mt-2 text-sm text-red-700" role="alert">
+        <p className="mt-2 text-sm text-danger" role="alert">
           {error}
         </p>
       )}
       {success && (
-        <p className="mt-2 text-sm text-green-700" role="status">
+        <p className="mt-2 text-sm text-success" role="status">
           {t("attachments.uploadSuccess")}
         </p>
       )}
@@ -227,20 +227,20 @@ export function AttachmentPanel({
   const { t } = useTranslation();
   return (
     <section aria-labelledby="attachments-heading" className="space-y-3">
-      <h2 className="text-base font-semibold" id="attachments-heading">
+      <h2 className="text-base font-semibold text-foreground" id="attachments-heading">
         {t("attachments.title")}
       </h2>
       {canUpload && upload ? (
         <AttachmentUploadForm onUpload={(file) => upload.mutateAsync(file)} isPending={upload.isPending} />
       ) : disabledReason ? (
-        <p className="rounded-md border bg-muted p-3 text-sm text-muted-foreground">{disabledReason}</p>
+        <p className="rounded-md border border-border bg-surface-subtle p-3 text-sm text-muted-foreground">{disabledReason}</p>
       ) : null}
       {isLoading ? (
         <p className="text-sm text-muted-foreground" role="status">
           {t("common.loading")}
         </p>
       ) : isError ? (
-        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">
+        <div className="rounded-md border border-danger-subtle bg-danger-subtle/50 p-3 text-sm text-danger-foreground" role="alert">
           {t("attachments.loadError")}{" "}
           <button type="button" className="button-secondary mt-2" onClick={onRetry}>
             {t("common.retry")}
@@ -249,7 +249,7 @@ export function AttachmentPanel({
       ) : attachments && attachments.length > 0 ? (
         <AttachmentRows attachments={attachments} scope={scope} locale={locale} />
       ) : (
-        <p className="rounded-md border bg-white px-4 py-6 text-center text-sm text-muted-foreground">
+        <p className="rounded-xl border border-dashed border-border bg-surface/50 px-4 py-6 text-center text-sm text-muted-foreground">
           {emptyText ?? t("attachments.none")}
         </p>
       )}
@@ -283,8 +283,8 @@ export function MessageAttachmentList({
     <div className="mt-2">
       <ul className="flex flex-col gap-1.5" aria-label={t("attachments.title")}>
         {attachments.map((attachment) => (
-          <li className="flex items-center justify-between gap-3 rounded-sm border bg-white px-2 py-1" key={attachment.id}>
-            <span className="min-w-0 truncate text-xs font-medium" title={attachment.fileName}>
+          <li className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface px-2.5 py-1.5 shadow-2xs" key={attachment.id}>
+            <span className="min-w-0 truncate text-xs font-medium text-foreground" title={attachment.fileName}>
               <span aria-hidden="true">📎 </span>
               <bdi dir="auto">{attachment.fileName}</bdi>
             </span>
@@ -298,7 +298,7 @@ export function MessageAttachmentList({
         ))}
       </ul>
       {downloadCtl.error && (
-        <p className="mt-1.5 text-xs text-red-700" role="alert">
+        <p className="mt-1.5 text-xs text-danger" role="alert">
           {downloadCtl.error}
         </p>
       )}

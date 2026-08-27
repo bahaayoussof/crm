@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Link, useSearchParams } from "react-router-dom";
 import { AppSelect } from "@/components/ui/app-select";
+import { FilterBar } from "@/components/shared/filter-bar";
 import { useAuth } from "@/features/auth/auth-state";
 import { useDebouncedValue } from "@/features/customers/use-debounced-value";
 import { useKnowledgeArticles } from "./knowledge-article-hooks";
@@ -43,43 +44,80 @@ export function KnowledgeBaseListPage() {
     ...statuses.map((value) => ({ value, label: t(`knowledgeBase.status.${value}`) })),
   ];
 
-  return <KnowledgeBasePage>
-    <PageHeader
-      title={t("knowledgeBase.title")}
-      description={t("knowledgeBase.description")}
-      actions={canManage ? <Link className="button-link" to="/knowledge-base/new">{t("knowledgeBase.create")}</Link> : undefined}
-    />
-    <div className="my-6 grid gap-3 border-b pb-6 sm:grid-cols-2 lg:grid-cols-4">
-      <label className="sm:col-span-2">
-        <span className="sr-only">{t("knowledgeBase.search")}</span>
-        <input className="input" type="search" dir="auto" value={search} onChange={(event) => setFilter("search", event.target.value)} placeholder={t("knowledgeBase.search")} />
-      </label>
-      <div>
-        <AppSelect
-          ariaLabel={t("knowledgeBase.statusFilter")}
-          value={status ?? ""}
-          onValueChange={(value) => setFilter("status", value)}
-          options={statusOptions}
+  return (
+    <KnowledgeBasePage>
+      <div className="space-y-6">
+        <PageHeader
+          title={t("knowledgeBase.title")}
+          description={t("knowledgeBase.description")}
+          actions={canManage ? <Link className="button-link" to="/knowledge-base/new">{t("knowledgeBase.create")}</Link> : undefined}
         />
+        <FilterBar className="my-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="sm:col-span-2">
+            <span className="sr-only">{t("knowledgeBase.search")}</span>
+            <div className="relative">
+              <svg
+                className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+              <input
+                className="input ps-9"
+                type="search"
+                dir="auto"
+                value={search}
+                onChange={(event) => setFilter("search", event.target.value)}
+                placeholder={t("knowledgeBase.search")}
+              />
+            </div>
+          </label>
+          <div>
+            <AppSelect
+              ariaLabel={t("knowledgeBase.statusFilter")}
+              value={status ?? ""}
+              onValueChange={(value) => setFilter("status", value)}
+              options={statusOptions}
+            />
+          </div>
+          <label>
+            <span className="sr-only">{t("knowledgeBase.categoryFilter")}</span>
+            <input className="input" dir="auto" value={params.get("category") ?? ""} onChange={(event) => setFilter("category", event.target.value)} placeholder={t("knowledgeBase.categoryFilter")} />
+          </label>
+          {hasFilters && (
+            <button className="button-ghost sm:col-span-2 lg:col-span-4 justify-self-start" onClick={() => setParams({})}>
+              {t("knowledgeBase.clearFilters")}
+            </button>
+          )}
+        </FilterBar>
+        {articles.isLoading ? (
+          <LoadingRows />
+        ) : articles.isError ? (
+          <StatePanel action={<button className="button-secondary" onClick={() => articles.refetch()}>{t("common.retry")}</button>}>
+            {t("knowledgeBase.loadError")}
+          </StatePanel>
+        ) : articles.data && articles.data.data.length === 0 ? (
+          <StatePanel action={hasFilters ? <button className="button-secondary" onClick={() => setParams({})}>{t("knowledgeBase.clearFilters")}</button> : canManage ? <Link className="button-link" to="/knowledge-base/new">{t("knowledgeBase.create")}</Link> : undefined}>
+            {hasFilters ? t("knowledgeBase.noMatches") : t("knowledgeBase.empty")}
+          </StatePanel>
+        ) : (
+          <KnowledgeArticleTable
+            articles={articles.data?.data ?? []}
+            page={page}
+            pageSize={articles.data?.meta.limit ?? 20}
+            pageCount={articles.data?.meta.totalPages ?? 0}
+            onPageChange={(nextPage) => setFilter("page", nextPage > 1 ? String(nextPage) : "")}
+          />
+        )}
       </div>
-      <label>
-        <span className="sr-only">{t("knowledgeBase.categoryFilter")}</span>
-        <input className="input" dir="auto" value={params.get("category") ?? ""} onChange={(event) => setFilter("category", event.target.value)} placeholder={t("knowledgeBase.categoryFilter")} />
-      </label>
-    </div>
-    {articles.isLoading ? <LoadingRows />
-      : articles.isError ? <StatePanel action={<button className="button-secondary" onClick={() => articles.refetch()}>{t("common.retry")}</button>}>{t("knowledgeBase.loadError")}</StatePanel>
-      : articles.data && articles.data.data.length === 0 ? <StatePanel action={hasFilters
-          ? <button className="button-secondary" onClick={() => setParams({})}>{t("knowledgeBase.clearFilters")}</button>
-          : canManage ? <Link className="button-link" to="/knowledge-base/new">{t("knowledgeBase.create")}</Link> : undefined}>
-          {hasFilters ? t("knowledgeBase.noMatches") : t("knowledgeBase.empty")}
-        </StatePanel>
-      : <KnowledgeArticleTable
-          articles={articles.data?.data ?? []}
-          page={page}
-          pageSize={articles.data?.meta.limit ?? 20}
-          pageCount={articles.data?.meta.totalPages ?? 0}
-          onPageChange={(nextPage) => setFilter("page", nextPage > 1 ? String(nextPage) : "")}
-        />}
-  </KnowledgeBasePage>;
+    </KnowledgeBasePage>
+  );
 }

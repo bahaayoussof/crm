@@ -72,7 +72,10 @@ describe("AuthProvider logout", () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.click((await screen.findAllByRole("button", { name: "Log out" }))[0]);
+    const profileTriggers = await screen.findAllByRole("button", { name: /Test Admin/i });
+    fireEvent.click(profileTriggers[0]);
+    const logoutBtn = await screen.findByRole("menuitem", { name: "Log out" });
+    fireEvent.click(logoutBtn);
 
     expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
     expect(getAuthToken()).toBeNull();

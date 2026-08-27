@@ -28,12 +28,9 @@ interface UserTableMeta {
 }
 
 const ICON_LINK =
-  "inline-flex size-9 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors " +
-  "hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
+  "inline-flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors " +
+  "hover:bg-surface-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30";
 
-// Explicit column ownership: Name takes a fixed share, Email flexes into the
-// remainder, Role / Status / Created / Actions get stable pixel widths.
-// Logical alignment flips in RTL; no dir branching.
 const columnClasses: Record<string, string> = {
   name: "w-[22%]",
   email: "w-auto",
@@ -46,17 +43,11 @@ const columnClasses: Record<string, string> = {
 export function UserTable({ users, currentUserId, page, pageSize, pageCount, onPageChange }: UserTableProps) {
   const { t, i18n } = useTranslation();
 
-  // Single open confirmation, coordinated here so a filter/pagination change
-  // (which swaps the `users` array) closes any stale confirmation. The `variant`
-  // keeps the desktop-table and mobile-card triggers from both opening a panel
-  // for the same row (both DOM trees are mounted; only one is visible).
   const [openConfirm, setOpenConfirm] = useState<{ id: string; variant: ConfirmVariant } | null>(null);
   useEffect(() => { setOpenConfirm(null); }, [users, page]);
   const requestOpenConfirm = useCallback((id: string, variant: ConfirmVariant) => setOpenConfirm({ id, variant }), []);
   const closeConfirm = useCallback(() => setOpenConfirm(null), []);
 
-  // Frontend guard for the last active ADMIN, using only the rows on this page.
-  // The backend still enforces it (data here may be stale / paginated).
   const provableLastActiveAdmin = useMemo(() => {
     const activeAdmins = users.filter((u) => u.role === "ADMIN" && u.isActive);
     return activeAdmins.length === 1 ? activeAdmins[0].id : null;
@@ -69,7 +60,7 @@ export function UserTable({ users, currentUserId, page, pageSize, pageCount, onP
       header: () => t("users.columns.name"),
       cell: ({ row, table }) => <span className="flex min-w-0 items-center gap-1.5">
         <Link
-          className="min-w-0 truncate rounded-sm font-medium text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+          className="min-w-0 truncate rounded-sm font-semibold text-foreground hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
           dir="auto"
           title={row.original.name}
           to={`/users/${row.original.id}/edit`}
@@ -99,7 +90,7 @@ export function UserTable({ users, currentUserId, page, pageSize, pageCount, onP
       id: "createdAt",
       accessorKey: "createdAt",
       header: () => t("users.columns.created"),
-      cell: ({ getValue }) => <span className="whitespace-nowrap text-muted-foreground"><bdi dir="ltr">{formatUserDate(getValue<string>(), i18n.language)}</bdi></span>,
+      cell: ({ getValue }) => <span className="whitespace-nowrap text-xs text-muted-foreground"><bdi dir="ltr">{formatUserDate(getValue<string>(), i18n.language)}</bdi></span>,
     },
     {
       id: "actions",
@@ -124,20 +115,20 @@ export function UserTable({ users, currentUserId, page, pageSize, pageCount, onP
   });
 
   return <>
-    <div className="hidden overflow-x-auto rounded-md border bg-white md:block">
+    <div className="hidden overflow-x-auto rounded-xl border border-border bg-surface shadow-subtle md:block">
       <table className="w-full min-w-[52rem] table-fixed text-start text-sm">
         <colgroup>
           {table.getAllLeafColumns().map((column) => <col key={column.id} className={columnClasses[column.id] ?? ""} />)}
         </colgroup>
-        <thead className="border-b bg-muted/70 text-xs text-muted-foreground">
+        <thead className="border-b border-border bg-surface-subtle text-xs text-muted-foreground">
           {table.getHeaderGroups().map((headerGroup) => <tr key={headerGroup.id}>{headerGroup.headers.map((header) => <th
-            className={`px-4 py-2.5 font-semibold ${header.column.id === "actions" ? "text-end" : "text-start"}`}
+            className={`px-4 py-3 font-semibold ${header.column.id === "actions" ? "text-end" : "text-start"}`}
             scope="col"
             key={header.id}
           >{header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}</th>)}</tr>)}
         </thead>
-        <tbody className="divide-y">
-          {table.getRowModel().rows.map((row) => <tr className="align-middle transition-colors hover:bg-muted/40" key={row.id}>{row.getVisibleCells().map((cell) => <td
+        <tbody className="divide-y divide-border-subtle">
+          {table.getRowModel().rows.map((row) => <tr className="align-middle transition-colors hover:bg-surface-hover" key={row.id}>{row.getVisibleCells().map((cell) => <td
             className={`px-4 py-3 ${cell.column.id === "actions" ? "text-end" : ""}`}
             key={cell.id}
           >{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}
@@ -145,11 +136,11 @@ export function UserTable({ users, currentUserId, page, pageSize, pageCount, onP
       </table>
     </div>
 
-    <ul className="divide-y rounded-md border bg-white md:hidden">
+    <ul className="divide-y divide-border-subtle rounded-xl border border-border bg-surface shadow-subtle md:hidden">
       {users.map((user) => <li className="p-4" key={user.id}>
         <div className="flex min-w-0 items-center gap-1.5">
           <Link
-            className="min-w-0 truncate rounded-sm font-medium text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            className="min-w-0 truncate rounded-sm font-semibold text-foreground hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
             dir="auto"
             title={user.name}
             to={`/users/${user.id}/edit`}
@@ -168,11 +159,13 @@ export function UserTable({ users, currentUserId, page, pageSize, pageCount, onP
       </li>)}
     </ul>
 
-    {pageCount > 1 && <nav className="mt-6 flex items-center justify-between gap-3" aria-label={t("users.pagination")}>
-      <button className="button-secondary" type="button" disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}>{t("common.previous")}</button>
-      <span className="text-center text-sm text-muted-foreground">{t("users.page", { page, total: pageCount })}</span>
-      <button className="button-secondary" type="button" disabled={!table.getCanNextPage()} onClick={() => table.nextPage()}>{t("common.next")}</button>
-    </nav>}
+    {pageCount > 1 && (
+      <nav className="mt-6 flex items-center justify-between gap-3" aria-label={t("users.pagination")}>
+        <button className="button-secondary" type="button" disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}>{t("common.previous")}</button>
+        <span className="text-center text-xs font-medium text-muted-foreground">{t("users.page", { page, total: pageCount })}</span>
+        <button className="button-secondary" type="button" disabled={!table.getCanNextPage()} onClick={() => table.nextPage()}>{t("common.next")}</button>
+      </nav>
+    )}
   </>;
 }
 
@@ -182,14 +175,13 @@ function RowActions({ user, meta, variant }: { user: User; meta: UserTableMeta; 
   const isSelf = user.id === meta.currentUserId;
   const lockedLastAdmin = meta.provableLastActiveAdmin === user.id;
   const deactivating = user.isActive;
-  // Self-deactivation is never offered; a provable last-active-admin lock disables it too.
   const disabled = deactivating && (isSelf || lockedLastAdmin);
   const disabledReason = disabled
     ? isSelf ? t("users.selfDeactivateBlocked") : t("users.lastAdminBlocked")
     : undefined;
 
   return (
-    <div className="inline-flex items-center gap-1">
+    <div className="inline-flex items-center gap-1.5">
       <Link className={ICON_LINK} to={`/users/${user.id}/edit`} aria-label={t("users.editAction")} title={t("users.editAction")}>
         <PencilIcon />
       </Link>

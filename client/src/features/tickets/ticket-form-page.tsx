@@ -4,12 +4,14 @@ import { Controller, useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AppSelectField } from "@/components/ui/app-select";
+import { PageHeader } from "@/components/shared/page-header";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/auth-state";
 import { CustomerCombobox } from "./customer-combobox";
 import { getTicketError } from "./ticket-error";
 import { useAgents, useCategories, useCreateTicket, useTicket, useUpdateTicket } from "./ticket-hooks";
 import { ticketFormSchema, type TicketFormValues } from "./ticket.schemas";
-import { TicketPage, TicketPageHeader, TicketSkeleton, TicketState } from "./ticket-ui";
+import { TicketPage, TicketSkeleton, TicketState } from "./ticket-ui";
 
 const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"] as const;
 
@@ -91,111 +93,122 @@ export function TicketFormPage() {
 
   return (
     <TicketPage>
-      <TicketPageHeader
-        title={editing ? t("tickets.editTitle") : t("tickets.createTitle")}
-        description={t("tickets.formDescription")}
-      />
-      <form className="mt-6 max-w-3xl overflow-visible rounded-md border bg-white" onSubmit={submit} noValidate>
-        {apiError && (
-          <p className="mx-5 mt-5 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 sm:mx-6" role="alert">
-            {apiError}
-          </p>
-        )}
-        <section className="px-5 py-6 sm:px-6" aria-labelledby="ticket-details-heading">
-          <h2 id="ticket-details-heading" className="text-base font-semibold">{t("tickets.ticketDetails")}</h2>
-          <div className="mt-5 space-y-5">
-            {editing ? (
-              <div>
-                <span className="block text-sm font-medium">{t("tickets.customer")}</span>
-                <p className="mt-2 rounded-md bg-muted px-3 py-2">
-                  {ticket.data?.customer.name}{" "}
-                  <bdi className="text-muted-foreground" dir="ltr">{ticket.data?.customer.email}</bdi>
-                </p>
-              </div>
-            ) : (
-              <Field id="ticket-customer" label={t("tickets.customer")} error={errors.customerId?.message ? t(errors.customerId.message) : undefined}>
-                <Controller
-                  control={control}
-                  name="customerId"
-                  render={({ field }) => (
-                    <CustomerCombobox
-                      id="ticket-customer"
-                      value={field.value}
-                      onChange={field.onChange}
-                      invalid={Boolean(errors.customerId)}
-                      describedBy={errors.customerId ? "ticket-customer-error" : undefined}
-                    />
-                  )}
-                />
+      <div className="space-y-6">
+        <PageHeader
+          title={editing ? t("tickets.editTitle") : t("tickets.createTitle")}
+          description={t("tickets.formDescription")}
+        />
+        <form className="max-w-3xl overflow-visible rounded-xl border border-border bg-surface shadow-subtle" onSubmit={submit} noValidate>
+          {apiError && (
+            <p className="mx-5 mt-5 rounded-md border border-danger-subtle bg-danger-subtle/50 p-3 text-sm text-danger-foreground sm:mx-6" role="alert">
+              {apiError}
+            </p>
+          )}
+          <section className="px-5 py-6 sm:px-6" aria-labelledby="ticket-details-heading">
+            <h2 id="ticket-details-heading" className="text-base font-semibold text-foreground">{t("tickets.ticketDetails")}</h2>
+            <div className="mt-5 space-y-5">
+              {editing ? (
+                <div>
+                  <span className="block text-sm font-medium text-foreground">{t("tickets.customer")}</span>
+                  <p className="mt-2 rounded-md bg-surface-subtle border border-border px-3 py-2 text-foreground">
+                    {ticket.data?.customer.name}{" "}
+                    <bdi className="text-muted-foreground" dir="ltr">{ticket.data?.customer.email}</bdi>
+                  </p>
+                </div>
+              ) : (
+                <Field id="ticket-customer" label={t("tickets.customer")} error={errors.customerId?.message ? t(errors.customerId.message) : undefined}>
+                  <Controller
+                    control={control}
+                    name="customerId"
+                    render={({ field }) => (
+                      <CustomerCombobox
+                        id="ticket-customer"
+                        value={field.value}
+                        onChange={field.onChange}
+                        invalid={Boolean(errors.customerId)}
+                        describedBy={errors.customerId ? "ticket-customer-error" : undefined}
+                      />
+                    )}
+                  />
+                </Field>
+              )}
+              <Field id="ticket-subject" label={t("tickets.subject")} error={errors.subject?.message ? t(errors.subject.message) : undefined}>
+                <input id="ticket-subject" className="input" aria-invalid={Boolean(errors.subject)} {...register("subject")} />
               </Field>
-            )}
-            <Field id="ticket-subject" label={t("tickets.subject")} error={errors.subject?.message ? t(errors.subject.message) : undefined}>
-              <input id="ticket-subject" className="input" aria-invalid={Boolean(errors.subject)} {...register("subject")} />
-            </Field>
-            <Field id="ticket-description" label={t("tickets.descriptionLabel")} error={errors.description?.message ? t(errors.description.message) : undefined}>
-              <textarea id="ticket-description" className="input min-h-36 resize-y" aria-invalid={Boolean(errors.description)} {...register("description")} />
-            </Field>
-          </div>
-        </section>
-        <section className="border-t px-5 py-6 sm:px-6 sm:py-7" aria-labelledby="ticket-classification-heading">
-          <h2 id="ticket-classification-heading" className="text-base font-semibold">{t("tickets.classification")}</h2>
-          <div className="mt-5 grid gap-x-5 gap-y-5 sm:grid-cols-2">
-            <Controller
-              name="priority"
-              control={control}
-              render={({ field }) => (
-                <AppSelectField
-                  id="ticket-priority"
-                  label={t("tickets.priorityLabel")}
-                  labelClassName="block text-sm font-medium"
-                  disabled={editing && !canChangePriority}
-                  value={field.value}
-                  onValueChange={field.onChange}
-                  options={priorityOptions}
-                />
-              )}
-            />
-            <Controller
-              name="categoryId"
-              control={control}
-              render={({ field, fieldState }) => (
-                <AppSelectField
-                  id="ticket-category"
-                  label={t("tickets.category")}
-                  labelClassName="block text-sm font-medium"
-                  value={field.value}
-                  onValueChange={field.onChange}
-                  error={fieldState.error?.message ? t(fieldState.error.message) : undefined}
-                  options={categoryOptions}
-                />
-              )}
-            />
-            {canAssign && (
+              <Field id="ticket-description" label={t("tickets.descriptionLabel")} error={errors.description?.message ? t(errors.description.message) : undefined}>
+                <textarea id="ticket-description" className="input min-h-36 resize-y" aria-invalid={Boolean(errors.description)} {...register("description")} />
+              </Field>
+            </div>
+          </section>
+          <section className="border-t border-border px-5 py-6 sm:px-6 sm:py-7" aria-labelledby="ticket-classification-heading">
+            <h2 id="ticket-classification-heading" className="text-base font-semibold text-foreground">{t("tickets.classification")}</h2>
+            <div className="mt-5 grid gap-x-5 gap-y-5 sm:grid-cols-2">
               <Controller
-                name="assignedAgentId"
+                name="priority"
                 control={control}
                 render={({ field }) => (
                   <AppSelectField
-                    id="ticket-agent"
-                    label={t("tickets.assignedAgent")}
-                    labelClassName="block text-sm font-medium"
+                    id="ticket-priority"
+                    label={t("tickets.priorityLabel")}
+                    labelClassName="block text-sm font-medium text-foreground"
+                    disabled={editing && !canChangePriority}
                     value={field.value}
                     onValueChange={field.onChange}
-                    options={agentOptions}
+                    options={priorityOptions}
                   />
                 )}
               />
-            )}
+              <Controller
+                name="categoryId"
+                control={control}
+                render={({ field, fieldState }) => (
+                  <AppSelectField
+                    id="ticket-category"
+                    label={t("tickets.category")}
+                    labelClassName="block text-sm font-medium text-foreground"
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    error={fieldState.error?.message ? t(fieldState.error.message) : undefined}
+                    options={categoryOptions}
+                  />
+                )}
+              />
+              {canAssign && (
+                <Controller
+                  name="assignedAgentId"
+                  control={control}
+                  render={({ field }) => (
+                    <AppSelectField
+                      id="ticket-agent"
+                      label={t("tickets.assignedAgent")}
+                      labelClassName="block text-sm font-medium text-foreground"
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      options={agentOptions}
+                    />
+                  )}
+                />
+              )}
+            </div>
+          </section>
+          <div className="flex flex-wrap justify-end gap-3 border-t border-border bg-surface-subtle/50 px-5 py-4 sm:px-6 rounded-b-xl">
+            <Link className="button-secondary" to={editing ? `/tickets/${id}` : "/tickets"}>{t("common.cancel")}</Link>
+            <button className="button-primary w-auto" disabled={isSubmitting}>
+              {isSubmitting ? t("common.saving") : editing ? t("common.save") : t("tickets.create")}
+            </button>
           </div>
-        </section>
-        <div className="flex flex-wrap justify-end gap-3 border-t bg-muted/35 px-5 py-4 sm:px-6">
-          <Link className="button-secondary" to={editing ? `/tickets/${id}` : "/tickets"}>{t("common.cancel")}</Link>
-          <button className="button-primary w-auto" disabled={isSubmitting}>
-            {isSubmitting ? t("common.saving") : editing ? t("common.save") : t("tickets.create")}
-          </button>
-        </div>
-      </form>
+        </form>
+      </div>
     </TicketPage>
   );
 }
-function Field({ id, label, error, children }: { id: string; label: string; error?: string; children: React.ReactNode }) { return <div><label className="block text-sm font-medium" htmlFor={id}>{label}</label><div className="mt-2">{children}</div>{error && <p id={`${id}-error`} className="mt-1.5 text-sm text-red-700">{error}</p>}</div>; }
+
+function Field({ id, label, error, children }: { id: string; label: string; error?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-foreground" htmlFor={id}>{label}</label>
+      <div className="mt-2">{children}</div>
+      {error && <p id={`${id}-error`} className="mt-1.5 text-sm text-danger">{error}</p>}
+    </div>
+  );
+}

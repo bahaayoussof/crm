@@ -2,7 +2,9 @@
   "app": { "title": "Customer Support CRM", "foundationReady": "Project foundation is ready." },
   "navigation": {
     "languageSwitcher": "Choose language", "primary": "Primary navigation", "dashboard": "Dashboard", "tickets": "Tickets", "customers": "Customers", "knowledgeBase": "Knowledge Base", "reports": "Reports", "quickReplies": "Quick Replies", "users": "Users",
-    "portalHome": "Portal home", "portalContext": "Support portal", "workspaceContext": "Support workspace", "openCustomers": "Open customer records"
+    "collapseSidebar": "Collapse sidebar", "expandSidebar": "Expand sidebar",
+    "portalHome": "Portal home", "portalContext": "Support portal", "workspaceContext": "Support workspace", "openCustomers": "Open customer records",
+    "sections": { "main": "Main", "support": "Support", "management": "Management" }
   },
   "common": {
     "retry": "Retry", "previous": "Previous", "next": "Next", "cancel": "Cancel", "save": "Save", "saving": "Saving…", "clearSearch": "Clear search",

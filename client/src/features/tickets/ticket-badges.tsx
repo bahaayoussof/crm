@@ -1,13 +1,46 @@
 import { useTranslation } from "react-i18next";
+import { Badge } from "@/components/ui/badge";
 import type { TicketPriority, TicketStatus } from "./ticket.types";
 
-const statusStyles: Record<TicketStatus, string> = {
-  NEW: "border-gray-200 bg-gray-50 text-gray-700", OPEN: "border-blue-200 bg-blue-50 text-blue-700",
-  IN_PROGRESS: "border-violet-200 bg-violet-50 text-violet-700", WAITING_CUSTOMER: "border-amber-200 bg-amber-50 text-amber-800",
-  RESOLVED: "border-green-200 bg-green-50 text-green-700", CLOSED: "border-gray-300 bg-gray-100 text-gray-800", ESCALATED: "border-red-200 bg-red-50 text-red-700",
+const statusVariants: Record<TicketStatus, "neutral" | "info" | "progress" | "warning" | "success" | "danger"> = {
+  NEW: "neutral",
+  OPEN: "info",
+  IN_PROGRESS: "progress",
+  WAITING_CUSTOMER: "warning",
+  RESOLVED: "success",
+  CLOSED: "neutral",
+  ESCALATED: "danger",
 };
+
 const priorityStyles: Record<TicketPriority, string> = {
-  LOW: "text-gray-600", MEDIUM: "text-blue-700", HIGH: "text-amber-700", URGENT: "font-semibold text-red-700",
+  LOW: "text-muted-foreground font-normal",
+  MEDIUM: "text-info-foreground font-medium",
+  HIGH: "text-warning-foreground font-medium",
+  URGENT: "text-danger-foreground font-semibold",
 };
-export function TicketStatusBadge({ status }: { status: TicketStatus }) { const { t } = useTranslation(); return <span className={`inline-flex rounded-md border px-2 py-0.5 text-xs font-medium ${statusStyles[status]}`}>{t(`tickets.status.${status}`)}</span>; }
-export function TicketPriorityText({ priority }: { priority: TicketPriority }) { const { t } = useTranslation(); return <span className={`text-xs font-medium ${priorityStyles[priority]}`}>{t(`tickets.priority.${priority}`)}</span>; }
+
+const priorityDotStyles: Record<TicketPriority, string> = {
+  LOW: "bg-muted-foreground/50",
+  MEDIUM: "bg-info",
+  HIGH: "bg-warning",
+  URGENT: "bg-danger animate-pulse",
+};
+
+export function TicketStatusBadge({ status }: { status: TicketStatus }) {
+  const { t } = useTranslation();
+  return (
+    <Badge variant={statusVariants[status]} size="default">
+      {t(`tickets.status.${status}`)}
+    </Badge>
+  );
+}
+
+export function TicketPriorityText({ priority }: { priority: TicketPriority }) {
+  const { t } = useTranslation();
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-xs ${priorityStyles[priority]}`}>
+      <span className={`size-1.5 rounded-full shrink-0 ${priorityDotStyles[priority]}`} />
+      <span>{t(`tickets.priority.${priority}`)}</span>
+    </span>
+  );
+}

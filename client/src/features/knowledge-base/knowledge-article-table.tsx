@@ -30,7 +30,7 @@ export function KnowledgeArticleTable({ articles, page, pageSize, pageCount, onP
       accessorKey: "title",
       header: t("knowledgeBase.columns.title"),
       cell: ({ row }) => <Link
-        className="line-clamp-2 rounded-sm font-semibold text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+        className="line-clamp-2 rounded-sm font-semibold text-foreground hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
         dir="auto"
         title={row.original.title}
         to={`/knowledge-base/${row.original.id}`}
@@ -43,7 +43,7 @@ export function KnowledgeArticleTable({ articles, page, pageSize, pageCount, onP
       cell: ({ getValue }) => {
         const category = getValue<string | null>();
         return category
-          ? <span className="block truncate" dir="auto" title={category}>{category}</span>
+          ? <span className="block truncate text-foreground font-medium" dir="auto" title={category}>{category}</span>
           : <span className="text-muted-foreground">{t("common.notProvided")}</span>;
       },
     },
@@ -57,13 +57,13 @@ export function KnowledgeArticleTable({ articles, page, pageSize, pageCount, onP
       id: "updatedAt",
       accessorKey: "updatedAt",
       header: t("knowledgeBase.columns.updated"),
-      cell: ({ getValue }) => <span className="whitespace-nowrap text-muted-foreground"><bdi dir="ltr">{formatArticleDate(getValue<string>(), i18n.language)}</bdi></span>,
+      cell: ({ getValue }) => <span className="whitespace-nowrap text-xs text-muted-foreground"><bdi dir="ltr">{formatArticleDate(getValue<string>(), i18n.language)}</bdi></span>,
     },
     {
       id: "author",
       accessorFn: (row) => row.createdBy.name,
       header: t("knowledgeBase.columns.author"),
-      cell: ({ row }) => <span className="block truncate text-muted-foreground" dir="auto" title={row.original.createdBy.name}>{row.original.createdBy.name}</span>,
+      cell: ({ row }) => <span className="block truncate text-xs text-muted-foreground" dir="auto" title={row.original.createdBy.name}>{row.original.createdBy.name}</span>,
     },
   ], [i18n.language, t]);
 
@@ -80,28 +80,28 @@ export function KnowledgeArticleTable({ articles, page, pageSize, pageCount, onP
   });
 
   return <>
-    <div className="hidden overflow-x-auto rounded-md border bg-white md:block">
+    <div className="hidden overflow-x-auto rounded-xl border border-border bg-surface shadow-subtle md:block">
       <table className="w-full min-w-[44rem] table-fixed text-start text-sm">
-        <thead className="border-b bg-muted/70 text-xs text-muted-foreground">
+        <thead className="border-b border-border bg-surface-subtle text-xs text-muted-foreground">
           {table.getHeaderGroups().map((headerGroup) => <tr key={headerGroup.id}>{headerGroup.headers.map((header) => <th className={`px-4 py-3 text-start font-semibold ${columnClasses[header.column.id] ?? ""}`} scope="col" key={header.id}>{header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}</th>)}</tr>)}
         </thead>
-        <tbody className="divide-y">
-          {table.getRowModel().rows.map((row) => <tr className="align-top transition-colors hover:bg-muted/55 focus-within:bg-muted/55" key={row.id}>{row.getVisibleCells().map((cell) => <td className={`px-4 py-3.5 ${columnClasses[cell.column.id] ?? ""}`} key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}
+        <tbody className="divide-y divide-border-subtle">
+          {table.getRowModel().rows.map((row) => <tr className="align-top transition-colors hover:bg-surface-hover" key={row.id}>{row.getVisibleCells().map((cell) => <td className={`px-4 py-3.5 ${columnClasses[cell.column.id] ?? ""}`} key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}
         </tbody>
       </table>
     </div>
-    <div className="divide-y rounded-md border bg-white md:hidden">
+    <div className="divide-y divide-border-subtle rounded-xl border border-border bg-surface shadow-subtle md:hidden">
       {articles.map((article) => <Link
-        className="block p-4 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"
+        className="block p-4 transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"
         key={article.id}
         to={`/knowledge-base/${article.id}`}
       >
         <div className="flex items-start justify-between gap-3">
-          <p className="min-w-0 break-words font-semibold" dir="auto">{article.title}</p>
+          <p className="min-w-0 break-words font-semibold text-foreground" dir="auto">{article.title}</p>
           <ArticleStatusBadge status={article.status} />
         </div>
         <p className="mt-1 text-sm text-muted-foreground" dir="auto">{article.category ?? t("common.notProvided")}</p>
-        <p className="mt-3 border-t pt-2 text-xs text-muted-foreground">
+        <p className="mt-3 border-t border-border-subtle pt-2 text-xs text-muted-foreground">
           {t("knowledgeBase.columns.updated")}: <bdi dir="ltr">{formatArticleDate(article.updatedAt, i18n.language)}</bdi>
           <span className="mx-1">·</span>
           <span dir="auto">{article.createdBy.name}</span>
@@ -110,7 +110,7 @@ export function KnowledgeArticleTable({ articles, page, pageSize, pageCount, onP
     </div>
     {pageCount > 1 && <nav className="mt-6 flex items-center justify-between gap-3" aria-label={t("knowledgeBase.pagination")}>
       <button className="button-secondary" type="button" disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}>{t("common.previous")}</button>
-      <span className="text-center text-sm text-muted-foreground">{t("knowledgeBase.page", { page, total: pageCount })}</span>
+      <span className="text-center text-xs font-medium text-muted-foreground">{t("knowledgeBase.page", { page, total: pageCount })}</span>
       <button className="button-secondary" type="button" disabled={!table.getCanNextPage()} onClick={() => table.nextPage()}>{t("common.next")}</button>
     </nav>}
   </>;
