@@ -1,3 +1,4 @@
+import { Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link, useSearchParams } from "react-router-dom";
 import { useCustomers } from "./customer-hooks";
@@ -43,20 +44,11 @@ export function CustomerListPage() {
         />
         <FilterBar className="my-6">
           <div className="relative w-full max-w-sm">
-            <svg
+            <Search
               className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+              strokeWidth={1.75}
               aria-hidden="true"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.3-4.3" />
-            </svg>
+            />
             <label className="sr-only" htmlFor="customer-search">{t("customers.search")}</label>
             <input
               id="customer-search"

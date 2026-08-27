@@ -1,4 +1,5 @@
-import type { ComponentType, SVGProps } from "react";
+import type { ComponentType } from "react";
+import type { LucideProps } from "lucide-react";
 
 export interface NavChildItem {
   to: string;
@@ -10,7 +11,7 @@ export interface NavChildItem {
 export interface NavItemConfig {
   to: string;
   key: string;
-  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  icon: ComponentType<LucideProps>;
   label?: string;
   badge?: string | number;
   children?: NavChildItem[];

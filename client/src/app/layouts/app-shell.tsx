@@ -9,6 +9,7 @@ import { canManageQuickReplies } from "@/features/quick-replies/quick-reply-perm
 import { canViewReports } from "@/features/reports/reports-permissions";
 import { canManageUsers } from "@/features/users/user-permissions";
 import { cn } from "@/lib/utils";
+import { Menu, X } from "lucide-react";
 import {
   CustomersNavIcon,
   DashboardNavIcon,
@@ -169,11 +170,7 @@ export function AppShell({ audience, children }: PropsWithChildren<{ audience: P
                 className="inline-flex size-10 items-center justify-center rounded-lg border border-border bg-surface text-muted-foreground hover:text-foreground hover:bg-surface-hover transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                 aria-label="Open mobile navigation"
               >
-                <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                  <line x1="4" x2="20" y1="12" y2="12" />
-                  <line x1="4" x2="20" y1="6" y2="6" />
-                  <line x1="4" x2="20" y1="18" y2="18" />
-                </svg>
+                <Menu className="size-5" strokeWidth={1.75} aria-hidden="true" />
               </button>
               <div className="flex items-center gap-2 min-w-0">
                 <div className="flex size-7.5 shrink-0 items-center justify-center rounded-md bg-foreground text-background font-bold text-xs shadow-2xs">
@@ -254,10 +251,7 @@ export function AppShell({ audience, children }: PropsWithChildren<{ audience: P
                     className="inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-surface-subtle hover:text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                     aria-label="Close menu"
                   >
-                    <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
+                    <X className="size-5" strokeWidth={1.75} aria-hidden="true" />
                   </button>
                 </div>
 

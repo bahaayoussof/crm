@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ArrowLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/features/auth/auth-state";
@@ -20,7 +21,12 @@ export function KnowledgeBaseDetailPage() {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const back = <Link className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" to="/knowledge-base">← {t("knowledgeBase.backToList")}</Link>;
+  const back = (
+    <Link className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" to="/knowledge-base">
+      <ArrowLeft className="size-3.5 rtl:rotate-180" strokeWidth={1.75} aria-hidden="true" />
+      <span>{t("knowledgeBase.backToList")}</span>
+    </Link>
+  );
 
   if (article.isLoading) return <KnowledgeBasePage><LoadingRows /></KnowledgeBasePage>;
   if (article.isError) {

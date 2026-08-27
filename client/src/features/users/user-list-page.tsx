@@ -1,3 +1,4 @@
+import { Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link, useSearchParams } from "react-router-dom";
 import { AppSelect } from "@/components/ui/app-select";
@@ -63,20 +64,11 @@ export function UserListPage() {
           <label className="block w-full min-w-0 flex-1">
             <span className="sr-only">{t("users.search")}</span>
             <div className="relative">
-              <svg
+              <Search
                 className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+                strokeWidth={1.75}
                 aria-hidden="true"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.3-4.3" />
-              </svg>
+              />
               <input
                 className="input ps-9"
                 type="search"

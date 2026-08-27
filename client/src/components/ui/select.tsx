@@ -1,59 +1,6 @@
 import * as React from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
-
-function ChevronDownIcon({ className = "size-4" }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.6}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path d="M5.5 8l4.5 4.5L14.5 8" />
-    </svg>
-  );
-}
-
-function ChevronUpIcon({ className = "size-4" }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.6}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path d="M14.5 12l-4.5-4.5L5.5 12" />
-    </svg>
-  );
-}
-
-function CheckIcon({ className = "size-3.5" }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path d="M4 10.5l4 4 8-9" />
-    </svg>
-  );
-}
+import { Check, ChevronDown, ChevronUp } from "lucide-react";
 
 export const Select = SelectPrimitive.Root;
 export const SelectGroup = SelectPrimitive.Group;
@@ -78,7 +25,7 @@ export const SelectTrigger = React.forwardRef<
           data-slot="select-chevron"
           className="pointer-events-none shrink-0 text-muted-foreground transition-transform duration-200 ease-in-out group-data-[state=open]:rotate-180"
         >
-          <ChevronDownIcon className="size-4" />
+          <ChevronDown className="size-4" strokeWidth={1.75} aria-hidden="true" />
         </span>
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
@@ -95,7 +42,7 @@ export const SelectScrollUpButton = React.forwardRef<
       className={`flex cursor-default items-center justify-center py-1 text-muted-foreground ${className}`}
       {...props}
     >
-      <ChevronUpIcon className="size-4" />
+      <ChevronUp className="size-4" strokeWidth={1.75} aria-hidden="true" />
     </SelectPrimitive.ScrollUpButton>
   );
 });
@@ -110,7 +57,7 @@ export const SelectScrollDownButton = React.forwardRef<
       className={`flex cursor-default items-center justify-center py-1 text-muted-foreground ${className}`}
       {...props}
     >
-      <ChevronDownIcon className="size-4" />
+      <ChevronDown className="size-4" strokeWidth={1.75} aria-hidden="true" />
     </SelectPrimitive.ScrollDownButton>
   );
 });
@@ -173,7 +120,7 @@ export const SelectItem = React.forwardRef<
     >
       <span className="absolute end-2 flex size-4 items-center justify-center text-primary">
         <SelectPrimitive.ItemIndicator>
-          <CheckIcon className="size-3.5" />
+          <Check className="size-3.5" strokeWidth={2} aria-hidden="true" />
         </SelectPrimitive.ItemIndicator>
       </span>
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>

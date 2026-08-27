@@ -1,5 +1,6 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
+import { MoreHorizontal } from "lucide-react";
 import { useAnchoredPopover } from "@/components/shared/use-anchored-popover";
 import { cn } from "@/lib/utils";
 
@@ -51,11 +52,7 @@ export function ActionMenu({
           className
         )}
       >
-        <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="1" />
-          <circle cx="19" cy="12" r="1" />
-          <circle cx="5" cy="12" r="1" />
-        </svg>
+        <MoreHorizontal className="size-4" strokeWidth={1.75} aria-hidden="true" />
       </button>
 
       {open &&

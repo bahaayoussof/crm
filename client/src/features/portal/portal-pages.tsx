@@ -1,5 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
+import { ArrowLeft, Star } from "lucide-react";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
@@ -191,9 +192,12 @@ export function PortalNewTicketPage() {
 }
 
 const StarIcon = ({ filled }: { filled: boolean }) => (
-  <svg aria-hidden="true" className={`size-6 ${filled ? "fill-amber-400 text-amber-400" : "fill-none text-muted-foreground"}`} stroke="currentColor" strokeWidth="1.5" viewBox="0 0 20 20">
-    <path d="M10 1.6l2.6 5.27 5.82.85-4.21 4.1.99 5.8L10 15.9l-5.2 2.73.99-5.8L1.58 8.72l5.82-.85z" strokeLinejoin="round" />
-  </svg>
+  <Star
+    aria-hidden="true"
+    size={24}
+    strokeWidth={1.5}
+    className={`size-6 ${filled ? "fill-amber-400 text-amber-400" : "fill-none text-muted-foreground"}`}
+  />
 );
 
 function StarRating({ name, value, onChange, readOnly }: { name: string; value: number; onChange?: (value: number) => void; readOnly?: boolean }) {
@@ -299,7 +303,10 @@ export function PortalTicketDetailPage() {
     </form>
   );
   return <PortalPage>
-    <Link className="inline-flex items-center gap-1 rounded-sm text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" to="/portal/tickets">← {t("portal.back")}</Link>
+    <Link className="inline-flex items-center gap-1.5 rounded-sm text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" to="/portal/tickets">
+      <ArrowLeft className="size-3.5 rtl:rotate-180" strokeWidth={1.75} aria-hidden="true" />
+      <span>{t("portal.back")}</span>
+    </Link>
     <header className="mt-4 border-b border-border pb-5">
       <TicketRef id={ticket.id} />
       <h1 className="mt-1 break-words text-2xl font-bold tracking-tight text-foreground [overflow-wrap:anywhere]">{ticket.subject}</h1>

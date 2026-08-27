@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { TFunction } from "i18next";
+import { ArrowLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 import { AppSelectField } from "@/components/ui/app-select";
@@ -63,8 +64,9 @@ export function TicketDetailPage() {
     <header className="border-b border-border pb-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <Link className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline" to="/tickets">
-            ← {t("tickets.backToList")}
+          <Link className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline" to="/tickets">
+            <ArrowLeft className="size-3.5 rtl:rotate-180" strokeWidth={1.75} aria-hidden="true" />
+            <span>{t("tickets.backToList")}</span>
           </Link>
           <p className="mt-2 font-mono text-xs font-medium text-primary" dir="ltr">{ticketReference(record.id)}</p>
           <h1 className="mt-1 break-words text-2xl font-bold tracking-tight text-foreground [overflow-wrap:anywhere]">{record.subject}</h1>

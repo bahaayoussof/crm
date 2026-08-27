@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -37,20 +38,11 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
     const hasValue = value !== undefined && value !== "";
     return (
       <div className="relative flex w-full items-center">
-        <svg
+        <Search
           className="pointer-events-none absolute start-3 size-4 text-muted-foreground/70"
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+          strokeWidth={1.75}
           aria-hidden="true"
-        >
-          <circle cx="11" cy="11" r="8" />
-          <path d="m21 21-4.3-4.3" />
-        </svg>
+        />
         <Input
           ref={ref}
           type="search"
@@ -65,9 +57,7 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
             className="absolute end-2 inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground focus:outline-none"
             aria-label="Clear search"
           >
-            <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
+            <X className="size-3.5" strokeWidth={1.75} aria-hidden="true" />
           </button>
         )}
       </div>

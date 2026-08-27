@@ -1,4 +1,5 @@
 import axios from "axios";
+import { ArrowLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { formatTicketDate } from "@/features/tickets/ticket-format";
@@ -84,7 +85,12 @@ export function PortalKnowledgeArticlePage() {
   const { t, i18n } = useTranslation();
   const query = usePortalKnowledgeArticle(id);
 
-  const back = <Link className="inline-flex items-center gap-1 rounded-sm text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" to="/portal/knowledge-base">← {t("portal.knowledgeBase.back")}</Link>;
+  const back = (
+    <Link className="inline-flex items-center gap-1.5 rounded-sm text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" to="/portal/knowledge-base">
+      <ArrowLeft className="size-3.5 rtl:rotate-180" strokeWidth={1.75} aria-hidden="true" />
+      <span>{t("portal.knowledgeBase.back")}</span>
+    </Link>
+  );
 
   if (query.isLoading) return <PortalPage><PortalState>{t("portal.knowledgeBase.loadingDetail")}</PortalState></PortalPage>;
   if (query.isError) return (
