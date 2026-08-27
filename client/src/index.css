@@ -77,13 +77,13 @@
 
   /* Tables (Light) */
   --table-background: #FFFFFF;
-  --table-header-background: #FAFAFA;
+  --table-header-background: #FAFAFC;
   --table-row-background: #FFFFFF;
-  --table-row-hover: #F7F7F7;
-  --table-row-selected: #F2F2F2;
-  --table-border: #E8E8E8;
-  --table-header-foreground: #737373;
-  --table-foreground: #171717;
+  --table-row-hover: #F8F9FA;
+  --table-row-selected: #F1F3F5;
+  --table-border: #EAEAEC;
+  --table-header-foreground: #71717A;
+  --table-foreground: #18181B;
 
   /* Primary CTA (Monochrome - Light) */
   --primary: #171717;
@@ -191,14 +191,14 @@
   --sidebar-border: #292929;
 
   /* Tables (Dark) */
-  --table-background: #181818;
-  --table-header-background: #181818;
-  --table-row-background: #181818;
-  --table-row-hover: #202020;
-  --table-row-selected: #292929;
-  --table-border: #292929;
-  --table-header-foreground: #858585;
-  --table-foreground: #F5F5F5;
+  --table-background: #141416;
+  --table-header-background: #19191C;
+  --table-row-background: #141416;
+  --table-row-hover: #1E1E22;
+  --table-row-selected: #242429;
+  --table-border: #222226;
+  --table-header-foreground: #8E8E93;
+  --table-foreground: #EDEDEF;
 
   /* Primary CTA (Monochrome - Dark) */
   --primary: #F5F5F5;

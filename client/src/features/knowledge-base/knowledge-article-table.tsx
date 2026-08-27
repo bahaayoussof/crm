@@ -2,6 +2,16 @@ import { flexRender, getCoreRowModel, useReactTable, type ColumnDef, type Pagina
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
+import { DataTablePagination } from "@/components/shared/data-table/data-table-pagination";
+import { AssigneeCell } from "@/components/shared/data-table/assignee-cell";
 import { formatArticleDate } from "./knowledge-article-format";
 import { ArticleStatusBadge } from "./knowledge-base-ui";
 import type { KnowledgeArticleListItem } from "./knowledge-article.types";
@@ -11,6 +21,7 @@ interface KnowledgeArticleTableProps {
   page: number;
   pageSize: number;
   pageCount: number;
+  totalCount?: number;
   onPageChange: (page: number) => void;
 }
 
@@ -22,52 +33,83 @@ const columnClasses: Record<string, string> = {
   author: "hidden xl:table-cell w-[16%]",
 };
 
-export function KnowledgeArticleTable({ articles, page, pageSize, pageCount, onPageChange }: KnowledgeArticleTableProps) {
+export function KnowledgeArticleTable({
+  articles,
+  page,
+  pageSize,
+  pageCount,
+  totalCount,
+  onPageChange,
+}: KnowledgeArticleTableProps) {
   const { t, i18n } = useTranslation();
-  const columns = useMemo<ColumnDef<KnowledgeArticleListItem>[]>(() => [
-    {
-      id: "title",
-      accessorKey: "title",
-      header: t("knowledgeBase.columns.title"),
-      cell: ({ row }) => <Link
-        className="line-clamp-2 rounded-sm font-semibold text-foreground hover:underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        dir="auto"
-        title={row.original.title}
-        to={`/knowledge-base/${row.original.id}`}
-      >{row.original.title}</Link>,
-    },
-    {
-      id: "category",
-      accessorKey: "category",
-      header: t("knowledgeBase.columns.category"),
-      cell: ({ getValue }) => {
-        const category = getValue<string | null>();
-        return category
-          ? <span className="block truncate text-foreground font-medium" dir="auto" title={category}>{category}</span>
-          : <span className="text-muted-foreground">{t("common.notProvided")}</span>;
+  const columns = useMemo<ColumnDef<KnowledgeArticleListItem>[]>(
+    () => [
+      {
+        id: "title",
+        accessorKey: "title",
+        header: t("knowledgeBase.columns.title"),
+        cell: ({ row }) => (
+          <Link
+            className="line-clamp-2 rounded-sm font-medium text-[13px] text-foreground hover:underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            dir="auto"
+            title={row.original.title}
+            to={`/knowledge-base/${row.original.id}`}
+          >
+            {row.original.title}
+          </Link>
+        ),
       },
-    },
-    {
-      id: "status",
-      accessorKey: "status",
-      header: t("knowledgeBase.columns.status"),
-      cell: ({ row }) => <ArticleStatusBadge status={row.original.status} />,
-    },
-    {
-      id: "updatedAt",
-      accessorKey: "updatedAt",
-      header: t("knowledgeBase.columns.updated"),
-      cell: ({ getValue }) => <span className="whitespace-nowrap text-xs text-muted-foreground"><bdi dir="ltr">{formatArticleDate(getValue<string>(), i18n.language)}</bdi></span>,
-    },
-    {
-      id: "author",
-      accessorFn: (row) => row.createdBy.name,
-      header: t("knowledgeBase.columns.author"),
-      cell: ({ row }) => <span className="block truncate text-xs text-muted-foreground" dir="auto" title={row.original.createdBy.name}>{row.original.createdBy.name}</span>,
-    },
-  ], [i18n.language, t]);
+      {
+        id: "category",
+        accessorKey: "category",
+        header: t("knowledgeBase.columns.category"),
+        cell: ({ getValue }) => {
+          const category = getValue<string | null>();
+          return category ? (
+            <span
+              className="block truncate text-xs text-foreground font-normal"
+              dir="auto"
+              title={category}
+            >
+              {category}
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground">{t("common.notProvided")}</span>
+          );
+        },
+      },
+      {
+        id: "status",
+        accessorKey: "status",
+        header: t("knowledgeBase.columns.status"),
+        cell: ({ row }) => <ArticleStatusBadge status={row.original.status} />,
+      },
+      {
+        id: "updatedAt",
+        accessorKey: "updatedAt",
+        header: t("knowledgeBase.columns.updated"),
+        cell: ({ getValue }) => (
+          <span className="whitespace-nowrap text-xs text-muted-foreground">
+            <bdi dir="ltr">{formatArticleDate(getValue<string>(), i18n.language)}</bdi>
+          </span>
+        ),
+      },
+      {
+        id: "author",
+        accessorFn: (row) => row.createdBy.name,
+        header: t("knowledgeBase.columns.author"),
+        cell: ({ row }) => (
+          <AssigneeCell name={row.original.createdBy.name} />
+        ),
+      },
+    ],
+    [i18n.language, t]
+  );
 
-  const pagination = useMemo<PaginationState>(() => ({ pageIndex: page - 1, pageSize }), [page, pageSize]);
+  const pagination = useMemo<PaginationState>(
+    () => ({ pageIndex: page - 1, pageSize }),
+    [page, pageSize]
+  );
   const table = useReactTable({
     data: articles,
     columns,
@@ -79,44 +121,93 @@ export function KnowledgeArticleTable({ articles, page, pageSize, pageCount, onP
     onPaginationChange: (updater) => handlePaginationChange(updater, pagination, onPageChange),
   });
 
-  return <>
-    <div className="hidden overflow-x-auto rounded-xl border border-border bg-surface shadow-subtle md:block">
-      <table className="w-full min-w-[44rem] table-fixed text-start text-sm">
-        <thead className="border-b border-border bg-surface-secondary text-xs text-muted-foreground">
-          {table.getHeaderGroups().map((headerGroup) => <tr key={headerGroup.id}>{headerGroup.headers.map((header) => <th className={`px-4 py-3 text-start font-semibold ${columnClasses[header.column.id] ?? ""}`} scope="col" key={header.id}>{header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}</th>)}</tr>)}
-        </thead>
-        <tbody className="divide-y divide-border-subtle">
-          {table.getRowModel().rows.map((row) => <tr className="align-top transition-colors hover:bg-surface-hover" key={row.id}>{row.getVisibleCells().map((cell) => <td className={`px-4 py-3.5 ${columnClasses[cell.column.id] ?? ""}`} key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}
-        </tbody>
-      </table>
-    </div>
-    <div className="divide-y divide-border-subtle rounded-xl border border-border bg-surface shadow-subtle md:hidden">
-      {articles.map((article) => <Link
-        className="block p-4 transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-        key={article.id}
-        to={`/knowledge-base/${article.id}`}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <p className="min-w-0 break-words font-semibold text-foreground" dir="auto">{article.title}</p>
-          <ArticleStatusBadge status={article.status} />
+  return (
+    <>
+      <div className="hidden md:block overflow-x-auto">
+        <Table className="min-w-[44rem]">
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <TableHead
+                    className={columnClasses[header.column.id] ?? ""}
+                    key={header.id}
+                  >
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.map((row) => (
+              <TableRow key={row.id}>
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell
+                    className={columnClasses[cell.column.id] ?? ""}
+                    key={cell.id}
+                  >
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="divide-y divide-border-subtle bg-table-background md:hidden">
+        {articles.map((article) => (
+          <Link
+            className="block p-4 transition-colors hover:bg-table-row-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+            key={article.id}
+            to={`/knowledge-base/${article.id}`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <p className="min-w-0 break-words font-medium text-[13px] text-foreground" dir="auto">
+                {article.title}
+              </p>
+              <ArticleStatusBadge status={article.status} />
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground" dir="auto">
+              {article.category ?? t("common.notProvided")}
+            </p>
+            <p className="mt-3 border-t border-border-subtle pt-2 text-xs text-muted-foreground">
+              {t("knowledgeBase.columns.updated")}:{" "}
+              <bdi dir="ltr">{formatArticleDate(article.updatedAt, i18n.language)}</bdi>
+              <span className="mx-1">·</span>
+              <span dir="auto">{article.createdBy.name}</span>
+            </p>
+          </Link>
+        ))}
+      </div>
+
+      {pageCount > 1 && (
+        <div className="border-t border-table-border bg-table-background px-3.5 py-2">
+          <DataTablePagination
+            page={page}
+            pageCount={pageCount}
+            pageSize={pageSize}
+            totalCount={totalCount}
+            canPreviousPage={table.getCanPreviousPage()}
+            canNextPage={table.getCanNextPage()}
+            onPreviousPage={() => table.previousPage()}
+            onNextPage={() => table.nextPage()}
+            ariaLabel={t("knowledgeBase.pagination")}
+          />
         </div>
-        <p className="mt-1 text-sm text-muted-foreground" dir="auto">{article.category ?? t("common.notProvided")}</p>
-        <p className="mt-3 border-t border-border-subtle pt-2 text-xs text-muted-foreground">
-          {t("knowledgeBase.columns.updated")}: <bdi dir="ltr">{formatArticleDate(article.updatedAt, i18n.language)}</bdi>
-          <span className="mx-1">·</span>
-          <span dir="auto">{article.createdBy.name}</span>
-        </p>
-      </Link>)}
-    </div>
-    {pageCount > 1 && <nav className="mt-6 flex items-center justify-between gap-3" aria-label={t("knowledgeBase.pagination")}>
-      <button className="button-secondary" type="button" disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}>{t("common.previous")}</button>
-      <span className="text-center text-xs font-medium text-muted-foreground">{t("knowledgeBase.page", { page, total: pageCount })}</span>
-      <button className="button-secondary" type="button" disabled={!table.getCanNextPage()} onClick={() => table.nextPage()}>{t("common.next")}</button>
-    </nav>}
-  </>;
+      )}
+    </>
+  );
 }
 
-function handlePaginationChange(updater: Updater<PaginationState>, current: PaginationState, onPageChange: (page: number) => void) {
+function handlePaginationChange(
+  updater: Updater<PaginationState>,
+  current: PaginationState,
+  onPageChange: (page: number) => void
+) {
   const next = typeof updater === "function" ? updater(current) : updater;
   if (next.pageIndex !== current.pageIndex) onPageChange(next.pageIndex + 1);
 }

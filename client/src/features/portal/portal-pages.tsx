@@ -15,54 +15,100 @@ import { portalTicketSchema, type PortalTicketForm } from "./portal.schemas";
 import { useCreatePortalTicket, usePortalCategories, usePortalOverview, usePortalTicket, usePortalTickets, useReplyPortalTicket, useSubmitPortalFeedback } from "./portal-hooks";
 import type { PortalTicket, PortalTicketDetail, PortalTicketStatus } from "./portal.types";
 import { PortalPage, PortalPageHeader, PortalState, PortalStatus, TicketRef } from "./portal-ui";
-import { FilterBar } from "@/components/shared/filter-bar";
+import {
+  TableContainer,
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
+import {
+  DataTableSurface,
+  DataTableToolbar,
+  DataTableSearch,
+} from "@/components/shared/data-table";
+import { DataTablePagination } from "@/components/shared/data-table/data-table-pagination";
 
 const statuses: PortalTicketStatus[] = ["OPEN", "IN_PROGRESS", "WAITING_FOR_YOU", "RESOLVED", "CLOSED"];
 const errorCode = (error: unknown) => axios.isAxiosError(error) ? error.response?.data?.error?.code as string | undefined : undefined;
 
 function TicketRows({ tickets }: { tickets: PortalTicket[] }) {
   const { t, i18n } = useTranslation();
-  return <>
-    <div className="mt-4 hidden overflow-hidden rounded-xl border border-border bg-surface shadow-subtle md:block">
-      <table className="w-full table-fixed text-sm">
-        <thead className="border-b border-border bg-surface-subtle text-xs font-semibold text-muted-foreground">
-          <tr>
-            <th className="w-32 px-4 py-3 text-start">{t("portal.ticketId")}</th>
-            <th className="px-4 py-3 text-start">{t("portal.subject")}</th>
-            <th className="w-36 px-4 py-3 text-start">{t("portal.statusLabel")}</th>
-            <th className="w-36 px-4 py-3 text-start">{t("portal.category")}</th>
-            <th className="w-44 px-4 py-3 text-start">{t("portal.created")}</th>
-            <th className="w-44 px-4 py-3 text-start">{t("portal.updated")}</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border-subtle">
-          {tickets.map((ticket) => (
-            <tr className="transition-colors hover:bg-surface-hover focus-within:bg-surface-hover" key={ticket.id}>
-              <td className="px-4 py-3"><TicketRef id={ticket.id} /></td>
-              <td className="px-4 py-3">
-                <Link className="block break-words font-semibold text-foreground hover:text-primary transition-colors focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" to={`/portal/tickets/${ticket.id}`}>
-                  {ticket.subject}
-                </Link>
-              </td>
-              <td className="px-4 py-3"><PortalStatus status={ticket.status} /></td>
-              <td className="truncate px-4 py-3 text-muted-foreground" title={ticket.category?.name}>{ticket.category?.name ?? t("common.notProvided")}</td>
-              <td className="px-4 py-3 text-xs text-muted-foreground"><bdi dir="ltr">{formatTicketDate(ticket.createdAt, i18n.language)}</bdi></td>
-              <td className="px-4 py-3 text-xs text-muted-foreground"><bdi dir="ltr">{formatTicketDate(ticket.updatedAt, i18n.language)}</bdi></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-    <div className="mt-4 grid gap-3 md:hidden">
-      {tickets.map((ticket) => (
-        <Link className="rounded-xl border border-border bg-surface p-4 shadow-subtle transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" key={ticket.id} to={`/portal/tickets/${ticket.id}`}>
-          <div className="flex items-start justify-between gap-3"><strong className="min-w-0 break-words text-sm font-semibold text-foreground">{ticket.subject}</strong><PortalStatus status={ticket.status} /></div>
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground"><TicketRef id={ticket.id} /><span>{ticket.category?.name ?? t("common.notProvided")}</span></div>
-          <p className="mt-2 text-xs text-muted-foreground">{t("portal.updated")}: <bdi dir="ltr">{formatTicketDate(ticket.updatedAt, i18n.language)}</bdi></p>
-        </Link>
-      ))}
-    </div>
-  </>;
+  return (
+    <>
+      <div className="hidden md:block overflow-x-auto">
+        <Table className="min-w-[48rem]">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-32">{t("portal.ticketId")}</TableHead>
+              <TableHead className="w-auto">{t("portal.subject")}</TableHead>
+              <TableHead className="w-36">{t("portal.statusLabel")}</TableHead>
+              <TableHead className="w-36">{t("portal.category")}</TableHead>
+              <TableHead className="w-44">{t("portal.created")}</TableHead>
+              <TableHead className="w-44">{t("portal.updated")}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {tickets.map((ticket) => (
+              <TableRow key={ticket.id}>
+                <TableCell>
+                  <TicketRef id={ticket.id} />
+                </TableCell>
+                <TableCell>
+                  <Link
+                    className="block break-words font-medium text-foreground hover:underline transition-colors focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    to={`/portal/tickets/${ticket.id}`}
+                  >
+                    {ticket.subject}
+                  </Link>
+                </TableCell>
+                <TableCell>
+                  <PortalStatus status={ticket.status} />
+                </TableCell>
+                <TableCell
+                  className="truncate text-xs text-muted-foreground"
+                  title={ticket.category?.name}
+                >
+                  {ticket.category?.name ?? t("common.notProvided")}
+                </TableCell>
+                <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                  <bdi dir="ltr">{formatTicketDate(ticket.createdAt, i18n.language)}</bdi>
+                </TableCell>
+                <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                  <bdi dir="ltr">{formatTicketDate(ticket.updatedAt, i18n.language)}</bdi>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      <div className="divide-y divide-border-subtle bg-table-background md:hidden">
+        {tickets.map((ticket) => (
+          <Link
+            className="block p-4 transition-colors hover:bg-table-row-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            key={ticket.id}
+            to={`/portal/tickets/${ticket.id}`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <strong className="min-w-0 break-words text-sm font-semibold text-foreground">
+                {ticket.subject}
+              </strong>
+              <PortalStatus status={ticket.status} />
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+              <TicketRef id={ticket.id} />
+              <span>{ticket.category?.name ?? t("common.notProvided")}</span>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {t("portal.updated")}: <bdi dir="ltr">{formatTicketDate(ticket.updatedAt, i18n.language)}</bdi>
+            </p>
+          </Link>
+        ))}
+      </div>
+    </>
+  );
 }
 
 export function PortalHomePage() {
@@ -83,11 +129,17 @@ export function PortalHomePage() {
         ))}
       </section>
       <section className="mt-8" aria-labelledby="recent-requests-title">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between gap-4 mb-3">
           <h2 className="text-base font-semibold tracking-tight text-foreground" id="recent-requests-title">{t("portal.recent")}</h2>
           <Link className="rounded-sm text-sm font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" to="/portal/tickets">{t("portal.viewAll")}</Link>
         </div>
-        {query.data!.recentTickets.length ? <TicketRows tickets={query.data!.recentTickets} /> : <PortalState>{t("portal.empty")}</PortalState>}
+        {query.data!.recentTickets.length ? (
+          <DataTableSurface>
+            <TicketRows tickets={query.data!.recentTickets} />
+          </DataTableSurface>
+        ) : (
+          <PortalState>{t("portal.empty")}</PortalState>
+        )}
       </section>
     </>}
   </PortalPage>;
@@ -112,30 +164,69 @@ export function PortalTicketsPage() {
     ...statuses.map((value) => ({ value, label: t(`portal.status.${value}`) })),
   ];
 
-  return <PortalPage>
-    <PortalPageHeader title={t("portal.myRequests")} description={t("portal.requestsDescription")} action={<Link className="button-link w-full sm:w-auto" to="/portal/tickets/new">{t("portal.newRequest")}</Link>} />
-    <FilterBar className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_15rem]">
-      <label className="block" htmlFor="portal-search">
-        <span className="sr-only">{t("portal.search")}</span>
-        <input className="input" id="portal-search" value={search} onChange={(event) => update("search", event.target.value)} placeholder={t("portal.search")} />
-      </label>
-      <AppSelect
-        id="portal-status"
-        ariaLabel={t("portal.statusLabel")}
-        value={status ?? ""}
-        onValueChange={(val) => update("status", val)}
-        options={statusOptions}
+  return (
+    <PortalPage>
+      <PortalPageHeader
+        title={t("portal.myRequests")}
+        description={t("portal.requestsDescription")}
+        action={<Link className="button-link w-full sm:w-auto" to="/portal/tickets/new">{t("portal.newRequest")}</Link>}
       />
-    </FilterBar>
-    {query.isLoading ? <PortalState>{t("portal.loadingRequests")}</PortalState> : query.isError ? <PortalState retry={() => query.refetch()}>{t("portal.requestsError")}</PortalState> : query.data!.data.length ? <>
-      <TicketRows tickets={query.data!.data} />
-      <nav aria-label={t("portal.pagination")} className="mt-5 flex items-center justify-between gap-3">
-        <button className="button-secondary" disabled={page <= 1} onClick={() => update("page", String(page - 1))}>{t("common.previous")}</button>
-        <span className="text-center text-xs font-medium text-muted-foreground">{t("portal.page", { page, total: query.data!.meta.totalPages || 1 })}</span>
-        <button className="button-secondary" disabled={page >= query.data!.meta.totalPages} onClick={() => update("page", String(page + 1))}>{t("common.next")}</button>
-      </nav>
-    </> : <PortalState>{search || status ? t("portal.noMatches") : t("portal.empty")}</PortalState>}
-  </PortalPage>;
+      <div className="mt-5">
+        <DataTableSurface>
+          <DataTableToolbar>
+            <DataTableSearch
+              id="portal-search"
+              ariaLabel={t("portal.search")}
+              value={search}
+              onChange={(val) => update("search", val)}
+              placeholder={t("portal.search")}
+            />
+            <div className="w-36 sm:ms-auto">
+              <AppSelect
+                id="portal-status"
+                ariaLabel={t("portal.statusLabel")}
+                value={status ?? ""}
+                onValueChange={(val) => update("status", val)}
+                options={statusOptions}
+              />
+            </div>
+          </DataTableToolbar>
+          {query.isLoading ? (
+            <div className="p-6">
+              <PortalState>{t("portal.loadingRequests")}</PortalState>
+            </div>
+          ) : query.isError ? (
+            <div className="p-6">
+              <PortalState retry={() => query.refetch()}>{t("portal.requestsError")}</PortalState>
+            </div>
+          ) : query.data!.data.length ? (
+            <>
+              <TicketRows tickets={query.data!.data} />
+              {query.data!.meta.totalPages > 1 && (
+                <div className="border-t border-table-border bg-table-background px-3.5 py-2">
+                  <DataTablePagination
+                    page={page}
+                    pageCount={query.data!.meta.totalPages || 1}
+                    pageSize={query.data!.meta.limit || 10}
+                    totalCount={query.data!.meta.total}
+                    canPreviousPage={page > 1}
+                    canNextPage={page < query.data!.meta.totalPages}
+                    onPreviousPage={() => update("page", String(page - 1))}
+                    onNextPage={() => update("page", String(page + 1))}
+                    ariaLabel={t("portal.pagination")}
+                  />
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="p-6">
+              <PortalState>{search || status ? t("portal.noMatches") : t("portal.empty")}</PortalState>
+            </div>
+          )}
+        </DataTableSurface>
+      </div>
+    </PortalPage>
+  );
 }
 
 export function PortalNewTicketPage() {

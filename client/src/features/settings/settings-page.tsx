@@ -9,6 +9,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, SearchInput } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  TableContainer,
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
 import { useCreateCategory, usePutSlaRule, useSettingCategories, useSlaRules, useUpdateCategory } from "./settings-hooks";
 import type { Priority, SettingCategory, SlaRule } from "./settings.types";
 
@@ -36,7 +45,73 @@ function CategoriesSection() {
     {editorTarget && <CategoryEditorDialog category={editorTarget === "new" ? null : editorTarget} pending={pending} onClose={() => setEditorTarget(null)} onSubmit={async (values) => { if (editorTarget === "new") await create.mutateAsync(values); else await update.mutateAsync({ id: editorTarget.id, input: values }); setEditorTarget(null); }} />}
     {confirmTarget && <CategoryStatusDialog category={confirmTarget} pending={update.isPending} onClose={() => setConfirmTarget(null)} onConfirm={async () => { await update.mutateAsync({ id: confirmTarget.id, input: { isActive: !confirmTarget.isActive } }); setConfirmTarget(null); }} />}</>;
 }
-function CategoryRows({ rows, pending, onEdit, onToggle }: { rows: SettingCategory[]; pending: boolean; onEdit: (r: SettingCategory) => void; onToggle: (r: SettingCategory) => void }) { const { t } = useTranslation(); return <><div className="hidden overflow-x-auto rounded-lg border md:block"><table className="w-full min-w-[38rem] text-sm"><thead className="bg-surface-subtle"><tr><th className="p-3 text-start">{t("settings.categories.name")}</th><th className="p-3 text-start">{t("settings.categories.fieldDescription")}</th><th className="p-3 text-start">{t("settings.status")}</th><th className="p-3 text-end">{t("settings.actions")}</th></tr></thead><tbody className="divide-y">{rows.map((r) => <tr key={r.id}><td className="p-3 font-medium" dir="auto">{r.name}</td><td className="max-w-xs truncate p-3 text-muted-foreground" title={r.description ?? ""}>{r.description || "—"}</td><td className="p-3"><Status active={r.isActive} /></td><td className="p-3"><div className="flex justify-end gap-1"><Button size="icon" variant="ghost" aria-label={t("common.edit")} onClick={() => onEdit(r)}><Pencil className="size-4" /></Button><Button size="icon" variant="ghost" disabled={pending} aria-label={r.isActive ? t("settings.deactivate") : t("settings.activate")} onClick={() => onToggle(r)}><Power className="size-4" /></Button></div></td></tr>)}</tbody></table></div><ul className="divide-y rounded-lg border md:hidden">{rows.map((r) => <li className="p-4" key={r.id}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-medium" dir="auto">{r.name}</p><p className="mt-1 break-words text-sm text-muted-foreground" dir="auto">{r.description || "—"}</p></div><Status active={r.isActive} /></div><div className="mt-3 flex justify-end gap-2"><Button size="sm" variant="secondary" onClick={() => onEdit(r)}><Pencil className="size-3.5" />{t("common.edit")}</Button><Button size="sm" variant="outline" disabled={pending} onClick={() => onToggle(r)}><Power className="size-3.5" />{r.isActive ? t("settings.deactivate") : t("settings.activate")}</Button></div></li>)}</ul></>; }
+function CategoryRows({ rows, pending, onEdit, onToggle }: { rows: SettingCategory[]; pending: boolean; onEdit: (r: SettingCategory) => void; onToggle: (r: SettingCategory) => void }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <div className="hidden md:block">
+        <TableContainer>
+          <Table className="min-w-[38rem]">
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("settings.categories.name")}</TableHead>
+                <TableHead>{t("settings.categories.fieldDescription")}</TableHead>
+                <TableHead className="w-32">{t("settings.status")}</TableHead>
+                <TableHead className="w-24 text-end">{t("settings.actions")}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell className="font-medium" dir="auto">
+                    {r.name}
+                  </TableCell>
+                  <TableCell className="max-w-xs truncate text-muted-foreground" title={r.description ?? ""}>
+                    {r.description || "—"}
+                  </TableCell>
+                  <TableCell>
+                    <Status active={r.isActive} />
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex justify-end gap-1">
+                      <Button size="icon" variant="ghost" aria-label={t("common.edit")} onClick={() => onEdit(r)}>
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" disabled={pending} aria-label={r.isActive ? t("settings.deactivate") : t("settings.activate")} onClick={() => onToggle(r)}>
+                        <Power className="size-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </div>
+      <ul className="divide-y divide-border-subtle rounded-xl border border-table-border bg-table-background shadow-subtle md:hidden">
+        {rows.map((r) => (
+          <li className="p-4" key={r.id}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-medium" dir="auto">{r.name}</p>
+                <p className="mt-1 break-words text-sm text-muted-foreground" dir="auto">{r.description || "—"}</p>
+              </div>
+              <Status active={r.isActive} />
+            </div>
+            <div className="mt-3 flex justify-end gap-2">
+              <Button size="sm" variant="secondary" onClick={() => onEdit(r)}>
+                <Pencil className="size-3.5" />{t("common.edit")}
+              </Button>
+              <Button size="sm" variant="outline" disabled={pending} onClick={() => onToggle(r)}>
+                <Power className="size-3.5" />{r.isActive ? t("settings.deactivate") : t("settings.activate")}
+              </Button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
 function Status({ active }: { active: boolean }) { const { t } = useTranslation(); return <Badge variant={active ? "success" : "neutral"}>{active ? t("settings.active") : t("settings.inactive")}</Badge>; }
 
 function CategoryEditorDialog({ category, pending, onClose, onSubmit }: { category: SettingCategory | null; pending: boolean; onClose: () => void; onSubmit: (values: { name: string; description: string }) => Promise<void> }) {

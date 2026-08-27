@@ -1,15 +1,20 @@
-import { Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link, useSearchParams } from "react-router-dom";
 import { AppSelect } from "@/components/ui/app-select";
 import { PageHeader } from "@/components/shared/page-header";
-import { FilterBar } from "@/components/shared/filter-bar";
 import { Button } from "@/components/ui/button";
+import {
+  DataTableSurface,
+  DataTableToolbar,
+  DataTableSearch,
+  DataTableSkeleton,
+} from "@/components/shared/data-table";
 import { useDebouncedValue } from "@/features/customers/use-debounced-value";
 import { useAgents, useCategories, useTickets } from "./ticket-hooks";
 import { TicketTable } from "./ticket-table";
+import { TicketFiltersPopover } from "./ticket-filters-popover";
 import type { TicketPriority, TicketStatus } from "./ticket.types";
-import { TicketPage, TicketSkeleton, TicketState } from "./ticket-ui";
+import { TicketPage, TicketState } from "./ticket-ui";
 
 const statuses: TicketStatus[] = ["NEW", "OPEN", "IN_PROGRESS", "WAITING_CUSTOMER", "RESOLVED", "CLOSED", "ESCALATED"];
 const priorities: TicketPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
@@ -63,7 +68,7 @@ export function TicketListPage() {
 
   return (
     <TicketPage>
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader
           title={t("tickets.title")}
           description={t("tickets.description")}
@@ -74,90 +79,95 @@ export function TicketListPage() {
           }
         />
 
-        {/* Filter Bar */}
-        <FilterBar className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <label className="sm:col-span-2">
-            <span className="sr-only">{t("tickets.search")}</span>
-            <div className="relative">
-              <Search
-                className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70"
-                strokeWidth={1.75}
-                aria-hidden="true"
-              />
-              <input
-                className="input ps-9"
-                type="search"
-                dir="auto"
-                value={search}
-                onChange={(event) => setFilter("search", event.target.value)}
-                placeholder={t("tickets.search")}
-              />
-            </div>
-          </label>
-          <div>
-            <AppSelect
-              ariaLabel={t("tickets.statusLabel")}
-              value={status ?? ""}
-              onValueChange={(value) => setFilter("status", value)}
-              options={statusOptions}
+        {/* Unified Table Surface Card */}
+        <DataTableSurface>
+          {/* Single-Row Compact Toolbar */}
+          <DataTableToolbar>
+            {/* Search Input */}
+            <DataTableSearch
+              id="ticket-search"
+              ariaLabel={t("tickets.search")}
+              value={search}
+              onChange={(value) => setFilter("search", value)}
+              placeholder={t("tickets.search")}
             />
-          </div>
-          <div>
-            <AppSelect
-              ariaLabel={t("tickets.priorityLabel")}
-              value={priority ?? ""}
-              onValueChange={(value) => setFilter("priority", value)}
-              options={priorityOptions}
-            />
-          </div>
-          <div>
-            <AppSelect
-              ariaLabel={t("tickets.category")}
-              value={categoryId ?? ""}
-              onValueChange={(value) => setFilter("categoryId", value)}
-              options={categoryOptions}
-            />
-          </div>
-          <div>
-            <AppSelect
-              ariaLabel={t("tickets.assignedAgent")}
-              value={assignedAgentId ?? ""}
-              onValueChange={(value) => setFilter("assignedAgentId", value)}
-              options={agentOptions}
-            />
-          </div>
-          {hasFilters && (
-            <button
-              className="button-ghost justify-self-start sm:col-span-2 lg:col-span-5"
-              onClick={() => setParams({})}
-            >
-              {t("tickets.clearFilters")}
-            </button>
-          )}
-        </FilterBar>
 
-        {tickets.isLoading ? (
-          <TicketSkeleton />
-        ) : tickets.isError ? (
-          <TicketState action={<Button variant="secondary" onClick={() => tickets.refetch()}>{t("common.retry")}</Button>}>
-            {t("tickets.loadError")}
-          </TicketState>
-        ) : (
-          <TicketTable
-            tickets={tickets.data?.data ?? []}
-            emptyMessage={emptyMessage}
-            page={page}
-            pageSize={tickets.data?.meta.limit ?? 20}
-            pageCount={tickets.data?.meta.totalPages ?? 0}
-            onPageChange={(nextPage) => setFilter("page", nextPage > 1 ? String(nextPage) : "")}
-          />
-        )}
+            {/* Right-Side Toolbar Controls */}
+            <div className="flex items-center gap-2 shrink-0 sm:ms-auto">
+              {/* Secondary Filters Popover (Priority, Category, Agent) */}
+              <TicketFiltersPopover
+                priority={priority}
+                categoryId={categoryId}
+                assignedAgentId={assignedAgentId}
+                priorityOptions={priorityOptions}
+                categoryOptions={categoryOptions}
+                agentOptions={agentOptions}
+                onFilterChange={setFilter}
+                onClearFilters={() => {
+                  const next = new URLSearchParams(params);
+                  next.delete("priority");
+                  next.delete("categoryId");
+                  next.delete("assignedAgentId");
+                  setParams(next);
+                }}
+              />
+
+              {/* Status Select Directly on Toolbar */}
+              <div className="w-32 sm:w-36">
+                <AppSelect
+                  ariaLabel={t("tickets.statusLabel")}
+                  value={status ?? ""}
+                  onValueChange={(value) => setFilter("status", value)}
+                  options={statusOptions}
+                />
+              </div>
+
+              {/* Clear All Filters button if active */}
+              {hasFilters && (
+                <button
+                  className="button-ghost h-8.5 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setParams({})}
+                >
+                  {t("tickets.clearFilters")}
+                </button>
+              )}
+            </div>
+          </DataTableToolbar>
+
+          {/* Table Body & Loading / Error States */}
+          {tickets.isLoading ? (
+            <div className="p-4" aria-label="loading">
+              <DataTableSkeleton columns={8} />
+            </div>
+          ) : tickets.isError ? (
+            <div className="p-6">
+              <TicketState action={<Button variant="secondary" onClick={() => tickets.refetch()}>{t("common.retry")}</Button>}>
+                {t("tickets.loadError")}
+              </TicketState>
+            </div>
+          ) : (
+            <TicketTable
+              tickets={tickets.data?.data ?? []}
+              emptyMessage={emptyMessage}
+              page={page}
+              pageSize={tickets.data?.meta.limit ?? 20}
+              pageCount={tickets.data?.meta.totalPages ?? 0}
+              totalCount={tickets.data?.meta.total}
+              onPageChange={(nextPage) => setFilter("page", nextPage > 1 ? String(nextPage) : "")}
+            />
+          )}
+        </DataTableSurface>
       </div>
     </TicketPage>
   );
 }
 
-function getEmptyMessage(filters: { search: string; status?: TicketStatus; priority?: TicketPriority; categoryId?: string; assignedAgentId?: string }, categories: { id: string; name: string }[] | undefined, agents: { id: string; name: string }[] | undefined, t: ReturnType<typeof useTranslation>["t"]) {
+function getEmptyMessage(
+  filters: { search: string; status?: TicketStatus; priority?: TicketPriority; categoryId?: string; assignedAgentId?: string },
+  categories: { id: string; name: string }[] | undefined,
+  agents: { id: string; name: string }[] | undefined,
+  t: ReturnType<typeof useTranslation>["t"]
+) {
   const active = [filters.search, filters.status, filters.priority, filters.categoryId, filters.assignedAgentId].filter(Boolean);
   if (active.length === 0) return t("tickets.empty");
   if (active.length > 1) return t("tickets.noMatches");

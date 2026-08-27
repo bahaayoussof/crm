@@ -10,6 +10,16 @@ import { formatTicketDate, ticketReference } from "../tickets/ticket-format";
 import { TicketPriorityText, TicketStatusBadge } from "../tickets/ticket-badges";
 import { useDashboardOverview } from "./dashboard-hooks";
 import type { DashboardOverview, DashboardTicket } from "./dashboard.types";
+import {
+  TableContainer,
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
+import { AssigneeCell } from "@/components/shared/data-table/assignee-cell";
 import { cn } from "@/lib/utils";
 
 export function DashboardPage() {
@@ -242,88 +252,88 @@ function TicketSection({
       {tickets.length ? (
         <>
           {/* Desktop Table */}
-          <div
-            className={cn(
-              "hidden overflow-x-auto rounded-xl border bg-surface shadow-subtle md:block",
-              highlight ? "border-border" : "border-border"
-            )}
-          >
-            <table className={`${detailed ? "min-w-[76rem]" : "min-w-[58rem]"} w-full table-fixed text-sm`}>
-              <colgroup>
-                <col className="w-28" />
-                <col className={detailed ? "w-72" : "w-80"} />
-                {detailed && <col className="w-48" />}
-                <col className="w-28" />
-                <col className="w-40" />
-                {detailed && <col className="w-36" />}
-                <col className="w-48" />
-                <col className="w-44" />
-              </colgroup>
-              <thead className="border-b border-border bg-surface-secondary text-xs font-medium text-muted-foreground">
-                <tr>
-                  {[
-                    t("tickets.columns.id"),
-                    t("tickets.subject"),
-                    ...(detailed ? [t("tickets.customer")] : []),
-                    t("tickets.priorityLabel"),
-                    t("tickets.statusLabel"),
-                    ...(detailed ? [t("dashboard.sla")] : []),
-                    t("tickets.assignedAgent"),
-                    t("tickets.updated"),
-                  ].map((label) => (
-                    <th className="whitespace-nowrap px-4 py-3 text-start font-semibold" key={label}>
-                      {label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-subtle">
-                {tickets.map((ticket) => (
-                  <tr key={ticket.id} className="transition-colors hover:bg-surface-hover">
-                    <td className="px-4 py-3">
-                      <Link
-                        aria-label={`${t("tickets.columns.id")} ${ticket.id}`}
-                        className="font-mono text-xs font-medium text-muted-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        title={ticket.id}
-                        to={`/tickets/${ticket.id}`}
-                        dir="ltr"
-                      >
-                        {ticketReference(ticket.id)}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="line-clamp-2 min-w-0 break-words font-medium text-foreground" title={ticket.subject}>
-                        {ticket.subject}
-                      </span>
-                    </td>
-                    {detailed && (
-                      <td className="px-4 py-3">
-                        <span className="line-clamp-2 min-w-0 break-words text-muted-foreground" title={ticket.customer.name}>
-                          {ticket.customer.name}
+          <div className="hidden md:block">
+            <TableContainer>
+              <Table className={detailed ? "min-w-[76rem]" : "min-w-[58rem]"}>
+                <colgroup>
+                  <col className="w-28" />
+                  <col className={detailed ? "w-72" : "w-80"} />
+                  {detailed && <col className="w-48" />}
+                  <col className="w-28" />
+                  <col className="w-40" />
+                  {detailed && <col className="w-36" />}
+                  <col className="w-48" />
+                  <col className="w-44" />
+                </colgroup>
+                <TableHeader>
+                  <TableRow>
+                    {[
+                      t("tickets.columns.id"),
+                      t("tickets.subject"),
+                      ...(detailed ? [t("tickets.customer")] : []),
+                      t("tickets.priorityLabel"),
+                      t("tickets.statusLabel"),
+                      ...(detailed ? [t("dashboard.sla")] : []),
+                      t("tickets.assignedAgent"),
+                      t("tickets.updated"),
+                    ].map((label) => (
+                      <TableHead className="whitespace-nowrap" key={label}>
+                        {label}
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {tickets.map((ticket) => (
+                    <TableRow key={ticket.id}>
+                      <TableCell>
+                        <Link
+                          aria-label={`${t("tickets.columns.id")} ${ticket.id}`}
+                          className="font-mono text-xs font-medium text-muted-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          title={ticket.id}
+                          to={`/tickets/${ticket.id}`}
+                          dir="ltr"
+                        >
+                          {ticketReference(ticket.id)}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <span className="line-clamp-2 min-w-0 break-words font-medium text-foreground" title={ticket.subject}>
+                          {ticket.subject}
                         </span>
-                      </td>
-                    )}
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <TicketPriorityText priority={ticket.priority} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <TicketStatusBadge status={ticket.status} />
-                    </td>
-                    {detailed && (
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <Sla state={ticket.slaState} />
-                      </td>
-                    )}
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground" title={ticket.assignedAgent?.name ?? t("tickets.unassigned")}>
-                      {ticket.assignedAgent?.name ?? t("tickets.unassigned")}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
-                      <bdi dir="ltr">{formatTicketDate(ticket.updatedAt, i18n.language)}</bdi>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      </TableCell>
+                      {detailed && (
+                        <TableCell>
+                          <span className="line-clamp-2 min-w-0 break-words text-muted-foreground" title={ticket.customer.name}>
+                            {ticket.customer.name}
+                          </span>
+                        </TableCell>
+                      )}
+                      <TableCell className="whitespace-nowrap">
+                        <TicketPriorityText priority={ticket.priority} />
+                      </TableCell>
+                      <TableCell>
+                        <TicketStatusBadge status={ticket.status} />
+                      </TableCell>
+                      {detailed && (
+                        <TableCell className="whitespace-nowrap">
+                          <Sla state={ticket.slaState} />
+                        </TableCell>
+                      )}
+                      <TableCell>
+                        <AssigneeCell
+                          name={ticket.assignedAgent?.name}
+                          unassignedLabel={t("tickets.unassigned")}
+                        />
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                        <bdi dir="ltr">{formatTicketDate(ticket.updatedAt, i18n.language)}</bdi>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
           </div>
 
           {/* Mobile Cards */}

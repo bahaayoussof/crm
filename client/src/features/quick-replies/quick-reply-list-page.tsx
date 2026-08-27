@@ -1,11 +1,15 @@
-import { Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link, useSearchParams } from "react-router-dom";
-import { FilterBar } from "@/components/shared/filter-bar";
+import {
+  DataTableSurface,
+  DataTableToolbar,
+  DataTableSearch,
+  DataTableSkeleton,
+} from "@/components/shared/data-table";
 import { useDebouncedValue } from "@/features/customers/use-debounced-value";
 import { useQuickReplies } from "./quick-reply-hooks";
 import { QuickReplyTable } from "./quick-reply-table";
-import { LoadingRows, PageHeader, QuickRepliesPage, StatePanel } from "./quick-replies-ui";
+import { PageHeader, QuickRepliesPage, StatePanel } from "./quick-replies-ui";
 
 export function QuickReplyListPage() {
   const { t } = useTranslation();
@@ -30,55 +34,67 @@ export function QuickReplyListPage() {
 
   return (
     <QuickRepliesPage>
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader
           title={t("quickReplies.title")}
           description={t("quickReplies.description")}
           actions={<Link className="button-link" to="/quick-replies/new">{t("quickReplies.create")}</Link>}
         />
-        <FilterBar className="my-6">
-          <div className="relative w-full max-w-md">
-            <Search
-              className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70"
-              strokeWidth={1.75}
-              aria-hidden="true"
-            />
-            <label className="sr-only" htmlFor="quick-reply-search">{t("quickReplies.search")}</label>
-            <input
+
+        {/* Unified DataTable Surface */}
+        <DataTableSurface>
+          {/* Shared Single-Row Compact Toolbar */}
+          <DataTableToolbar>
+            {/* Search Input */}
+            <DataTableSearch
               id="quick-reply-search"
-              className="input ps-9"
-              type="search"
-              dir="auto"
+              ariaLabel={t("quickReplies.search")}
               value={search}
-              onChange={(event) => setFilter("search", event.target.value)}
+              onChange={(value) => setFilter("search", value)}
               placeholder={t("quickReplies.search")}
             />
-          </div>
-          {hasFilters && (
-            <button className="button-ghost" onClick={() => setParams({})}>
-              {t("quickReplies.clearFilters")}
-            </button>
+
+            {/* Right-Side Actions */}
+            {hasFilters && (
+              <div className="flex items-center gap-2 sm:ms-auto">
+                <button
+                  className="button-ghost h-8.5 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setParams({})}
+                >
+                  {t("quickReplies.clearFilters")}
+                </button>
+              </div>
+            )}
+          </DataTableToolbar>
+
+          {/* Table Body & Loading / Error / Empty States */}
+          {quickReplies.isLoading ? (
+            <div className="p-4" aria-label={t("common.loading")}>
+              <DataTableSkeleton columns={4} />
+            </div>
+          ) : quickReplies.isError ? (
+            <div className="p-6">
+              <StatePanel action={<button className="button-secondary" onClick={() => quickReplies.refetch()}>{t("common.retry")}</button>}>
+                {t("quickReplies.loadError")}
+              </StatePanel>
+            </div>
+          ) : quickReplies.data && quickReplies.data.data.length === 0 ? (
+            <div className="p-6">
+              <StatePanel action={hasFilters ? <button className="button-secondary" onClick={() => setParams({})}>{t("quickReplies.clearFilters")}</button> : <Link className="button-link" to="/quick-replies/new">{t("quickReplies.create")}</Link>}>
+                {hasFilters ? t("quickReplies.noMatches") : t("quickReplies.empty")}
+              </StatePanel>
+            </div>
+          ) : (
+            <QuickReplyTable
+              quickReplies={quickReplies.data?.data ?? []}
+              page={page}
+              pageSize={quickReplies.data?.meta.limit ?? 20}
+              pageCount={quickReplies.data?.meta.totalPages ?? 0}
+              totalCount={quickReplies.data?.meta.total}
+              onPageChange={(nextPage) => setFilter("page", nextPage > 1 ? String(nextPage) : "")}
+            />
           )}
-        </FilterBar>
-        {quickReplies.isLoading ? (
-          <LoadingRows />
-        ) : quickReplies.isError ? (
-          <StatePanel action={<button className="button-secondary" onClick={() => quickReplies.refetch()}>{t("common.retry")}</button>}>
-            {t("quickReplies.loadError")}
-          </StatePanel>
-        ) : quickReplies.data && quickReplies.data.data.length === 0 ? (
-          <StatePanel action={hasFilters ? <button className="button-secondary" onClick={() => setParams({})}>{t("quickReplies.clearFilters")}</button> : <Link className="button-link" to="/quick-replies/new">{t("quickReplies.create")}</Link>}>
-            {hasFilters ? t("quickReplies.noMatches") : t("quickReplies.empty")}
-          </StatePanel>
-        ) : (
-          <QuickReplyTable
-            quickReplies={quickReplies.data?.data ?? []}
-            page={page}
-            pageSize={quickReplies.data?.meta.limit ?? 20}
-            pageCount={quickReplies.data?.meta.totalPages ?? 0}
-            onPageChange={(nextPage) => setFilter("page", nextPage > 1 ? String(nextPage) : "")}
-          />
-        )}
+        </DataTableSurface>
       </div>
     </QuickRepliesPage>
   );

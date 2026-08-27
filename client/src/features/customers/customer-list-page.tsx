@@ -1,13 +1,17 @@
-import { Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link, useSearchParams } from "react-router-dom";
 import { useCustomers } from "./customer-hooks";
 import { CustomerTable } from "./customer-table";
-import { CustomerPage, LoadingRows, PageHeader, StatePanel } from "./customer-ui";
+import { CustomerPage, PageHeader, StatePanel } from "./customer-ui";
 import { useDebouncedValue } from "./use-debounced-value";
 import { useAuth } from "@/features/auth/auth-state";
 import { canManageCustomers } from "./customer-permissions";
-import { FilterBar } from "@/components/shared/filter-bar";
+import {
+  DataTableSurface,
+  DataTableToolbar,
+  DataTableSearch,
+  DataTableSkeleton,
+} from "@/components/shared/data-table";
 
 export function CustomerListPage() {
   const { t } = useTranslation();
@@ -36,55 +40,67 @@ export function CustomerListPage() {
 
   return (
     <CustomerPage>
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader
           title={t("customers.title")}
           description={t("customers.description")}
           actions={canManage ? <Link className="button-link" to="/customers/new">{t("customers.add")}</Link> : undefined}
         />
-        <FilterBar className="my-6">
-          <div className="relative w-full max-w-sm">
-            <Search
-              className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70"
-              strokeWidth={1.75}
-              aria-hidden="true"
-            />
-            <label className="sr-only" htmlFor="customer-search">{t("customers.search")}</label>
-            <input
+
+        {/* Unified DataTable Surface */}
+        <DataTableSurface>
+          {/* Shared Single-Row Compact Toolbar */}
+          <DataTableToolbar>
+            {/* Search Input */}
+            <DataTableSearch
               id="customer-search"
-              className="input ps-9"
-              dir="auto"
-              type="search"
+              ariaLabel={t("customers.search")}
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={setSearch}
               placeholder={t("customers.search")}
             />
-          </div>
-          {debouncedSearch && (
-            <button className="button-ghost" onClick={() => setSearch("")}>
-              {t("common.clearSearch")}
-            </button>
+
+            {/* Right-Side Actions */}
+            {debouncedSearch && (
+              <div className="flex items-center gap-2 sm:ms-auto">
+                <button
+                  className="button-ghost h-8.5 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setSearch("")}
+                >
+                  {t("common.clearSearch")}
+                </button>
+              </div>
+            )}
+          </DataTableToolbar>
+
+          {/* Table Body & Loading / Error / Empty States */}
+          {customers.isLoading ? (
+            <div className="p-4" aria-label={t("common.loading")}>
+              <DataTableSkeleton columns={6} />
+            </div>
+          ) : customers.isError ? (
+            <div className="p-6">
+              <StatePanel action={<button className="button-secondary" onClick={() => customers.refetch()}>{t("common.retry")}</button>}>
+                {t("customers.loadError")}
+              </StatePanel>
+            </div>
+          ) : customers.data?.data.length === 0 ? (
+            <div className="p-6">
+              <StatePanel action={debouncedSearch ? <button className="button-secondary" onClick={() => setSearch("")}>{t("common.clearSearch")}</button> : canManage ? <Link className="button-link" to="/customers/new">{t("customers.add")}</Link> : undefined}>
+                {debouncedSearch ? t("customers.noMatches", { search: debouncedSearch }) : t("customers.empty")}
+              </StatePanel>
+            </div>
+          ) : (
+            <CustomerTable
+              customers={customers.data?.data ?? []}
+              page={page}
+              pageSize={customers.data?.meta.limit ?? 20}
+              pageCount={customers.data?.meta.totalPages ?? 0}
+              totalCount={customers.data?.meta.total}
+              onPageChange={setPage}
+            />
           )}
-        </FilterBar>
-        {customers.isLoading ? (
-          <LoadingRows />
-        ) : customers.isError ? (
-          <StatePanel action={<button className="button-secondary" onClick={() => customers.refetch()}>{t("common.retry")}</button>}>
-            {t("customers.loadError")}
-          </StatePanel>
-        ) : customers.data?.data.length === 0 ? (
-          <StatePanel action={debouncedSearch ? <button className="button-secondary" onClick={() => setSearch("")}>{t("common.clearSearch")}</button> : canManage ? <Link className="button-link" to="/customers/new">{t("customers.add")}</Link> : undefined}>
-            {debouncedSearch ? t("customers.noMatches", { search: debouncedSearch }) : t("customers.empty")}
-          </StatePanel>
-        ) : (
-          <CustomerTable
-            customers={customers.data?.data ?? []}
-            page={page}
-            pageSize={customers.data?.meta.limit ?? 20}
-            pageCount={customers.data?.meta.totalPages ?? 0}
-            onPageChange={setPage}
-          />
-        )}
+        </DataTableSurface>
       </div>
     </CustomerPage>
   );

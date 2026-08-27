@@ -7,6 +7,15 @@ import { TicketPriorityText } from "../tickets/ticket-badges";
 import { formatTicketDate } from "../tickets/ticket-format";
 import { useAgentReports, useReportsOverview, useSlaReports, useTicketReports } from "./reports-hooks";
 import type { AgentReportRow, ReportsRangeParams } from "./reports.types";
+import {
+  TableContainer,
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
 const PRESETS = [7, 30, 90] as const;
@@ -191,27 +200,40 @@ export function ReportsPage() {
                   <dd className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">{formatMinutes(sla.data.averageResolutionMinutes, t)}</dd>
                 </div>
               </dl>
-              <div className="overflow-x-auto rounded-lg border border-border">
-                <table className="w-full min-w-[28rem] text-sm">
-                  <thead className="bg-surface-subtle text-xs text-muted-foreground border-b border-border">
-                    <tr>
-                      {[t("tickets.priorityLabel"), t("reports.sla.metShort"), t("reports.sla.breachedShort"), t("reports.sla.complianceShort")].map((label) => (
-                        <th key={label} className="px-3 py-2 text-start font-semibold">{label}</th>
+              <TableContainer>
+                <Table className="min-w-[28rem]">
+                  <TableHeader>
+                    <TableRow>
+                      {[
+                        t("tickets.priorityLabel"),
+                        t("reports.sla.metShort"),
+                        t("reports.sla.breachedShort"),
+                        t("reports.sla.complianceShort"),
+                      ].map((label) => (
+                        <TableHead key={label}>{label}</TableHead>
                       ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border-subtle">
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {sla.data.byPriority.map((row) => (
-                      <tr key={row.priority} className="hover:bg-surface-hover transition-colors">
-                        <td className="px-3 py-2"><TicketPriorityText priority={row.priority} /></td>
-                        <td className="px-3 py-2 tabular-nums text-foreground">{nf.format(row.firstResponseMet)}</td>
-                        <td className="px-3 py-2 tabular-nums text-foreground">{nf.format(row.firstResponseBreached)}</td>
-                        <td className="px-3 py-2 tabular-nums font-medium text-foreground">{row.compliancePct === null ? "—" : `${nf.format(row.compliancePct)}%`}</td>
-                      </tr>
+                      <TableRow key={row.priority}>
+                        <TableCell>
+                          <TicketPriorityText priority={row.priority} />
+                        </TableCell>
+                        <TableCell className="tabular-nums text-foreground">
+                          {nf.format(row.firstResponseMet)}
+                        </TableCell>
+                        <TableCell className="tabular-nums text-foreground">
+                          {nf.format(row.firstResponseBreached)}
+                        </TableCell>
+                        <TableCell className="tabular-nums font-medium text-foreground">
+                          {row.compliancePct === null ? "—" : `${nf.format(row.compliancePct)}%`}
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                  </TableBody>
+                </Table>
+              </TableContainer>
             </div>
           )}
         </Panel>
@@ -256,43 +278,57 @@ export function ReportsPage() {
           <div className="mt-4 grid gap-6 md:grid-cols-2">
             <div>
               <h3 className="text-sm font-semibold text-foreground">{t("reports.byPriority")}</h3>
-              <div className="mt-2 overflow-x-auto rounded-lg border border-border">
-                <table className="w-full text-sm">
-                  <thead className="bg-surface-subtle text-xs text-muted-foreground border-b border-border">
-                    <tr>{[t("tickets.priorityLabel"), t("reports.legend.created"), t("reports.legend.resolved")].map((label) => <th key={label} className="px-3 py-2 text-start font-semibold">{label}</th>)}</tr>
-                  </thead>
-                  <tbody className="divide-y divide-border-subtle">
+              <TableContainer className="mt-2">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {[t("tickets.priorityLabel"), t("reports.legend.created"), t("reports.legend.resolved")].map((label) => (
+                        <TableHead key={label}>{label}</TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {tickets.data.byPriority.map((row) => (
-                      <tr key={row.priority} className="hover:bg-surface-hover transition-colors">
-                        <td className="px-3 py-2"><TicketPriorityText priority={row.priority} /></td>
-                        <td className="px-3 py-2 tabular-nums text-foreground">{nf.format(row.created)}</td>
-                        <td className="px-3 py-2 tabular-nums text-foreground">{nf.format(row.resolved)}</td>
-                      </tr>
+                      <TableRow key={row.priority}>
+                        <TableCell>
+                          <TicketPriorityText priority={row.priority} />
+                        </TableCell>
+                        <TableCell className="tabular-nums text-foreground">{nf.format(row.created)}</TableCell>
+                        <TableCell className="tabular-nums text-foreground">{nf.format(row.resolved)}</TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                  </TableBody>
+                </Table>
+              </TableContainer>
             </div>
             <div>
               <h3 className="text-sm font-semibold text-foreground">{t("reports.byCategory")}</h3>
               {tickets.data.byCategory.length === 0 ? (
                 <p className="mt-2 text-sm text-muted-foreground">{t("reports.emptyStatus")}</p>
               ) : (
-                <div className="mt-2 overflow-x-auto rounded-lg border border-border">
-                  <table className="w-full text-sm">
-                    <thead className="bg-surface-subtle text-xs text-muted-foreground border-b border-border">
-                      <tr>{[t("tickets.category"), t("reports.legend.created")].map((label) => <th key={label} className="px-3 py-2 text-start font-semibold">{label}</th>)}</tr>
-                    </thead>
-                    <tbody className="divide-y divide-border-subtle">
+                <TableContainer className="mt-2">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {[t("tickets.category"), t("reports.legend.created")].map((label) => (
+                          <TableHead key={label}>{label}</TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
                       {tickets.data.byCategory.map((row) => (
-                        <tr key={row.categoryId ?? "uncategorized"} className="hover:bg-surface-hover transition-colors">
-                          <td className="px-3 py-2"><span className="line-clamp-1 break-words font-medium text-foreground" title={row.categoryName ?? t("reports.uncategorized")}>{row.categoryName ?? t("reports.uncategorized")}</span></td>
-                          <td className="px-3 py-2 tabular-nums text-foreground">{nf.format(row.created)}</td>
-                        </tr>
+                        <TableRow key={row.categoryId ?? "uncategorized"}>
+                          <TableCell>
+                            <span className="line-clamp-1 break-words font-medium text-foreground" title={row.categoryName ?? t("reports.uncategorized")}>
+                              {row.categoryName ?? t("reports.uncategorized")}
+                            </span>
+                          </TableCell>
+                          <TableCell className="tabular-nums text-foreground">{nf.format(row.created)}</TableCell>
+                        </TableRow>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
+                    </TableBody>
+                  </Table>
+                </TableContainer>
               )}
             </div>
           </div>
@@ -304,28 +340,57 @@ export function ReportsPage() {
 
 function AgentTable({ rows, nf }: { rows: AgentReportRow[]; nf: Intl.NumberFormat }) {
   const { t } = useTranslation();
-  const headers = [t("reports.agents.name"), t("reports.agents.assigned"), t("reports.agents.resolved"), t("reports.agents.open"), t("reports.agents.slaMet"), t("reports.agents.avgResponse")];
-  return <>
-    <div className="mt-3 hidden overflow-x-auto rounded-xl border border-border bg-surface shadow-subtle md:block">
-      <table className="w-full min-w-[52rem] table-fixed text-sm">
-        <colgroup><col className="w-56" /><col className="w-24" /><col className="w-24" /><col className="w-20" /><col className="w-28" /><col className="w-32" /></colgroup>
-        <thead className="bg-surface-subtle text-xs text-muted-foreground border-b border-border">
-          <tr>{headers.map((label) => <th key={label} className="px-4 py-2.5 text-start font-semibold">{label}</th>)}</tr>
-        </thead>
-        <tbody className="divide-y divide-border-subtle">
-          {rows.map((row) => (
-            <tr key={row.agentId} className="hover:bg-surface-hover transition-colors">
-              <td className="px-4 py-2.5"><span className="line-clamp-1 break-words font-semibold text-foreground" title={row.agentName}>{row.agentName}</span></td>
-              <td className="px-4 py-2.5 tabular-nums text-foreground">{nf.format(row.assigned)}</td>
-              <td className="px-4 py-2.5 tabular-nums text-foreground">{nf.format(row.resolved)}</td>
-              <td className="px-4 py-2.5 tabular-nums text-foreground">{nf.format(row.open)}</td>
-              <td className="px-4 py-2.5 tabular-nums font-medium text-foreground">{row.slaMetPct === null ? "—" : `${nf.format(row.slaMetPct)}%`}</td>
-              <td className="px-4 py-2.5 tabular-nums text-muted-foreground">{formatMinutes(row.averageFirstResponseMinutes, t)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+  const headers = [
+    t("reports.agents.name"),
+    t("reports.agents.assigned"),
+    t("reports.agents.resolved"),
+    t("reports.agents.open"),
+    t("reports.agents.slaMet"),
+    t("reports.agents.avgResponse"),
+  ];
+  return (
+    <>
+      <div className="mt-3 hidden md:block">
+        <TableContainer>
+          <Table className="min-w-[52rem]">
+            <colgroup>
+              <col className="w-56" />
+              <col className="w-24" />
+              <col className="w-24" />
+              <col className="w-20" />
+              <col className="w-28" />
+              <col className="w-32" />
+            </colgroup>
+            <TableHeader>
+              <TableRow>
+                {headers.map((label) => (
+                  <TableHead key={label}>{label}</TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.agentId}>
+                  <TableCell>
+                    <span className="line-clamp-1 break-words font-semibold text-foreground" title={row.agentName}>
+                      {row.agentName}
+                    </span>
+                  </TableCell>
+                  <TableCell className="tabular-nums text-foreground">{nf.format(row.assigned)}</TableCell>
+                  <TableCell className="tabular-nums text-foreground">{nf.format(row.resolved)}</TableCell>
+                  <TableCell className="tabular-nums text-foreground">{nf.format(row.open)}</TableCell>
+                  <TableCell className="tabular-nums font-medium text-foreground">
+                    {row.slaMetPct === null ? "—" : `${nf.format(row.slaMetPct)}%`}
+                  </TableCell>
+                  <TableCell className="tabular-nums text-muted-foreground">
+                    {formatMinutes(row.averageFirstResponseMinutes, t)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </div>
     <ul className="mt-3 grid gap-3 md:hidden">
       {rows.map((row) => (
         <li key={row.agentId} className="rounded-xl border border-border bg-surface p-4 shadow-subtle">
@@ -339,7 +404,8 @@ function AgentTable({ rows, nf }: { rows: AgentReportRow[]; nf: Intl.NumberForma
         </li>
       ))}
     </ul>
-  </>;
+    </>
+  );
 }
 
 function SlaBar({ label, tally, nf, t }: { label: string; tally: { met: number; breached: number; pending: number; total: number; compliancePct: number | null }; nf: Intl.NumberFormat; t: (key: string, opts?: Record<string, unknown>) => string }) {

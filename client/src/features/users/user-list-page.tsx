@@ -1,13 +1,17 @@
-import { Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link, useSearchParams } from "react-router-dom";
 import { AppSelect } from "@/components/ui/app-select";
-import { FilterBar } from "@/components/shared/filter-bar";
+import {
+  DataTableSurface,
+  DataTableToolbar,
+  DataTableSearch,
+  DataTableSkeleton,
+} from "@/components/shared/data-table";
 import { useAuth } from "@/features/auth/auth-state";
 import { useDebouncedValue } from "@/features/customers/use-debounced-value";
 import { useUsers } from "./user-hooks";
 import { UserTable } from "./user-table";
-import { LoadingRows, PageHeader, StatePanel, UsersPage } from "./users-ui";
+import { PageHeader, StatePanel, UsersPage } from "./users-ui";
 import { MANAGEABLE_ROLES, type ManageableRole } from "./user.types";
 
 const STATUSES = ["active", "inactive"] as const;
@@ -54,75 +58,86 @@ export function UserListPage() {
 
   return (
     <UsersPage>
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader
           title={t("users.title")}
           description={t("users.description")}
           actions={<Link className="button-link" to="/users/new">{t("users.create")}</Link>}
         />
-        <FilterBar className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <label className="block w-full min-w-0 flex-1">
-            <span className="sr-only">{t("users.search")}</span>
-            <div className="relative">
-              <Search
-                className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70"
-                strokeWidth={1.75}
-                aria-hidden="true"
-              />
-              <input
-                className="input ps-9"
-                type="search"
-                dir="auto"
-                value={search}
-                onChange={(event) => setFilter("search", event.target.value)}
-                placeholder={t("users.search")}
-              />
+
+        {/* Unified DataTable Surface */}
+        <DataTableSurface>
+          {/* Shared Single-Row Compact Toolbar */}
+          <DataTableToolbar>
+            {/* Search Input */}
+            <DataTableSearch
+              id="user-search"
+              ariaLabel={t("users.search")}
+              value={search}
+              onChange={(value) => setFilter("search", value)}
+              placeholder={t("users.search")}
+            />
+
+            {/* Right-Side Filter Controls */}
+            <div className="flex flex-wrap items-center gap-2 sm:ms-auto">
+              <div className="w-32 sm:w-36">
+                <AppSelect
+                  ariaLabel={t("users.filterRole")}
+                  value={role ?? ""}
+                  onValueChange={(val) => setFilter("role", val)}
+                  options={roleOptions}
+                />
+              </div>
+
+              <div className="w-32 sm:w-36">
+                <AppSelect
+                  ariaLabel={t("users.filterStatus")}
+                  value={status ?? ""}
+                  onValueChange={(val) => setFilter("status", val)}
+                  options={statusOptions}
+                />
+              </div>
+
+              {hasFilters && (
+                <button
+                  className="button-ghost h-8.5 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setParams({})}
+                >
+                  {t("users.clearFilters")}
+                </button>
+              )}
             </div>
-          </label>
-          <div className="w-full sm:w-44">
-            <span className="mb-1 block text-xs font-medium text-muted-foreground">{t("users.filterRole")}</span>
-            <AppSelect
-              ariaLabel={t("users.filterRole")}
-              value={role ?? ""}
-              onValueChange={(val) => setFilter("role", val)}
-              options={roleOptions}
+          </DataTableToolbar>
+
+          {/* Table Body & Loading / Error / Empty States */}
+          {users.isLoading ? (
+            <div className="p-4">
+              <DataTableSkeleton columns={6} />
+            </div>
+          ) : users.isError ? (
+            <div className="p-6">
+              <StatePanel action={<button className="button-secondary" onClick={() => users.refetch()}>{t("common.retry")}</button>}>
+                {t("users.loadError")}
+              </StatePanel>
+            </div>
+          ) : users.data && users.data.data.length === 0 ? (
+            <div className="p-6">
+              <StatePanel action={hasFilters ? <button className="button-secondary" onClick={() => setParams({})}>{t("users.clearFilters")}</button> : <Link className="button-link" to="/users/new">{t("users.create")}</Link>}>
+                {hasFilters ? t("users.noMatches") : t("users.empty")}
+              </StatePanel>
+            </div>
+          ) : (
+            <UserTable
+              users={users.data?.data ?? []}
+              currentUserId={currentUser?.id ?? ""}
+              page={page}
+              pageSize={users.data?.meta.limit ?? 20}
+              pageCount={users.data?.meta.totalPages ?? 0}
+              totalCount={users.data?.meta.total}
+              onPageChange={(nextPage) => setFilter("page", nextPage > 1 ? String(nextPage) : "")}
             />
-          </div>
-          <div className="w-full sm:w-44">
-            <span className="mb-1 block text-xs font-medium text-muted-foreground">{t("users.filterStatus")}</span>
-            <AppSelect
-              ariaLabel={t("users.filterStatus")}
-              value={status ?? ""}
-              onValueChange={(val) => setFilter("status", val)}
-              options={statusOptions}
-            />
-          </div>
-          {hasFilters && (
-            <button className="button-ghost" onClick={() => setParams({})}>
-              {t("users.clearFilters")}
-            </button>
           )}
-        </FilterBar>
-        {users.isLoading ? (
-          <LoadingRows />
-        ) : users.isError ? (
-          <StatePanel action={<button className="button-secondary" onClick={() => users.refetch()}>{t("common.retry")}</button>}>
-            {t("users.loadError")}
-          </StatePanel>
-        ) : users.data && users.data.data.length === 0 ? (
-          <StatePanel action={hasFilters ? <button className="button-secondary" onClick={() => setParams({})}>{t("users.clearFilters")}</button> : <Link className="button-link" to="/users/new">{t("users.create")}</Link>}>
-            {hasFilters ? t("users.noMatches") : t("users.empty")}
-          </StatePanel>
-        ) : (
-          <UserTable
-            users={users.data?.data ?? []}
-            currentUserId={currentUser?.id ?? ""}
-            page={page}
-            pageSize={users.data?.meta.limit ?? 20}
-            pageCount={users.data?.meta.totalPages ?? 0}
-            onPageChange={(nextPage) => setFilter("page", nextPage > 1 ? String(nextPage) : "")}
-          />
-        )}
+        </DataTableSurface>
       </div>
     </UsersPage>
   );
