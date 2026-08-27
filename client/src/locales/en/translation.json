@@ -1,7 +1,7 @@
 {
   "app": { "title": "Customer Support CRM", "foundationReady": "Project foundation is ready." },
   "navigation": {
-    "languageSwitcher": "Choose language", "primary": "Primary navigation", "dashboard": "Dashboard", "tickets": "Tickets", "customers": "Customers", "knowledgeBase": "Knowledge Base", "reports": "Reports", "quickReplies": "Quick Replies", "users": "Users",
+    "languageSwitcher": "Choose language", "primary": "Primary navigation", "dashboard": "Dashboard", "tickets": "Tickets", "customers": "Customers", "knowledgeBase": "Knowledge Base", "reports": "Reports", "quickReplies": "Quick Replies", "users": "Users", "settings": "Settings",
     "collapseSidebar": "Collapse sidebar", "expandSidebar": "Expand sidebar",
     "portalHome": "Portal home", "portalContext": "Support portal", "workspaceContext": "Support workspace", "openCustomers": "Open customer records",
     "sections": { "main": "Main", "support": "Support", "management": "Management" }
@@ -158,6 +158,13 @@
       "bodyMax": "Reply text must be 5,000 characters or fewer"
     },
     "errors": { "QUICK_REPLY_NOT_FOUND": "Quick reply not found.", "VALIDATION_ERROR": "Check the form and try again.", "FORBIDDEN": "You do not have permission to perform this action." }
+  },
+  "settings": {
+    "title": "Settings", "description": "Manage operational configuration used by tickets and support workflows.", "sectionsLabel": "Settings sections", "tabs": { "categories": "Categories", "sla": "SLA Rules", "quick": "Quick Replies" },
+    "status": "Status", "actions": "Actions", "active": "Active", "inactive": "Inactive", "activate": "Activate", "deactivate": "Deactivate",
+    "categories": { "title": "Categories", "description": "Manage active and retired ticket categories without changing ticket history.", "formDescription": "Set the category name and optional description used by the support team.", "search": "Search categories by name…", "create": "Create category", "edit": "Edit category", "name": "Name", "fieldDescription": "Description", "empty": "No categories have been configured.", "noResults": "No categories match this search.", "loadError": "Unable to load categories.", "saveError": "Unable to save the category.", "validation": "Enter a category name between 2 and 100 characters.", "deactivateTitle": "Deactivate {{name}}?", "activateTitle": "Activate {{name}}?", "confirmDeactivate": "Existing tickets keep this category, but it will be removed from active selectors.", "confirmActivate": "This category will become available in active ticket selectors.", "statusError": "Unable to change the category status." },
+    "sla": { "loadError": "Unable to load SLA rules.", "first": "First response (minutes)", "resolution": "Resolution (minutes)", "enabled": "Rule is active", "configured": "Configured for prospective ticket deadlines.", "missing": "No rule exists for this priority yet.", "create": "Create rule", "saveError": "Unable to save the SLA rule.", "validation": "Use positive values up to 525,600; resolution cannot be lower than first response." },
+    "quick": { "title": "Quick Replies", "description": "Manage reusable reply text in the existing Quick Replies workspace. Agent composer access and current permissions remain unchanged.", "open": "Open Quick Replies" }
   },
   "users": {
     "title": "Users",

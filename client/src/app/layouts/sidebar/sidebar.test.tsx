@@ -70,6 +70,7 @@ describe("Sidebar component", () => {
     expect(screen.getByRole("link", { name: "Reports" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Quick Replies" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Users" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
 
     // Profile card
     expect(screen.getByText("Bahaa Youssof")).toBeInTheDocument();
@@ -156,5 +157,6 @@ describe("Sidebar component", () => {
     expect(screen.queryByRole("link", { name: "Reports" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Quick Replies" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Users" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Settings" })).not.toBeInTheDocument();
   });
 });

@@ -69,6 +69,14 @@ The remaining routes are the `feature/user-management` administration surface (r
 
 Internal-user administration is separate from public customer registration; this surface never creates or exposes `CUSTOMER` accounts. There is no user-deletion route — accounts are retired by setting `isActive=false`, which blocks login (`403 ACCOUNT_DEACTIVATED`) and, on a live session, `GET /auth/me` and every `/api/users` admin request (`401 ACCOUNT_DEACTIVATED`).
 
+## Settings — LIVE on `feature/settings`
+
+Every `/settings/*` endpoint requires an authenticated, currently active `ADMIN`; other roles receive `403`. Routes: `GET/POST /settings/categories`, `PATCH /settings/categories/:id`, `GET /settings/sla-rules`, and `PUT /settings/sla-rules/:priority`.
+
+Category management returns active and inactive rows; supports strict name search, create, edit, and activation; and never deletes. Names are trimmed, 2–100 characters, and unique; descriptions are at most 500 characters. Duplicate names return `409 CATEGORY_NAME_ALREADY_EXISTS`; missing rows return `404 CATEGORY_NOT_FOUND`. The existing `GET /categories` contract remains active-only and unchanged.
+
+SLA management returns all configured rules and safely creates or updates one LOW, MEDIUM, HIGH, or URGENT resource. Minute values are integers from 1 through 525,600 and resolution cannot be lower than first response. Rules are activated/deactivated, never deleted. Changes are prospective and existing Ticket deadline snapshots are never rewritten. Background automation remains deferred.
+
 ## Categories
 
 ```text

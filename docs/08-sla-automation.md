@@ -30,6 +30,8 @@ When an unresolved ticket changes priority, recalculate from the priority-change
 
 This snapshot behavior does not include timers, workers, alerts, notifications, automatic escalation, or any other SLA automation.
 
+`feature/settings` adds ADMIN-only management of the existing per-priority `SlaRule` rows. Rules are activated or deactivated, never deleted; targets are positive bounded integers and resolution cannot be lower than first response. Settings changes are prospective: they affect later ticket creation and the existing eligible priority-change recalculation only. They never rewrite deadline snapshots on existing tickets. Background monitoring and automated actions remain deferred to `feature/sla-automation`.
+
 Useful derived states:
 - ON_TRACK
 - AT_RISK

@@ -54,7 +54,7 @@ The role descriptions below include capabilities that are not yet built. As of `
 
 - Tasks and Reminders: ownership, assignment, and role visibility are undefined (`feature/tasks-reminders`).
 - Team Collaboration: scope (mentions, watchers, handoff, shared comments, or tasks) is undefined (`feature/team-collaboration`).
-- Settings: which configurable resources `ADMIN` (and possibly `MANAGER`) may edit (`feature/settings`).
+- Settings is ADMIN-only: Category and SLA Rule management plus a link to the existing Quick Replies workspace. MANAGER, AGENT, and CUSTOMER receive `403` from `/api/settings/*` and cannot access `/settings`. Existing Quick Replies authorization remains unchanged.
 - Custom Branding: who may change application/Portal branding and within what bounds (`feature/custom-branding`).
 - General Audit Logs: whether a dedicated `AuditLog` beyond `TicketHistory` is introduced, and who reads it.
 

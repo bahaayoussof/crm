@@ -4,6 +4,12 @@ Use this file for decisions not already fixed by the project documentation.
 
 Do not record trivial implementation details.
 
+### ADR-026: Functional Settings scope and contracts
+
+**Date:** 2026-08-27
+
+`feature/settings` is an ADMIN-only workspace for the existing Category and SlaRule models. `/api/settings/categories` manages active/inactive categories while preserving the active-only `/api/categories` lookup. `/api/settings/sla-rules` safely upserts one resource per TicketPriority. Both use activation rather than deletion; SLA changes are prospective and never rewrite Ticket snapshots. The UI links to the existing Quick Replies workspace instead of duplicating it. General, Branding, provider, notification, theme, and integration settings remain absent; Branding stays deferred to `feature/custom-branding`, and monitoring/automatic actions to `feature/sla-automation`.
+
 ## Template
 
 ### ADR-XXX: Decision Title

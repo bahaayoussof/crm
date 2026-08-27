@@ -19,6 +19,7 @@ import {
   ReportsNavIcon,
   TicketsNavIcon,
   UsersNavIcon,
+  SettingsNavIcon,
 } from "./nav-icons";
 import { Sidebar } from "./sidebar/sidebar";
 
@@ -140,6 +141,7 @@ export function AppShell({ audience, children }: PropsWithChildren<{ audience: P
       ? [{ to: "/quick-replies", key: "quickReplies", icon: QuickRepliesNavIcon } as const]
       : []),
     ...(user && canManageUsers(user.role) ? [{ to: "/users", key: "users", icon: UsersNavIcon } as const] : []),
+    ...(user?.role === "ADMIN" ? [{ to: "/settings", key: "settings", icon: SettingsNavIcon } as const] : []),
   ];
 
   return (

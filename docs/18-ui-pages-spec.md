@@ -1398,6 +1398,8 @@ Quick Replies
 
 Department/branch configuration may be added later.
 
+Implemented on `feature/settings`: ADMIN-only Categories and SLA Rules management plus a descriptive link to the existing `/quick-replies` workspace. Categories support search, create, edit, activate/deactivate, desktop table and mobile cards. SLA Rules support one LOW/MEDIUM/HIGH/URGENT row each, safe create/update, activate/deactivate, and prospective-only behavior. General, Branding, provider controls, integrations, and dead toggles are absent. Branding remains `feature/custom-branding`; Quick Replies is linked, not duplicated.
+
 Do not create dead settings screens full of nonfunctional toggles.
 
 ---

@@ -11,6 +11,7 @@ import {
   Ticket,
   UserCog,
   Users,
+  Settings,
 } from "lucide-react";
 
 export function DashboardNavIcon(props: LucideProps) {
@@ -40,6 +41,7 @@ export function QuickRepliesNavIcon(props: LucideProps) {
 export function UsersNavIcon(props: LucideProps) {
   return <UserCog size={18} strokeWidth={1.75} aria-hidden="true" {...props} />;
 }
+export function SettingsNavIcon(props: LucideProps) { return <Settings size={18} strokeWidth={1.75} aria-hidden="true" {...props} />; }
 
 export function LogoutIcon(props: LucideProps) {
   return <LogOut size={16} strokeWidth={1.75} aria-hidden="true" {...props} />;

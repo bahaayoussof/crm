@@ -17,6 +17,7 @@ import {
   ReportsNavIcon,
   TicketsNavIcon,
   UsersNavIcon,
+  SettingsNavIcon,
 } from "../nav-icons";
 import { SidebarFlyout } from "./sidebar-flyout";
 import type { NavSectionConfig } from "./sidebar-types";
@@ -63,6 +64,9 @@ export function Sidebar({ user, collapsed, onToggleCollapsed, onLogout }: Sideba
       : []),
     ...(user && canManageUsers(user.role)
       ? [{ to: "/users", key: "users", icon: UsersNavIcon }]
+      : []),
+    ...(user?.role === "ADMIN"
+      ? [{ to: "/settings", key: "settings", icon: SettingsNavIcon }]
       : []),
   ];
 
