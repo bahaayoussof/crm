@@ -1302,6 +1302,22 @@ Charts stack vertically.
 
 Tables use responsive strategy.
 
+## Implemented behavior (`feature/reports`, on branch — ADR-024)
+
+`client/src/features/reports/reports-page.tsx` at `/reports`, guarded by `client/src/app/router/reports-route.tsx` (`canViewReports` = `ADMIN` || `MANAGER`; `AGENT`/`CUSTOMER` → `/dashboard` replace). Nav item shown only to `ADMIN`/`MANAGER`.
+
+- **Filters:** quick-range presets (7 / 30 / 90 days) plus custom `From` / `To` date inputs, all synced to URL `from`/`to` (ISO). No params → server default (trailing 30 days). A `Reset` clears them. The resolved range and "Times shown in UTC" are printed under the filter bar.
+- **Overview KPIs:** Created tickets, Resolved tickets, SLA compliance %, Avg. first response (`Nh Nm`), Customer satisfaction (`N / 5` + response count). `—` when a metric has no data.
+- **Ticket volume:** created-vs-resolved grouped bar chart, one bucket per UTC day, with an `sr-only` list mirror.
+- **Status distribution:** horizontal bar chart of the created cohort.
+- **SLA performance:** stacked met/breached/pending bars for first response and resolution with compliance %, average first-response and resolution durations, and a per-priority met/breached/compliance table.
+- **Customer satisfaction:** average summary line + 1–5 rating distribution bars from `Feedback.rating`.
+- **Agent performance:** table (`Agent`, `Assigned`, `Resolved`, `Open`, `SLA met %`, `Avg. response`) on desktop, stacked cards on mobile — one row per agent active in range.
+- **Ticket breakdown:** by-priority (created/resolved) and by-category (created; null → "Uncategorized") tables.
+- **States:** structured skeleton while the overview query loads; page-level error + retry if it fails; each secondary section (SLA, agents, breakdown) shows its own inline "could not be loaded" + retry; localized empty states per section. Full English/Arabic + RTL; dates LTR-isolated.
+
+Every figure is computed from stored columns (no fabricated analytics). Not verified against PostgreSQL or a browser this cycle.
+
 ---
 
 # 15. Users Management

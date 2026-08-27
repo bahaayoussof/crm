@@ -14,7 +14,7 @@ This contract mixes live and planned endpoints. Each section is tagged:
 - `PARTIAL` — only part of the listed surface is registered; the rest is planned.
 - `PLANNED` — documented target with no registered route yet. Do not consume as a live API.
 
-Registered routers as of `master` `79c7067` plus the uncommitted `feature/customer-feedback` branch: `/api/auth`, `/api/customers`, `/api/categories`, `/api/users` (lookup only), `/api/tickets`, `/api/dashboard`, `/api/knowledge-articles`, `/api/quick-replies` (integrated at `79c7067`), `/api/attachments`, `/api/portal/knowledge-articles`, `/api/portal/attachments`, `/api/portal`, `/api/health`, plus attachment sub-routes on `/api/tickets`, `/api/customers`, and the portal ticket router (`feature/attachments`, integrated at `8e24d22`), and feedback sub-routes on the portal ticket router (`feature/customer-feedback`, on branch). There is no registered `/api/reports`, `/api/notifications`, `/api/feedback` (feedback is Portal-only), or `/api/settings` route.
+Registered routers as of `master` `12a0c12` (feature/customer-feedback integrated) plus the uncommitted `feature/reports` branch: `/api/auth`, `/api/customers`, `/api/categories`, `/api/users` (lookup only), `/api/tickets`, `/api/dashboard`, `/api/reports` (`feature/reports`, on branch — ADMIN/MANAGER), `/api/knowledge-articles`, `/api/quick-replies`, `/api/attachments`, `/api/portal/knowledge-articles`, `/api/portal/attachments`, `/api/portal`, `/api/health`, plus attachment sub-routes on `/api/tickets`, `/api/customers`, and the portal ticket router (`feature/attachments`, integrated at `8e24d22`), and feedback sub-routes on the portal ticket router (`feature/customer-feedback`, integrated at `12a0c12`). There is no registered `/api/notifications`, `/api/feedback` (feedback is Portal-only), or `/api/settings` route.
 
 ## Authentication
 
@@ -229,16 +229,33 @@ Registered at `/api/portal/knowledge-articles` (`feature/knowledge-base`), `CUST
 
 Known limitations: no popularity/view tracking, no article versioning/revision history, no rich-text or Markdown rendering, no related-article recommendations.
 
-## Reports — PLANNED
+## Reports — LIVE (on `feature/reports`, not yet integrated)
 
 ```text
-GET /reports/overview      PLANNED
-GET /reports/tickets       PLANNED
-GET /reports/agents        PLANNED
-GET /reports/sla           PLANNED
+GET /reports/overview   ADMIN, MANAGER
+GET /reports/tickets    ADMIN, MANAGER
+GET /reports/agents     ADMIN, MANAGER
+GET /reports/sla        ADMIN, MANAGER
 ```
 
-No route is registered. This is the `feature/reports` contract for `ADMIN`/`MANAGER`: created/resolved volume, status distribution, SLA compliance, average first-response time, agent performance, and customer satisfaction, all from real persisted data with an explicit date-range and timezone definition. `GET /dashboard/overview` (LIVE, below) is an operational snapshot, not the Reports feature. Satisfaction metrics depend on `feature/customer-feedback`. Do not invent fabricated analytics.
+`reportsRouter` is registered at `/api/reports` in `server/src/app.ts` (after `/api/dashboard`). `requireAuth` then `requireRole(ADMIN, MANAGER)` on every route — `AGENT`, `CUSTOMER`, and unauthenticated callers receive the standard `403 FORBIDDEN` / `401`. No schema change (existing `Ticket`, `Feedback`, `Category`, `User` rows only). `GET /dashboard/overview` remains a separate operational snapshot.
+
+**Date range.** Every route accepts optional `from` / `to` ISO datetimes. Default: the trailing 30 days ending now. `from` after `to`, a span over 366 days, or any unknown query field → `400 VALIDATION_ERROR`. All day bucketing is **UTC**; every response echoes `range: { from, to }`, `timezone: "UTC"`, and `generatedAt`.
+
+**Cohort rules.** The "created cohort" is tickets with `createdAt` in range; "resolved" counts use `resolvedAt` in range (so tickets created earlier still count). SLA outcomes are derived from stored timestamps — there is no persisted breach record:
+- First response `MET` = `firstRespondedAt <= firstResponseDueAt`; `BREACHED` = responded late, or unanswered past due; `PENDING` = unanswered, not yet due; `NONE` = no `firstResponseDueAt`.
+- Resolution `MET` = `resolvedAt`/`closedAt` `<= resolutionDueAt`; `BREACHED` / `PENDING` / `NONE` analogous.
+- `compliancePct = round(met / (met + breached) * 100)`, `null` when the denominator is 0.
+
+**`GET /reports/overview`** → `{ kpis: { createdTickets, resolvedTickets, slaCompliancePct, averageFirstResponseMinutes, satisfaction: { averageRating, responseCount } }, ticketVolume: [{ date, created, resolved }] (one bucket per UTC day), statusDistribution: [{ status, count }] (created cohort), satisfaction: { averageRating, responseCount, distribution: [{ rating: 1..5, count }] } }`. Satisfaction is read from `Feedback.rating` for rows created in range; `averageRating` is `null` with no feedback.
+
+**`GET /reports/tickets`** → `{ totals: { created, resolved, open }, volume: [...], byStatus: [...], byPriority: [{ priority, created, resolved }], byCategory: [{ categoryId, categoryName, created }] (null bucket = uncategorized, sorted by count) }`.
+
+**`GET /reports/agents`** → `{ agents: [{ agentId, agentName, assigned, resolved, open, slaMet, slaBreached, slaMetPct, averageFirstResponseMinutes }] }` — one row per `AGENT`-role user plus any agent still referenced by an in-range ticket; figures cover the agent's created-cohort tickets (`resolved` uses `resolvedAt` in range). Sorted by `assigned` desc, then `resolved` desc, then name.
+
+**`GET /reports/sla`** → `{ firstResponse: { met, breached, pending, total, compliancePct }, resolution: { … }, byPriority: [{ priority, firstResponseMet, firstResponseBreached, resolutionMet, resolutionBreached, compliancePct }], averageFirstResponseMinutes, averageResolutionMinutes }` over the created cohort.
+
+Known limitations: no department/branch/channel breakdown, no trend deltas vs. a previous period, no CSV/PDF export, no per-day SLA series, no caching layer (each call recomputes from a lean ticket projection), fixed UTC bucketing (no per-user timezone). Nothing is fabricated — every figure traces to a stored column.
 
 ## Attachments — LIVE (integrated into `master` at `8e24d22`)
 
@@ -315,7 +332,7 @@ GET  /api/portal/tickets/:id/feedback   read own submitted feedback (CUSTOMER) �
 - **Side effect:** submission writes one `TicketHistory` row (`action: "FEEDBACK_SUBMITTED"`, `actorUserId` = customer's user id, `newValue` = rating string) inside the create transaction.
 - **Ticket detail:** `GET /api/portal/tickets/:id` additionally returns `feedbackEligible: boolean` and `feedback: { rating, comment, createdAt } | null` so the Portal page needs no extra request.
 
-Satisfaction reporting (`GET /reports/*`) is still `feature/reports` and consumes `Feedback.rating`; no reports route is registered yet.
+Satisfaction reporting (`GET /reports/*`, ADMIN/MANAGER) consumes `Feedback.rating` and is implemented on the `feature/reports` branch — see "Reports — LIVE" above.
 
 ## Notifications — PLANNED
 

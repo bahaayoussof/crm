@@ -570,3 +570,33 @@ Updatable feedback (rejected — unstable reports datum, no product need); a ded
 **Consequences**
 
 `GET /api/portal/tickets/:id` gains two fields; the Portal ticket-detail type and its tests are updated. A new `TicketHistory` `action` string value (`FEEDBACK_SUBMITTED`) joins `TICKET_CREATED` / `STATUS_CHANGED`; any future exhaustive history-action rendering must handle it. PostgreSQL and authenticated English/Arabic browser verification were not performed and rely on deterministic mocked tests until a developer completes them. `feature/reports` is the next roadmap branch and will consume `Feedback.rating`.
+
+## ADR-024: Reports on Existing Rows — ADMIN/MANAGER Read-Only Aggregates over a UTC Date Range
+
+**Status:** Accepted (implemented on `feature/reports`, uncommitted; automated-verified only)
+
+**Context**
+
+Roadmap order 5. `docs/05` and `docs/18` §14 call for a management Reports page: created/resolved volume, status distribution, SLA compliance, average first-response time, agent performance, and customer satisfaction — "all from real persisted data with an explicit date-range and timezone definition", and "do not invent fabricated analytics". The Operational Dashboard (`GET /dashboard/overview`) is a live snapshot, not this. Satisfaction depends on `Feedback.rating` (`feature/customer-feedback`, integrated at `12a0c12`).
+
+**Decision**
+
+- **No schema change, no migration.** Every figure is computed from existing `Ticket`, `Feedback`, `Category`, and `User` columns. There is no persisted SLA-breach record and none is added — SLA outcomes are derived from `firstResponseDueAt` / `firstRespondedAt` / `resolutionDueAt` / `resolvedAt` / `closedAt` at request time.
+- **New module `server/src/modules/reports/`**, registered at `/api/reports` in `app.ts` (after `/api/dashboard`). Four `GET` routes — `/overview`, `/tickets`, `/agents`, `/sla` — behind `requireAuth` + `requireRole(ADMIN, MANAGER)`. No `AGENT` access (`docs/18` allows it "only if explicitly allowed" — it is not). No Portal route.
+- **Date range:** optional `from` / `to` ISO datetimes via one shared `reportsRangeQuerySchema` (`validateQuery`). Default = trailing 30 days ending now. `from` after `to`, span over 366 days, or any unknown query field → `400 VALIDATION_ERROR`. All day bucketing is **UTC**; every response echoes `range`, `timezone: "UTC"`, `generatedAt`.
+- **Cohort rules:** "created cohort" = `createdAt` in range; "resolved" counts use `resolvedAt` in range (tickets created earlier still count). One lean `ticket.findMany` (`OR: [createdAt in range, resolvedAt in range]`) feeds all aggregation in memory — no groupBy fan-out, no caching layer.
+- **SLA derivation:** first-response / resolution each classified `MET` / `BREACHED` / `PENDING` / `NONE`; `compliancePct = round(met / (met + breached) * 100)`, `null` when the denominator is 0. This is a report-local calc, intentionally not the `shared/sla/deriveSla` helper (that produces a single current-state label for one ticket; reports need met-vs-breached tallies over a cohort).
+- **Frontend `client/src/features/reports/`:** `reports-page.tsx` at `/reports`, guarded by `reports-route.tsx` (`canViewReports` = `ADMIN` || `MANAGER`, else `/dashboard` replace); conditional nav item. Presets (7/30/90) + custom dates synced to URL `from`/`to`. Recharts (already a client dep) for volume + status; hand-built bars for SLA/satisfaction. Per-section loading / page-error / section-error / empty states. `reports.*` EN/AR (577/577 parity), RTL, LTR-isolated dates.
+- **Out of scope (explicit):** no department/branch/channel breakdown, no previous-period trend deltas, no CSV/PDF export, no per-day SLA series, no result caching, no per-user timezone (fixed UTC), no scheduled/emailed reports.
+
+**Reason**
+
+The domain rows already hold everything the spec asks for; a reporting schema would be premature. A single in-memory pass keeps the code testable (12 deterministic server tests cover auth, range validation, and every aggregation) and fast enough at assessment scale. UTC bucketing is the one timezone choice that is unambiguous and matches how the timestamps are stored. Keeping `AGENT` out matches the default in `docs/18`.
+
+**Alternatives Considered**
+
+Reusing `deriveSla` for compliance (rejected — wrong shape: single label vs. cohort tally); SQL `groupBy` per metric (rejected — many round trips, harder to keep the cohort rules consistent); a materialized/cached report table (rejected — no schema change wanted, data is small); putting Reports under the Dashboard router (rejected — different audience, different contract, `docs/05` lists them separately); allowing `AGENT` a scoped view (rejected — not requested, adds a visibility predicate to every query).
+
+**Consequences**
+
+`app.ts` gains one router. No existing endpoint or type changes. The satisfaction section needs demo `Feedback` rows to look populated — `feature/demo-seed-data` (order 14) must seed enough. PostgreSQL and authenticated English/Arabic browser verification were not performed and rely on the deterministic mocked tests until a developer completes them. Next roadmap branch: `feature/user-management` (order 6).

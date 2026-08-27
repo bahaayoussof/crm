@@ -1,7 +1,7 @@
 {
   "app": { "title": "نظام إدارة دعم العملاء", "foundationReady": "البنية الأساسية للمشروع جاهزة." },
   "navigation": {
-    "languageSwitcher": "اختيار اللغة", "primary": "التنقل الرئيسي", "dashboard": "لوحة التحكم", "tickets": "التذاكر", "customers": "العملاء", "knowledgeBase": "قاعدة المعرفة", "quickReplies": "الردود السريعة",
+    "languageSwitcher": "اختيار اللغة", "primary": "التنقل الرئيسي", "dashboard": "لوحة التحكم", "tickets": "التذاكر", "customers": "العملاء", "knowledgeBase": "قاعدة المعرفة", "reports": "التقارير", "quickReplies": "الردود السريعة",
     "portalHome": "الصفحة الرئيسية للبوابة", "portalContext": "بوابة الدعم", "workspaceContext": "مساحة عمل الدعم", "openCustomers": "فتح سجلات العملاء"
   },
   "common": {
@@ -22,6 +22,23 @@
     "chartTitle": "التذاكر حسب الحالة", "chartDescription": "عدد التذاكر المرئية مجمّعًا حسب الحالة الحالية.", "ticketsCount": "التذاكر", "emptyDistribution": "لا توجد بيانات لحالات التذاكر بعد.",
     "summaryTitle": "الملخص التشغيلي", "generatedAt": "وقت الإنشاء", "needsAttention": "تحتاج إلى اهتمام", "myAssignedTickets": "التذاكر المسندة إليّ", "recentTickets": "أحدث التذاكر", "emptyAttention": "لا توجد تذاكر مرئية تحتاج إلى اهتمام حاليًا.", "emptyAssigned": "لا توجد تذاكر نشطة مسندة إليك حاليًا.", "emptyRecent": "لا توجد تذاكر مرئية حديثة خارج قائمة الانتظار الأساسية.", "viewAll": "عرض كل التذاكر", "sla": "حالة اتفاقية الخدمة",
     "slaStates": { "ON_TRACK": "ضمن المسار", "AT_RISK": "معرضة للخطر", "BREACHED": "متجاوزة", "MET": "مستوفاة", "NOT_CONFIGURED": "غير مهيأة" }
+  },
+  "reports": {
+    "title": "التقارير", "description": "تتبّع حجم التذاكر وأداء اتفاقية مستوى الخدمة ونشاط الفريق ضمن نطاق زمني.",
+    "loadError": "تعذّر تحميل التقارير.", "sectionError": "تعذّر تحميل هذا القسم.",
+    "kpisLabel": "أبرز مؤشرات التقرير", "uncategorized": "بدون تصنيف",
+    "filters": { "label": "مرشّحات التقرير", "presetLabel": "نطاقات سريعة", "lastDays": "آخر {{count}} يوم", "from": "من", "to": "إلى", "reset": "إعادة تعيين", "timezone": "الأوقات معروضة بتوقيت UTC" },
+    "kpis": { "createdTickets": "التذاكر المُنشأة", "resolvedTickets": "التذاكر المُحلّة", "slaCompliance": "الالتزام باتفاقية الخدمة", "averageResponse": "متوسط أول ردّ", "satisfaction": "رضا العملاء", "satisfactionResponses": "{{count}} ردّ" },
+    "volumeTitle": "حجم التذاكر", "volumeDescription": "التذاكر المُنشأة مقابل المُحلّة يوميًا.", "emptyVolume": "لا يوجد نشاط تذاكر في هذا النطاق.",
+    "statusTitle": "توزيع الحالات", "emptyStatus": "لا توجد بيانات لهذا النطاق.",
+    "slaTitle": "أداء اتفاقية مستوى الخدمة", "slaDescription": "نتائج أول ردّ والحلّ للتذاكر المُنشأة ضمن النطاق.",
+    "sla": { "firstResponse": "أول ردّ", "resolution": "الحلّ", "avgFirstResponse": "متوسط أول ردّ", "avgResolution": "متوسط الحلّ", "metShort": "مستوفاة", "breachedShort": "متجاوزة", "pendingShort": "معلّقة", "complianceShort": "الالتزام" },
+    "satisfactionTitle": "رضا العملاء", "satisfactionDescription": "التقييمات المُقدّمة عبر بوابة العملاء.", "emptySatisfaction": "لم يُقدَّم أي تقييم في هذا النطاق.", "satisfactionSummary": "متوسط {{rating}} من 5 من {{count}} ردّ.",
+    "agentsTitle": "أداء الوكلاء", "agentsDescription": "أرقام الإسناد والحلّ واتفاقية الخدمة لكل وكيل للتذاكر المُنشأة ضمن النطاق.", "emptyAgents": "لا يوجد نشاط وكلاء في هذا النطاق.",
+    "agents": { "name": "الوكيل", "assigned": "مُسندة", "resolved": "محلولة", "open": "مفتوحة", "slaMet": "نسبة استيفاء الخدمة", "avgResponse": "متوسط الردّ" },
+    "breakdownTitle": "تفصيل التذاكر", "byPriority": "حسب الأولوية", "byCategory": "حسب التصنيف",
+    "legend": { "created": "مُنشأة", "resolved": "محلولة" },
+    "duration": { "minutes": "{{count}} دقيقة", "hours": "{{count}} ساعة" }
   },
   "tickets": {
     "title": "التذاكر", "description": "إدارة طلبات دعم العملاء ومتابعتها", "new": "تذكرة جديدة", "create": "إنشاء التذكرة", "createTitle": "إنشاء تذكرة", "editTitle": "تعديل التذكرة", "edit": "تعديل التذكرة",

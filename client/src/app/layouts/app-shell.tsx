@@ -5,6 +5,7 @@ import { LanguageSwitcher } from "@/components/shared/language-switcher";
 import { useAuth } from "@/features/auth/auth-state";
 import type { ProtectedAudience } from "@/features/auth/auth-routing";
 import { canManageQuickReplies } from "@/features/quick-replies/quick-reply-permissions";
+import { canViewReports } from "@/features/reports/reports-permissions";
 
 const internalNavigation = [
   { to: "/dashboard", key: "dashboard" },
@@ -42,9 +43,11 @@ export function AppShell({ audience, children }: PropsWithChildren<{ audience: P
     </div>;
   }
 
-  const navigation = user && canManageQuickReplies(user.role)
-    ? [...internalNavigation, { to: "/quick-replies", key: "quickReplies" }]
-    : internalNavigation;
+  const navigation = [
+    ...internalNavigation,
+    ...(user && canViewReports(user.role) ? [{ to: "/reports", key: "reports" } as const] : []),
+    ...(user && canManageQuickReplies(user.role) ? [{ to: "/quick-replies", key: "quickReplies" } as const] : []),
+  ];
 
   return <div className="min-h-[100dvh] bg-background lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
     <aside className="hidden border-e bg-white lg:flex lg:min-h-[100dvh] lg:flex-col">

@@ -38,10 +38,10 @@ The role descriptions below include capabilities that are not yet built. As of `
 ### Implemented — `feature/customer-feedback`, on branch, not yet integrated
 
 - Feedback (`POST`/`GET /api/portal/tickets/:id/feedback`): a `CUSTOMER` may submit and read exactly one rating (`1`–`5`, integer) plus an optional comment for their own ticket whose stored status is `RESOLVED` or `CLOSED`. Non-owned/missing ticket → `404 TICKET_NOT_FOUND`; other status → `409 TICKET_NOT_ELIGIBLE_FOR_FEEDBACK`; repeat submission → `409 FEEDBACK_ALREADY_SUBMITTED`. `customerId` is server-derived from `User -> Customer.userId`. Internal roles and unauthenticated callers are rejected (these are `portalRouter` sub-routes, `requireRole(CUSTOMER)`); there is no internal feedback route. See the matrix below.
+- Reports (`GET /api/reports/{overview,tickets,agents,sla}`, `feature/reports`, on branch): `ADMIN` and `MANAGER` only (`requireAuth` + `requireRole(ADMIN, MANAGER)`). `AGENT`, `CUSTOMER`, and unauthenticated callers receive `403 FORBIDDEN` / `401`. Read-only aggregates over existing rows; the satisfaction metric is derived from `Feedback.rating`. No `AGENT` reports access is granted.
 
 ### Planned — permission model known, not implemented
 
-- `ADMIN`/`MANAGER` Reports access, including the satisfaction metric derived from `Feedback.rating` (`feature/reports`).
 - `ADMIN`-managed internal user creation and role changes (`feature/user-management`).
 - Per-user Notifications read/unread (`feature/notifications`).
 
@@ -53,7 +53,7 @@ The role descriptions below include capabilities that are not yet built. As of `
 - Custom Branding: who may change application/Portal branding and within what bounds (`feature/custom-branding`).
 - General Audit Logs: whether a dedicated `AuditLog` beyond `TicketHistory` is introduced, and who reads it.
 
-Do not describe Users Management, Notifications, Tasks, Settings, or Reports permissions as implemented. Knowledge Base management (`feature/knowledge-base`), Quick Replies management (`feature/quick-replies`, integrated), and `CUSTOMER` feedback submission (`feature/customer-feedback`, on branch) are implemented; the other role-list items below remain the target model.
+Do not describe Users Management, Notifications, Tasks, or Settings permissions as implemented. Knowledge Base management (`feature/knowledge-base`), Quick Replies management (`feature/quick-replies`), `CUSTOMER` feedback submission (`feature/customer-feedback`, integrated at `12a0c12`), and `ADMIN`/`MANAGER` Reports read access (`feature/reports`, on branch) are implemented; the other role-list items below remain the target model.
 
 ## Roles
 

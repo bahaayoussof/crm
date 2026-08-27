@@ -1,7 +1,7 @@
 {
   "app": { "title": "Customer Support CRM", "foundationReady": "Project foundation is ready." },
   "navigation": {
-    "languageSwitcher": "Choose language", "primary": "Primary navigation", "dashboard": "Dashboard", "tickets": "Tickets", "customers": "Customers", "knowledgeBase": "Knowledge Base", "quickReplies": "Quick Replies",
+    "languageSwitcher": "Choose language", "primary": "Primary navigation", "dashboard": "Dashboard", "tickets": "Tickets", "customers": "Customers", "knowledgeBase": "Knowledge Base", "reports": "Reports", "quickReplies": "Quick Replies",
     "portalHome": "Portal home", "portalContext": "Support portal", "workspaceContext": "Support workspace", "openCustomers": "Open customer records"
   },
   "common": {
@@ -22,6 +22,23 @@
     "chartTitle": "Tickets by status", "chartDescription": "Visible ticket count grouped by current status.", "ticketsCount": "Tickets", "emptyDistribution": "No ticket status data yet.",
     "summaryTitle": "Operational summary", "generatedAt": "Generated at", "needsAttention": "Needs attention", "myAssignedTickets": "My Assigned Tickets", "recentTickets": "Recent tickets", "emptyAttention": "No visible tickets currently need attention.", "emptyAssigned": "No active tickets are currently assigned to you.", "emptyRecent": "No recent visible tickets remain outside the primary queue.", "viewAll": "View all tickets", "sla": "SLA state",
     "slaStates": { "ON_TRACK": "On track", "AT_RISK": "At risk", "BREACHED": "Breached", "MET": "Met", "NOT_CONFIGURED": "Not configured" }
+  },
+  "reports": {
+    "title": "Reports", "description": "Track ticket volume, SLA performance, and team activity across a date range.",
+    "loadError": "Unable to load reports.", "sectionError": "This section could not be loaded.",
+    "kpisLabel": "Report highlights", "uncategorized": "Uncategorized",
+    "filters": { "label": "Report filters", "presetLabel": "Quick ranges", "lastDays": "Last {{count}} days", "from": "From", "to": "To", "reset": "Reset", "timezone": "Times shown in UTC" },
+    "kpis": { "createdTickets": "Created tickets", "resolvedTickets": "Resolved tickets", "slaCompliance": "SLA compliance", "averageResponse": "Avg. first response", "satisfaction": "Customer satisfaction", "satisfactionResponses": "{{count}} responses" },
+    "volumeTitle": "Ticket volume", "volumeDescription": "Created vs. resolved tickets per day.", "emptyVolume": "No ticket activity in this range.",
+    "statusTitle": "Status distribution", "emptyStatus": "No data for this range.",
+    "slaTitle": "SLA performance", "slaDescription": "First-response and resolution outcomes for tickets created in range.",
+    "sla": { "firstResponse": "First response", "resolution": "Resolution", "avgFirstResponse": "Avg. first response", "avgResolution": "Avg. resolution", "metShort": "Met", "breachedShort": "Breached", "pendingShort": "Pending", "complianceShort": "Compliance" },
+    "satisfactionTitle": "Customer satisfaction", "satisfactionDescription": "Ratings submitted through the customer portal.", "emptySatisfaction": "No feedback submitted in this range.", "satisfactionSummary": "Average {{rating}} out of 5 from {{count}} responses.",
+    "agentsTitle": "Agent performance", "agentsDescription": "Assigned, resolved, and SLA figures per agent for tickets created in range.", "emptyAgents": "No agent activity in this range.",
+    "agents": { "name": "Agent", "assigned": "Assigned", "resolved": "Resolved", "open": "Open", "slaMet": "SLA met %", "avgResponse": "Avg. response" },
+    "breakdownTitle": "Ticket breakdown", "byPriority": "By priority", "byCategory": "By category",
+    "legend": { "created": "Created", "resolved": "Resolved" },
+    "duration": { "minutes": "{{count}} min", "hours": "{{count}} h" }
   },
   "tickets": {
     "title": "Tickets", "description": "Manage and track customer support requests", "new": "New ticket", "create": "Create ticket", "createTitle": "Create ticket", "editTitle": "Edit ticket", "edit": "Edit ticket",
