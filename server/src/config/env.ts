@@ -21,6 +21,8 @@ const envSchema = z.object({
   // Private Vercel Blob store token for secure attachment storage (feature/attachments).
   // Optional: when unset, attachment upload/download return a structured STORAGE_UNAVAILABLE error.
   BLOB_READ_WRITE_TOKEN: z.string().min(1).optional(),
+  // Shared only with the deployment scheduler. It never authenticates product users.
+  CRON_SECRET: z.string().min(32, "CRON_SECRET must be at least 32 characters").optional(),
 });
 
 const result = envSchema.safeParse(process.env);

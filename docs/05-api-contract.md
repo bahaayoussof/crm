@@ -354,7 +354,7 @@ GET  /api/portal/tickets/:id/feedback   read own submitted feedback (CUSTOMER) �
 
 Satisfaction reporting (`GET /reports/*`, ADMIN/MANAGER) consumes `Feedback.rating` and is implemented on the `feature/reports` branch — see "Reports — LIVE" above.
 
-## Notifications — LIVE (on `feature/notifications-roadmap`, not integrated)
+## Notifications — LIVE
 
 ```text
 GET   /api/notifications                  list current user's notifications
@@ -363,7 +363,20 @@ PATCH /api/notifications/read-all         mark all current user's notifications 
 PATCH /api/notifications/:id/read         mark one owned notification read
 ```
 
-All routes require `ADMIN`, `MANAGER`, or `AGENT`; `CUSTOMER` is rejected. List query supports bounded `page`, `limit`, and `read=true|false`; every operation is scoped to `request.auth.userId`, and a missing or wrong-owner id returns the same `404 NOTIFICATION_NOT_FOUND`. Assignment, customer-reply, and escalation notifications are written atomically with their ticket transaction and may carry an optional `ticketId` link. Unread count polls every 30 seconds in the internal client. There is no Portal notification surface, realtime transport, scheduled SLA monitoring, email/push delivery, or arbitrary-update notification fan-out.
+All routes require `ADMIN`, `MANAGER`, or `AGENT`; `CUSTOMER` is rejected. List query supports bounded `page`, `limit`, and `read=true|false`; every operation is scoped to `request.auth.userId`, and a missing or wrong-owner id returns the same `404 NOTIFICATION_NOT_FOUND`. Assignment, customer-reply, and escalation notifications are written atomically with their ticket transaction and may carry an optional `ticketId` link. Unread count polls every 30 seconds in the internal client. There is no Portal notification surface, realtime transport, email/push delivery, or arbitrary-update notification fan-out.
+
+## SLA automation — INTERNAL CRON
+
+```text
+GET /api/internal/sla-monitor
+Authorization: Bearer <CRON_SECRET>
+```
+
+This is a deployment-scheduler endpoint, not a product API. Product JWTs, authenticated roles, and Portal sessions do not grant access. Missing server configuration returns `503 CRON_NOT_CONFIGURED`; a missing or invalid scheduler bearer secret returns `401 CRON_AUTHENTICATION_REQUIRED`. A successful response contains only `{ data: { assigned, escalated, inspected, generatedAt } }` and exposes no ticket or user records.
+
+Vercel Cron invokes it every five minutes. Each execution inspects at most 100 oldest unassigned active tickets and 100 oldest resolution-SLA-breached unresolved tickets. Automatic assignment preserves every existing assignment, considers active `AGENT` users only, matches every non-null ticket department/branch constraint, chooses the lowest active assigned-ticket count, and breaks ties by agent id ascending. Automatic escalation changes a nonterminal, non-`ESCALATED` ticket to `ESCALATED` when `resolutionDueAt <= execution time`; first-response deadlines do not trigger escalation.
+
+Each mutation uses a conditional database update inside the same transaction as its `TicketHistory` row and notifications. If another or repeated execution has already assigned, escalated, resolved, closed, or otherwise changed the ticket, the conditional update affects zero rows and no history or notification is written. Automated history uses `actorUserId: null`, with actions `AUTO_ASSIGNMENT` and `SLA_AUTO_ESCALATED`. Assignment alerts go to the selected agent; escalation alerts go to active `ADMIN` and `MANAGER` users. No derived SLA state is persisted.
 
 ## Quick Replies — LIVE (on `feature/quick-replies`, not yet integrated)
 

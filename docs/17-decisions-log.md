@@ -4,6 +4,16 @@ Use this file for decisions not already fixed by the project documentation.
 
 Do not record trivial implementation details.
 
+### ADR-030: Five-minute idempotent SLA monitor through Vercel Cron
+
+**Date:** 2026-08-27
+
+`feature/sla-automation` uses one protected `GET /api/internal/sla-monitor` endpoint invoked by Vercel Cron every five minutes. It authenticates with a separate, server-only `CRON_SECRET`; product JWTs and roles do not authorize it. Each run processes deterministic batches of up to 100 assignment candidates and 100 escalation candidates, without a queue or worker subsystem.
+
+Unassigned tickets in active statuses are assigned only to active `AGENT` users matching every non-null ticket department/branch constraint. The policy selects the fewest active assigned tickets and breaks ties by `id ASC`; existing assignments are never changed. Unresolved tickets whose persisted resolution deadline is at or before the execution time enter `ESCALATED`, unless already escalated. First-response deadlines do not trigger escalation.
+
+Each action uses a conditional `updateMany` guard inside the same transaction as its actorless `TicketHistory` row and in-app notifications. A zero-row update produces no history or notification, so a repeated or overlapping execution against unchanged state is a no-op. No derived breach/status field, assignment rotation history, configurable rules engine, general job queue, or unrelated SLA redesign is introduced.
+
 ### ADR-029: Bounded internal in-app notifications
 
 **Date:** 2026-08-27

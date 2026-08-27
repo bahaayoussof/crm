@@ -48,7 +48,8 @@ The role descriptions below include capabilities that are not yet built. As of `
 
 ### Implemented on feature branch
 
-- Per-user Notifications read/unread: `ADMIN`, `MANAGER`, and `AGENT` can list and mutate only their own records; `CUSTOMER` is rejected (`feature/notifications-roadmap`, not integrated).
+- Per-user Notifications read/unread: `ADMIN`, `MANAGER`, and `AGENT` can list and mutate only their own records; `CUSTOMER` is rejected.
+- SLA monitoring is not role-authenticated. `GET /api/internal/sla-monitor` accepts only the deployment scheduler's independent `CRON_SECRET`; product JWTs grant no access. Automated history has no actor, assignment stays within active `AGENT` department/branch eligibility, and alert records are delivered through the existing per-user Notifications boundary.
 
 ### Unresolved — require a product decision before a permission can be written
 

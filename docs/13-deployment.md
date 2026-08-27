@@ -22,6 +22,14 @@ Expected categories:
 - frontend/API base URLs
 - AI provider credentials if AI is enabled
 - storage credentials if external attachment storage is used
+- `CRON_SECRET` for deployment-scheduler authentication
+
+### SLA monitor (`feature/sla-automation`)
+
+- Deploy the server project with `server/vercel.json`; its Vercel Cron schedule calls `/api/internal/sla-monitor` every five minutes (`*/5 * * * *`).
+- Set `CRON_SECRET` to a distinct random value of at least 32 characters in the server deployment. Vercel sends it as `Authorization: Bearer <CRON_SECRET>` for cron invocations.
+- Do not reuse `JWT_SECRET`, expose the value to the client, or invoke this endpoint from product UI.
+- The endpoint is idempotent and batch-bounded, but the deployment must still provide the configured PostgreSQL connection and a Vercel-compatible server entry.
 
 ### Attachment storage (`feature/attachments`)
 

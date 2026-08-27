@@ -30,7 +30,7 @@ When an unresolved ticket changes priority, recalculate from the priority-change
 
 This snapshot behavior does not include timers, workers, alerts, notifications, automatic escalation, or any other SLA automation.
 
-`feature/settings` adds ADMIN-only management of the existing per-priority `SlaRule` rows. Rules are activated or deactivated, never deleted; targets are positive bounded integers and resolution cannot be lower than first response. Settings changes are prospective: they affect later ticket creation and the existing eligible priority-change recalculation only. They never rewrite deadline snapshots on existing tickets. Background monitoring and automated actions remain deferred to `feature/sla-automation`.
+`feature/settings` adds ADMIN-only management of the existing per-priority `SlaRule` rows. Rules are activated or deactivated, never deleted; targets are positive bounded integers and resolution cannot be lower than first response. Settings changes are prospective: they affect later ticket creation and the existing eligible priority-change recalculation only. They never rewrite deadline snapshots on existing tickets.
 
 Useful derived states:
 - ON_TRACK
@@ -82,6 +82,28 @@ Manual assignment is acceptable for the core delivery.
 
 Portal-created requests snapshot the active MEDIUM rule. Customer replies never set `firstRespondedAt`. Reopening preserves `resolutionDueAt` and does not recalculate deadlines. Portal responses never expose raw or derived SLA fields.
 
-## Basic Tracking Versus Deferred Automation
+## Bounded Monitoring Automation
 
-Basic SLA tracking consists of deadline snapshots, eligible priority-change recalculation, one-time first-response recording, shared request-time derivation, Dashboard presentation, and internal Ticket Details presentation. Background workers, scheduled monitoring, persisted SLA state or breach events, notifications, automatic escalation/assignment, SLA reports, and SLA administration remain deferred.
+Vercel Cron calls the internal `GET /api/internal/sla-monitor` endpoint every five minutes with the independent server-side `CRON_SECRET`. This is not a normal authenticated product endpoint and does not accept product JWT authorization. One execution processes bounded batches of at most 100 assignment candidates and 100 escalation candidates, ordered deterministically so later executions drain larger backlogs.
+
+Automatic assignment:
+
+- considers only active statuses and tickets whose `assignedAgentId` is null
+- never changes an existing manual or automated assignment
+- considers active `AGENT` users only
+- requires equality for every non-null ticket `departmentId` and `branchId`; an unconstrained ticket may use any active agent
+- chooses the eligible agent with the fewest tickets in active statuses, then `id ASC`
+- increments the in-memory load after each successful assignment so one run distributes its batch consistently
+
+Automatic escalation:
+
+- uses only the persisted resolution deadline: `resolutionDueAt <= execution time`
+- requires an unresolved, non-closed active status and null `resolvedAt` / `closedAt`
+- changes the status to `ESCALATED`, but never re-escalates an already `ESCALATED` ticket
+- does not use the first-response deadline as an escalation trigger
+
+Both actions use conditional updates inside transactions. History and notifications are inserted only after the guarded update affects exactly one row. Repeated or overlapping executions therefore create no duplicate mutation, history, or notification for unchanged state. Automated history has `actorUserId: null`; assignment alerts target the selected agent and escalation alerts target active `ADMIN`/`MANAGER` users. No `isBreached`, `slaStatus`, or other derived state is stored.
+
+## Basic Tracking Versus Bounded Automation
+
+Basic SLA tracking consists of deadline snapshots, eligible priority-change recalculation, one-time first-response recording, shared request-time derivation, Dashboard presentation, and internal Ticket Details presentation. The bounded cron monitor adds scheduled automatic assignment, resolution-breach escalation, history, and in-app alerts. General worker infrastructure, job queues, configurable rule builders, round-robin history, persisted derived SLA state, and external notification delivery remain out of scope.

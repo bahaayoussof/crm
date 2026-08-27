@@ -16,6 +16,7 @@ import { knowledgeArticleRouter } from "./modules/knowledge-base/knowledge-artic
 import { quickReplyRouter } from "./modules/quick-replies/quick-reply.routes.js";
 import { settingsRouter } from "./modules/settings/settings.routes.js";
 import { notificationRouter } from "./modules/notifications/notification.routes.js";
+import { slaAutomationRouter } from "./modules/sla-automation/sla-automation.routes.js";
 import { portalKnowledgeArticleRouter } from "./modules/knowledge-base/knowledge-article.portal.routes.js";
 import { attachmentRouter } from "./modules/attachments/attachment.routes.js";
 import { portalAttachmentRouter } from "./modules/attachments/attachment.portal.routes.js";
@@ -65,6 +66,7 @@ app.use("/api/knowledge-articles", knowledgeArticleRouter);
 app.use("/api/quick-replies", quickReplyRouter);
 app.use("/api/settings", settingsRouter);
 app.use("/api/notifications", notificationRouter);
+app.use("/api/internal/sla-monitor", slaAutomationRouter);
 app.use("/api/attachments", attachmentRouter);
 app.use("/api/portal/knowledge-articles", portalKnowledgeArticleRouter);
 app.use("/api/portal/attachments", portalAttachmentRouter);
