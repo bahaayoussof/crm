@@ -21,7 +21,13 @@ vi.mock("./reports-hooks", () => ({
 vi.mock("recharts", () => ({
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   BarChart: ({ data, children }: { data: unknown; children: React.ReactNode }) => <div data-chart={JSON.stringify(data)}>{children}</div>,
-  Bar: () => null, CartesianGrid: () => null, XAxis: () => null, YAxis: () => null, Tooltip: () => null, Legend: () => null,
+  Bar: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  Cell: () => null,
+  CartesianGrid: () => null,
+  XAxis: () => null,
+  YAxis: () => null,
+  Tooltip: () => null,
+  Legend: () => null,
 }));
 
 import { ReportsPage } from "./reports-page";
@@ -124,6 +130,13 @@ describe("ReportsPage", () => {
     const chart = screen.getByTestId("volume-chart").querySelector("[data-chart]");
     expect(chart?.getAttribute("data-chart")).toContain('"created":3');
     expect(chart?.getAttribute("data-chart")).toContain('"resolved":4');
+  });
+
+  it("passes the status distribution into the status chart", () => {
+    renderPage();
+    const chart = screen.getByTestId("status-chart").querySelector("[data-chart]");
+    expect(chart?.getAttribute("data-chart")).toContain('"label":"Open"');
+    expect(chart?.getAttribute("data-chart")).toContain('"count":7');
   });
 
   it("renders the agent performance table", () => {

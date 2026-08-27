@@ -24,12 +24,12 @@ interface CustomerTableProps {
 }
 
 const columnClasses: Record<string, string> = {
-  name: "",
-  email: "",
-  phone: "hidden xl:table-cell",
-  openTickets: "hidden lg:table-cell",
-  totalTickets: "hidden xl:table-cell",
-  lastInteraction: "",
+  name: "w-[22%]",
+  email: "w-auto",
+  phone: "w-[160px]",
+  openTickets: "w-[110px]",
+  totalTickets: "w-[110px]",
+  lastInteraction: "w-[180px]",
 };
 
 export function CustomerTable({
@@ -49,8 +49,9 @@ export function CustomerTable({
         header: t("customers.name"),
         cell: ({ row }) => (
           <Link
-            className="rounded-sm font-semibold text-foreground hover:underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="block truncate rounded-sm font-semibold text-foreground hover:underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             to={`/customers/${row.original.id}`}
+            title={row.original.name}
           >
             {row.original.name}
           </Link>
@@ -60,11 +61,14 @@ export function CustomerTable({
         id: "email",
         accessorKey: "email",
         header: t("customers.email"),
-        cell: ({ getValue }) => (
-          <bdi className="text-muted-foreground" dir="ltr">
-            {getValue<string>()}
-          </bdi>
-        ),
+        cell: ({ getValue }) => {
+          const val = getValue<string>();
+          return (
+            <bdi className="block truncate text-muted-foreground" title={val} dir="ltr">
+              {val}
+            </bdi>
+          );
+        },
       },
       {
         id: "phone",
@@ -73,7 +77,7 @@ export function CustomerTable({
         cell: ({ getValue }) => {
           const phone = getValue<string | null>();
           return phone ? (
-            <bdi className="text-muted-foreground" dir="ltr">
+            <bdi className="block truncate text-muted-foreground" title={phone} dir="ltr">
               {phone}
             </bdi>
           ) : (
@@ -134,15 +138,17 @@ export function CustomerTable({
   return (
     <>
       <div className="hidden md:block overflow-x-auto">
-        <Table className="min-w-[44rem]">
+        <Table className="w-full">
+          <colgroup>
+            {table.getAllLeafColumns().map((column) => (
+              <col key={column.id} className={columnClasses[column.id] ?? ""} />
+            ))}
+          </colgroup>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <TableHead
-                    className={columnClasses[header.column.id] ?? ""}
-                    key={header.id}
-                  >
+                  <TableHead key={header.id}>
                     {header.isPlaceholder
                       ? null
                       : flexRender(header.column.columnDef.header, header.getContext())}
@@ -156,7 +162,7 @@ export function CustomerTable({
               <TableRow key={row.id}>
                 {row.getVisibleCells().map((cell) => (
                   <TableCell
-                    className={`${cellClassName(cell.column.id)} ${columnClasses[cell.column.id] ?? ""}`}
+                    className={cellClassName(cell.column.id)}
                     key={cell.id}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}

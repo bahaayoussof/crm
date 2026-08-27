@@ -94,33 +94,26 @@ export function TicketListPage() {
 
             {/* Right-Side Toolbar Controls */}
             <div className="flex items-center gap-2 shrink-0 sm:ms-auto">
-              {/* Secondary Filters Popover (Priority, Category, Agent) */}
+              {/* Filters Popover (Status, Priority, Category, Agent) */}
               <TicketFiltersPopover
+                status={status}
                 priority={priority}
                 categoryId={categoryId}
                 assignedAgentId={assignedAgentId}
+                statusOptions={statusOptions}
                 priorityOptions={priorityOptions}
                 categoryOptions={categoryOptions}
                 agentOptions={agentOptions}
                 onFilterChange={setFilter}
                 onClearFilters={() => {
                   const next = new URLSearchParams(params);
+                  next.delete("status");
                   next.delete("priority");
                   next.delete("categoryId");
                   next.delete("assignedAgentId");
                   setParams(next);
                 }}
               />
-
-              {/* Status Select Directly on Toolbar */}
-              <div className="w-32 sm:w-36">
-                <AppSelect
-                  ariaLabel={t("tickets.statusLabel")}
-                  value={status ?? ""}
-                  onValueChange={(value) => setFilter("status", value)}
-                  options={statusOptions}
-                />
-              </div>
 
               {/* Clear All Filters button if active */}
               {hasFilters && (

@@ -14,7 +14,7 @@ import { DataTablePagination } from "@/components/shared/data-table/data-table-p
 import { AssigneeCell } from "@/components/shared/data-table/assignee-cell";
 import { formatArticleDate } from "./knowledge-article-format";
 import { ArticleStatusBadge } from "./knowledge-base-ui";
-import type { KnowledgeArticleListItem } from "./knowledge-article.types";
+import type { KnowledgeArticleListItem, KnowledgeArticleStatus } from "./knowledge-article.types";
 
 interface KnowledgeArticleTableProps {
   articles: KnowledgeArticleListItem[];
@@ -26,11 +26,11 @@ interface KnowledgeArticleTableProps {
 }
 
 const columnClasses: Record<string, string> = {
-  title: "w-[40%]",
-  category: "hidden lg:table-cell w-[16%]",
-  status: "w-[12%]",
-  updatedAt: "w-[16%]",
-  author: "hidden xl:table-cell w-[16%]",
+  title: "w-[36%]",
+  category: "w-[16%]",
+  status: "w-[120px]",
+  author: "w-[160px]",
+  updatedAt: "w-[160px]",
 };
 
 export function KnowledgeArticleTable({
@@ -51,9 +51,8 @@ export function KnowledgeArticleTable({
         cell: ({ row }) => (
           <Link
             className="line-clamp-2 rounded-sm font-medium text-[13px] text-foreground hover:underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            dir="auto"
-            title={row.original.title}
             to={`/knowledge-base/${row.original.id}`}
+            title={row.original.title}
           >
             {row.original.title}
           </Link>
@@ -82,7 +81,18 @@ export function KnowledgeArticleTable({
         id: "status",
         accessorKey: "status",
         header: t("knowledgeBase.columns.status"),
-        cell: ({ row }) => <ArticleStatusBadge status={row.original.status} />,
+        cell: ({ getValue }) => <ArticleStatusBadge status={getValue<KnowledgeArticleStatus>()} />,
+      },
+      {
+        id: "author",
+        accessorKey: "createdBy.name",
+        header: t("knowledgeBase.columns.author"),
+        cell: ({ row }) => (
+          <AssigneeCell
+            name={row.original.createdBy?.name}
+            unassignedLabel={t("knowledgeBase.authorUnknown")}
+          />
+        ),
       },
       {
         id: "updatedAt",
@@ -90,16 +100,8 @@ export function KnowledgeArticleTable({
         header: t("knowledgeBase.columns.updated"),
         cell: ({ getValue }) => (
           <span className="whitespace-nowrap text-xs text-muted-foreground">
-            <bdi dir="ltr">{formatArticleDate(getValue<string>(), i18n.language)}</bdi>
+            {formatArticleDate(getValue<string>(), i18n.language)}
           </span>
-        ),
-      },
-      {
-        id: "author",
-        accessorFn: (row) => row.createdBy.name,
-        header: t("knowledgeBase.columns.author"),
-        cell: ({ row }) => (
-          <AssigneeCell name={row.original.createdBy.name} />
         ),
       },
     ],
@@ -110,6 +112,7 @@ export function KnowledgeArticleTable({
     () => ({ pageIndex: page - 1, pageSize }),
     [page, pageSize]
   );
+
   const table = useReactTable({
     data: articles,
     columns,
@@ -124,15 +127,17 @@ export function KnowledgeArticleTable({
   return (
     <>
       <div className="hidden md:block overflow-x-auto">
-        <Table className="min-w-[44rem]">
+        <Table className="w-full">
+          <colgroup>
+            {table.getAllLeafColumns().map((column) => (
+              <col key={column.id} className={columnClasses[column.id] ?? ""} />
+            ))}
+          </colgroup>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <TableHead
-                    className={columnClasses[header.column.id] ?? ""}
-                    key={header.id}
-                  >
+                  <TableHead key={header.id}>
                     {header.isPlaceholder
                       ? null
                       : flexRender(header.column.columnDef.header, header.getContext())}
@@ -145,10 +150,7 @@ export function KnowledgeArticleTable({
             {table.getRowModel().rows.map((row) => (
               <TableRow key={row.id}>
                 {row.getVisibleCells().map((cell) => (
-                  <TableCell
-                    className={columnClasses[cell.column.id] ?? ""}
-                    key={cell.id}
-                  >
+                  <TableCell key={cell.id}>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
                 ))}

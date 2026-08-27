@@ -134,6 +134,19 @@
   --progress-soft-foreground: #6D28D9;
   --progress-subtle: #F5F3FF;
 
+  /* Chart Tokens (Light) */
+  --chart-1: #0284C7;
+  --chart-2: #16A34A;
+  --chart-3: #D97706;
+  --chart-4: #7C3AED;
+  --chart-5: #DC2626;
+
+  --chart-grid: #E8E8E8;
+  --chart-axis: #737373;
+  --chart-tooltip: #FFFFFF;
+  --chart-tooltip-border: #E8E8E8;
+  --chart-tooltip-foreground: #171717;
+
   /* Elevation */
   --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.03);
   --shadow-subtle: 0 1px 2px 0 rgb(0 0 0 / 0.02);
@@ -249,6 +262,19 @@
   --progress-soft-foreground: #A78BFA;
   --progress-subtle: #241B35;
 
+  /* Chart Tokens (Dark) */
+  --chart-1: #38BDF8;
+  --chart-2: #4ADE80;
+  --chart-3: #FBBF24;
+  --chart-4: #A78BFA;
+  --chart-5: #F87171;
+
+  --chart-grid: #292929;
+  --chart-axis: #858585;
+  --chart-tooltip: #181818;
+  --chart-tooltip-border: #292929;
+  --chart-tooltip-foreground: #F5F5F5;
+
   /* Elevation */
   --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.4);
   --shadow-subtle: 0 1px 2px 0 rgb(0 0 0 / 0.3);
@@ -352,6 +378,17 @@
   --color-progress-soft-foreground: var(--progress-soft-foreground);
   --color-progress-subtle: var(--progress-subtle);
   --color-progress-foreground: var(--progress-foreground);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-grid: var(--chart-grid);
+  --color-chart-axis: var(--chart-axis);
+  --color-chart-tooltip: var(--chart-tooltip);
+  --color-chart-tooltip-border: var(--chart-tooltip-border);
+  --color-chart-tooltip-foreground: var(--chart-tooltip-foreground);
 
   --shadow-card: var(--shadow-card);
   --shadow-subtle: var(--shadow-subtle);

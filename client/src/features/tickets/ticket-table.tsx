@@ -149,15 +149,17 @@ export function TicketTable({
     <>
       {/* Desktop Table */}
       <div className="hidden md:block overflow-x-auto">
-        <Table className="min-w-[56rem]">
+        <Table className="w-full">
+          <colgroup>
+            {table.getAllLeafColumns().map((column) => (
+              <col key={column.id} className={columnClass(column.id)} />
+            ))}
+          </colgroup>
           <TableHeader>
             {table.getHeaderGroups().map((group) => (
               <TableRow key={group.id}>
                 {group.headers.map((header) => (
-                  <TableHead
-                    className={columnClass(header.column.id)}
-                    key={header.id}
-                  >
+                  <TableHead key={header.id}>
                     {flexRender(header.column.columnDef.header, header.getContext())}
                   </TableHead>
                 ))}
@@ -174,10 +176,7 @@ export function TicketTable({
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id}>
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell
-                      className={columnClass(cell.column.id)}
-                      key={cell.id}
-                    >
+                    <TableCell key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
@@ -249,18 +248,16 @@ function changePage(
 }
 
 function columnClass(id: string) {
-  const width =
+  return (
     {
-      id: "w-24",
-      ticket: "min-w-[20rem] max-w-[26rem]",
-      customer: "w-44",
-      status: "w-28",
-      priority: "w-24",
-      category: "w-32",
-      agent: "w-40",
-      updated: "w-32",
-    }[id] ?? "";
-  if (["category", "agent"].includes(id)) return `${width} hidden lg:table-cell`;
-  if (id === "updated") return `${width} hidden xl:table-cell`;
-  return width;
+      id: "w-[90px]",
+      ticket: "w-auto",
+      customer: "w-[140px]",
+      status: "w-[110px]",
+      priority: "w-[90px]",
+      category: "w-[120px]",
+      agent: "w-[150px]",
+      updated: "w-[170px]",
+    }[id] ?? ""
+  );
 }

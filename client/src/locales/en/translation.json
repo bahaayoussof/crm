@@ -24,6 +24,7 @@
     "title": "Support dashboard", "description": "Current workload, SLA pressure, and tickets that need attention.", "metricsLabel": "Dashboard metrics", "loadError": "Unable to load the dashboard.",
     "metrics": { "openTickets": "Open tickets", "assignedToMe": "Assigned to me", "unassignedTickets": "Unassigned tickets", "slaAtRisk": "SLA at risk", "slaBreached": "SLA breached", "resolvedToday": "Resolved today", "waitingCustomer": "Waiting for customer" },
     "chartTitle": "Tickets by status", "chartDescription": "Visible ticket count grouped by current status.", "ticketsCount": "Tickets", "emptyDistribution": "No ticket status data yet.",
+    "slaHealthTitle": "SLA health", "slaHealthDescription": "Active ticket compliance across response and resolution deadlines.", "emptySlaHealth": "No active tickets requiring SLA tracking.",
     "summaryTitle": "Operational summary", "generatedAt": "Generated at", "needsAttention": "Needs attention", "myAssignedTickets": "My Assigned Tickets", "recentTickets": "Recent tickets", "emptyAttention": "No visible tickets currently need attention.", "emptyAssigned": "No active tickets are currently assigned to you.", "emptyRecent": "No recent visible tickets remain outside the primary queue.", "viewAll": "View all tickets", "sla": "SLA state",
     "slaStates": { "ON_TRACK": "On track", "AT_RISK": "At risk", "BREACHED": "Breached", "MET": "Met", "NOT_CONFIGURED": "Not configured" }
   },

@@ -8,7 +8,7 @@ export const TableContainer = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "overflow-x-auto rounded-xl border border-table-border bg-table-background shadow-xs overflow-hidden",
+      "overflow-x-auto rounded-xl border border-table-border bg-table-background shadow-xs",
       className
     )}
     {...props}

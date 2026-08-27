@@ -1,10 +1,9 @@
 import { useMemo } from "react";
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Tooltip, XAxis, YAxis } from "recharts";
 import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { PageHeader } from "@/components/shared/page-header";
 import { TicketPriorityText } from "../tickets/ticket-badges";
-import { formatTicketDate } from "../tickets/ticket-format";
 import { useAgentReports, useReportsOverview, useSlaReports, useTicketReports } from "./reports-hooks";
 import type { AgentReportRow, ReportsRangeParams } from "./reports.types";
 import {
@@ -16,6 +15,16 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
+import {
+  ChartContainer,
+  ChartTooltipContent,
+  ChartLegendContent,
+  ChartEmptyState,
+  ChartSkeleton,
+  CANONICAL_STATUS_ORDER,
+  getStatusChartColor,
+  CHART_THEME_TOKENS,
+} from "@/components/shared/charts";
 import { cn } from "@/lib/utils";
 
 const PRESETS = [7, 30, 90] as const;
@@ -58,16 +67,37 @@ export function ReportsPage() {
   };
 
   if (overview.isLoading) {
-    return <main className="page-container" aria-label={t("common.loading")}><Skeleton /></main>;
+    return (
+      <main className="page-container space-y-6" aria-label={t("common.loading")}>
+        <Skeleton />
+      </main>
+    );
   }
   if (overview.isError || !overview.data) {
-    return <main className="page-container"><InlineState text={t("reports.loadError")}><button className="button-secondary" onClick={() => overview.refetch()}>{t("common.retry")}</button></InlineState></main>;
+    return (
+      <main className="page-container">
+        <InlineState text={t("reports.loadError")}>
+          <button className="button-secondary" onClick={() => overview.refetch()}>
+            {t("common.retry")}
+          </button>
+        </InlineState>
+      </main>
+    );
   }
 
   const data = overview.data;
   const k = data.kpis;
   const volume = data.ticketVolume.map((point) => ({ ...point, label: point.date.slice(5) }));
-  const statusChart = data.statusDistribution.map((row) => ({ ...row, label: t(`tickets.status.${row.status}`) }));
+
+  const statusMap = new Map(data.statusDistribution.map((row) => [row.status, row.count]));
+  const statusChart = CANONICAL_STATUS_ORDER
+    .filter((status) => statusMap.has(status))
+    .map((status) => ({
+      status,
+      count: statusMap.get(status) ?? 0,
+      label: t(`tickets.status.${status}`),
+      color: getStatusChartColor(status),
+    }));
 
   return (
     <main className="page-container space-y-6">
@@ -123,29 +153,42 @@ export function ReportsPage() {
         <Panel title={t("reports.volumeTitle")}>
           {volume.length ? (
             <div className="mt-4 h-56" data-testid="volume-chart">
-              <ResponsiveContainer width="100%" height="100%">
+              <ChartContainer label={t("reports.volumeTitle")}>
                 <BarChart data={volume} margin={{ left: -16, right: 8, top: 4, bottom: 4 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} interval="preserveStartEnd" stroke="var(--border)" />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} width={32} stroke="var(--border)" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "var(--popover)",
-                      borderColor: "var(--border)",
-                      borderRadius: "0.5rem",
-                      boxShadow: "var(--shadow-flyout)",
-                      fontSize: "0.75rem",
-                      color: "var(--popover-foreground)",
-                    }}
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_THEME_TOKENS.grid} />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 10, fill: CHART_THEME_TOKENS.axis }}
+                    interval="preserveStartEnd"
+                    stroke={CHART_THEME_TOKENS.axis}
                   />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar name={t("reports.legend.created")} dataKey="created" fill="var(--chart-1)" radius={[3, 3, 0, 0]} isAnimationActive={false} />
-                  <Bar name={t("reports.legend.resolved")} dataKey="resolved" fill="var(--chart-2)" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fontSize: 11, fill: CHART_THEME_TOKENS.axis }}
+                    width={32}
+                    stroke={CHART_THEME_TOKENS.axis}
+                  />
+                  <Tooltip content={<ChartTooltipContent />} />
+                  <Legend content={<ChartLegendContent />} />
+                  <Bar
+                    name={t("reports.legend.created")}
+                    dataKey="created"
+                    fill="var(--chart-1)"
+                    radius={[3, 3, 0, 0]}
+                    isAnimationActive={false}
+                  />
+                  <Bar
+                    name={t("reports.legend.resolved")}
+                    dataKey="resolved"
+                    fill="var(--chart-2)"
+                    radius={[3, 3, 0, 0]}
+                    isAnimationActive={false}
+                  />
                 </BarChart>
-              </ResponsiveContainer>
+              </ChartContainer>
             </div>
           ) : (
-            <p className="mt-6 text-sm text-muted-foreground">{t("reports.emptyVolume")}</p>
+            <ChartEmptyState description={t("reports.emptyVolume")} className="mt-4" />
           )}
         </Panel>
 
@@ -153,31 +196,41 @@ export function ReportsPage() {
           {statusChart.length ? (
             <>
               <div className="mt-4 h-56" data-testid="status-chart">
-                <ResponsiveContainer width="100%" height="100%">
+                <ChartContainer label={t("reports.statusTitle")}>
                   <BarChart data={statusChart} layout="vertical" margin={{ left: 8, right: 8 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border)" />
-                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} stroke="var(--border)" />
-                    <YAxis dataKey="label" type="category" width={104} tick={{ fontSize: 10, fill: "var(--foreground)" }} stroke="var(--border)" />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "var(--popover)",
-                        borderColor: "var(--border)",
-                        borderRadius: "0.5rem",
-                        boxShadow: "var(--shadow-flyout)",
-                        fontSize: "0.75rem",
-                        color: "var(--popover-foreground)",
-                      }}
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={CHART_THEME_TOKENS.grid} />
+                    <XAxis
+                      type="number"
+                      allowDecimals={false}
+                      tick={{ fontSize: 11, fill: CHART_THEME_TOKENS.axis }}
+                      stroke={CHART_THEME_TOKENS.axis}
                     />
-                    <Bar dataKey="count" fill="var(--chart-1)" radius={[0, 3, 3, 0]} isAnimationActive={false} />
+                    <YAxis
+                      dataKey="label"
+                      type="category"
+                      width={104}
+                      tick={{ fontSize: 10, fill: "var(--foreground)" }}
+                      stroke={CHART_THEME_TOKENS.axis}
+                    />
+                    <Tooltip content={<ChartTooltipContent />} />
+                    <Bar dataKey="count" radius={[0, 3, 3, 0]} isAnimationActive={false}>
+                      {statusChart.map((entry) => (
+                        <Cell key={entry.status} fill={entry.color} />
+                      ))}
+                    </Bar>
                   </BarChart>
-                </ResponsiveContainer>
+                </ChartContainer>
               </div>
               <ul className="sr-only">
-                {statusChart.map((row) => <li key={row.status}>{row.label}: {row.count}</li>)}
+                {statusChart.map((row) => (
+                  <li key={row.status}>
+                    {row.label}: {row.count}
+                  </li>
+                ))}
               </ul>
             </>
           ) : (
-            <p className="mt-6 text-sm text-muted-foreground">{t("reports.emptyStatus")}</p>
+            <ChartEmptyState description={t("reports.emptyStatus")} className="mt-4" />
           )}
         </Panel>
       </section>
@@ -240,7 +293,7 @@ export function ReportsPage() {
 
         <Panel title={t("reports.satisfactionTitle")} description={t("reports.satisfactionDescription")}>
           {data.satisfaction.responseCount === 0 ? (
-            <p className="mt-6 text-sm text-muted-foreground">{t("reports.emptySatisfaction")}</p>
+            <ChartEmptyState description={t("reports.emptySatisfaction")} className="mt-4" />
           ) : (
             <div className="mt-4 space-y-3">
               <p className="text-sm text-muted-foreground">{t("reports.satisfactionSummary", { rating: data.satisfaction.averageRating, count: data.satisfaction.responseCount })}</p>
@@ -391,19 +444,19 @@ function AgentTable({ rows, nf }: { rows: AgentReportRow[]; nf: Intl.NumberForma
           </Table>
         </TableContainer>
       </div>
-    <ul className="mt-3 grid gap-3 md:hidden">
-      {rows.map((row) => (
-        <li key={row.agentId} className="rounded-xl border border-border bg-surface p-4 shadow-subtle">
-          <p className="font-semibold text-foreground" dir="auto">{row.agentName}</p>
-          <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-            <div className="flex justify-between gap-2"><dt className="text-muted-foreground text-xs">{t("reports.agents.assigned")}</dt><dd className="tabular-nums font-medium">{nf.format(row.assigned)}</dd></div>
-            <div className="flex justify-between gap-2"><dt className="text-muted-foreground text-xs">{t("reports.agents.resolved")}</dt><dd className="tabular-nums font-medium">{nf.format(row.resolved)}</dd></div>
-            <div className="flex justify-between gap-2"><dt className="text-muted-foreground text-xs">{t("reports.agents.open")}</dt><dd className="tabular-nums font-medium">{nf.format(row.open)}</dd></div>
-            <div className="flex justify-between gap-2"><dt className="text-muted-foreground text-xs">{t("reports.agents.slaMet")}</dt><dd className="tabular-nums font-medium">{row.slaMetPct === null ? "—" : `${nf.format(row.slaMetPct)}%`}</dd></div>
-          </dl>
-        </li>
-      ))}
-    </ul>
+      <ul className="mt-3 grid gap-3 md:hidden">
+        {rows.map((row) => (
+          <li key={row.agentId} className="rounded-xl border border-border bg-surface p-4 shadow-subtle">
+            <p className="font-semibold text-foreground" dir="auto">{row.agentName}</p>
+            <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+              <div className="flex justify-between gap-2"><dt className="text-muted-foreground text-xs">{t("reports.agents.assigned")}</dt><dd className="tabular-nums font-medium">{nf.format(row.assigned)}</dd></div>
+              <div className="flex justify-between gap-2"><dt className="text-muted-foreground text-xs">{t("reports.agents.resolved")}</dt><dd className="tabular-nums font-medium">{nf.format(row.resolved)}</dd></div>
+              <div className="flex justify-between gap-2"><dt className="text-muted-foreground text-xs">{t("reports.agents.open")}</dt><dd className="tabular-nums font-medium">{nf.format(row.open)}</dd></div>
+              <div className="flex justify-between gap-2"><dt className="text-muted-foreground text-xs">{t("reports.agents.slaMet")}</dt><dd className="tabular-nums font-medium">{row.slaMetPct === null ? "—" : `${nf.format(row.slaMetPct)}%`}</dd></div>
+            </dl>
+          </li>
+        ))}
+      </ul>
     </>
   );
 }
@@ -415,18 +468,20 @@ function SlaBar({ label, tally, nf, t }: { label: string; tally: { met: number; 
     { key: "breached", value: tally.breached, color: "bg-danger" },
     { key: "pending", value: tally.pending, color: "bg-warning" },
   ];
-  return <div>
-    <div className="flex items-baseline justify-between text-sm">
-      <span className="font-medium text-foreground">{label}</span>
-      <span className="tabular-nums font-semibold text-foreground">{tally.compliancePct === null ? "—" : `${nf.format(tally.compliancePct)}%`}</span>
+  return (
+    <div>
+      <div className="flex items-baseline justify-between text-sm">
+        <span className="font-medium text-foreground">{label}</span>
+        <span className="tabular-nums font-semibold text-foreground">{tally.compliancePct === null ? "—" : `${nf.format(tally.compliancePct)}%`}</span>
+      </div>
+      <div className="mt-1 flex h-2.5 overflow-hidden rounded-full bg-surface-subtle border border-border" role="img" aria-label={`${label}: ${t("reports.sla.metShort")} ${tally.met}, ${t("reports.sla.breachedShort")} ${tally.breached}, ${t("reports.sla.pendingShort")} ${tally.pending}`}>
+        {segments.map((segment) => segment.value > 0 && <span key={segment.key} className={segment.color} style={{ width: `${(segment.value / total) * 100}%` }} />)}
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground tabular-nums">
+        {t("reports.sla.metShort")} {nf.format(tally.met)} · {t("reports.sla.breachedShort")} {nf.format(tally.breached)} · {t("reports.sla.pendingShort")} {nf.format(tally.pending)}
+      </p>
     </div>
-    <div className="mt-1 flex h-2.5 overflow-hidden rounded-full bg-surface-subtle border border-border" role="img" aria-label={`${label}: ${t("reports.sla.metShort")} ${tally.met}, ${t("reports.sla.breachedShort")} ${tally.breached}, ${t("reports.sla.pendingShort")} ${tally.pending}`}>
-      {segments.map((segment) => segment.value > 0 && <span key={segment.key} className={segment.color} style={{ width: `${(segment.value / total) * 100}%` }} />)}
-    </div>
-    <p className="mt-1 text-xs text-muted-foreground tabular-nums">
-      {t("reports.sla.metShort")} {nf.format(tally.met)} · {t("reports.sla.breachedShort")} {nf.format(tally.breached)} · {t("reports.sla.pendingShort")} {nf.format(tally.pending)}
-    </p>
-  </div>;
+  );
 }
 
 function Kpi({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -477,8 +532,11 @@ function Skeleton() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         {Array.from({ length: 5 }, (_, index) => <div key={index} className="h-24 animate-pulse rounded-xl bg-muted" />)}
       </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <ChartSkeleton height={224} />
+        <ChartSkeleton height={224} />
+      </div>
       <div className="h-64 animate-pulse rounded-xl bg-muted" />
-      <div className="h-72 animate-pulse rounded-xl bg-muted" />
     </div>
   );
 }

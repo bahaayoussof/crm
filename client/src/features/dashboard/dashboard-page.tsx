@@ -1,4 +1,4 @@
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, Tooltip, XAxis, YAxis } from "recharts";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { PageHeader } from "@/components/shared/page-header";
@@ -20,6 +20,16 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { AssigneeCell } from "@/components/shared/data-table/assignee-cell";
+import {
+  ChartContainer,
+  ChartTooltipContent,
+  ChartEmptyState,
+  ChartSkeleton,
+  CANONICAL_STATUS_ORDER,
+  getStatusChartColor,
+  getSlaChartColor,
+  CHART_THEME_TOKENS,
+} from "@/components/shared/charts";
 import { cn } from "@/lib/utils";
 
 export function DashboardPage() {
@@ -127,31 +137,13 @@ export function DashboardPage() {
         empty={t(`dashboard.${isAgent ? "emptyAssigned" : "emptyAttention"}`)}
         tickets={primaryTickets}
         detailed
-        highlight
       />
 
-      {/* Operational Charts & Summary Grid */}
-      <section className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
-        <Distribution data={data} />
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("dashboard.summaryTitle")}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <dl className="divide-y divide-border-subtle">
-              <Summary label={t("dashboard.metrics.waitingCustomer")} value={data.metrics.waitingCustomer} />
-              <Summary
-                label={t(`dashboard.metrics.${isAgent ? "assignedToMe" : "unassignedTickets"}`)}
-                value={isAgent ? data.metrics.assignedToMe : data.metrics.unassignedTickets}
-              />
-              <Summary
-                label={t("dashboard.generatedAt")}
-                value={formatTicketDate(data.generatedAt, i18n.language)}
-                technical
-              />
-            </dl>
-          </CardContent>
-        </Card>
+      {/* Operational Analytics & Summary Grid */}
+      <section className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+        <StatusDistribution data={data} />
+        <SlaHealth data={data} />
+        <OperationalSummary data={data} isAgent={isAgent} />
       </section>
 
       {/* Recent Tickets Section */}
@@ -170,12 +162,18 @@ export function DashboardPage() {
   );
 }
 
-function Distribution({ data }: { data: DashboardOverview }) {
+function StatusDistribution({ data }: { data: DashboardOverview }) {
   const { t } = useTranslation();
-  const chart = data.statusDistribution.map((item) => ({
-    ...item,
-    label: t(`tickets.status.${item.status}`),
-  }));
+  const statusMap = new Map(data.statusDistribution.map((item) => [item.status, item.count]));
+
+  const chart = CANONICAL_STATUS_ORDER
+    .map((status) => ({
+      status,
+      count: statusMap.get(status) ?? 0,
+      label: t(`tickets.status.${status}`),
+      color: getStatusChartColor(status),
+    }))
+    .filter((item) => (statusMap.has(item.status) ? (statusMap.get(item.status) ?? 0) > 0 : false));
 
   return (
     <Card aria-labelledby="dashboard-chart-title" aria-describedby="dashboard-chart-description">
@@ -186,26 +184,32 @@ function Distribution({ data }: { data: DashboardOverview }) {
       <CardContent>
         {chart.length ? (
           <>
-            <div className="h-60" data-testid="status-chart">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chart} layout="vertical" margin={{ left: 8, right: 8, top: 4, bottom: 4 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border)" />
-                  <XAxis type="number" allowDecimals={false} stroke="var(--muted-foreground)" fontSize={11} />
-                  <YAxis dataKey="label" type="category" width={110} tick={{ fontSize: 12, fill: "var(--foreground)" }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "var(--popover)",
-                      borderColor: "var(--border)",
-                      borderRadius: "0.5rem",
-                      boxShadow: "var(--shadow-flyout)",
-                      fontSize: "0.75rem",
-                      color: "var(--popover-foreground)",
-                    }}
-                    formatter={(value) => [value, t("dashboard.ticketsCount")]}
+            <div className="h-56" data-testid="status-chart">
+              <ChartContainer label={t("dashboard.chartTitle")}>
+                <BarChart data={chart} layout="vertical" margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={CHART_THEME_TOKENS.grid} />
+                  <XAxis type="number" allowDecimals={false} stroke={CHART_THEME_TOKENS.axis} fontSize={11} />
+                  <YAxis
+                    dataKey="label"
+                    type="category"
+                    width={105}
+                    tick={{ fontSize: 11, fill: "var(--foreground)" }}
+                    stroke={CHART_THEME_TOKENS.axis}
                   />
-                  <Bar dataKey="count" fill="var(--chart-1)" radius={[0, 4, 4, 0]} isAnimationActive={false} />
+                  <Tooltip
+                    content={
+                      <ChartTooltipContent
+                        formatter={(value) => [value, t("dashboard.ticketsCount")]}
+                      />
+                    }
+                  />
+                  <Bar dataKey="count" radius={[0, 4, 4, 0]} isAnimationActive={false}>
+                    {chart.map((entry) => (
+                      <Cell key={entry.status} fill={entry.color} />
+                    ))}
+                  </Bar>
                 </BarChart>
-              </ResponsiveContainer>
+              </ChartContainer>
             </div>
             <ul className="sr-only">
               {chart.map((item) => (
@@ -216,8 +220,115 @@ function Distribution({ data }: { data: DashboardOverview }) {
             </ul>
           </>
         ) : (
-          <p className="py-8 text-center text-xs text-muted-foreground">{t("dashboard.emptyDistribution")}</p>
+          <ChartEmptyState description={t("dashboard.emptyDistribution")} minHeight="14rem" />
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function SlaHealth({ data }: { data: DashboardOverview }) {
+  const { t } = useTranslation();
+  const openTickets = data.metrics.openTickets;
+  const breached = data.metrics.slaBreached;
+  const atRisk = data.metrics.slaAtRisk;
+  const onTrack = Math.max(0, openTickets - breached - atRisk);
+
+  const slaData = [
+    {
+      key: "ON_TRACK" as const,
+      label: t("dashboard.slaStates.ON_TRACK"),
+      count: onTrack,
+      color: getSlaChartColor("ON_TRACK"),
+    },
+    {
+      key: "AT_RISK" as const,
+      label: t("dashboard.slaStates.AT_RISK"),
+      count: atRisk,
+      color: getSlaChartColor("AT_RISK"),
+    },
+    {
+      key: "BREACHED" as const,
+      label: t("dashboard.slaStates.BREACHED"),
+      count: breached,
+      color: getSlaChartColor("BREACHED"),
+    },
+  ];
+
+  const hasActivity = openTickets > 0 || breached > 0 || atRisk > 0;
+
+  return (
+    <Card aria-labelledby="dashboard-sla-chart-title" aria-describedby="dashboard-sla-chart-description">
+      <CardHeader>
+        <CardTitle id="dashboard-sla-chart-title">{t("dashboard.slaHealthTitle")}</CardTitle>
+        <CardDescription id="dashboard-sla-chart-description">{t("dashboard.slaHealthDescription")}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {hasActivity ? (
+          <>
+            <div className="h-56" data-testid="sla-chart">
+              <ChartContainer label={t("dashboard.slaHealthTitle")}>
+                <BarChart data={slaData} layout="vertical" margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={CHART_THEME_TOKENS.grid} />
+                  <XAxis type="number" allowDecimals={false} stroke={CHART_THEME_TOKENS.axis} fontSize={11} />
+                  <YAxis
+                    dataKey="label"
+                    type="category"
+                    width={90}
+                    tick={{ fontSize: 11, fill: "var(--foreground)" }}
+                    stroke={CHART_THEME_TOKENS.axis}
+                  />
+                  <Tooltip
+                    content={
+                      <ChartTooltipContent
+                        formatter={(value) => [value, t("dashboard.ticketsCount")]}
+                      />
+                    }
+                  />
+                  <Bar dataKey="count" radius={[0, 4, 4, 0]} isAnimationActive={false}>
+                    {slaData.map((entry) => (
+                      <Cell key={entry.key} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ChartContainer>
+            </div>
+            <ul className="sr-only">
+              {slaData.map((item) => (
+                <li key={item.key}>
+                  {item.label}: {item.count}
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <ChartEmptyState description={t("dashboard.emptySlaHealth")} minHeight="14rem" />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function OperationalSummary({ data, isAgent }: { data: DashboardOverview; isAgent: boolean }) {
+  const { t, i18n } = useTranslation();
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("dashboard.summaryTitle")}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <dl className="divide-y divide-border-subtle">
+          <Summary label={t("dashboard.metrics.waitingCustomer")} value={data.metrics.waitingCustomer} />
+          <Summary
+            label={t(`dashboard.metrics.${isAgent ? "assignedToMe" : "unassignedTickets"}`)}
+            value={isAgent ? data.metrics.assignedToMe : data.metrics.unassignedTickets}
+          />
+          <Summary
+            label={t("dashboard.generatedAt")}
+            value={formatTicketDate(data.generatedAt, i18n.language)}
+            technical
+          />
+        </dl>
       </CardContent>
     </Card>
   );
@@ -228,13 +339,11 @@ function TicketSection({
   empty,
   tickets,
   detailed = false,
-  highlight = false,
 }: {
   title: string;
   empty: string;
   tickets: DashboardTicket[];
   detailed?: boolean;
-  highlight?: boolean;
 }) {
   const { t, i18n } = useTranslation();
 
@@ -254,16 +363,16 @@ function TicketSection({
           {/* Desktop Table */}
           <div className="hidden md:block">
             <TableContainer>
-              <Table className={detailed ? "min-w-[76rem]" : "min-w-[58rem]"}>
+              <Table className={detailed ? "min-w-[68rem]" : "min-w-[54rem]"}>
                 <colgroup>
                   <col className="w-28" />
-                  <col className={detailed ? "w-72" : "w-80"} />
-                  {detailed && <col className="w-48" />}
+                  <col className={detailed ? "w-64" : "w-72"} />
+                  {detailed && <col className="w-40" />}
                   <col className="w-28" />
-                  <col className="w-40" />
+                  <col className="w-32" />
                   {detailed && <col className="w-36" />}
-                  <col className="w-48" />
                   <col className="w-44" />
+                  <col className="w-40" />
                 </colgroup>
                 <TableHeader>
                   <TableRow>
@@ -411,7 +520,11 @@ function DashboardSkeleton() {
         ))}
       </div>
       <div className="h-64 animate-pulse rounded-xl bg-muted" />
-      <div className="h-72 animate-pulse rounded-xl bg-muted" />
+      <div className="grid gap-6 lg:grid-cols-3">
+        <ChartSkeleton height={260} />
+        <ChartSkeleton height={260} />
+        <div className="h-64 animate-pulse rounded-xl bg-muted" />
+      </div>
     </div>
   );
 }

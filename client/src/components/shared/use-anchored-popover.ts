@@ -51,7 +51,7 @@ const DEFAULTS = {
   maxWidth: 320,
   gap: 6,
   margin: 8,
-  maxHeight: 360,
+  maxHeight: 560,
   minHeight: 120,
 };
 
@@ -169,6 +169,17 @@ export function useAnchoredPopover<T extends HTMLElement = HTMLElement, P extend
       const target = event.target as Node | null;
       if (!target) return;
       if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+
+      // Do not dismiss when interacting with portalled select / menu / dialog items
+      if (
+        target instanceof Element &&
+        target.closest(
+          "[data-radix-popper-content-wrapper], [data-radix-select-content], [data-radix-portal], [role='listbox'], [role='option'], [role='menu'], [role='menuitem']"
+        )
+      ) {
+        return;
+      }
+
       onDismissRef.current("outside");
     };
     const onKeyDown = (event: KeyboardEvent) => {

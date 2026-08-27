@@ -8,7 +8,7 @@ import { SpinnerIcon, UserRoundCheckIcon, UserRoundXIcon } from "./user-icons";
 import type { User } from "./user.types";
 
 const TRIGGER_BASE =
-  "inline-flex size-9 items-center justify-center rounded-md border transition-colors " +
+  "inline-flex size-8 items-center justify-center rounded-lg border transition-colors " +
   "focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60";
 const TRIGGER_NEUTRAL = "border-border text-muted-foreground hover:bg-surface-hover hover:text-foreground focus-visible:ring-ring";
 const TRIGGER_DANGER = "border-danger-soft text-danger-foreground hover:bg-danger-soft focus-visible:ring-danger/30";

@@ -11,9 +11,11 @@ interface Option {
 }
 
 interface TicketFiltersPopoverProps {
+  status?: string;
   priority?: string;
   categoryId?: string;
   assignedAgentId?: string;
+  statusOptions: Option[];
   priorityOptions: Option[];
   categoryOptions: Option[];
   agentOptions: Option[];
@@ -22,9 +24,11 @@ interface TicketFiltersPopoverProps {
 }
 
 export function TicketFiltersPopover({
+  status,
   priority,
   categoryId,
   assignedAgentId,
+  statusOptions,
   priorityOptions,
   categoryOptions,
   agentOptions,
@@ -34,7 +38,7 @@ export function TicketFiltersPopover({
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
-  const activeCount = [priority, categoryId, assignedAgentId].filter(Boolean).length;
+  const activeCount = [status, priority, categoryId, assignedAgentId].filter(Boolean).length;
 
   const { triggerRef, panelRef, style } = useAnchoredPopover<HTMLButtonElement, HTMLDivElement>({
     open,
@@ -42,6 +46,7 @@ export function TicketFiltersPopover({
     align: "end",
     gap: 6,
     width: 288,
+    maxHeight: 560,
   });
 
   return (
@@ -75,9 +80,9 @@ export function TicketFiltersPopover({
             style={style}
             role="dialog"
             aria-label={t("common.filters", "Filters")}
-            className="fixed z-50 w-72 rounded-xl border border-border bg-popover p-3.5 text-start text-popover-foreground shadow-flyout space-y-3 animate-in fade-in-0 zoom-in-95 duration-100"
+            className="fixed z-50 w-72 flex flex-col rounded-xl border border-border bg-popover p-3.5 text-start text-popover-foreground shadow-flyout space-y-3 animate-in fade-in-0 zoom-in-95 duration-100 overflow-hidden"
           >
-            <div className="flex items-center justify-between border-b border-border/70 pb-2">
+            <div className="flex shrink-0 items-center justify-between border-b border-border/70 pb-2">
               <span className="text-xs font-semibold text-foreground">
                 {t("common.filters", "Filters")}
               </span>
@@ -102,7 +107,19 @@ export function TicketFiltersPopover({
               </div>
             </div>
 
-            <div className="space-y-2.5">
+            <div className="space-y-2.5 overflow-y-auto pe-0.5">
+              <div>
+                <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                  {t("tickets.statusLabel")}
+                </label>
+                <AppSelect
+                  ariaLabel={t("tickets.statusLabel")}
+                  value={status ?? ""}
+                  onValueChange={(val) => onFilterChange("status", val)}
+                  options={statusOptions}
+                />
+              </div>
+
               <div>
                 <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
                   {t("tickets.priorityLabel")}
@@ -140,7 +157,7 @@ export function TicketFiltersPopover({
               </div>
             </div>
 
-            <div className="border-t border-border/70 pt-2 flex justify-end">
+            <div className="shrink-0 border-t border-border/70 pt-2 flex justify-end">
               <button
                 type="button"
                 onClick={() => setOpen(false)}
