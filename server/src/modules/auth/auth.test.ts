@@ -32,6 +32,7 @@ const customerUser = {
   name: "Ahmed Mohamed",
   email: "ahmed@example.com",
   role: "CUSTOMER" as const,
+  isActive: true,
   customerProfile: {
     id: "customer-1",
     name: "Ahmed Mohamed",
@@ -143,6 +144,34 @@ describe("authentication API", () => {
 
     expect(response.status).toBe(401);
     expect(response.body.error).toEqual({ code: "INVALID_CREDENTIALS", message: "Invalid email or password" });
+  });
+
+  it("blocks login for a deactivated account", async () => {
+    mocks.findUser.mockResolvedValue({ ...customerUser, isActive: false, passwordHash: "hashed:password123" });
+
+    const response = await request(app).post("/api/auth/login").send({
+      email: "ahmed@example.com",
+      password: "password123",
+    });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe("ACCOUNT_DEACTIVATED");
+  });
+
+  it("rejects /auth/me once an account is deactivated", async () => {
+    mocks.findUser.mockResolvedValueOnce({ ...customerUser, passwordHash: "hashed:password123" });
+    const loginResponse = await request(app).post("/api/auth/login").send({
+      email: "ahmed@example.com",
+      password: "password123",
+    });
+
+    mocks.findUser.mockResolvedValueOnce({ ...customerUser, isActive: false });
+    const response = await request(app)
+      .get("/api/auth/me")
+      .set("Authorization", `Bearer ${loginResponse.body.data.token}`);
+
+    expect(response.status).toBe(401);
+    expect(response.body.error.code).toBe("ACCOUNT_DEACTIVATED");
   });
 
   it("rejects missing and invalid tokens", async () => {

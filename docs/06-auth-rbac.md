@@ -39,10 +39,15 @@ The role descriptions below include capabilities that are not yet built. As of `
 
 - Feedback (`POST`/`GET /api/portal/tickets/:id/feedback`): a `CUSTOMER` may submit and read exactly one rating (`1`–`5`, integer) plus an optional comment for their own ticket whose stored status is `RESOLVED` or `CLOSED`. Non-owned/missing ticket → `404 TICKET_NOT_FOUND`; other status → `409 TICKET_NOT_ELIGIBLE_FOR_FEEDBACK`; repeat submission → `409 FEEDBACK_ALREADY_SUBMITTED`. `customerId` is server-derived from `User -> Customer.userId`. Internal roles and unauthenticated callers are rejected (these are `portalRouter` sub-routes, `requireRole(CUSTOMER)`); there is no internal feedback route. See the matrix below.
 - Reports (`GET /api/reports/{overview,tickets,agents,sla}`, `feature/reports`, on branch): `ADMIN` and `MANAGER` only (`requireAuth` + `requireRole(ADMIN, MANAGER)`). `AGENT`, `CUSTOMER`, and unauthenticated callers receive `403 FORBIDDEN` / `401`. Read-only aggregates over existing rows; the satisfaction metric is derived from `Feedback.rating`. No `AGENT` reports access is granted.
+- Users administration (`GET /api/users`, `GET /api/users/:id`, `POST /api/users`, `PATCH /api/users/:id`, `feature/user-management`): **`ADMIN` only** (`requireAuth` → `requireActiveUser` → `requireRole(ADMIN)` per route; `/users/agents` keeps its `ADMIN`/`MANAGER`/`AGENT` lookup group). `MANAGER`, `AGENT`, `CUSTOMER`, and unauthenticated callers receive `403 FORBIDDEN` / `401` — the `docs/18` §15 "MANAGER only if explicitly granted" default resolves to **not granted**. Acts on internal identities only; a `CUSTOMER` id is `404`. `role` is constrained to `{ADMIN,MANAGER,AGENT}` on create and update.
+  - **No inline role mutation.** Role changes only through `PATCH /api/users/:id` (the Edit User form); there is no `PATCH /users/:id/role` route and the Users table renders role/status as read-only badges.
+  - **Self-management safety (server-enforced):** an `ADMIN` cannot change their own role (`409 SELF_ROLE_CHANGE_FORBIDDEN`; submitting the unchanged current role is fine) or deactivate their own account (`409 SELF_DEACTIVATION_FORBIDDEN`).
+  - **Last-active-`ADMIN` protection (server-enforced, transaction-safe):** demoting or deactivating the last active `ADMIN` when no other active `ADMIN` remains → `409 LAST_ACTIVE_ADMIN_REQUIRED`. Another `ADMIN` may demote/deactivate an `ADMIN` while a different active `ADMIN` remains. There is no hard deletion.
+  - **Active-session enforcement:** `requireActiveUser` reads the caller's current `role`/`isActive` from the database before `requireRole`, so a demotion or deactivation takes effect on the next `/api/users` request rather than after the 8-hour JWT expiry. A deactivated caller gets `401 ACCOUNT_DEACTIVATED`. `/auth/me` already re-reads the database. Other routers still authorize from the JWT role until expiry — this is a deliberate, bounded scope (no per-request user lookup on every endpoint; no refresh-token infrastructure).
+  - New `User.isActive` (default `true`): a deactivated user cannot log in (`403 ACCOUNT_DEACTIVATED`), fails `GET /auth/me` mid-session (`401 ACCOUNT_DEACTIVATED`), fails `/api/users` admin requests (`401`), and is excluded from `/users/agents` results.
 
 ### Planned — permission model known, not implemented
 
-- `ADMIN`-managed internal user creation and role changes (`feature/user-management`).
 - Per-user Notifications read/unread (`feature/notifications`).
 
 ### Unresolved — require a product decision before a permission can be written
@@ -53,7 +58,7 @@ The role descriptions below include capabilities that are not yet built. As of `
 - Custom Branding: who may change application/Portal branding and within what bounds (`feature/custom-branding`).
 - General Audit Logs: whether a dedicated `AuditLog` beyond `TicketHistory` is introduced, and who reads it.
 
-Do not describe Users Management, Notifications, Tasks, or Settings permissions as implemented. Knowledge Base management (`feature/knowledge-base`), Quick Replies management (`feature/quick-replies`), `CUSTOMER` feedback submission (`feature/customer-feedback`, integrated at `12a0c12`), and `ADMIN`/`MANAGER` Reports read access (`feature/reports`, on branch) are implemented; the other role-list items below remain the target model.
+Do not describe Notifications, Tasks, or Settings permissions as implemented. Knowledge Base management (`feature/knowledge-base`), Quick Replies management (`feature/quick-replies`), `CUSTOMER` feedback submission (`feature/customer-feedback`, integrated at `12a0c12`), `ADMIN`/`MANAGER` Reports read access (`feature/reports`, on branch), and `ADMIN`-only Users administration (`feature/user-management`, on branch) are implemented; the other role-list items below remain the target model.
 
 ## Roles
 

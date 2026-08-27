@@ -50,6 +50,7 @@ model User {
   email        String   @unique
   passwordHash String
   role         Role
+  isActive     Boolean  @default(true)
   departmentId String?
   branchId     String?
   createdAt    DateTime @default(now())

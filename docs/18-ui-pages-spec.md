@@ -1330,13 +1330,11 @@ Every figure is computed from stored columns (no fabricated analytics). Not veri
 
 ## Roles
 
-ADMIN.
-
-MANAGER access only if explicitly granted.
+ADMIN. **Implemented (`feature/user-management`, ADR-025): ADMIN only — MANAGER access was not granted.** `MANAGER`/`AGENT`/`CUSTOMER` receive `403` on every `/api/users` administration route and see no `/users` nav item; `UserManageRoute` redirects non-`ADMIN` to `/dashboard`.
 
 ## Goal
 
-Manage internal CRM users and roles.
+Manage internal CRM users and roles. Acts on internal identities only — portal customers are never listed or created here.
 
 ## Table
 
@@ -1350,15 +1348,26 @@ Status
 Created
 ```
 
+Table columns (desktop): **Name · Email · Role · Status · Created · Actions**. Explicit `table-fixed` widths (Name ~22%, Email flexible, Role/Status/Created/Actions fixed px). Email stays on one line (`truncate` + `dir="ltr"` + full value in `title`), never wraps character-by-character. Role and Status are **read-only localized badges** — no dropdowns in table cells. Below `md`, a card list with the same fields, actions, and a read-only role. The current signed-in admin's row carries a small `You` badge.
+
+Row actions (one Actions cell): **Edit** (pencil → `/users/:id/edit`) and **Deactivate** / **Reactivate** (`UserRoundX` / `UserRoundCheck` icons — not a shield). The status action opens an accessible `role="dialog"` (`aria-modal`) confirmation showing the user's name, the action, and — for deactivation — the consequence ("cannot sign in; authenticated access rejected; historical tickets / messages / notes / history preserved"). The confirmation is rendered through a **React portal on `document.body`** (never inside the table or its `overflow-x-auto` wrapper) and pinned to the trigger's logical-end edge with `position: fixed` against `getBoundingClientRect()` — so it floats above the table, flips above the trigger when space below is short, clamps to the viewport (incl. 320 px), and never adds a scrollbar to the table or shifts its content. It shares the `useAnchoredPopover` floating-layer primitive (`components/shared/`) and the project `z-50`. Only one confirmation is open at a time (keyed by stable user id); clicking another row's trigger moves it; a filter/pagination change closes stale confirmation state. Focus moves to Cancel on open and returns to the trigger on Cancel/Escape/outside-pointer; Tab is trapped between Cancel and Confirm; pending state blocks a duplicate request and disables both buttons; failure stays visible with a `role="alert"` message and Confirm relabelled **Retry**. Confirm always acts on the user captured when the popover opened.
+
 Actions:
 
 ```text
-Create User
-Edit User
-Change Role
+Create User   — name / email / temporary password / role (ADMIN | MANAGER | AGENT)
+Edit User     — name / email / role / active flag
 ```
 
-Avoid implementing unnecessary enterprise identity features.
+**Implemented:**
+- `Status` is `User.isActive` (boolean, default active). Deactivated accounts cannot sign in (`403 ACCOUNT_DEACTIVATED`), fail `GET /auth/me` and `/api/users` admin requests mid-session (`401 ACCOUNT_DEACTIVATED`), and are hidden from ticket assignment.
+- **Role changes only through Edit User** — there is no separate "Change Role" list action and no `PATCH /users/:id/role` route; the Role `<select>` in the Edit form submits inside the one safe update payload.
+- **Self-management:** on your own Edit page the Role select and Active checkbox are disabled/read-only with a localized explanation; the table hides/disables self-deactivation. The server also rejects a self role change (`409 SELF_ROLE_CHANGE_FORBIDDEN`) and self-deactivation (`409 SELF_DEACTIVATION_FORBIDDEN`).
+- **Last active admin is protected** (server, transaction-safe): demoting or deactivating the last active `ADMIN` → `409 LAST_ACTIVE_ADMIN_REQUIRED`. The UI also disables the action when the loaded page proves a single active admin, and still handles the server conflict with a localized accessible message, keeping form values.
+- Selects use one treatment: native control, platform arrow suppressed, a single custom chevron pinned to the logical end (correct in LTR and RTL, never rotated).
+- No user-deletion action — retire an account by clearing its active flag.
+
+Avoid implementing unnecessary enterprise identity features (no password-reset email flow, bulk actions, CSV import/export, admin-action audit log, or department/branch assignment in this feature).
 
 ---
 

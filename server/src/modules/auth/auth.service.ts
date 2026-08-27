@@ -11,6 +11,7 @@ const authUserSelect = {
   name: true,
   email: true,
   role: true,
+  isActive: true,
   customerProfile: {
     select: { id: true, name: true, email: true, phone: true },
   },
@@ -93,6 +94,10 @@ export async function login(input: LoginInput): Promise<AuthResponse> {
     throw new AppError(401, "INVALID_CREDENTIALS", "Invalid email or password");
   }
 
+  if (!user.isActive) {
+    throw new AppError(403, "ACCOUNT_DEACTIVATED", "This account has been deactivated");
+  }
+
   const { passwordHash: _passwordHash, ...safeUser } = user;
   void _passwordHash;
   return createAuthResponse(safeUser);
@@ -103,6 +108,10 @@ export async function getCurrentUser(userId: string): Promise<AuthUser> {
 
   if (!user) {
     throw new AppError(401, "INVALID_TOKEN", "Authentication token is invalid or expired");
+  }
+
+  if (!user.isActive) {
+    throw new AppError(401, "ACCOUNT_DEACTIVATED", "This account has been deactivated");
   }
 
   return toAuthUser(user);

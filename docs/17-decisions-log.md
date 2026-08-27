@@ -600,3 +600,48 @@ Reusing `deriveSla` for compliance (rejected — wrong shape: single label vs. c
 **Consequences**
 
 `app.ts` gains one router. No existing endpoint or type changes. The satisfaction section needs demo `Feedback` rows to look populated — `feature/demo-seed-data` (order 14) must seed enough. PostgreSQL and authenticated English/Arabic browser verification were not performed and rely on the deterministic mocked tests until a developer completes them. Next roadmap branch: `feature/user-management` (order 6).
+
+---
+
+## ADR-025: Users Administration — ADMIN-only CRUD + Role Change, `User.isActive` for Retirement
+
+**Status:** Accepted (implemented on `feature/user-management`, uncommitted; automated-verified only)
+
+**Context**
+
+Roadmap order 6. `docs/18` §15 asks for a `/users` page (table: Name, Email, Role, Status, Created; actions: Create User, Edit User, Change Role) to "manage internal CRM users and roles", scoped to `ADMIN` with "MANAGER access only if explicitly granted", and warns "avoid implementing unnecessary enterprise identity features". Before this feature the only users route was `GET /users/agents` (a ticket-assignment lookup); the schema had no way to disable an account.
+
+**Decision**
+
+- **Schema:** one column — `User.isActive Boolean @default(true)` (migration `20260827101406_add_user_is_active`). No status enum, no soft-delete columns, no `lastLoginAt`, no invite/token table, no department/branch assignment UI.
+- **MANAGER boundary:** resolved to **ADMIN only**. Every administration route is `requireRole(ADMIN)`; `MANAGER`/`AGENT`/`CUSTOMER` get `403`. `GET /users/agents` keeps its existing `ADMIN`/`MANAGER`/`AGENT` group.
+- **Routes** (extend the existing `userRouter`, still mounted at `/api/users` — no `app.ts` change): `GET /` (paginated list; `search` name/email, optional `role` + `status` filters; `createdAt DESC, id ASC`), `GET /:id`, `POST /` (`name`, `email`, `password` 8–128 bcrypt cost 12, `role`), `PATCH /:id` (`name?`, `email?`, `isActive?`), `PATCH /:id/role` (`role`). Strict Zod bodies; safe projection `{ id, name, email, role, isActive, createdAt, updatedAt }` — never `passwordHash`.
+- **Internal identities only:** `role` on create / role-change is constrained to `{ADMIN,MANAGER,AGENT}` (`CUSTOMER` → `400`); list/detail/update filter `role in {ADMIN,MANAGER,AGENT}` so a `CUSTOMER` row returns `404 USER_NOT_FOUND`. This surface never creates or exposes portal customers.
+- **Self-lockout guards:** deactivating your own account → `409 CANNOT_DEACTIVATE_SELF`; changing your own role → `409 CANNOT_CHANGE_OWN_ROLE`. Duplicate email on create/update → `409 EMAIL_ALREADY_REGISTERED`.
+- **`isActive` enforcement in auth:** `authUserSelect` gains `isActive`; `login` rejects a deactivated account with `403 ACCOUNT_DEACTIVATED`; `getCurrentUser` (`GET /auth/me`) rejects mid-session with `401 ACCOUNT_DEACTIVATED` (forces client logout). `/users/agents` now filters `isActive: true` so disabled agents disappear from assignment.
+- **No deletion route.** Retirement = `isActive=false`. Ticket/message/note/history FKs (`Restrict`) make row deletion unsafe and the spec does not ask for it.
+- **Frontend `client/src/features/users/`:** `/users` list (search + role + status filters synced to URL, TanStack table, mobile cards), `/users/new` + `/users/:id/edit` forms (create takes password + role; edit takes name/email/`isActive` only — role is changed from the list), inline anchored `role="dialog"` role-change popover with a role `<select>` + Save/Cancel + error-retry. `user-manage-route.tsx` sends non-`ADMIN` to `/dashboard`; conditional nav item via `canManageUsers` = `role === "ADMIN"`. `users.*` + `navigation.users` EN/AR (634/634 parity), RTL, LTR-isolated email/date. Inline SVG icons (no icon dep).
+- **Out of scope (explicit):** password reset / "send reset email", bulk actions, CSV import/export, audit log of admin actions, per-user permissions beyond the 4 roles, MFA, session revocation lists, department/branch assignment.
+
+**Reason**
+
+The spec is deliberately small ("avoid unnecessary enterprise identity features"). One boolean covers "Status"; four roles already exist; bcrypt + JWT auth is already in place. ADMIN-only matches the documented default and avoids designing a partial-MANAGER capability nobody asked for. Blocking self-deactivation / self-demotion prevents the one obvious way an admin bricks their own access.
+
+**Alternatives Considered**
+
+`status` enum (`ACTIVE`/`SUSPENDED`/`INVITED`) — rejected, no invite flow and `SUSPENDED` vs deleted is the only real distinction. Hard delete with dependency guards (like customer deletion) — rejected, `Restrict` FKs across tickets/messages/notes/history make it almost always fail and history must be preserved. Granting `MANAGER` read-only or create-but-not-role-change access — rejected, not requested; revisit only if a product decision lands. A dedicated `PATCH /:id` accepting `role` too — rejected, keeping role on its own route makes the "Change Role" action and its self-demotion guard explicit and auditable.
+
+**Consequences**
+
+One migration (`User.isActive`). `auth.service.ts` changed (select + two new rejection paths) — existing auth tests updated with an `isActive: true` fixture field plus two new deactivation cases. `GET /users/agents` response now hides inactive agents (intended). No other endpoint or type changes. PostgreSQL and authenticated English/Arabic browser verification were not performed and rely on the deterministic mocked tests (server 287, client 298) until a developer completes them. Next roadmap branch: `feature/settings` (order 7).
+
+### Pre-integration correction (amends ADR-025, no new ADR — still on `feature/user-management`, uncommitted)
+
+- **Role mutation consolidated into `PATCH /api/users/:id`.** The dedicated `PATCH /users/:id/role` route, `changeUserRoleSchema`, and the table's inline role-change popover are removed. `updateUserSchema` gains an optional `role`; role changes happen only in the Edit User form and travel in the one safe update payload. The Users table renders role and status as read-only badges (no dropdowns in cells).
+- **Self-management safety, server-enforced:** `409 SELF_ROLE_CHANGE_FORBIDDEN` (was `CANNOT_CHANGE_OWN_ROLE`) when an admin submits a *changed* own role (unchanged is allowed, so a self profile edit still works); `409 SELF_DEACTIVATION_FORBIDDEN` (was `CANNOT_DEACTIVATE_SELF`). The Edit User page renders the caller's own Role select disabled and the Active checkbox disabled, each with a localized explanation and a `You` badge; the table hides/disables self-deactivation.
+- **Last-active-`ADMIN` protection:** `updateUser` now runs read-check-write inside one `prisma.$transaction`; demoting or deactivating an active `ADMIN` triggers a `count` of other active admins and throws `409 LAST_ACTIVE_ADMIN_REQUIRED` when none remain. The frontend also disables the action when the loaded page *proves* a single active admin, and always handles the server conflict (data may be stale/paginated), preserving entered form values on rejection.
+- **Active-session enforcement:** new `requireActiveUser` middleware (`server/src/middleware/require-active-user.ts`) resolves the caller's current DB `role`/`isActive` and overwrites `request.auth.role` before `requireRole(ADMIN)` on every `/api/users` admin route (not `/users/agents`, not other routers — scoped to keep the change bounded and avoid a per-request user lookup everywhere; no refresh tokens). A demoted admin loses `/api/users` access on the next request; a deactivated caller gets `401 ACCOUNT_DEACTIVATED`.
+- **Only submitted fields are written** — `updateUser` builds the `data` object key by key; the client `updateUser` sends only the keys present in its payload (a status toggle sends `{ isActive }` alone).
+- **Consistent Select treatment:** a `NativeSelect` primitive (`users-ui.tsx`) renders the native control with `appearance-none` + `bg-none` + `pe-9` and one absolutely-positioned custom `ChevronDownIcon` at the logical end (`end-3`, vertically centred, `pointer-events-none`, never rotated for RTL). Applied to the Role/Status filters and the Create/Edit Role field only — the global `.input` and unrelated selects are untouched. The `ShieldIcon` is replaced by `UserRoundXIcon` / `UserRoundCheckIcon` for the deactivate/reactivate actions; status changes use the anchored `role="dialog"` confirm pattern showing name + action + (for deactivation) the "cannot sign in / history preserved" consequence.
+- **Table presentation:** explicit `table-fixed` column widths (Name 22%, Email flexible, Role 132px, Status 120px, Created 150px, Actions 112px); Email is `truncate` + `dir="ltr"` + `title` (no more character-by-character wrapping); Name links to Edit without persistent blue styling; mobile keeps a card list with the same actions and read-only role.
+- Tests: server `user.test.ts` rewritten (31 cases incl. last-admin, self-guard codes, role-in-update, transaction-failure, stale-JWT-role, deactivated-caller); client `users.test.tsx` rewritten (24 cases). Full suites now **server 298 / client 310**, 0 failed. i18n `users.*` EN/AR parity **644/644**.

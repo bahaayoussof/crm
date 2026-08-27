@@ -1,0 +1,211 @@
+import { flexRender, getCoreRowModel, useReactTable, type ColumnDef, type PaginationState, type Updater } from "@tanstack/react-table";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
+import { formatUserDate } from "./user-format";
+import { PencilIcon } from "./user-icons";
+import { UserStatusConfirm } from "./user-status-confirm";
+import { RoleBadge, StatusBadge, YouBadge } from "./users-ui";
+import type { User } from "./user.types";
+
+interface UserTableProps {
+  users: User[];
+  currentUserId: string;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+  onPageChange: (page: number) => void;
+}
+
+type ConfirmVariant = "desktop" | "mobile";
+
+interface UserTableMeta {
+  currentUserId: string;
+  provableLastActiveAdmin: string | null;
+  openConfirm: { id: string; variant: ConfirmVariant } | null;
+  requestOpenConfirm: (id: string, variant: ConfirmVariant) => void;
+  closeConfirm: () => void;
+}
+
+const ICON_LINK =
+  "inline-flex size-9 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors " +
+  "hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
+
+// Explicit column ownership: Name takes a fixed share, Email flexes into the
+// remainder, Role / Status / Created / Actions get stable pixel widths.
+// Logical alignment flips in RTL; no dir branching.
+const columnClasses: Record<string, string> = {
+  name: "w-[22%]",
+  email: "w-auto",
+  role: "w-[132px]",
+  status: "w-[120px]",
+  createdAt: "w-[150px]",
+  actions: "w-[112px]",
+};
+
+export function UserTable({ users, currentUserId, page, pageSize, pageCount, onPageChange }: UserTableProps) {
+  const { t, i18n } = useTranslation();
+
+  // Single open confirmation, coordinated here so a filter/pagination change
+  // (which swaps the `users` array) closes any stale confirmation. The `variant`
+  // keeps the desktop-table and mobile-card triggers from both opening a panel
+  // for the same row (both DOM trees are mounted; only one is visible).
+  const [openConfirm, setOpenConfirm] = useState<{ id: string; variant: ConfirmVariant } | null>(null);
+  useEffect(() => { setOpenConfirm(null); }, [users, page]);
+  const requestOpenConfirm = useCallback((id: string, variant: ConfirmVariant) => setOpenConfirm({ id, variant }), []);
+  const closeConfirm = useCallback(() => setOpenConfirm(null), []);
+
+  // Frontend guard for the last active ADMIN, using only the rows on this page.
+  // The backend still enforces it (data here may be stale / paginated).
+  const provableLastActiveAdmin = useMemo(() => {
+    const activeAdmins = users.filter((u) => u.role === "ADMIN" && u.isActive);
+    return activeAdmins.length === 1 ? activeAdmins[0].id : null;
+  }, [users]);
+
+  const columns = useMemo<ColumnDef<User>[]>(() => [
+    {
+      id: "name",
+      accessorKey: "name",
+      header: () => t("users.columns.name"),
+      cell: ({ row, table }) => <span className="flex min-w-0 items-center gap-1.5">
+        <Link
+          className="min-w-0 truncate rounded-sm font-medium text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+          dir="auto"
+          title={row.original.name}
+          to={`/users/${row.original.id}/edit`}
+        >{row.original.name}</Link>
+        {row.original.id === (table.options.meta as UserTableMeta).currentUserId && <YouBadge />}
+      </span>,
+    },
+    {
+      id: "email",
+      accessorKey: "email",
+      header: () => t("users.columns.email"),
+      cell: ({ getValue }) => <span className="block min-w-0 max-w-full truncate text-muted-foreground" dir="ltr" title={getValue<string>()}>{getValue<string>()}</span>,
+    },
+    {
+      id: "role",
+      accessorKey: "role",
+      header: () => t("users.columns.role"),
+      cell: ({ row }) => <RoleBadge role={row.original.role} />,
+    },
+    {
+      id: "status",
+      accessorKey: "isActive",
+      header: () => t("users.columns.status"),
+      cell: ({ row }) => <StatusBadge active={row.original.isActive} />,
+    },
+    {
+      id: "createdAt",
+      accessorKey: "createdAt",
+      header: () => t("users.columns.created"),
+      cell: ({ getValue }) => <span className="whitespace-nowrap text-muted-foreground"><bdi dir="ltr">{formatUserDate(getValue<string>(), i18n.language)}</bdi></span>,
+    },
+    {
+      id: "actions",
+      header: () => <span className="block text-end">{t("users.columns.actions")}</span>,
+      cell: ({ row, table }) => <RowActions user={row.original} meta={table.options.meta as UserTableMeta} variant="desktop" />,
+    },
+  ], [i18n.language, t]);
+
+  const meta: UserTableMeta = { currentUserId, provableLastActiveAdmin, openConfirm, requestOpenConfirm, closeConfirm };
+
+  const pagination = useMemo<PaginationState>(() => ({ pageIndex: page - 1, pageSize }), [page, pageSize]);
+  const table = useReactTable({
+    data: users,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getRowId: (user) => user.id,
+    manualPagination: true,
+    pageCount,
+    state: { pagination },
+    meta,
+    onPaginationChange: (updater) => handlePaginationChange(updater, pagination, onPageChange),
+  });
+
+  return <>
+    <div className="hidden overflow-x-auto rounded-md border bg-white md:block">
+      <table className="w-full min-w-[52rem] table-fixed text-start text-sm">
+        <colgroup>
+          {table.getAllLeafColumns().map((column) => <col key={column.id} className={columnClasses[column.id] ?? ""} />)}
+        </colgroup>
+        <thead className="border-b bg-muted/70 text-xs text-muted-foreground">
+          {table.getHeaderGroups().map((headerGroup) => <tr key={headerGroup.id}>{headerGroup.headers.map((header) => <th
+            className={`px-4 py-2.5 font-semibold ${header.column.id === "actions" ? "text-end" : "text-start"}`}
+            scope="col"
+            key={header.id}
+          >{header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}</th>)}</tr>)}
+        </thead>
+        <tbody className="divide-y">
+          {table.getRowModel().rows.map((row) => <tr className="align-middle transition-colors hover:bg-muted/40" key={row.id}>{row.getVisibleCells().map((cell) => <td
+            className={`px-4 py-3 ${cell.column.id === "actions" ? "text-end" : ""}`}
+            key={cell.id}
+          >{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}
+        </tbody>
+      </table>
+    </div>
+
+    <ul className="divide-y rounded-md border bg-white md:hidden">
+      {users.map((user) => <li className="p-4" key={user.id}>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <Link
+            className="min-w-0 truncate rounded-sm font-medium text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            dir="auto"
+            title={user.name}
+            to={`/users/${user.id}/edit`}
+          >{user.name}</Link>
+          {user.id === currentUserId && <YouBadge />}
+        </div>
+        <p className="mt-1 truncate text-sm text-muted-foreground" dir="ltr" title={user.email}>{user.email}</p>
+        <div className="mt-2.5 flex flex-wrap items-center gap-2">
+          <RoleBadge role={user.role} />
+          <StatusBadge active={user.isActive} />
+          <span className="text-xs text-muted-foreground">{t("users.columns.created")}: <bdi dir="ltr">{formatUserDate(user.createdAt, i18n.language)}</bdi></span>
+        </div>
+        <div className="mt-3 flex justify-end">
+          <RowActions user={user} meta={meta} variant="mobile" />
+        </div>
+      </li>)}
+    </ul>
+
+    {pageCount > 1 && <nav className="mt-6 flex items-center justify-between gap-3" aria-label={t("users.pagination")}>
+      <button className="button-secondary" type="button" disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}>{t("common.previous")}</button>
+      <span className="text-center text-sm text-muted-foreground">{t("users.page", { page, total: pageCount })}</span>
+      <button className="button-secondary" type="button" disabled={!table.getCanNextPage()} onClick={() => table.nextPage()}>{t("common.next")}</button>
+    </nav>}
+  </>;
+}
+
+function RowActions({ user, meta, variant }: { user: User; meta: UserTableMeta; variant: ConfirmVariant }) {
+  const { t } = useTranslation();
+
+  const isSelf = user.id === meta.currentUserId;
+  const lockedLastAdmin = meta.provableLastActiveAdmin === user.id;
+  const deactivating = user.isActive;
+  // Self-deactivation is never offered; a provable last-active-admin lock disables it too.
+  const disabled = deactivating && (isSelf || lockedLastAdmin);
+  const disabledReason = disabled
+    ? isSelf ? t("users.selfDeactivateBlocked") : t("users.lastAdminBlocked")
+    : undefined;
+
+  return (
+    <div className="inline-flex items-center gap-1">
+      <Link className={ICON_LINK} to={`/users/${user.id}/edit`} aria-label={t("users.editAction")} title={t("users.editAction")}>
+        <PencilIcon />
+      </Link>
+      <UserStatusConfirm
+        user={user}
+        disabled={disabled}
+        disabledReason={disabledReason}
+        open={meta.openConfirm?.id === user.id && meta.openConfirm.variant === variant}
+        onRequestOpen={() => meta.requestOpenConfirm(user.id, variant)}
+        onRequestClose={meta.closeConfirm}
+      />
+    </div>
+  );
+}
+
+function handlePaginationChange(updater: Updater<PaginationState>, current: PaginationState, onPageChange: (page: number) => void) {
+  const next = typeof updater === "function" ? updater(current) : updater;
+  if (next.pageIndex !== current.pageIndex) onPageChange(next.pageIndex + 1);
+}

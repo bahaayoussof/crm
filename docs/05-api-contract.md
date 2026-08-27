@@ -43,19 +43,31 @@ GET  /auth/me
 
 `GET /auth/me` requires `Authorization: Bearer <token>` and returns `{ "data": { "user": ... } }`. Internal users have `customer: null`. Password hashes are never returned. Authentication errors use `{ "error": { "code": "...", "message": "..." } }`.
 
-## Users — PARTIAL
+## Users — LIVE
 
 ```text
 GET    /users/agents      LIVE
-GET    /users             PLANNED
-GET    /users/:id         PLANNED
-POST   /users             PLANNED
-PATCH  /users/:id         PLANNED
+GET    /users             LIVE   (ADMIN)
+GET    /users/:id         LIVE   (ADMIN)
+POST   /users             LIVE   (ADMIN)
+PATCH  /users/:id         LIVE   (ADMIN)   name / email / role / isActive
 ```
 
-`GET /users/agents` is the only registered users route. It is an internal-only Ticket Management lookup that returns safe summaries of `AGENT` users (`id`, `name`, `email`) to `ADMIN`, `MANAGER`, and `AGENT`. It never returns password hashes or customer identities.
+`GET /users/agents` is an internal-only Ticket Management lookup that returns safe summaries of **active** `AGENT` users (`id`, `name`, `email`) to `ADMIN`, `MANAGER`, and `AGENT`. It never returns password hashes or customer identities. It is JWT-role gated (not DB-fresh).
 
-The list/detail/create/update routes are the planned `feature/user-management` contract for ADMIN-managed internal users and roles. They are not implemented. When built they must not allow public creation of `ADMIN`, `MANAGER`, or `AGENT` accounts; internal-user administration is separate from public customer registration. Exact request/response shapes and the MANAGER capability boundary are resolved during that feature.
+The remaining routes are the `feature/user-management` administration surface (roadmap order 6) and are **ADMIN only** — `MANAGER`/`AGENT`/`CUSTOMER`/anonymous receive `403`/`401`. They act on internal identities only (`CUSTOMER` rows are invisible: a `CUSTOMER` id returns `404 USER_NOT_FOUND`). Each admin route runs a `requireActiveUser` middleware that resolves the caller's **current database role and active state** before `requireRole(ADMIN)`, so a stale JWT cannot keep ADMIN access after a demotion, and a deactivated caller gets `401 ACCOUNT_DEACTIVATED` on the next request.
+
+- `GET /users` — paginated list (`page`, `limit≤100`, `search` over name/email, optional `role` filter in `{ADMIN,MANAGER,AGENT}`, optional `status` in `{active,inactive}`; unknown query keys and `role=CUSTOMER` → `400`). Ordered `createdAt DESC, id ASC`. Row shape: `{ id, name, email, role, isActive, createdAt, updatedAt }` (no `passwordHash`). Envelope: `{ data, meta: { page, limit, total, totalPages } }`.
+- `GET /users/:id` — same row shape; `404 USER_NOT_FOUND`.
+- `POST /users` — strict body `{ name (2–100), email, password (8–128), role in {ADMIN,MANAGER,AGENT} }`. `role=CUSTOMER` or any extra field → `400`. Duplicate email → `409 EMAIL_ALREADY_REGISTERED`. Password is bcrypt-hashed (cost 12). `201` with the row shape.
+- `PATCH /users/:id` — the single safe update path. Strict partial body `{ name?, email?, role?, isActive? }` (≥1 key; unknown fields → `400`; `role=CUSTOMER` → `400`). Only submitted fields are written. Read-check-write runs inside one transaction. Conflicts:
+  - changing **your own** role → `409 SELF_ROLE_CHANGE_FORBIDDEN` (submitting your own unchanged role is allowed);
+  - deactivating **your own** account → `409 SELF_DEACTIVATION_FORBIDDEN`;
+  - demoting or deactivating the **last active `ADMIN`** (no other active `ADMIN` remains) → `409 LAST_ACTIVE_ADMIN_REQUIRED`;
+  - email collision → `409 EMAIL_ALREADY_REGISTERED`.
+  `200` with the row shape. There is no separate `PATCH /users/:id/role` route — role changes go through this payload (the Edit User form is the only client entry point).
+
+Internal-user administration is separate from public customer registration; this surface never creates or exposes `CUSTOMER` accounts. There is no user-deletion route — accounts are retired by setting `isActive=false`, which blocks login (`403 ACCOUNT_DEACTIVATED`) and, on a live session, `GET /auth/me` and every `/api/users` admin request (`401 ACCOUNT_DEACTIVATED`).
 
 ## Categories
 

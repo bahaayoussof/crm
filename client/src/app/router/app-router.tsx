@@ -22,6 +22,9 @@ import { QuickReplyListPage } from "@/features/quick-replies/quick-reply-list-pa
 import { QuickReplyManageRoute } from "./quick-reply-manage-route";
 import { ReportsPage } from "@/features/reports/reports-page";
 import { ReportsRoute } from "./reports-route";
+import { UserFormPage } from "@/features/users/user-form-page";
+import { UserListPage } from "@/features/users/user-list-page";
+import { UserManageRoute } from "./user-manage-route";
 import { TicketEditRoute } from "./ticket-edit-route";
 
 export function AppRouter() {
@@ -53,6 +56,11 @@ export function AppRouter() {
       </Route>
       <Route element={<ReportsRoute />}>
         <Route path="/reports" element={<ReportsPage />} />
+      </Route>
+      <Route element={<UserManageRoute />}>
+        <Route path="/users" element={<UserListPage />} />
+        <Route path="/users/new" element={<UserFormPage />} />
+        <Route path="/users/:id/edit" element={<UserFormPage />} />
       </Route>
     </Route>
     <Route element={<ProtectedRoute audience="customer" />}><Route path="/portal" element={<PortalShell />}><Route index element={<PortalHomePage />} /><Route path="tickets" element={<PortalTicketsPage />} /><Route path="tickets/new" element={<PortalNewTicketPage />} /><Route path="tickets/:id" element={<PortalTicketDetailPage />} /><Route path="knowledge-base" element={<PortalKnowledgeBasePage />} /><Route path="knowledge-base/:id" element={<PortalKnowledgeArticlePage />} /></Route></Route>

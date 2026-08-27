@@ -6,6 +6,7 @@ import { useAuth } from "@/features/auth/auth-state";
 import type { ProtectedAudience } from "@/features/auth/auth-routing";
 import { canManageQuickReplies } from "@/features/quick-replies/quick-reply-permissions";
 import { canViewReports } from "@/features/reports/reports-permissions";
+import { canManageUsers } from "@/features/users/user-permissions";
 
 const internalNavigation = [
   { to: "/dashboard", key: "dashboard" },
@@ -47,6 +48,7 @@ export function AppShell({ audience, children }: PropsWithChildren<{ audience: P
     ...internalNavigation,
     ...(user && canViewReports(user.role) ? [{ to: "/reports", key: "reports" } as const] : []),
     ...(user && canManageQuickReplies(user.role) ? [{ to: "/quick-replies", key: "quickReplies" } as const] : []),
+    ...(user && canManageUsers(user.role) ? [{ to: "/users", key: "users" } as const] : []),
   ];
 
   return <div className="min-h-[100dvh] bg-background lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
