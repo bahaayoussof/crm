@@ -78,8 +78,8 @@ export function ReportsPage() {
                 className={cn(
                   "min-h-8 rounded-md px-3 text-xs font-medium transition-colors select-none",
                   activePreset === days
-                    ? "bg-primary-subtle text-primary font-semibold border border-primary/30"
-                    : "text-muted-foreground hover:bg-surface-subtle hover:text-foreground border border-border"
+                    ? "bg-surface-active text-foreground font-semibold border border-border-strong shadow-2xs"
+                    : "text-muted-foreground hover:bg-surface-hover hover:text-foreground border border-border"
                 )}
                 onClick={() => applyPreset(days)}
               >
@@ -98,7 +98,7 @@ export function ReportsPage() {
           {(range.from || range.to) && <button type="button" className="button-ghost px-2 text-xs" onClick={() => setParams({})}>{t("reports.filters.reset")}</button>}
         </div>
         <p className="mt-3 text-xs text-muted-foreground" dir="ltr">
-          {formatTicketDate(data.range.from, i18n.language)} – {formatTicketDate(data.range.to, i18n.language)} · {t("reports.filters.timezone")}
+          {range.from ? range.from.slice(0, 10) : "—"} → {range.to ? range.to.slice(0, 10) : "—"}
         </p>
       </section>
 
@@ -110,37 +110,34 @@ export function ReportsPage() {
         <Kpi label={t("reports.kpis.satisfaction")} value={k.satisfaction.averageRating === null ? "—" : `${nf.format(k.satisfaction.averageRating)} / 5`} sub={t("reports.kpis.satisfactionResponses", { count: k.satisfaction.responseCount })} />
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]">
-        <Panel title={t("reports.volumeTitle")} description={t("reports.volumeDescription")}>
-          {volume.some((point) => point.created || point.resolved) ? (
-            <div className="mt-4 h-64" data-testid="volume-chart">
+      <section className="grid gap-6 lg:grid-cols-2">
+        <Panel title={t("reports.volumeTitle")}>
+          {volume.length ? (
+            <div className="mt-4 h-56" data-testid="volume-chart">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={volume} margin={{ left: 8, right: 8 }}>
+                <BarChart data={volume} margin={{ left: -16, right: 8, top: 4, bottom: 4 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                   <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} interval="preserveStartEnd" stroke="var(--border)" />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} width={32} stroke="var(--border)" />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "var(--surface)",
+                      backgroundColor: "var(--popover)",
                       borderColor: "var(--border)",
                       borderRadius: "0.5rem",
-                      boxShadow: "var(--shadow-elevated)",
+                      boxShadow: "var(--shadow-flyout)",
                       fontSize: "0.75rem",
-                      color: "var(--foreground)",
+                      color: "var(--popover-foreground)",
                     }}
                   />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar name={t("reports.legend.created")} dataKey="created" fill="var(--primary)" radius={[3, 3, 0, 0]} isAnimationActive={false} />
-                  <Bar name={t("reports.legend.resolved")} dataKey="resolved" fill="#10b981" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                  <Bar name={t("reports.legend.created")} dataKey="created" fill="var(--chart-1)" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                  <Bar name={t("reports.legend.resolved")} dataKey="resolved" fill="var(--chart-2)" radius={[3, 3, 0, 0]} isAnimationActive={false} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           ) : (
             <p className="mt-6 text-sm text-muted-foreground">{t("reports.emptyVolume")}</p>
           )}
-          <ul className="sr-only">
-            {volume.map((point) => <li key={point.date}>{point.date}: {t("reports.legend.created")} {point.created}, {t("reports.legend.resolved")} {point.resolved}</li>)}
-          </ul>
         </Panel>
 
         <Panel title={t("reports.statusTitle")}>
@@ -154,15 +151,15 @@ export function ReportsPage() {
                     <YAxis dataKey="label" type="category" width={104} tick={{ fontSize: 10, fill: "var(--foreground)" }} stroke="var(--border)" />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: "var(--surface)",
+                        backgroundColor: "var(--popover)",
                         borderColor: "var(--border)",
                         borderRadius: "0.5rem",
-                        boxShadow: "var(--shadow-elevated)",
+                        boxShadow: "var(--shadow-flyout)",
                         fontSize: "0.75rem",
-                        color: "var(--foreground)",
+                        color: "var(--popover-foreground)",
                       }}
                     />
-                    <Bar dataKey="count" fill="var(--primary)" radius={[0, 3, 3, 0]} isAnimationActive={false} />
+                    <Bar dataKey="count" fill="var(--chart-1)" radius={[0, 3, 3, 0]} isAnimationActive={false} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

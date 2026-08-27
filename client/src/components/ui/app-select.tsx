@@ -168,7 +168,7 @@ export function AppSelectField<TValue extends string = string>({
       >
         {label}
         {required && !hideLabel && (
-          <span className="ms-1 text-red-500" aria-hidden="true">
+          <span className="ms-1 text-danger" aria-hidden="true">
             *
           </span>
         )}
@@ -181,7 +181,7 @@ export function AppSelectField<TValue extends string = string>({
         {...selectProps}
       />
       {error ? (
-        <p id={errorId} role="alert" className="text-xs font-medium text-red-600">
+        <p id={errorId} role="alert" className="text-xs font-medium text-danger-foreground">
           {error}
         </p>
       ) : helperText ? (

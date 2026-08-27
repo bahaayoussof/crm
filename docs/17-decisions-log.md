@@ -651,3 +651,35 @@ One migration (`User.isActive`). `auth.service.ts` changed (select + two new rej
 - **Consistent Select treatment:** a `NativeSelect` primitive (`users-ui.tsx`) renders the native control with `appearance-none` + `bg-none` + `pe-9` and one absolutely-positioned custom `ChevronDownIcon` at the logical end (`end-3`, vertically centred, `pointer-events-none`, never rotated for RTL). Applied to the Role/Status filters and the Create/Edit Role field only — the global `.input` and unrelated selects are untouched. The `ShieldIcon` is replaced by `UserRoundXIcon` / `UserRoundCheckIcon` for the deactivate/reactivate actions; status changes use the anchored `role="dialog"` confirm pattern showing name + action + (for deactivation) the "cannot sign in / history preserved" consequence.
 - **Table presentation:** explicit `table-fixed` column widths (Name 22%, Email flexible, Role 132px, Status 120px, Created 150px, Actions 112px); Email is `truncate` + `dir="ltr"` + `title` (no more character-by-character wrapping); Name links to Edit without persistent blue styling; mobile keeps a card list with the same actions and read-only role.
 - Tests: server `user.test.ts` rewritten (31 cases incl. last-admin, self-guard codes, role-in-update, transaction-failure, stale-JWT-role, deactivated-caller); client `users.test.tsx` rewritten (24 cases). Full suites now **server 298 / client 310**, 0 failed. i18n `users.*` EN/AR parity **644/644**.
+
+---
+
+## ADR-028: CRM Visual Identity & Global Light/Dark Theme Color System
+
+**Status:** Accepted (implemented and verified)
+
+**Context**
+
+The CRM required a cohesive, modern visual identity aligned with high-end SaaS design patterns: neutral monochrome base with soft functional semantic accents, paired with full first-class Light and Dark mode support across all screens (internal dashboard, ticket workspace, customers, reports, settings, user management, knowledge base, and the customer portal).
+
+**Decision**
+
+1. **Monochrome Base & Semantic Colors**:
+   - Neutral monochrome scale (zinc/neutral: `0` to `1000`) for surfaces, typography, borders, and main action buttons (CTA).
+   - In Light mode: canvas `#F5F5F5` (`--background`), surfaces `#FFFFFF` (`--card`, `--surface`), interactive hover `#F7F7F7`, active `#EEEEEE`.
+   - In Dark mode: canvas `#141414` (`--background`), surfaces `#181818` (`--card`, `--surface`), sidebar `#101010` (`--sidebar`), interactive hover `#202020`, active `#292929`.
+   - Primary CTA buttons use high-contrast neutral contrast (`#171717` in Light, `#F5F5F5` in Dark) with zero saturated brand distractions.
+   - Semantic functional colors (`success`, `warning`, `danger`, `info`, `progress`) use soft, tinted background pills paired with high-contrast text and border tokens.
+
+2. **Zero-Flash Theme Architecture**:
+   - Inline script in `index.html` synchronously inspects `localStorage` (`crm-theme`) and `window.matchMedia("(prefers-color-scheme: dark)")` to apply `.dark` class to `document.documentElement` before first paint.
+   - `ThemeProvider` manages `light`, `dark`, and `system` modes with live `matchMedia` listener support and resilient SSR/test fallbacks.
+   - `ThemeToggle` offers both segmented and menu variants. Placed inside the sidebar user popover in the internal CRM desktop, the mobile navigation drawer, and the portal navigation header.
+
+3. **Charts and Data Visualization**:
+   - Recharts charts use semantic CSS variables (`--chart-1` through `--chart-5`) to guarantee clear readability and contrast in both Light and Dark themes.
+
+**Consequences**
+
+All UI components (buttons, badges, inputs, selects, cards, tables, popovers, modals, ticket timeline) consume semantic CSS variables instead of hardcoded tailwind color classes. Automated tests (353 client tests) and browser visual verification in both Light and Dark modes pass with 100% success.
+

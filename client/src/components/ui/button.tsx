@@ -9,13 +9,13 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 }
 
 const variantStyles: Record<NonNullable<ButtonProps["variant"]>, string> = {
-  default: "bg-primary text-primary-foreground shadow-xs hover:bg-primary-hover active:scale-[0.98] focus-visible:ring-primary/30",
-  primary: "bg-primary text-primary-foreground shadow-xs hover:bg-primary-hover active:scale-[0.98] focus-visible:ring-primary/30",
-  secondary: "border border-border bg-surface text-foreground shadow-xs hover:bg-surface-hover hover:border-border-strong active:scale-[0.98] focus-visible:ring-primary/20",
-  outline: "border border-border bg-transparent text-foreground hover:bg-surface-subtle hover:border-border-strong active:scale-[0.98] focus-visible:ring-primary/20",
-  ghost: "bg-transparent text-muted-foreground hover:bg-surface-subtle hover:text-foreground active:scale-[0.98] focus-visible:ring-primary/20",
-  destructive: "border border-danger-subtle bg-danger-subtle/40 text-danger-foreground hover:bg-danger-subtle hover:border-danger/30 active:scale-[0.98] focus-visible:ring-danger/30",
-  link: "bg-transparent text-primary underline-offset-4 hover:underline p-0 h-auto font-normal focus-visible:ring-primary/20",
+  default: "bg-primary text-primary-foreground shadow-xs hover:bg-primary-hover active:scale-[0.98] focus-visible:ring-ring",
+  primary: "bg-primary text-primary-foreground shadow-xs hover:bg-primary-hover active:scale-[0.98] focus-visible:ring-ring",
+  secondary: "border border-border bg-surface text-foreground shadow-xs hover:bg-surface-hover hover:border-border-strong active:scale-[0.98] focus-visible:ring-ring",
+  outline: "border border-border bg-transparent text-foreground hover:bg-surface-hover hover:border-border-strong active:scale-[0.98] focus-visible:ring-ring",
+  ghost: "bg-transparent text-muted-foreground hover:bg-surface-hover hover:text-foreground active:scale-[0.98] focus-visible:ring-ring",
+  destructive: "border border-danger-soft bg-danger-soft/50 text-danger-foreground hover:bg-danger-soft hover:border-danger/30 active:scale-[0.98] focus-visible:ring-danger/30",
+  link: "bg-transparent text-foreground underline-offset-4 hover:underline p-0 h-auto font-normal focus-visible:ring-ring",
 };
 
 const sizeStyles: Record<NonNullable<ButtonProps["size"]>, string> = {

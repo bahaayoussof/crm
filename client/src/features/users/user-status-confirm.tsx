@@ -10,8 +10,8 @@ import type { User } from "./user.types";
 const TRIGGER_BASE =
   "inline-flex size-9 items-center justify-center rounded-md border transition-colors " +
   "focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60";
-const TRIGGER_NEUTRAL = "border-border text-muted-foreground hover:bg-muted/60 hover:text-foreground focus-visible:ring-primary";
-const TRIGGER_DANGER = "border-red-200 text-red-700 hover:bg-red-50 focus-visible:ring-red-300";
+const TRIGGER_NEUTRAL = "border-border text-muted-foreground hover:bg-surface-hover hover:text-foreground focus-visible:ring-ring";
+const TRIGGER_DANGER = "border-danger-soft text-danger-foreground hover:bg-danger-soft focus-visible:ring-danger/30";
 
 interface UserStatusConfirmProps {
   user: User;
@@ -114,16 +114,16 @@ export function UserStatusConfirm({ user, disabled, disabledReason, open, onRequ
           aria-modal="true"
           aria-labelledby={titleId}
           aria-describedby={deactivating ? descId : undefined}
-          className="fixed z-50 flex flex-col overflow-hidden rounded-md border border-border bg-white text-start shadow-lg"
+          className="fixed z-50 flex flex-col overflow-hidden rounded-md border border-border bg-popover text-start shadow-flyout"
           style={style}
           onKeyDown={onPanelKeyDown}
         >
           <div className="min-h-0 flex-1 overflow-y-auto p-3">
             <p id={titleId} className="text-sm font-medium leading-5 text-foreground" dir="auto">{title}</p>
             {deactivating && <p id={descId} className="mt-1 text-xs leading-5 text-muted-foreground">{t("users.deactivateConsequence")}</p>}
-            {error && <p role="alert" className="mt-2 text-xs leading-5 text-red-700">{error}</p>}
+            {error && <p role="alert" className="mt-2 text-xs leading-5 text-danger-foreground">{error}</p>}
           </div>
-          <div className="flex shrink-0 justify-end gap-2 border-t border-border bg-muted/30 p-2.5">
+          <div className="flex shrink-0 justify-end gap-2 border-t border-border bg-surface-secondary p-2.5">
             <button ref={cancelRef} type="button" className="button-ghost min-h-9 w-auto px-3 py-1 text-xs" disabled={update.isPending} onClick={requestClose}>
               {t("common.cancel")}
             </button>

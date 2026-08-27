@@ -30,7 +30,7 @@ export function KnowledgeArticleTable({ articles, page, pageSize, pageCount, onP
       accessorKey: "title",
       header: t("knowledgeBase.columns.title"),
       cell: ({ row }) => <Link
-        className="line-clamp-2 rounded-sm font-semibold text-foreground hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+        className="line-clamp-2 rounded-sm font-semibold text-foreground hover:underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         dir="auto"
         title={row.original.title}
         to={`/knowledge-base/${row.original.id}`}
@@ -82,7 +82,7 @@ export function KnowledgeArticleTable({ articles, page, pageSize, pageCount, onP
   return <>
     <div className="hidden overflow-x-auto rounded-xl border border-border bg-surface shadow-subtle md:block">
       <table className="w-full min-w-[44rem] table-fixed text-start text-sm">
-        <thead className="border-b border-border bg-surface-subtle text-xs text-muted-foreground">
+        <thead className="border-b border-border bg-surface-secondary text-xs text-muted-foreground">
           {table.getHeaderGroups().map((headerGroup) => <tr key={headerGroup.id}>{headerGroup.headers.map((header) => <th className={`px-4 py-3 text-start font-semibold ${columnClasses[header.column.id] ?? ""}`} scope="col" key={header.id}>{header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}</th>)}</tr>)}
         </thead>
         <tbody className="divide-y divide-border-subtle">
@@ -92,7 +92,7 @@ export function KnowledgeArticleTable({ articles, page, pageSize, pageCount, onP
     </div>
     <div className="divide-y divide-border-subtle rounded-xl border border-border bg-surface shadow-subtle md:hidden">
       {articles.map((article) => <Link
-        className="block p-4 transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"
+        className="block p-4 transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         key={article.id}
         to={`/knowledge-base/${article.id}`}
       >

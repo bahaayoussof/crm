@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { NavLink, useNavigate } from "react-router-dom";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
+import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { useAuth } from "@/features/auth/auth-state";
 import type { ProtectedAudience } from "@/features/auth/auth-routing";
 import { canManageQuickReplies } from "@/features/quick-replies/quick-reply-permissions";
@@ -285,8 +286,16 @@ export function AppShell({ audience, children }: PropsWithChildren<{ audience: P
                 </nav>
               </div>
 
-              {/* Drawer Bottom: Language + Profile + Logout */}
-              <div className="border-t border-border-subtle pt-4 mt-6 space-y-4">
+              {/* Drawer Bottom: Language + Theme + Profile + Logout */}
+              <div className="border-t border-border-subtle pt-4 mt-6 space-y-3">
+                {/* Appearance Theme Switcher */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {t("theme.title")}
+                  </span>
+                  <ThemeToggle />
+                </div>
+
                 {/* Language Switcher */}
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-medium text-muted-foreground">

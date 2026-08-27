@@ -79,12 +79,12 @@ export function DashboardPage() {
           <div
             key={key}
             className={cn(
-              "flex flex-col justify-between rounded-xl border bg-surface p-4 shadow-subtle transition-all",
-              variant === "danger" && value > 0 && "border-danger/30 bg-danger-subtle/15",
-              variant === "warning" && value > 0 && "border-warning/30 bg-warning-subtle/15",
-              variant === "primary" && "border-primary/20",
+              "flex flex-col justify-between rounded-xl border bg-card p-4 shadow-subtle transition-all",
+              variant === "danger" && value > 0 && "border-danger-soft bg-danger-soft/20",
+              variant === "warning" && value > 0 && "border-warning-soft bg-warning-soft/20",
+              variant === "primary" && "border-border",
               variant === "default" && "border-border",
-              variant === "success" && "border-success/20"
+              variant === "success" && "border-border"
             )}
           >
             <div className="flex items-center justify-between gap-2">
@@ -101,7 +101,7 @@ export function DashboardPage() {
             <p
               className={cn(
                 "mt-2 text-2xl font-bold tracking-tight tabular-nums",
-                variant === "danger" && value > 0 ? "text-danger" : "text-foreground"
+                variant === "danger" && value > 0 ? "text-danger-foreground font-semibold" : "text-card-foreground"
               )}
               dir="ltr"
             >
@@ -152,7 +152,7 @@ export function DashboardPage() {
       />
 
       <div>
-        <Link className="text-sm font-medium text-primary hover:underline" to="/tickets">
+        <Link className="text-sm font-medium text-foreground hover:underline" to="/tickets">
           {t("dashboard.viewAll")}
         </Link>
       </div>
@@ -184,16 +184,16 @@ function Distribution({ data }: { data: DashboardOverview }) {
                   <YAxis dataKey="label" type="category" width={110} tick={{ fontSize: 12, fill: "var(--foreground)" }} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "var(--surface)",
+                      backgroundColor: "var(--popover)",
                       borderColor: "var(--border)",
                       borderRadius: "0.5rem",
-                      boxShadow: "var(--shadow-elevated)",
+                      boxShadow: "var(--shadow-flyout)",
                       fontSize: "0.75rem",
-                      color: "var(--foreground)",
+                      color: "var(--popover-foreground)",
                     }}
                     formatter={(value) => [value, t("dashboard.ticketsCount")]}
                   />
-                  <Bar dataKey="count" fill="var(--primary)" radius={[0, 4, 4, 0]} isAnimationActive={false} />
+                  <Bar dataKey="count" fill="var(--chart-1)" radius={[0, 4, 4, 0]} isAnimationActive={false} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -259,7 +259,7 @@ function TicketSection({
                 <col className="w-48" />
                 <col className="w-44" />
               </colgroup>
-              <thead className="border-b border-border bg-surface-subtle text-xs font-medium text-muted-foreground">
+              <thead className="border-b border-border bg-surface-secondary text-xs font-medium text-muted-foreground">
                 <tr>
                   {[
                     t("tickets.columns.id"),
@@ -283,7 +283,7 @@ function TicketSection({
                     <td className="px-4 py-3">
                       <Link
                         aria-label={`${t("tickets.columns.id")} ${ticket.id}`}
-                        className="font-mono text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                        className="font-mono text-xs font-medium text-muted-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         title={ticket.id}
                         to={`/tickets/${ticket.id}`}
                         dir="ltr"
@@ -310,20 +310,15 @@ function TicketSection({
                       <TicketStatusBadge status={ticket.status} />
                     </td>
                     {detailed && (
-                      <td className="px-4 py-3">
+                      <td className="whitespace-nowrap px-4 py-3">
                         <Sla state={ticket.slaState} />
                       </td>
                     )}
-                    <td className="px-4 py-3">
-                      <span
-                        className="line-clamp-2 break-words text-xs text-muted-foreground"
-                        title={ticket.assignedAgent?.name ?? t("tickets.unassigned")}
-                      >
-                        {ticket.assignedAgent?.name ?? t("tickets.unassigned")}
-                      </span>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground" title={ticket.assignedAgent?.name ?? t("tickets.unassigned")}>
+                      {ticket.assignedAgent?.name ?? t("tickets.unassigned")}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground" dir="ltr">
-                      {formatTicketDate(ticket.updatedAt, i18n.language)}
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
+                      <bdi dir="ltr">{formatTicketDate(ticket.updatedAt, i18n.language)}</bdi>
                     </td>
                   </tr>
                 ))}
@@ -335,12 +330,12 @@ function TicketSection({
           <div className="grid gap-3 md:hidden">
             {tickets.map((ticket) => (
               <Link
-                className="min-w-0 overflow-hidden rounded-xl border border-border bg-surface p-4 shadow-subtle transition hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                className="min-w-0 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-subtle transition hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 to={`/tickets/${ticket.id}`}
                 key={ticket.id}
               >
                 <div className="flex min-w-0 items-center justify-between gap-3">
-                  <span className="min-w-0 truncate font-mono text-xs font-medium text-primary" title={ticket.id} dir="ltr">
+                  <span className="min-w-0 truncate font-mono text-xs font-medium text-muted-foreground" title={ticket.id} dir="ltr">
                     {ticketReference(ticket.id)}
                   </span>
                   <TicketPriorityText priority={ticket.priority} />

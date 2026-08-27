@@ -1,4 +1,5 @@
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
+import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/features/auth/auth-state";
 import { useTranslation } from "react-i18next";
@@ -31,9 +32,9 @@ export function PortalShell() {
         <div className="relative mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-6">
           <Link
             to="/portal"
-            className="me-auto flex items-center gap-2.5 min-h-10 text-base font-semibold tracking-tight text-foreground focus-visible:rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            className="me-auto flex items-center gap-2.5 min-h-10 text-base font-semibold tracking-tight text-foreground focus-visible:rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <div className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-xs shadow-xs">
+            <div className="flex size-7 items-center justify-center rounded-lg bg-foreground text-background font-bold text-xs shadow-xs">
               CS
             </div>
             <span>{t("portal.brand")}</span>
@@ -50,10 +51,10 @@ export function PortalShell() {
                   aria-current={active ? "page" : undefined}
                   className={cn(
                     "inline-flex min-h-9 shrink-0 items-center rounded-lg px-3 text-xs font-medium transition-colors select-none",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     active
-                      ? "bg-primary-subtle text-primary font-semibold"
-                      : "text-muted-foreground hover:bg-surface-subtle hover:text-foreground"
+                      ? "bg-surface-active text-foreground font-semibold shadow-2xs"
+                      : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
                   )}
                   key={item.to}
                   to={item.to}
@@ -75,7 +76,10 @@ export function PortalShell() {
             </button>
           </div>
 
-          <LanguageSwitcher />
+          <div className="flex items-center gap-1.5">
+            <ThemeToggle />
+            <LanguageSwitcher />
+          </div>
         </div>
       </header>
       <Outlet />
@@ -127,7 +131,7 @@ export function PortalState({ children, retry }: { children: React.ReactNode; re
 }
 
 export const TicketRef = ({ id }: { id: string }) => (
-  <bdi dir="ltr" className="font-mono text-xs font-semibold text-primary">
+  <bdi dir="ltr" className="font-mono text-xs font-medium text-muted-foreground">
     #{id.slice(-8).toUpperCase()}
   </bdi>
 );

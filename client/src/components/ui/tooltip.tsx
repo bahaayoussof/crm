@@ -61,7 +61,7 @@ export function Tooltip({
         <div
           role="tooltip"
           className={cn(
-            "pointer-events-none absolute z-50 whitespace-nowrap rounded-lg border border-border bg-foreground px-3 py-1.5 text-xs font-medium text-background shadow-card",
+            "pointer-events-none absolute z-50 whitespace-nowrap rounded-md border border-border bg-popover px-2.5 py-1 text-xs font-medium text-popover-foreground shadow-flyout",
             "animate-in fade-in-0 zoom-in-95 duration-150",
             sidePositions[side]
           )}

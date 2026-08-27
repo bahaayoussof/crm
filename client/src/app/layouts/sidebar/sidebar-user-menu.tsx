@@ -2,6 +2,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { useAnchoredPopover } from "@/components/shared/use-anchored-popover";
+import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { AuthUser } from "@/features/auth/auth.types";
 import { cn } from "@/lib/utils";
@@ -40,9 +41,18 @@ export function SidebarUserMenu({ user, collapsed, onLogout }: SidebarUserMenuPr
   };
 
   return (
-    <div className={collapsed ? "w-full flex items-center justify-center" : "w-full"}>
+    <div
+      className={
+        collapsed ? "w-full flex items-center justify-center" : "w-full"
+      }
+    >
       {collapsed ? (
-        <Tooltip content={user?.name || t("auth.userProfile")} side="right" enabled={!open} className="w-full flex justify-center">
+        <Tooltip
+          content={user?.name || t("auth.userProfile")}
+          side="right"
+          enabled={!open}
+          className="w-full flex justify-center"
+        >
           <button
             ref={triggerRef}
             type="button"
@@ -54,7 +64,8 @@ export function SidebarUserMenu({ user, collapsed, onLogout }: SidebarUserMenuPr
               "flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-xs font-semibold text-foreground shadow-2xs transition-all duration-150 outline-none select-none",
               "hover:border-border-strong hover:bg-surface-hover",
               "focus-visible:ring-2 focus-visible:ring-primary/30",
-              open && "ring-2 ring-primary/25 border-border-strong bg-surface-active"
+              open &&
+                "ring-2 ring-primary/25 border-border-strong bg-surface-active",
             )}
           >
             {userInitials}
@@ -72,7 +83,7 @@ export function SidebarUserMenu({ user, collapsed, onLogout }: SidebarUserMenuPr
             "group flex w-full items-center justify-between gap-2.5 rounded-lg border border-border/80 bg-surface/60 p-1.5 text-start transition-all duration-150 outline-none select-none",
             "hover:border-border-strong hover:bg-surface-hover hover:shadow-2xs",
             "focus-visible:ring-2 focus-visible:ring-primary/30",
-            open && "border-border-strong bg-surface-active shadow-2xs"
+            open && "border-border-strong bg-surface-active shadow-2xs",
           )}
         >
           <div className="flex min-w-0 items-center gap-2.5">
@@ -80,7 +91,10 @@ export function SidebarUserMenu({ user, collapsed, onLogout }: SidebarUserMenuPr
               {userInitials}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold text-foreground leading-tight" dir="auto">
+              <p
+                className="truncate text-xs font-semibold text-foreground leading-tight"
+                dir="auto"
+              >
                 {user?.name}
               </p>
               <p className="truncate text-[10px] font-medium text-muted-foreground capitalize leading-tight mt-0.5">
@@ -91,7 +105,7 @@ export function SidebarUserMenu({ user, collapsed, onLogout }: SidebarUserMenuPr
           <ChevronDownNavIcon
             className={cn(
               "size-3.5 shrink-0 text-muted-foreground transition-transform duration-200",
-              open && "rotate-180 text-foreground"
+              open && "rotate-180 text-foreground",
             )}
           />
         </button>
@@ -107,18 +121,31 @@ export function SidebarUserMenu({ user, collapsed, onLogout }: SidebarUserMenuPr
             className="fixed z-50 min-w-[200px] rounded-xl border border-border bg-surface p-1.5 shadow-flyout animate-in fade-in-0 zoom-in-95 duration-150 focus:outline-none"
           >
             {/* User Meta Card Header */}
-            <div className="border-b border-border-subtle px-2.5 py-2">
-              <p className="truncate text-xs font-semibold text-foreground" dir="auto">
-                {user?.name}
-              </p>
-              <p className="truncate text-[11px] text-muted-foreground" dir="ltr">
-                {user?.email}
-              </p>
-              <div className="mt-1.5 flex items-center gap-1.5">
+            <div className="border-b border-border-subtle px-2.5 py-2 flex justify-between items-center">
+              <div>
+                <p
+                  className="truncate text-xs font-semibold text-foreground"
+                  dir="auto"
+                >
+                  {user?.name}
+                </p>
+                <p
+                  className="truncate text-[11px] text-muted-foreground"
+                  dir="ltr"
+                >
+                  {user?.email}
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5">
                 <span className="inline-flex items-center rounded-md bg-surface-subtle border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground capitalize">
                   {user?.role?.toLowerCase()}
                 </span>
               </div>
+            </div>
+
+            {/* Theme Toggle Section */}
+            <div className="border-b border-border-subtle px-1 py-1">
+              <ThemeToggle variant="menu" />
             </div>
 
             {/* Actions List */}
@@ -127,14 +154,14 @@ export function SidebarUserMenu({ user, collapsed, onLogout }: SidebarUserMenuPr
                 type="button"
                 role="menuitem"
                 onClick={handleSignOut}
-                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium text-danger transition-colors hover:bg-danger-subtle hover:text-danger-foreground focus-visible:outline-none focus-visible:bg-danger-subtle"
+                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium text-danger transition-colors hover:bg-danger-soft hover:text-danger-foreground focus-visible:outline-none focus-visible:bg-danger-soft"
               >
                 <LogoutIcon className="size-3.5" />
                 <span>{t("auth.logout")}</span>
               </button>
             </div>
           </div>,
-          document.body
+          document.body,
         )}
     </div>
   );

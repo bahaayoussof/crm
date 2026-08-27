@@ -16,15 +16,15 @@ export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
 }
 
 const badgeVariants: Record<NonNullable<BadgeProps["variant"]>, string> = {
-  default: "border-primary-subtle bg-primary-subtle text-primary",
-  secondary: "border-border bg-surface-subtle text-muted-foreground",
+  default: "border-border bg-surface-secondary text-foreground",
+  secondary: "border-border bg-surface-secondary text-muted-foreground",
   outline: "border-border bg-transparent text-foreground",
-  success: "border-success-subtle bg-success-subtle text-success-foreground",
-  warning: "border-warning-subtle bg-warning-subtle text-warning-foreground",
-  danger: "border-danger-subtle bg-danger-subtle text-danger-foreground",
-  info: "border-info-subtle bg-info-subtle text-info-foreground",
-  progress: "border-progress-subtle bg-progress-subtle text-progress-foreground",
-  neutral: "border-border bg-surface-subtle text-muted-foreground",
+  success: "border-transparent bg-success-soft text-success-foreground",
+  warning: "border-transparent bg-warning-soft text-warning-foreground",
+  danger: "border-transparent bg-danger-soft text-danger-foreground",
+  info: "border-transparent bg-info-soft text-info-foreground",
+  progress: "border-transparent bg-progress-soft text-progress-foreground",
+  neutral: "border-border bg-surface-secondary text-muted-foreground",
 };
 
 const badgeSizes: Record<NonNullable<BadgeProps["size"]>, string> = {

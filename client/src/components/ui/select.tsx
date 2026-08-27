@@ -16,7 +16,7 @@ export const SelectTrigger = React.forwardRef<
     <SelectPrimitive.Trigger
       ref={ref}
       aria-invalid={invalid ? "true" : props["aria-invalid"]}
-      className={`group flex min-h-10 w-full items-center justify-between gap-2 rounded-md border border-border-strong bg-white px-3 py-2 text-start text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/75 hover:border-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground data-[placeholder]:text-muted-foreground/75 aria-invalid:border-red-500 aria-invalid:ring-2 aria-invalid:ring-red-100 ${className}`}
+      className={`group flex min-h-10 w-full items-center justify-between gap-2 rounded-md border border-border bg-surface px-3 py-2 text-start text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/75 hover:border-border-strong focus:border-ring focus:ring-2 focus:ring-ring/20 disabled:cursor-not-allowed disabled:bg-muted disabled:text-disabled-foreground data-[placeholder]:text-muted-foreground/75 aria-invalid:border-danger aria-invalid:ring-2 aria-invalid:ring-danger/20 ${className}`}
       {...props}
     >
       <span className="min-w-0 flex-1 truncate">{children}</span>
@@ -72,7 +72,7 @@ export const SelectContent = React.forwardRef<
         ref={ref}
         position={position}
         sideOffset={sideOffset}
-        className={`relative z-50 max-h-80 min-w-[8rem] overflow-hidden rounded-md border border-border bg-white text-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2 ${
+        className={`relative z-50 max-h-80 min-w-[8rem] overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-flyout data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2 ${
           position === "popper"
             ? "data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1"
             : ""
@@ -115,10 +115,10 @@ export const SelectItem = React.forwardRef<
   return (
     <SelectPrimitive.Item
       ref={ref}
-      className={`relative flex w-full cursor-pointer select-none items-center rounded-sm py-2 pe-8 ps-2 text-start text-sm outline-none transition-colors hover:bg-muted focus:bg-muted focus:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[state=checked]:bg-primary/10 data-[state=checked]:font-medium data-[state=checked]:text-primary ${className}`}
+      className={`relative flex w-full cursor-pointer select-none items-center rounded-sm py-2 pe-8 ps-2 text-start text-sm outline-none transition-colors hover:bg-surface-hover focus:bg-surface-hover focus:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[state=checked]:bg-surface-active data-[state=checked]:font-medium data-[state=checked]:text-foreground ${className}`}
       {...props}
     >
-      <span className="absolute end-2 flex size-4 items-center justify-center text-primary">
+      <span className="absolute end-2 flex size-4 items-center justify-center text-foreground">
         <SelectPrimitive.ItemIndicator>
           <Check className="size-3.5" strokeWidth={2} aria-hidden="true" />
         </SelectPrimitive.ItemIndicator>

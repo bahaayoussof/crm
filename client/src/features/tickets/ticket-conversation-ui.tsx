@@ -25,7 +25,7 @@ export function MessageBody({ body }: { body: string }) {
       {isLong && (
         <button
           type="button"
-          className="mt-1.5 rounded-sm text-xs font-medium text-primary transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+          className="mt-1.5 rounded-sm text-xs font-medium text-foreground transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-expanded={expanded}
           onClick={() => setExpanded((value) => !value)}
         >
@@ -65,7 +65,7 @@ export function ConversationMessage({
   return (
     <li className={`flex ${align}`}>
       <article
-        className={`min-w-0 max-w-full rounded-md border px-4 py-3 sm:max-w-[min(85%,46rem)] ${tone === "internal" ? "border-amber-200 bg-amber-50/70" : "border-border bg-white"}`}
+        className={`min-w-0 max-w-full rounded-md border px-4 py-3 sm:max-w-[min(85%,46rem)] ${tone === "internal" ? "border-warning-soft bg-warning-soft/40 text-foreground" : "border-border bg-surface text-foreground"}`}
       >
         <header className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-between sm:gap-x-3">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -74,7 +74,7 @@ export function ConversationMessage({
             </span>
             {meta && <span className="text-xs text-muted-foreground">{meta}</span>}
             {badge && (
-              <span className="rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
+              <span className="rounded-sm border border-warning-soft bg-warning-soft px-2 py-0.5 text-xs font-medium text-warning-foreground">
                 {badge}
               </span>
             )}
@@ -115,8 +115,8 @@ export function ConversationSection({
   footer?: React.ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-md border bg-white" aria-labelledby={headingId}>
-      <div className="border-b px-5 py-4">
+    <section className="overflow-hidden rounded-md border border-border bg-card text-card-foreground shadow-subtle" aria-labelledby={headingId}>
+      <div className="border-b border-border px-5 py-4">
         <h2 className="text-base font-semibold" id={headingId}>
           {heading}
         </h2>
@@ -134,7 +134,7 @@ export function ConversationSection({
           </ol>
         )}
       </div>
-      {footer && <div className="border-t bg-muted/20 p-4 sm:p-5">{footer}</div>}
+      {footer && <div className="border-t border-border bg-surface-secondary p-4 sm:p-5">{footer}</div>}
     </section>
   );
 }

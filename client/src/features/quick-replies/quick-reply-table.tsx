@@ -17,11 +17,11 @@ interface QuickReplyTableProps {
 
 const ICON_BUTTON =
   "inline-flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors " +
-  "hover:bg-surface-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 " +
+  "hover:bg-surface-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
   "disabled:cursor-not-allowed disabled:opacity-60";
 const ICON_BUTTON_DANGER =
-  "inline-flex size-8 items-center justify-center rounded-lg border border-danger-subtle text-danger-foreground transition-colors " +
-  "hover:bg-danger-subtle/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/30 " +
+  "inline-flex size-8 items-center justify-center rounded-lg border border-danger-soft text-danger-foreground transition-colors " +
+  "hover:bg-danger-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/30 " +
   "disabled:cursor-not-allowed disabled:opacity-60";
 
 const columnClasses: Record<string, string> = {
@@ -40,7 +40,7 @@ export function QuickReplyTable({ quickReplies, page, pageSize, pageCount, onPag
       accessorKey: "title",
       header: () => t("quickReplies.columns.title"),
       cell: ({ row }) => <Link
-        className="block min-w-0 rounded-sm break-words font-semibold text-foreground line-clamp-2 hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+        className="block min-w-0 rounded-sm break-words font-semibold text-foreground line-clamp-2 hover:underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         dir="auto"
         title={row.original.title}
         to={`/quick-replies/${row.original.id}/edit`}
@@ -87,7 +87,7 @@ export function QuickReplyTable({ quickReplies, page, pageSize, pageCount, onPag
         <colgroup>
           {table.getAllLeafColumns().map((column) => <col key={column.id} className={columnClasses[column.id] ?? ""} />)}
         </colgroup>
-        <thead className="border-b border-border bg-surface-subtle text-xs text-muted-foreground">
+        <thead className="border-b border-border bg-surface-secondary text-xs text-muted-foreground">
           {table.getHeaderGroups().map((headerGroup) => <tr key={headerGroup.id}>{headerGroup.headers.map((header) => <th
             className={`px-4 py-3 font-semibold ${header.column.id === "actions" ? "text-end" : "text-start"}`}
             scope="col"
@@ -106,7 +106,7 @@ export function QuickReplyTable({ quickReplies, page, pageSize, pageCount, onPag
     <div className="divide-y divide-border-subtle rounded-xl border border-border bg-surface shadow-subtle md:hidden">
       {quickReplies.map((quickReply) => <div className="p-4" key={quickReply.id}>
         <Link
-          className="block min-w-0 rounded-sm break-words font-semibold text-foreground line-clamp-2 hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+          className="block min-w-0 rounded-sm break-words font-semibold text-foreground line-clamp-2 hover:underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           dir="auto"
           title={quickReply.title}
           to={`/quick-replies/${quickReply.id}/edit`}
@@ -192,7 +192,7 @@ function RowActions({ quickReply }: { quickReply: QuickReply }) {
         <div
           role="dialog"
           aria-label={t("quickReplies.deleteConfirmLabel", { title: quickReply.title })}
-          className="absolute end-0 top-full z-20 mt-1 w-56 max-w-[calc(100vw-3rem)] rounded-xl border border-border bg-surface p-3 text-start shadow-elevated"
+          className="absolute end-0 top-full z-20 mt-1 w-56 max-w-[calc(100vw-3rem)] rounded-xl border border-border bg-popover text-popover-foreground p-3 text-start shadow-flyout"
         >
           <p className="text-xs leading-5 text-foreground" dir="auto">{t("quickReplies.deleteConfirmLabel", { title: quickReply.title })}</p>
           {error && <p role="alert" className="mt-1.5 text-xs text-danger">{error}</p>}

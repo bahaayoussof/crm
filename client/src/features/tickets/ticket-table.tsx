@@ -9,8 +9,8 @@ import type { TicketListItem } from "./ticket.types";
 export function TicketTable({ tickets, emptyMessage, page, pageSize, pageCount, onPageChange }: { tickets: TicketListItem[]; emptyMessage?: string; page: number; pageSize: number; pageCount: number; onPageChange: (page: number) => void }) {
   const { t, i18n } = useTranslation();
   const columns = useMemo<ColumnDef<TicketListItem>[]>(() => [
-    { id: "id", accessorKey: "id", header: t("tickets.columns.id"), cell: ({ row }) => <span className="font-mono text-xs font-medium text-primary" title={row.original.id}><bdi dir="ltr">{ticketReference(row.original.id)}</bdi></span> },
-    { id: "ticket", header: t("tickets.columns.ticket"), cell: ({ row }) => <div className="min-w-0"><Link className="line-clamp-2 break-words font-medium text-foreground hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" title={row.original.subject} to={`/tickets/${row.original.id}`}>{row.original.subject}</Link></div> },
+    { id: "id", accessorKey: "id", header: t("tickets.columns.id"), cell: ({ row }) => <span className="font-mono text-xs font-medium text-muted-foreground" title={row.original.id}><bdi dir="ltr">{ticketReference(row.original.id)}</bdi></span> },
+    { id: "ticket", header: t("tickets.columns.ticket"), cell: ({ row }) => <div className="min-w-0"><Link className="line-clamp-2 break-words font-medium text-foreground hover:underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" title={row.original.subject} to={`/tickets/${row.original.id}`}>{row.original.subject}</Link></div> },
     { id: "customer", accessorKey: "customer.name", header: t("tickets.customer"), cell: ({ row }) => <div className="min-w-0"><p className="truncate text-foreground font-medium" title={row.original.customer.name}>{row.original.customer.name}</p><p className="truncate text-xs text-muted-foreground" title={row.original.customer.email}><bdi dir="ltr">{row.original.customer.email}</bdi></p></div> },
     { id: "status", accessorKey: "status", header: t("tickets.statusLabel"), cell: ({ row }) => <TicketStatusBadge status={row.original.status} /> },
     { id: "priority", accessorKey: "priority", header: t("tickets.priorityLabel"), cell: ({ row }) => <TicketPriorityText priority={row.original.priority} /> },
@@ -23,7 +23,7 @@ export function TicketTable({ tickets, emptyMessage, page, pageSize, pageCount, 
   return <>
     <div className="hidden overflow-x-auto rounded-xl border border-border bg-surface shadow-subtle md:block">
       <table className="w-full min-w-[68rem] table-fixed text-sm">
-        <thead className="border-b border-border bg-surface-subtle text-xs text-muted-foreground">
+        <thead className="border-b border-border bg-surface-secondary text-xs text-muted-foreground">
           {table.getHeaderGroups().map((group) => (
             <tr key={group.id}>
               {group.headers.map((header) => (
@@ -60,11 +60,11 @@ export function TicketTable({ tickets, emptyMessage, page, pageSize, pageCount, 
         <p className="px-4 py-10 text-center text-sm text-muted-foreground">{emptyMessage}</p>
       ) : (
         tickets.map((ticket) => (
-          <Link className="block p-4 transition hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30" to={`/tickets/${ticket.id}`} key={ticket.id}>
+          <Link className="block p-4 transition hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring" to={`/tickets/${ticket.id}`} key={ticket.id}>
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="font-semibold text-foreground">{ticket.subject}</p>
-                <p className="mt-1 font-mono text-xs text-primary" title={ticket.id}>
+                <p className="mt-1 font-mono text-xs text-muted-foreground" title={ticket.id}>
                   <bdi dir="ltr">{ticketReference(ticket.id)}</bdi>
                 </p>
               </div>

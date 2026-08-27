@@ -29,7 +29,7 @@ interface UserTableMeta {
 
 const ICON_LINK =
   "inline-flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors " +
-  "hover:bg-surface-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30";
+  "hover:bg-surface-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 const columnClasses: Record<string, string> = {
   name: "w-[22%]",
@@ -60,7 +60,7 @@ export function UserTable({ users, currentUserId, page, pageSize, pageCount, onP
       header: () => t("users.columns.name"),
       cell: ({ row, table }) => <span className="flex min-w-0 items-center gap-1.5">
         <Link
-          className="min-w-0 truncate rounded-sm font-semibold text-foreground hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+          className="min-w-0 truncate rounded-sm font-semibold text-foreground hover:underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           dir="auto"
           title={row.original.name}
           to={`/users/${row.original.id}/edit`}
@@ -120,7 +120,7 @@ export function UserTable({ users, currentUserId, page, pageSize, pageCount, onP
         <colgroup>
           {table.getAllLeafColumns().map((column) => <col key={column.id} className={columnClasses[column.id] ?? ""} />)}
         </colgroup>
-        <thead className="border-b border-border bg-surface-subtle text-xs text-muted-foreground">
+        <thead className="border-b border-border bg-surface-secondary text-xs text-muted-foreground">
           {table.getHeaderGroups().map((headerGroup) => <tr key={headerGroup.id}>{headerGroup.headers.map((header) => <th
             className={`px-4 py-3 font-semibold ${header.column.id === "actions" ? "text-end" : "text-start"}`}
             scope="col"
@@ -140,7 +140,7 @@ export function UserTable({ users, currentUserId, page, pageSize, pageCount, onP
       {users.map((user) => <li className="p-4" key={user.id}>
         <div className="flex min-w-0 items-center gap-1.5">
           <Link
-            className="min-w-0 truncate rounded-sm font-semibold text-foreground hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            className="min-w-0 truncate rounded-sm font-semibold text-foreground hover:underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             dir="auto"
             title={user.name}
             to={`/users/${user.id}/edit`}

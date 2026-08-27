@@ -47,8 +47,8 @@ export function ActionMenu({
         aria-expanded={open}
         aria-label={triggerLabel}
         className={cn(
-          "inline-flex size-8 items-center justify-center rounded-md border border-border bg-surface text-muted-foreground transition hover:bg-surface-hover hover:text-foreground hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
-          open && "bg-surface-subtle text-foreground border-border-strong",
+          "inline-flex size-8 items-center justify-center rounded-md border border-border bg-surface text-muted-foreground transition hover:bg-surface-hover hover:text-foreground hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          open && "bg-surface-active text-foreground border-border-strong",
           className
         )}
       >
@@ -62,7 +62,7 @@ export function ActionMenu({
             ref={panelRef}
             style={{ ...style, position: "fixed" }}
             role="menu"
-            className="z-50 min-w-40 rounded-md border border-border bg-surface p-1 shadow-elevated animate-in fade-in-0 zoom-in-95 duration-100"
+            className="z-50 min-w-40 rounded-md border border-border bg-popover text-popover-foreground p-1 shadow-flyout animate-in fade-in-0 zoom-in-95 duration-100"
           >
             {items.map((item) => (
               <button
@@ -77,8 +77,8 @@ export function ActionMenu({
                 className={cn(
                   "flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-xs font-medium transition-colors text-start",
                   item.destructive
-                    ? "text-danger hover:bg-danger-subtle focus-visible:bg-danger-subtle"
-                    : "text-foreground hover:bg-surface-subtle focus-visible:bg-surface-subtle",
+                    ? "text-danger hover:bg-danger-soft hover:text-danger-foreground focus-visible:bg-danger-soft"
+                    : "text-foreground hover:bg-surface-hover focus-visible:bg-surface-hover",
                   item.disabled && "pointer-events-none opacity-50"
                 )}
               >

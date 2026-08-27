@@ -72,15 +72,15 @@ export function TicketConversation({ ticketId, items, canMutate, messageAttachme
 
   const composer = (
     <>
-      <div className="flex w-full border-b" role="tablist" aria-label={t("tickets.conversation.composerMode")}>{(["reply", "note"] as Mode[]).map((value) => <button type="button" role="tab" aria-selected={mode === value} aria-controls="conversation-composer-panel" className={`min-h-11 border-b-2 px-4 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${mode === value ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`} onClick={() => { setMode(value); setError(null); setSuccess(null); setInsertError(null); }} key={value}>{t(`tickets.conversation.${value}Tab`)}</button>)}</div>
+      <div className="flex w-full border-b border-border" role="tablist" aria-label={t("tickets.conversation.composerMode")}>{(["reply", "note"] as Mode[]).map((value) => <button type="button" role="tab" aria-selected={mode === value} aria-controls="conversation-composer-panel" className={`min-h-11 border-b-2 px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${mode === value ? "border-foreground text-foreground font-semibold" : "border-transparent text-muted-foreground hover:text-foreground"}`} onClick={() => { setMode(value); setError(null); setSuccess(null); setInsertError(null); }} key={value}>{t(`tickets.conversation.${value}Tab`)}</button>)}</div>
       <div className="pt-4" id="conversation-composer-panel" role="tabpanel">
         <label className="text-sm font-medium" htmlFor={`conversation-${mode}`}>{t(mode === "reply" ? "tickets.conversation.replyLabel" : "tickets.conversation.noteLabel")}</label>
         <p className="mt-1 text-xs text-muted-foreground" id={`conversation-${mode}-help`}>{t(mode === "reply" ? "tickets.conversation.replyHelp" : "tickets.conversation.noteHelp")}</p>
         <textarea ref={mode === "reply" ? replyRef : undefined} id={`conversation-${mode}`} className="input mt-3 min-h-28 resize-y py-3" value={body} disabled={!canMutate || pending} aria-describedby={`conversation-${mode}-help`} onChange={(event) => { if (mode === "reply") { setReply(event.target.value); setInsertError(null); } else setNote(event.target.value); }} />
-        {!canMutate && <p className="mt-2 text-sm text-amber-800" role="status">{t("tickets.conversation.readOnly")}</p>}
-        {insertError && <p className="mt-2 text-sm text-red-700" role="alert">{insertError}</p>}
-        {error && <p className="mt-2 text-sm text-red-700" role="alert">{error}</p>}
-        {success && <p className="mt-2 text-sm text-green-700" role="status">{success}</p>}
+        {!canMutate && <p className="mt-2 text-sm text-warning-foreground" role="status">{t("tickets.conversation.readOnly")}</p>}
+        {insertError && <p className="mt-2 text-sm text-danger-foreground" role="alert">{insertError}</p>}
+        {error && <p className="mt-2 text-sm text-danger-foreground" role="alert">{error}</p>}
+        {success && <p className="mt-2 text-sm text-success-foreground" role="status">{success}</p>}
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
           {mode === "reply" && canMutate && <QuickReplyPicker disabled={pending} onSelect={insertQuickReply} />}
           <button type="button" className="button-primary sm:ms-auto sm:w-auto" disabled={!canMutate || !body.trim() || pending} onClick={submit}>{pending ? t(mode === "reply" ? "tickets.conversation.sending" : "tickets.conversation.adding") : t(mode === "reply" ? "tickets.conversation.sendReply" : "tickets.conversation.addNote")}</button>

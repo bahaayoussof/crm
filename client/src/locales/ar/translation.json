@@ -1,5 +1,6 @@
 {
   "app": { "title": "نظام إدارة دعم العملاء", "foundationReady": "البنية الأساسية للمشروع جاهزة." },
+  "theme": { "title": "المظهر", "light": "فاتح", "dark": "داكن", "system": "تلقائي", "mode": "المظهر" },
   "navigation": {
     "languageSwitcher": "اختيار اللغة", "primary": "التنقل الرئيسي", "dashboard": "لوحة التحكم", "tickets": "التذاكر", "customers": "العملاء", "knowledgeBase": "قاعدة المعرفة", "reports": "التقارير", "quickReplies": "الردود السريعة", "users": "المستخدمون", "settings": "الإعدادات",
     "collapseSidebar": "طي الشريط الجانبي", "expandSidebar": "توسيع الشريط الجانبي",

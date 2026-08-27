@@ -29,7 +29,7 @@ export function CustomerTable({ customers, page, pageSize, pageCount, onPageChan
       id: "name",
       accessorKey: "name",
       header: t("customers.name"),
-      cell: ({ row }) => <Link className="rounded-sm font-semibold text-foreground hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" to={`/customers/${row.original.id}`}>{row.original.name}</Link>,
+      cell: ({ row }) => <Link className="rounded-sm font-semibold text-foreground hover:underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" to={`/customers/${row.original.id}`}>{row.original.name}</Link>,
     },
     {
       id: "email",
@@ -80,7 +80,7 @@ export function CustomerTable({ customers, page, pageSize, pageCount, onPageChan
   return <>
     <div className="hidden overflow-x-auto rounded-xl border border-border bg-surface shadow-subtle md:block">
       <table className="w-full min-w-[44rem] text-start text-sm">
-        <thead className="border-b border-border bg-surface-subtle text-xs text-muted-foreground">
+        <thead className="border-b border-border bg-surface-secondary text-xs text-muted-foreground">
           {table.getHeaderGroups().map((headerGroup) => <tr key={headerGroup.id}>{headerGroup.headers.map((header) => <th className={`px-4 py-3 text-start font-semibold ${columnClasses[header.column.id] ?? ""}`} scope="col" key={header.id}>{header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}</th>)}</tr>)}
         </thead>
         <tbody className="divide-y divide-border-subtle">
@@ -90,7 +90,7 @@ export function CustomerTable({ customers, page, pageSize, pageCount, onPageChan
     </div>
     <div className="divide-y divide-border-subtle rounded-xl border border-border bg-surface shadow-subtle md:hidden">
       {customers.map((customer) => (
-        <Link className="block p-4 transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30" to={`/customers/${customer.id}`} key={customer.id}>
+        <Link className="block p-4 transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring" to={`/customers/${customer.id}`} key={customer.id}>
           <div className="flex items-start justify-between gap-3">
             <p className="font-semibold text-foreground">{customer.name}</p>
             <span className="shrink-0 text-xs font-medium text-muted-foreground">{t("customers.openCount", { count: formatNumber(customer.openTicketCount, i18n.language) })}</span>
