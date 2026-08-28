@@ -176,6 +176,17 @@ The authorized internal detail also includes request-time SLA derivation alongsi
 
 `effectiveSlaTarget` is `FIRST_RESPONSE`, `RESOLUTION`, or `null`. The effective deadline is an ISO timestamp or `null`. These values are derived only after internal Ticket visibility succeeds, are never accepted from clients, and are not added to Ticket list or Portal response contracts.
 
+The authorized internal detail also carries the caller's collaboration state for the ticket (`feature/team-collaboration`, ADR-032):
+
+```json
+{
+  "watcherCount": 3,
+  "viewerIsWatching": true
+}
+```
+
+`watcherCount` is the number of internal users following the ticket; `viewerIsWatching` is whether the authenticated caller is one of them. Both are internal-only and never appear in the Ticket list or Portal contracts.
+
 ```text
 POST /tickets/:id/messages
 POST /tickets/:id/notes
@@ -365,7 +376,24 @@ PATCH /api/notifications/read-all         mark all current user's notifications 
 PATCH /api/notifications/:id/read         mark one owned notification read
 ```
 
-All routes require `ADMIN`, `MANAGER`, or `AGENT`; `CUSTOMER` is rejected. List query supports bounded `page`, `limit`, and `read=true|false`; every operation is scoped to `request.auth.userId`, and a missing or wrong-owner id returns the same `404 NOTIFICATION_NOT_FOUND`. Assignment, customer-reply, and escalation notifications are written atomically with their ticket transaction and may carry an optional `ticketId` link. Unread count polls every 30 seconds in the internal client. There is no Portal notification surface, realtime transport, email/push delivery, or arbitrary-update notification fan-out.
+All routes require `ADMIN`, `MANAGER`, or `AGENT`; `CUSTOMER` is rejected. List query supports bounded `page`, `limit`, and `read=true|false`; every operation is scoped to `request.auth.userId`, and a missing or wrong-owner id returns the same `404 NOTIFICATION_NOT_FOUND`. Assignment, customer-reply, escalation, mention, and watcher-activity notifications are written atomically with their ticket transaction and may carry an optional `ticketId` link. Unread count polls every 30 seconds in the internal client. There is no Portal notification surface, realtime transport, email/push delivery, or arbitrary-update notification fan-out.
+
+## Team Collaboration — LIVE (on `feature/team-collaboration`, not yet integrated)
+
+`feature/team-collaboration` (ADR-032). Internal-only mentions and ticket watchers. `CUSTOMER` and unauthenticated callers are rejected everywhere; the Customer Portal exposes none of it.
+
+```text
+GET    /api/users/mentionable?search=      active internal users for @mention autocomplete
+GET    /api/tickets/:id/watchers           list the ticket's watchers
+POST   /api/tickets/:id/watchers           follow the ticket (self only, idempotent)
+DELETE /api/tickets/:id/watchers/me        unfollow the ticket (self only, safe if absent)
+```
+
+- `GET /api/users/mentionable` — `ADMIN`/`MANAGER`/`AGENT` (same lookup group as `/users/agents`, registered before `/users/:id`). Returns at most 10 `{ id, name, email }` of **active internal** users; optional case-insensitive `search` over name/email. Never returns `CUSTOMER`. This is a separate route from the ADMIN-only `/api/users` list.
+- Watcher routes are sub-routes of `ticketRouter` (`requireAuth` + `requireRole(ADMIN, MANAGER, AGENT)`); each re-checks ticket visibility, so a hidden or missing ticket returns `404 TICKET_NOT_FOUND` (IDOR-safe). `POST` and `DELETE` act on the authenticated caller only and return `{ data: { watching: boolean, watcherCount: number } }`. `GET` returns `{ data: [{ id, createdAt, user: { id, name, email } }] }`.
+- **@mentions:** an internal note body may contain `@[Display Name](userId)` tokens. On `POST /api/tickets/:id/notes`, inside the same transaction as the note: valid tokens are resolved to active internal users (author excluded), `TicketMention` rows are written, the note author and every mentioned user are auto-added as watchers, and each mentioned user receives one `TICKET_MENTION` notification. Malformed tokens, `CUSTOMER` ids, inactive users, and the author are ignored. The stored note text is never rewritten.
+- **Watcher activity:** watchers receive a `TICKET_WATCH_ACTIVITY` notification when a staff reply or internal note is added, when status changes, when assignment changes, or when the customer replies from the Portal — always excluding the actor and any recipient already notified by the triggering event's own notification (assignment, escalation, customer-reply, or a `TICKET_MENTION` for the same note).
+- No schema column changes to existing tables; new tables `TicketWatcher` and `TicketMention` (migration `20260828163000_add_team_collaboration`). No new `Notification` enum — `type` stays a string with two new values.
 
 ## SLA automation — INTERNAL CRON
 

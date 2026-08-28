@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   category: { findMany: vi.fn(), findFirst: vi.fn() }, slaRule: { findFirst: vi.fn() }, ticketMessage: { create: vi.fn() }, ticketHistory: { create: vi.fn() },
   user: { findFirst: vi.fn().mockResolvedValue(null), findMany: vi.fn().mockResolvedValue([]) },
   notification: { createMany: vi.fn().mockResolvedValue({ count: 0 }) },
+  ticketWatcher: { findMany: vi.fn().mockResolvedValue([]) },
 }));
 vi.mock("../../config/prisma.js", () => ({ prisma: { ...mocks, $transaction: vi.fn(async (value: unknown) => typeof value === "function" ? (value as (tx: typeof mocks) => unknown)(mocks) : Promise.all(value as Promise<unknown>[])) } }));
 

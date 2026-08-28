@@ -1779,15 +1779,23 @@ A reminder is **not** a separate model — it is the due-date sweep over `Task`.
 
 ## Team Collaboration
 
-Status: product decision required before implementation. Branch: `feature/team-collaboration`.
+Status: IMPLEMENTED on `feature/team-collaboration` (uncommitted, automated-verified only). ADR-032. Scope fixed to **@mentions + watchers, internal-only**. The former decision points resolve as:
 
-Existing building blocks: internal `TicketNote` and `CustomerNote`, ticket history, assignment.
+- **What it means:** `@mentions` inside internal ticket notes, and per-ticket watchers who get in-app notifications on ticket activity. No handoff, no shared-comment model (notes already exist), no task delegation (that is `feature/tasks-reminders`).
+- **Data model:** two new tables — `TicketWatcher` (`ticketId`, `userId`, unique together) and `TicketMention` (`noteId`, `mentionedUserId`, denormalized `ticketId`, unique on `noteId`+`mentionedUserId`). No column changes to existing tables. `Notification.type` stays a string with two new values `TICKET_MENTION` / `TICKET_WATCH_ACTIVITY`.
+- **Notification behavior:** a mentioned user gets one `TICKET_MENTION`. Watchers get `TICKET_WATCH_ACTIVITY` on a new staff reply, a new internal note, a status change, an assignment change, or a Portal customer reply — always minus the actor and anyone already notified by that event (assignment / escalation / customer-reply / the mention for the same note). All fan-out is written inside the triggering mutation's transaction, like every other notification (ADR-029).
+- **Role visibility:** internal roles only (`ADMIN`/`MANAGER`/`AGENT`). `CUSTOMER` is never mentionable, never a watcher, and the Portal shows nothing about mentions or watchers. Watcher endpoints reuse the ticket-visibility predicate (hidden ticket → `404`).
+- **Auto-watch:** the note author and every valid mentioned user are auto-subscribed. Assignees / admins / managers are **not** auto-watched.
 
-Required decision points:
-- what "collaboration" means here: @mentions, watchers/followers, explicit handoff, shared comments, or task delegation
-- notification behavior for each
-- role visibility and whether customers ever see any of it (they must not for internal notes)
-- whether it introduces new models or extends notes/history
+### UI
+
+- **Internal Note composer (Ticket Details → Internal Note tab only):** typing `@` opens an anchored, portalled autocomplete of active internal users (`GET /api/users/mentionable?search=`), keyboard-navigable (Arrow keys / Enter / Tab / Escape) and mouse-selectable; choosing a user inserts `@[Name](userId) `. The public reply composer is unchanged. The stored token renders in the note timeline as a subtle inline `@Name` chip (never a link, the user id is never shown, the stored name is used so historical notes survive renames).
+- **Ticket sidebar — "Follow ticket":** a Follow / Following toggle button with a watcher count. Follow → `POST /api/tickets/:id/watchers`; Following → `DELETE /api/tickets/:id/watchers/me`. The ticket detail query is invalidated after each mutation so `watcherCount` / `viewerIsWatching` stay accurate. Pending and error (`role="alert"`) states; RTL-safe; EN/AR under `collaboration.*`.
+- **Notifications:** reuse the existing bell + `/tickets/:id` navigation. Server notification title/message stay English (matches every existing notification type — no one-off client localization).
+
+### Deferred (not implemented)
+
+Explicit handoff action, mentions in public replies or the Customer Portal, customer mentions, watcher notification preferences / mute / digests, email or push delivery, presence / typing / realtime sockets, AI mention suggestions, any customer-visible watcher information.
 
 ## Custom Branding
 

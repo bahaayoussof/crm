@@ -19,6 +19,7 @@ export type TicketMessageResult = TicketConversationItem & { delivery?: MessageD
 export interface TicketDetail extends TicketListItem {
   description: string; resolvedAt: string | null; closedAt: string | null;
   slaState: SlaState; effectiveSlaDueAt: string | null; effectiveSlaTarget: SlaTarget;
+  watcherCount: number; viewerIsWatching: boolean;
   customer: TicketPerson & { phone: string | null; createdAt: string };
   department: { id: string; name: string } | null; branch: { id: string; name: string } | null; history: TicketHistory[]; conversation: TicketConversationItem[];
 }
