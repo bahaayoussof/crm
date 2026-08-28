@@ -213,23 +213,29 @@ Answer:
 Dashboard Header
 ────────────────────────────────────────────────────
 
-KPI Cards
-┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐
-│ Open       │ │ Assigned   │ │ SLA Risk   │ │ Resolved   │
-│ 42         │ │ 18         │ │ 4          │ │ 27 Today   │
-└────────────┘ └────────────┘ └────────────┘ └────────────┘
+KPI Cards (5, one row on wide screens)
+┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐
+│ Open   │ │ Unassg │ │ SLA    │ │ SLA    │ │ Resolvd│
+│  42    │ │  18    │ │ Risk 4 │ │ Brch 0 │ │ Today  │
+└────────┘ └────────┘ └────────┘ └────────┘ └────────┘
 
-Operational Charts
-┌───────────────────────────────┐ ┌──────────────────────┐
-│ Ticket Volume                 │ │ Priority / Status    │
-│                               │ │ Distribution         │
-└───────────────────────────────┘ └──────────────────────┘
-
-Needs Attention
+Needs Attention  (full width)
 ────────────────────────────────────────────────────
 Ticket rows
 
-Recent Activity / Recent Tickets
+Ticket Activity (~2/3)              Status Distribution (~1/3)
+┌───────────────────────────────┐ ┌──────────────────────┐
+│ opened vs resolved / day      │ │ active-status donut  │
+│ 7D · 14D · 30D                │ │ centre total + legend│
+└───────────────────────────────┘ └──────────────────────┘
+
+SLA Health (1/2)                   Operational Summary (1/2)
+┌───────────────────────────────┐ ┌──────────────────────┐
+│ segmented bar + compliance %  │ │ waiting / unassigned │
+│ on-track · at-risk · breached │ │ escalated / resolved │
+└───────────────────────────────┘ └──────────────────────┘
+
+Recent Tickets  (full width; "View all tickets →" in header)
 ────────────────────────────────────────────────────
 Rows or compact list
 ```
@@ -278,19 +284,35 @@ Recent Tickets contains the newest role-visible tickets after excluding every id
 
 Both Dashboard desktop tables use an explicit minimum table width, horizontally scrollable bounded container, fixed column sizing, non-touching headers, and contained long Subject, Customer, assignee, date, and technical values. Mobile continues to use compact cards with overflow-safe content. Ticket identifiers remain locally LTR in English and Arabic.
 
-## Charts
+## Charts and operational panels
 
-Preferred:
+Implemented (`feature/dashboard-redesign`): the analytics area is one dominant chart plus a
+compact companion, followed by a two-panel operational row. Do not overload the dashboard with
+charts.
 
-### Ticket Trend
-Created vs resolved over time.
+### Ticket activity (primary, ~2/3 width)
+Smooth area chart of **opened vs. resolved** tickets per UTC day, backed by the
+`ticketActivity` field on `GET /dashboard/overview` (30-day series; see `05-api-contract.md` and
+ADR-031). A `7D / 14D / 30D` control slices the series client-side. All-zero series renders an
+"no ticket activity in this period" empty state. Reduced motion: chart animation is disabled.
 
-### Distribution
-One of:
-- tickets by status
-- tickets by priority
+### Ticket status distribution (~1/3 width)
+Donut of **active** statuses only (`NEW`, `OPEN`, `IN_PROGRESS`, `WAITING_CUSTOMER`,
+`ESCALATED`) with count > 0, using the existing semantic status colors, active total in the
+centre, and a text legend (label · count · %). Zero-value statuses are not drawn. Empty state
+when no active tickets.
 
-Do not overload the dashboard with charts.
+### SLA health (compact panel, not a Cartesian chart)
+A single segmented compliance bar (on-track / at-risk / breached) plus an overall compliance
+`%` and the exact counts as text — colour never carries meaning alone. `%` is
+`onTrack / (onTrack + atRisk + breached)`; the panel shows a "no SLA data" empty state when
+that denominator is zero (no division by zero).
+
+### Operational summary (compact panel)
+Plain-language counts already in the payload: Waiting for customer, Unassigned (or Assigned to
+me for `AGENT`), Escalated, Resolved today. Metrics the endpoint does not provide (average
+first response / resolution) are omitted, not shown as placeholders. `generatedAt` is demoted
+to one line of muted "Last updated …" helper text.
 
 ## Actions
 

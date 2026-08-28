@@ -77,11 +77,11 @@ export function AttachmentPreviewDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-md border bg-white shadow-lg outline-none"
+        className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-md border border-border bg-card text-card-foreground shadow-lg outline-none"
         onMouseDown={(event) => event.stopPropagation()}
         onKeyDown={onKeyDown}
       >
-        <header className="flex items-center gap-3 border-b px-4 py-3">
+        <header className="flex items-center gap-3 border-b border-border px-4 py-3">
           <h2 id={titleId} className="min-w-0 flex-1 truncate text-sm font-semibold">
             <span className="text-muted-foreground">{t("attachments.previewTitle")}: </span>
             <bdi dir="auto">{target.fileName}</bdi>
@@ -107,7 +107,7 @@ export function AttachmentPreviewDialog({
           </button>
         </header>
 
-        <div className="min-h-40 flex-1 overflow-auto bg-muted/20 p-4">
+        <div className="min-h-40 flex-1 overflow-auto bg-surface-subtle p-4">
           {state.status === "loading" && (
             <p className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground" role="status">
               <SpinnerIcon />
@@ -117,7 +117,7 @@ export function AttachmentPreviewDialog({
 
           {state.status === "error" && (
             <div className="py-8 text-center">
-              <p className="text-sm text-red-700" role="alert">
+              <p className="text-sm text-danger" role="alert">
                 {state.error ?? t("attachments.previewFailed")}
               </p>
               <button type="button" className="button-secondary mt-3" onClick={onRetry}>
@@ -136,13 +136,13 @@ export function AttachmentPreviewDialog({
 
           {state.status === "ready" && state.kind === "pdf" && state.objectUrl && (
             <div>
-              <iframe title={target.fileName} src={state.objectUrl} className="h-[70vh] w-full rounded-sm border bg-white" />
+              <iframe title={target.fileName} src={state.objectUrl} className="h-[70vh] w-full rounded-sm border border-border bg-surface" />
               <p className="mt-2 text-xs text-muted-foreground">{t("attachments.pdfPreviewUnavailable")}</p>
             </div>
           )}
 
           {state.status === "ready" && state.kind === "text" && (
-            <pre className="max-h-[70vh] overflow-auto whitespace-pre-wrap break-words rounded-sm border bg-white p-3 text-xs leading-5">
+            <pre className="max-h-[70vh] overflow-auto whitespace-pre-wrap break-words rounded-sm border border-border bg-surface p-3 text-xs leading-5">
               {state.text}
             </pre>
           )}

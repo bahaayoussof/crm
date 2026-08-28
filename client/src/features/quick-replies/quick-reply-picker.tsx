@@ -109,10 +109,10 @@ export function QuickReplyPicker({ onSelect, disabled }: { onSelect: (body: stri
           ref={panelRef}
           id={popoverId}
           data-quick-reply-popover=""
-          className="fixed z-50 flex flex-col overflow-hidden rounded-md border bg-white shadow-lg"
+          className="fixed z-[60] flex flex-col overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-flyout animate-in fade-in-0 zoom-in-95 duration-150"
           style={{ left: position.left, width: position.width, top: position.top, bottom: position.bottom, maxHeight: position.maxHeight }}
         >
-          <div className="border-b p-2">
+          <div className="border-b border-border p-1.5">
             <input
               ref={searchRef}
               className="input h-9 py-1 text-sm"
@@ -142,11 +142,11 @@ export function QuickReplyPicker({ onSelect, disabled }: { onSelect: (body: stri
               }}
             />
           </div>
-          <div id={listboxId} role="listbox" aria-label={t("quickReplies.picker.results")} className="min-h-0 flex-1 overflow-y-auto p-1">
+          <div id={listboxId} role="listbox" aria-label={t("quickReplies.picker.results")} className="min-h-0 flex-1 overflow-y-auto p-1.5">
             {quickReplies.isLoading ? (
               <p className="px-3 py-3 text-sm text-muted-foreground" role="status">{t("quickReplies.picker.searching")}</p>
             ) : quickReplies.isError ? (
-              <p className="px-3 py-3 text-sm text-red-700" role="status">{t("quickReplies.picker.error")}</p>
+              <p className="px-3 py-3 text-sm text-danger-foreground" role="status">{t("quickReplies.picker.error")}</p>
             ) : results.length === 0 ? (
               <p className="px-3 py-3 text-sm text-muted-foreground" role="status">
                 {debouncedQuery.trim() ? t("quickReplies.picker.noResults") : t("quickReplies.picker.empty")}
@@ -155,7 +155,7 @@ export function QuickReplyPicker({ onSelect, disabled }: { onSelect: (body: stri
               <button
                 id={`${listboxId}-${item.id}`}
                 key={item.id}
-                className={`block w-full rounded px-3 py-2 text-start outline-none hover:bg-muted focus-visible:bg-muted ${index === activeIndex ? "bg-muted" : ""}`}
+                className={`block w-full rounded-sm px-3 py-2 text-start outline-none transition-colors hover:bg-surface-hover focus-visible:bg-surface-hover ${index === activeIndex ? "bg-surface-hover" : ""}`}
                 type="button"
                 role="option"
                 aria-selected={index === activeIndex}

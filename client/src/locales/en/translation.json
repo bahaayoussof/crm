@@ -46,8 +46,10 @@
     "title": "Support dashboard", "description": "Current workload, SLA pressure, and tickets that need attention.", "metricsLabel": "Dashboard metrics", "loadError": "Unable to load the dashboard.",
     "metrics": { "openTickets": "Open tickets", "assignedToMe": "Assigned to me", "unassignedTickets": "Unassigned tickets", "slaAtRisk": "SLA at risk", "slaBreached": "SLA breached", "resolvedToday": "Resolved today", "waitingCustomer": "Waiting for customer" },
     "chartTitle": "Tickets by status", "chartDescription": "Visible ticket count grouped by current status.", "ticketsCount": "Tickets", "emptyDistribution": "No ticket status data yet.",
-    "slaHealthTitle": "SLA health", "slaHealthDescription": "Active ticket compliance across response and resolution deadlines.", "emptySlaHealth": "No active tickets requiring SLA tracking.",
-    "summaryTitle": "Operational summary", "generatedAt": "Generated at", "needsAttention": "Needs attention", "myAssignedTickets": "My Assigned Tickets", "recentTickets": "Recent tickets", "emptyAttention": "No visible tickets currently need attention.", "emptyAssigned": "No active tickets are currently assigned to you.", "emptyRecent": "No recent visible tickets remain outside the primary queue.", "viewAll": "View all tickets", "sla": "SLA state",
+    "donut": { "title": "Status distribution", "description": "Active tickets grouped by their current status.", "centerLabel": "Active tickets" },
+    "activity": { "title": "Ticket activity", "description": "Opened vs. resolved tickets per day.", "opened": "Opened", "resolved": "Resolved", "empty": "No ticket activity in this period.", "rangeLabel": "Activity time range", "rangeDays": "{{count}}D", "srSummary": "{{opened}} opened and {{resolved}} resolved over the last {{days}} days." },
+    "slaHealthTitle": "SLA health", "slaHealthDescription": "Active ticket compliance across response and resolution deadlines.", "emptySlaHealth": "No active tickets requiring SLA tracking.", "slaCompliance": "Overall compliance",
+    "summaryTitle": "Operational summary", "summaryEscalated": "Escalated", "generatedAt": "Generated at", "lastUpdated": "Last updated {{value}}", "needsAttention": "Needs attention", "myAssignedTickets": "My Assigned Tickets", "recentTickets": "Recent tickets", "emptyAttention": "No visible tickets currently need attention.", "emptyAssigned": "No active tickets are currently assigned to you.", "emptyRecent": "No recent visible tickets remain outside the primary queue.", "viewAll": "View all tickets", "sla": "SLA state",
     "slaStates": { "ON_TRACK": "On track", "AT_RISK": "At risk", "BREACHED": "Breached", "MET": "Met", "NOT_CONFIGURED": "Not configured" }
   },
   "reports": {
@@ -73,7 +75,7 @@
     "title": "Tickets", "description": "Manage and track customer support requests", "new": "New ticket", "create": "Create ticket", "createTitle": "Create ticket", "editTitle": "Edit ticket", "edit": "Edit ticket",
     "formDescription": "Record the issue, classification, and operational ownership.", "ticketDetails": "Ticket details", "classification": "Classification", "subject": "Subject", "descriptionLabel": "Description",
     "customer": "Customer", "customerComboboxPlaceholder": "Search or select customer…", "customerResults": "Customer search results", "customerSearching": "Searching customers…", "customerSearchError": "Unable to search customers.", "noCustomerResults": "No customers match your search.", "category": "Category", "selectCategory": "Select a category",
-    "assignedAgent": "Assigned agent", "unassigned": "Unassigned", "searchAssignee": "Search assignee…", "noAssigneesFound": "No assignees found", "statusLabel": "Status", "priorityLabel": "Priority", "created": "Created", "updated": "Updated", "history": "History", "metadata": "Ticket metadata", "operations": "Manage ticket",
+    "assignedAgent": "Assigned agent", "unassigned": "Unassigned", "searchAssignee": "Search assignee…", "noAssigneesFound": "No assignees found", "statusLabel": "Status", "priorityLabel": "Priority", "created": "Created", "updated": "Updated", "history": "History", "activity": "Activity", "viewAllActivity": "View all", "addAttachment": "Add attachment", "viewCustomer": "View customer", "metadata": "Ticket metadata", "operations": "Manage ticket",
     "search": "Search tickets by ID, subject, or customer…", "allStatuses": "All statuses", "allPriorities": "All priorities", "allCategories": "All categories", "allAgents": "All agents", "clearFilters": "Clear filters",
     "empty": "No tickets yet.", "noSearchMatches": "No tickets found for “{{search}}”.", "noStatusMatches": "No tickets with status “{{status}}”.", "noPriorityMatches": "No tickets with priority “{{priority}}”.", "noCategoryMatches": "No tickets in category “{{category}}”.", "noAgentMatches": "No tickets assigned to “{{agent}}”.", "noMatches": "No tickets match the current filters.", "loadError": "Unable to load tickets.", "loadDetailError": "Unable to load this ticket.", "notFound": "Ticket not found.", "unauthorized": "You do not have access to this ticket.",
     "saveError": "Unable to save ticket.", "updateError": "Unable to update ticket.", "saveOperations": "Save changes", "backToList": "Back to tickets", "pagination": "Ticket list pages", "page": "Page {{page}} of {{total}}", "noHistory": "No ticket history yet.", "systemActor": "System", "closeTicket": "Close ticket", "closeConfirmation": "Closing is final and prevents further customer replies. Close this ticket?", "confirmClose": "Confirm close", "cancelClose": "Cancel", "closing": "Closing...", "closeError": "Unable to close ticket.", "unassignedReadOnly": "This ticket must be assigned to you before you can change its workflow or conversation.",
@@ -91,15 +93,7 @@
       "replyHelp": "This response is visible to the customer.", "noteHelp": "Only your team can see this note.", "readOnly": "This ticket must be assigned to you before you can reply or add a note.",
       "sendReply": "Send reply", "addNote": "Add note", "sending": "Sending…", "adding": "Adding…", "replySuccess": "Reply sent.", "noteSuccess": "Internal note added.",
       "replyError": "Unable to send the reply.", "noteError": "Unable to add the internal note.", "internalLabel": "Internal note", "publicLabel": "Visible to customer",
-      "showMore": "Show more", "showLess": "Show less",
-      "whatsappReplyHint": "This reply is sent to the customer on WhatsApp:",
-      "whatsappNoPhone": "no phone number on file, delivery will fail",
-      "whatsappDelivery": {
-        "INTEGRATION_NOT_CONFIGURED": "Reply saved, but WhatsApp is not configured, so it was not delivered.",
-        "NO_RECIPIENT_PHONE": "Reply saved, but the customer has no phone number, so it was not delivered on WhatsApp.",
-        "PROVIDER_REJECTED": "Reply saved, but WhatsApp rejected the message, so it was not delivered.",
-        "PROVIDER_UNREACHABLE": "Reply saved, but WhatsApp could not be reached, so it was not delivered."
-      },
+      "showMore": "Show more", "showLess": "Show less", "messageCount": "{{total}} messages",
       "roles": { "ADMIN": "Admin", "MANAGER": "Manager", "AGENT": "Agent", "CUSTOMER": "Customer" }
     },
     "columns": { "id": "ID", "ticket": "Ticket" },
@@ -325,8 +319,12 @@
   "attachments": {
     "title": "Attachments",
     "upload": "Upload attachment",
+    "uploadShort": "Upload",
     "download": "Download attachment",
     "selectFile": "Select file",
+    "chooseFile": "Choose file",
+    "attachFile": "Attach file",
+    "removeFile": "Remove file",
     "acceptedTypes": "Accepted types: JPEG, PNG, WebP, PDF, plain text",
     "maxSize": "Maximum size: {{size}}",
     "selectedFile": "Selected file",

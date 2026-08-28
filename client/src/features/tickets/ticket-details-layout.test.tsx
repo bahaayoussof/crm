@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { changeAppLanguage } from "@/lib/i18n";
@@ -59,36 +59,61 @@ function renderDetail() {
   );
 }
 
-describe("Ticket Details long-content containment", () => {
-  afterEach(cleanup);
-  beforeEach(async () => {
-    await changeAppLanguage("en"); vi.clearAllMocks();
-    mocks.useAuth.mockReturnValue({ user: { id: "admin-1", name: "Admin", email: "admin@example.com", role: "ADMIN" } });
-    mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: baseTicket });
-    mocks.useCategories.mockReturnValue({ data: [{ id: "category-1", name: "Billing" }] });
-    mocks.useAgents.mockReturnValue({ data: [{ id: "agent-1", name: "Mariam Hassan", email: "mariam@example.com" }] });
-    mocks.useUpdateTicket.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
-    mocks.useCreateTicketMessage.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
-    mocks.useCreateTicketNote.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
-    mocks.useTicketAttachments.mockReturnValue({
-      data: [{ id: "att-1", fileName: LONG_FILENAME, mimeType: "application/pdf", createdAt: "2026-08-25T09:00:00.000Z", messageId: null }],
-      isLoading: false, isError: false, refetch: vi.fn(),
-    });
+function baseMocks() {
+  mocks.useAuth.mockReturnValue({ user: { id: "admin-1", name: "Admin", email: "admin@example.com", role: "ADMIN" } });
+  mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: baseTicket });
+  mocks.useCategories.mockReturnValue({ data: [{ id: "category-1", name: "Billing" }] });
+  mocks.useAgents.mockReturnValue({ data: [{ id: "agent-1", name: "Mariam Hassan", email: "mariam@example.com" }] });
+  mocks.useUpdateTicket.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+  mocks.useCreateTicketMessage.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+  mocks.useCreateTicketNote.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+  mocks.useTicketAttachments.mockReturnValue({
+    data: [{ id: "att-1", fileName: LONG_FILENAME, mimeType: "application/pdf", createdAt: "2026-08-25T09:00:00.000Z", messageId: null }],
+    isLoading: false, isError: false, refetch: vi.fn(),
   });
+}
 
-  it("gives the two Ticket Details columns min-w-0 so intrinsic content cannot widen the grid", () => {
+describe("Ticket Details workspace layout & long-content containment", () => {
+  afterEach(cleanup);
+  beforeEach(async () => { await changeAppLanguage("en"); vi.clearAllMocks(); baseMocks(); });
+
+  it("lays out a two-column workspace with both columns min-w-0", () => {
     const { container } = renderDetail();
-    const grid = container.querySelector(".grid.gap-6") as HTMLElement;
+    const grid = container.querySelector("div.grid") as HTMLElement;
     expect(grid).toBeTruthy();
     const columns = Array.from(grid.children) as HTMLElement[];
     expect(columns).toHaveLength(2);
     for (const column of columns) expect(column.className).toMatch(/min-w-0/);
   });
 
-  it("wraps long unbroken content in the message body, description, subject, history, and customer email", () => {
+  it("bounds the conversation into an internally scrollable message region (desktop only)", () => {
+    renderDetail();
+    // the message list lives inside a region that scrolls internally on lg, natural on mobile
+    const list = screen.getByRole("list", { name: "Ticket conversation timeline" });
+    const scroller = list.parentElement as HTMLElement;
+    expect(scroller.className).toMatch(/overflow-y-auto/);
+    expect(scroller.className).toMatch(/lg:min-h-0/);
+    expect(scroller.className).toMatch(/lg:flex-1/);
+    expect(scroller.className).not.toMatch(/max-h-\[/); // no mobile height cap — natural flow
+    // all three fixture messages render inside that same region
+    for (const text of ["Thanks, that is resolved now.", new RegExp(MSG_MARKER), "Private investigation notes."]) {
+      expect(scroller).toContainElement(screen.getByText(text, { selector: "p" }));
+    }
+    // the section is a bounded flex column on lg and the composer stays queryable
+    expect(list.closest("section")!.className).toMatch(/lg:flex-col/);
+    expect(screen.getByRole("button", { name: "Send reply" })).toBeInTheDocument();
+  });
+
+  it("gives consecutive messages breathing room", () => {
+    renderDetail();
+    const list = screen.getByRole("list", { name: "Ticket conversation timeline" });
+    expect(list.className).toMatch(/space-y-5/);
+  });
+
+  it("wraps long unbroken content in the message body, subject, description, activity, and customer email", () => {
     renderDetail();
     expect(longBody().className).toMatch(/\[overflow-wrap:anywhere\]/);
-    expect(longBody().className).toMatch(/whitespace-pre-wrap/); // newlines preserved
+    expect(longBody().className).toMatch(/whitespace-pre-wrap/);
 
     expect(screen.getByRole("heading", { level: 1 }).className).toMatch(/\[overflow-wrap:anywhere\]/);
     expect(screen.getByText(baseTicket.description, { selector: "p" }).className).toMatch(/\[overflow-wrap:anywhere\]/);
@@ -104,35 +129,22 @@ describe("Ticket Details long-content containment", () => {
     expect(name.closest("li")).toContainElement(screen.getByRole("button", { name: "Download attachment" }));
   });
 
-  it("keeps history timestamps on their own non-wrapping line, separate from the description", () => {
-    const { container } = renderDetail();
-    const historyHeading = screen.getByRole("heading", { name: "History" });
-    const historySection = historyHeading.closest("section") as HTMLElement;
-    const time = historySection.querySelector("li time") as HTMLElement;
+  it("keeps activity timestamps on their own non-wrapping line, separate from the actor/change line", () => {
+    renderDetail();
+    const activitySection = screen.getByRole("heading", { name: "Activity" }).closest("section") as HTMLElement;
+    const time = activitySection.querySelector("li time") as HTMLElement;
     expect(time).toBeTruthy();
     expect(time.className).toMatch(/whitespace-nowrap/);
     expect(time.className).toMatch(/shrink-0/);
-    // the row's action title and its timestamp sit in a flex header, not inside the description paragraph
     const row = time.closest("li") as HTMLElement;
-    const description = within(row).getByText(/NEW-/);
-    expect(description).not.toContainElement(time);
-    expect(container.querySelector("time")).toBeTruthy();
+    const change = within(row).getByText(/NEW-/);
+    expect(change).not.toContainElement(time);
   });
 });
 
 describe("Ticket Details conversation bubbles and long-message disclosure", () => {
   afterEach(cleanup);
-  beforeEach(async () => {
-    await changeAppLanguage("en"); vi.clearAllMocks();
-    mocks.useAuth.mockReturnValue({ user: { id: "admin-1", name: "Admin", email: "admin@example.com", role: "ADMIN" } });
-    mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: baseTicket });
-    mocks.useCategories.mockReturnValue({ data: [] });
-    mocks.useAgents.mockReturnValue({ data: [] });
-    mocks.useUpdateTicket.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
-    mocks.useCreateTicketMessage.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
-    mocks.useCreateTicketNote.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
-    mocks.useTicketAttachments.mockReturnValue({ data: [], isLoading: false, isError: false, refetch: vi.fn() });
-  });
+  beforeEach(async () => { await changeAppLanguage("en"); vi.clearAllMocks(); baseMocks(); });
 
   it("renders messages as width-bounded bubbles with logical side alignment", () => {
     renderDetail();
@@ -142,8 +154,8 @@ describe("Ticket Details conversation bubbles and long-message disclosure", () =
       expect(bubble.className).toMatch(/max-w-\[min\(85%,46rem\)\]/);
       expect(bubble.className).toMatch(/min-w-0/);
     }
-    expect((shortBubble.closest("li") as HTMLElement).className).toMatch(/justify-start/); // customer
-    expect((staffBubble.closest("li") as HTMLElement).className).toMatch(/justify-end/); // staff public reply
+    expect((shortBubble.closest("li") as HTMLElement).className).toMatch(/justify-start/);
+    expect((staffBubble.closest("li") as HTMLElement).className).toMatch(/justify-end/);
   });
 
   it("does not offer Show more for a short message", () => {
@@ -157,7 +169,6 @@ describe("Ticket Details conversation bubbles and long-message disclosure", () =
     const staffBubble = longBubble();
     const toggle = within(staffBubble).getByRole("button", { name: "Show more" });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
-    // full text is already in the DOM (line-clamped, not truncated)
     expect(longBody()).toBeInTheDocument();
     expect(longBody().className).toMatch(/line-clamp-\[10\]/);
 
@@ -174,8 +185,6 @@ describe("Ticket Details conversation bubbles and long-message disclosure", () =
     renderDetail();
     const noteBubble = screen.getByText("Private investigation notes.", { selector: "p" }).closest("article") as HTMLElement;
     expect(within(noteBubble).getByText("Internal note")).toBeInTheDocument();
-    expect(within(noteBubble).queryByRole("button", { name: /show more/i })).not.toBeInTheDocument();
-    // the public reply keeps its own explicit label
     const staffBubble = longBubble();
     expect(within(staffBubble).getByText("Visible to customer")).toBeInTheDocument();
   });
@@ -190,63 +199,96 @@ describe("Ticket Details conversation bubbles and long-message disclosure", () =
   });
 });
 
-describe("Ticket Details responsive action sizing", () => {
+describe("Ticket Details sidebar controls & responsive sizing", () => {
   afterEach(cleanup);
-  beforeEach(async () => {
-    await changeAppLanguage("en"); vi.clearAllMocks();
-    mocks.useAuth.mockReturnValue({ user: { id: "admin-1", name: "Admin", email: "admin@example.com", role: "ADMIN" } });
-    mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: baseTicket });
-    mocks.useCategories.mockReturnValue({ data: [{ id: "category-1", name: "Billing" }] });
-    mocks.useAgents.mockReturnValue({ data: [{ id: "agent-1", name: "Mariam Hassan", email: "mariam@example.com" }] });
-    mocks.useUpdateTicket.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
-    mocks.useCreateTicketMessage.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
-    mocks.useCreateTicketNote.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
-    mocks.useTicketAttachments.mockReturnValue({
-      data: [{ id: "att-1", fileName: "note.pdf", mimeType: "application/pdf", createdAt: "2026-08-25T09:00:00.000Z", messageId: null }],
-      isLoading: false, isError: false, refetch: vi.fn(),
-    });
-  });
+  beforeEach(async () => { await changeAppLanguage("en"); vi.clearAllMocks(); baseMocks(); });
 
-  it("makes Save changes, Upload attachment, and Send reply content-sized on desktop (button-primary → full width only on mobile)", () => {
+  it("exposes the ticket properties as reusable select controls in the sidebar", () => {
     renderDetail();
-    for (const name of ["Save changes", "Upload attachment", "Send reply"]) {
-      const button = screen.getByRole("button", { name });
-      expect(button.className).toMatch(/\bbutton-primary\b/); // mobile: full width via component class
-      expect(button.className).toMatch(/sm:w-auto/); // desktop: content-sized
+    for (const name of ["Status", "Priority", "Category", "Assigned agent"]) {
+      expect(screen.getByRole("combobox", { name })).toBeInTheDocument();
     }
   });
 
-  it("keeps the Send reply / Insert quick reply composer footer as a start/end row that stacks on mobile", () => {
+  it("hides Save changes until a property changes, then shows it content-sized on desktop", async () => {
+    renderDetail();
+    expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
+
+    const statusTrigger = screen.getByRole("combobox", { name: "Status" });
+    fireEvent.keyDown(statusTrigger, { key: "ArrowDown" });
+    await waitFor(() => expect(screen.getByRole("option", { name: "Resolved" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("option", { name: "Resolved" }));
+
+    const save = await screen.findByRole("button", { name: "Save changes" });
+    expect(save.className).toMatch(/\bbutton-primary\b/);
+    expect(save.className).toMatch(/sm:w-auto/);
+  });
+
+  it("keeps the whole attachment workflow in the main column and out of the sidebar", () => {
+    renderDetail();
+    // conversation column owns the Attach file trigger, next to the composer
+    const attach = screen.getByRole("button", { name: "Attach file" });
+    const send = screen.getByRole("button", { name: "Send reply" });
+    expect(attach.closest("section")).toBe(send.closest("section"));
+    // sidebar is a pure context panel — no attachments, no file input, no attachment actions
+    const sidebar = screen.getByRole("heading", { name: "Ticket details" }).closest("aside") as HTMLElement;
+    expect(sidebar.querySelector('input[type="file"]')).toBeNull();
+    expect(within(sidebar).queryByRole("heading", { name: "Attachments" })).not.toBeInTheDocument();
+    expect(within(sidebar).queryByRole("button", { name: "Add attachment" })).not.toBeInTheDocument();
+    expect(within(sidebar).queryByRole("button", { name: "Download attachment" })).not.toBeInTheDocument();
+    expect(within(sidebar).queryByRole("button", { name: "Preview attachment" })).not.toBeInTheDocument();
+    // the ticket-level Attachments list renders below the composer in the main column
+    const list = screen.getByRole("heading", { name: "Attachments" });
+    expect(list.closest("aside")).toBeNull();
+    const listSection = list.closest("section") as HTMLElement;
+    const filename = screen.getByTitle(LONG_FILENAME);
+    expect(listSection).toContainElement(filename);
+    expect(filename.className).toMatch(/truncate/);
+    expect(within(filename.closest("li") as HTMLElement).getByRole("button", { name: "Download attachment" })).toBeInTheDocument();
+    expect(within(filename.closest("li") as HTMLElement).getByRole("button", { name: "Preview attachment" })).toBeInTheDocument();
+  });
+
+  it("reveals the uploader from Attach file and collapses it on Cancel", async () => {
+    renderDetail();
+    expect(screen.queryByRole("button", { name: "Upload" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Attach file" }));
+    const choose = await screen.findByText("Choose file");
+    const upload = screen.getByRole("button", { name: "Upload" });
+    const cancel = screen.getByRole("button", { name: "Cancel" });
+    expect(choose).toBeInTheDocument();
+    expect(upload.parentElement).toBe(cancel.parentElement); // Upload + Cancel one row
+    fireEvent.click(cancel);
+    expect(screen.queryByRole("button", { name: "Upload" })).not.toBeInTheDocument();
+  });
+
+  it("shows a themed selected-file card with a contained filename, metadata, and a Remove action", async () => {
+    renderDetail();
+    fireEvent.click(screen.getByRole("button", { name: "Attach file" }));
+    const input = (await screen.findByLabelText("Select file")) as HTMLInputElement;
+    const longName = `azm_squad_customer_support_crm_super_long_filename_v12_final.pdf`;
+    fireEvent.change(input, { target: { files: [new File(["x".repeat(40 * 1024)], longName, { type: "application/pdf" })] } });
+    const name = await screen.findByTitle(longName);
+    expect(name.className).toMatch(/truncate/);
+    expect(screen.getByText(/PDF ·/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Remove file" }));
+    expect(screen.queryByTitle(longName)).not.toBeInTheDocument();
+  });
+
+  it("keeps the Send reply composer footer as a start/end row that stacks on mobile", () => {
     renderDetail();
     const send = screen.getByRole("button", { name: "Send reply" });
+    expect(send.className).toMatch(/\bbutton-primary\b/);
+    expect(send.className).toMatch(/sm:w-auto/);
     const footer = send.parentElement as HTMLElement;
     expect(footer.className).toMatch(/flex-col/);
     expect(footer.className).toMatch(/sm:flex-row/);
     expect(send.className).toMatch(/sm:ms-auto/);
   });
 
-  it("lays Manage Ticket fields out in a responsive two-column grid that collapses in the narrow sidebar", () => {
-    renderDetail();
-    const status = screen.getByLabelText("Status");
-    const grid = status.closest("div.grid") as HTMLElement;
-    expect(grid.className).toMatch(/sm:grid-cols-2/);
-    expect(grid.className).toMatch(/xl:grid-cols-1/);
-    expect(within(grid).getByLabelText("Priority")).toBeInTheDocument();
-    expect(within(grid).getByLabelText("Category")).toBeInTheDocument();
-    expect(within(grid).getByLabelText("Assigned agent")).toBeInTheDocument();
-  });
-
-  it("keeps attachment row actions grouped and reachable next to a filename", () => {
-    renderDetail();
-    const row = screen.getByTitle("note.pdf").closest("li") as HTMLElement;
-    expect(within(row).getByRole("button", { name: "Preview attachment" })).toBeInTheDocument();
-    expect(within(row).getByRole("button", { name: "Download attachment" })).toBeInTheDocument();
-  });
-
-  it("keeps Arabic labels and RTL for the action controls", async () => {
+  it("keeps Arabic labels and RTL for the sidebar controls", async () => {
     await changeAppLanguage("ar");
     renderDetail();
-    expect(screen.getByRole("button", { name: "حفظ التغييرات" }).className).toMatch(/sm:w-auto/);
+    expect(screen.getByRole("combobox", { name: "الحالة" })).toBeInTheDocument();
     expect(document.documentElement).toHaveAttribute("dir", "rtl");
   });
 });
