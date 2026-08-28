@@ -50,16 +50,16 @@ The role descriptions below include capabilities that are not yet built. As of `
 
 - Per-user Notifications read/unread: `ADMIN`, `MANAGER`, and `AGENT` can list and mutate only their own records; `CUSTOMER` is rejected.
 - SLA monitoring is not role-authenticated. `GET /api/internal/sla-monitor` accepts only the deployment scheduler's independent `CRON_SECRET`; product JWTs grant no access. Automated history has no actor, assignment stays within active `AGENT` department/branch eligibility, and alert records are delivered through the existing per-user Notifications boundary.
+- Tasks and Reminders (`feature/tasks-reminders`, ADR-029): `/api/tasks` is `ADMIN`/`MANAGER`/`AGENT` only (`CUSTOMER` → `403`, no Portal route). `ADMIN`/`MANAGER` see and manage every task; an `AGENT` sees only tasks they created or are assigned, may only self-assign, and — when assigned but not the creator — may change only the task status. Task deletion is limited to `ADMIN`/`MANAGER` or the creator. Optional ticket linkage is checked against the ticket-visibility policy for both the actor and the assignee. The due-date reminder sweep `GET /api/internal/task-reminders` is cron-only and reuses the same `CRON_SECRET` bearer check as SLA monitoring; it delivers `TASK_REMINDER` records through the per-user Notifications boundary.
 
 ### Unresolved — require a product decision before a permission can be written
 
-- Tasks and Reminders: ownership, assignment, and role visibility are undefined (`feature/tasks-reminders`).
 - Team Collaboration: scope (mentions, watchers, handoff, shared comments, or tasks) is undefined (`feature/team-collaboration`).
 - Settings is ADMIN-only: Category and SLA Rule management plus a link to the existing Quick Replies workspace. MANAGER, AGENT, and CUSTOMER receive `403` from `/api/settings/*` and cannot access `/settings`. Existing Quick Replies authorization remains unchanged.
 - Custom Branding: who may change application/Portal branding and within what bounds (`feature/custom-branding`).
 - General Audit Logs: whether a dedicated `AuditLog` beyond `TicketHistory` is introduced, and who reads it.
 
-Do not describe Notifications, Tasks, or Settings permissions as implemented. Knowledge Base management (`feature/knowledge-base`), Quick Replies management (`feature/quick-replies`), `CUSTOMER` feedback submission (`feature/customer-feedback`, integrated at `12a0c12`), `ADMIN`/`MANAGER` Reports read access (`feature/reports`, on branch), and `ADMIN`-only Users administration (`feature/user-management`, on branch) are implemented; the other role-list items below remain the target model.
+Do not describe Settings permissions as implemented in `master`. Knowledge Base management (`feature/knowledge-base`), Quick Replies management (`feature/quick-replies`), `CUSTOMER` feedback submission (`feature/customer-feedback`, integrated at `12a0c12`), `ADMIN`/`MANAGER` Reports read access (`feature/reports`, on branch), `ADMIN`-only Users administration (`feature/user-management`, on branch), and Tasks & Reminders (`feature/tasks-reminders`, on branch) are implemented; the other role-list items below remain the target model.
 
 ## Roles
 

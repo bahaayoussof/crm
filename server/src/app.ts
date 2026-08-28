@@ -20,6 +20,8 @@ import { slaAutomationRouter } from "./modules/sla-automation/sla-automation.rou
 import { portalKnowledgeArticleRouter } from "./modules/knowledge-base/knowledge-article.portal.routes.js";
 import { attachmentRouter } from "./modules/attachments/attachment.routes.js";
 import { portalAttachmentRouter } from "./modules/attachments/attachment.portal.routes.js";
+import { taskRouter } from "./modules/tasks/task.routes.js";
+import { taskReminderRouter } from "./modules/tasks/task-reminder.routes.js";
 
 
 const allowedOrigins = new Set(env.CLIENT_URLS ?? [env.CLIENT_URL]);
@@ -67,6 +69,8 @@ app.use("/api/quick-replies", quickReplyRouter);
 app.use("/api/settings", settingsRouter);
 app.use("/api/notifications", notificationRouter);
 app.use("/api/internal/sla-monitor", slaAutomationRouter);
+app.use("/api/internal/task-reminders", taskReminderRouter);
+app.use("/api/tasks", taskRouter);
 app.use("/api/attachments", attachmentRouter);
 app.use("/api/portal/knowledge-articles", portalKnowledgeArticleRouter);
 app.use("/api/portal/attachments", portalAttachmentRouter);

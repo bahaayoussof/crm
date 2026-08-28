@@ -3,6 +3,10 @@
     {
       "path": "/api/internal/sla-monitor",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/internal/task-reminders",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

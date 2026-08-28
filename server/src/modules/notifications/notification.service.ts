@@ -10,6 +10,7 @@ const notificationSelect = {
   title: true,
   message: true,
   ticketId: true,
+  taskId: true,
   readAt: true,
   createdAt: true,
 } satisfies Prisma.NotificationSelect;
@@ -87,6 +88,9 @@ export async function markAllRead(userId: string) {
  * Always accepts a Prisma.TransactionClient so the insertion is atomic
  * with the event that triggered it. Uses createMany for efficiency.
  * Deduplicates recipient IDs before insertion.
+ *
+ * Pass ticketId or taskId to link the notification to a domain record.
+ * Exactly one should be non-null per call; set the other to null explicitly.
  */
 export async function createNotifications(
   tx: Prisma.TransactionClient,
@@ -94,12 +98,21 @@ export async function createNotifications(
   type: string,
   title: string,
   message: string,
-  ticketId: string,
+  ticketId: string | null,
+  taskId?: string | null,
 ) {
   const unique = [...new Set(recipients)].filter(Boolean);
   if (unique.length === 0) return;
   const now = new Date();
   await tx.notification.createMany({
-    data: unique.map((userId) => ({ userId, type, title, message, ticketId, createdAt: now })),
+    data: unique.map((userId) => ({
+      userId,
+      type,
+      title,
+      message,
+      ticketId: ticketId ?? null,
+      taskId: taskId ?? null,
+      createdAt: now,
+    })),
   });
 }

@@ -14,7 +14,7 @@ This contract mixes live and planned endpoints. Each section is tagged:
 - `PARTIAL` — only part of the listed surface is registered; the rest is planned.
 - `PLANNED` — documented target with no registered route yet. Do not consume as a live API.
 
-Registered routers as of `master` `12a0c12` (feature/customer-feedback integrated) plus the uncommitted `feature/reports` branch: `/api/auth`, `/api/customers`, `/api/categories`, `/api/users` (lookup only), `/api/tickets`, `/api/dashboard`, `/api/reports` (`feature/reports`, on branch — ADMIN/MANAGER), `/api/knowledge-articles`, `/api/quick-replies`, `/api/attachments`, `/api/portal/knowledge-articles`, `/api/portal/attachments`, `/api/portal`, `/api/health`, plus attachment sub-routes on `/api/tickets`, `/api/customers`, and the portal ticket router (`feature/attachments`, integrated at `8e24d22`), and feedback sub-routes on the portal ticket router (`feature/customer-feedback`, integrated at `12a0c12`). There is no registered `/api/notifications`, `/api/feedback` (feedback is Portal-only), or `/api/settings` route.
+Registered routers as of `master` `12a0c12` (feature/customer-feedback integrated) plus the uncommitted `feature/reports` branch: `/api/auth`, `/api/customers`, `/api/categories`, `/api/users` (lookup only), `/api/tickets`, `/api/dashboard`, `/api/reports` (`feature/reports`, on branch — ADMIN/MANAGER), `/api/knowledge-articles`, `/api/quick-replies`, `/api/attachments`, `/api/portal/knowledge-articles`, `/api/portal/attachments`, `/api/portal`, `/api/health`, plus attachment sub-routes on `/api/tickets`, `/api/customers`, and the portal ticket router (`feature/attachments`, integrated at `8e24d22`), and feedback sub-routes on the portal ticket router (`feature/customer-feedback`, integrated at `12a0c12`). There is no registered `/api/feedback` (feedback is Portal-only) or `/api/settings` route in `master`. `/api/notifications` is integrated (`e28962b`); `/api/tasks` + `/api/internal/task-reminders` are on the uncommitted `feature/tasks-reminders` branch.
 
 ## Authentication
 
@@ -377,6 +377,34 @@ This is a deployment-scheduler endpoint, not a product API. Product JWTs, authen
 Vercel Cron invokes it every five minutes. Each execution inspects at most 100 oldest unassigned active tickets and 100 oldest resolution-SLA-breached unresolved tickets. Automatic assignment preserves every existing assignment, considers active `AGENT` users only, matches every non-null ticket department/branch constraint, chooses the lowest active assigned-ticket count, and breaks ties by agent id ascending. Automatic escalation changes a nonterminal, non-`ESCALATED` ticket to `ESCALATED` when `resolutionDueAt <= execution time`; first-response deadlines do not trigger escalation.
 
 Each mutation uses a conditional database update inside the same transaction as its `TicketHistory` row and notifications. If another or repeated execution has already assigned, escalated, resolved, closed, or otherwise changed the ticket, the conditional update affects zero rows and no history or notification is written. Automated history uses `actorUserId: null`, with actions `AUTO_ASSIGNMENT` and `SLA_AUTO_ESCALATED`. Assignment alerts go to the selected agent; escalation alerts go to active `ADMIN` and `MANAGER` users. No derived SLA state is persisted.
+
+## Tasks — LIVE (on `feature/tasks-reminders`, not yet integrated)
+
+```text
+GET    /api/tasks           list (ADMIN, MANAGER, AGENT) — ?status &assigneeId &ticketId &search &page &limit
+POST   /api/tasks           create (ADMIN, MANAGER, AGENT)
+GET    /api/tasks/:id       read one (ADMIN, MANAGER, AGENT)
+PATCH  /api/tasks/:id       update (field-level rights, see below)
+DELETE /api/tasks/:id       delete (ADMIN, MANAGER, or creator) → 204
+```
+
+`taskRouter` is registered at `/api/tasks` in `server/src/app.ts` behind `requireAuth` + `requireRole(ADMIN, MANAGER, AGENT)`. `CUSTOMER` and unauthenticated callers are rejected everywhere; there is no Portal route. New `Task` model + nullable `Notification.taskId` (migration `20260827200533_add_tasks`).
+
+- **Visibility:** `ADMIN`/`MANAGER` see every task; `AGENT` sees only tasks they created or are assigned. An `AGENT`'s `assigneeId` list filter is ignored.
+- **Assignment:** `AGENT` may only self-assign (other `assigneeId` → `403 FORBIDDEN`); `ADMIN`/`MANAGER` assign to any active `AGENT` or self (`404 ASSIGNEE_NOT_FOUND` otherwise). Assigning to another user writes one `TASK_ASSIGNED` notification in the same transaction.
+- **Ticket link (optional):** validated against ticket-visibility for the actor (`404 TICKET_NOT_FOUND`) and the effective assignee (`422 TICKET_NOT_ACCESSIBLE_BY_ASSIGNEE`). No `TicketHistory` row is written.
+- **Field-level `PATCH`:** `ADMIN`/`MANAGER` → all fields; `AGENT` creator → content, `status`, `dueAt`, `ticketId`, never `assigneeId` (`403`); `AGENT` assignee-but-not-creator → `status` only (any other field → `403`). `remindedAt` is reset when `dueAt` changes, the assignee changes, or a `DONE` task is reopened.
+- **Not found / IDOR:** any task outside the caller's visibility → `404 TASK_NOT_FOUND`.
+- A successful mutation returns `{ data: <task> }` with safe `creator` / `assignee` (`{ id, name }`) and `ticket` (`{ id, subject }`) projections — never `passwordHash` or email.
+
+### Task reminders — INTERNAL CRON
+
+```text
+GET /api/internal/task-reminders
+Authorization: Bearer <CRON_SECRET>
+```
+
+Deployment-scheduler endpoint, not a product API — reuses the **same** `CRON_SECRET` bearer check as `/api/internal/sla-monitor` (`503 CRON_NOT_CONFIGURED`, `401 CRON_AUTHENTICATION_REQUIRED`). Vercel Cron invokes it every five minutes. Each run selects at most 100 tasks with `status = OPEN`, `remindedAt IS NULL`, and `dueAt <= now`, oldest `dueAt` first; per task, inside a transaction, a conditional `updateMany({ remindedAt: null }) → count === 1` guard stamps `remindedAt` and sends one `TASK_REMINDER` notification to the assignee. Repeated or overlapping runs write nothing extra. Response is only `{ data: { inspected, reminded, generatedAt } }`.
 
 ## Quick Replies — LIVE (on `feature/quick-replies`, not yet integrated)
 

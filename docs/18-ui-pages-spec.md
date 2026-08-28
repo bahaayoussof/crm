@@ -1723,29 +1723,37 @@ No placeholders or variables, categories/folders, favorites, usage analytics, or
 
 The following original-assignment areas have no implementation and no complete specification. They are recorded here so they are not forgotten. Do not invent final schemas, endpoints, permissions, or screen layouts for them during unrelated work. Existing frontend design rules, English/Arabic behavior, RTL, responsive behavior, and role navigation rules still apply once each is specified.
 
-## Tasks (Agent Dashboard)
+# 24. Tasks & Reminders
 
-Status: product decision required before implementation. Branch: `feature/tasks-reminders`.
+Status: IMPLEMENTED on `feature/tasks-reminders` (uncommitted, automated-verified only). ADR-029. Resolutions to the former decision points:
 
-Required decision points:
-- data model and storage
-- ownership (creator vs assignee) and whether a task can be assigned to another user
-- optional linkage to a ticket and/or a customer
-- due date and completion model
-- role visibility (own only, team, manager oversight)
-- relationship to Notifications
-- placement: Dashboard section, ticket workspace panel, or dedicated route
+- **Data model:** new `Task` model (`title`, `description?`, `status` OPEN/DONE, `dueAt?`, `remindedAt?`, `ticketId?`, `creatorId`, `assigneeId`) + nullable `Notification.taskId`.
+- **Ownership / assignment:** creator + assignee are separate. `AGENT` may only self-assign; `ADMIN`/`MANAGER` may assign to any active `AGENT`. Cross-user assignment sends a `TASK_ASSIGNED` in-app notification.
+- **Linkage:** optional ticket link only (no direct customer link — reachable through the ticket). Validated against ticket visibility for the actor and the assignee.
+- **Completion:** two-state `status` toggle (mark done / reopen); reopening a `DONE` task with a due date re-arms its reminder.
+- **Role visibility:** `ADMIN`/`MANAGER` see all tasks; `AGENT` sees only tasks they created or are assigned.
+- **Placement:** dedicated `/tasks` route with a **Support**-section nav item for all internal roles — not a Dashboard widget. `/tasks/:id` detail + `/tasks/new` / `/tasks/:id/edit` form.
 
-## Reminders (Agent Dashboard)
+## List page (`/tasks`)
 
-Status: product decision required before implementation. Branch: `feature/tasks-reminders`.
+- Toolbar: debounced search (title/description) + status `AppSelect` (all/Open/Done) always; assignee `AppSelect` for `ADMIN`/`MANAGER` only. All filters sync to URL search params.
+- TanStack `table` (desktop) + card list (mobile). Columns: Task (title link → detail, linked-ticket sub-link), Status (badge + client-computed **Overdue** badge when `status = OPEN` and `dueAt` is past), Assignee, Due (datetime, LTR-isolated), Actions.
+- Row actions gated by field-level rights: mark-done/reopen (anyone who can edit status), Edit (content editors), Delete (creator or ADMIN/MANAGER). The delete confirmation (`task-delete-confirm.tsx`) is a `role="dialog"` popover **portalled to `document.body`** and anchored to the trigger via the shared `use-anchored-popover.ts` primitive — it floats above the table, flips above when short, clamps to the viewport, and never grows the table's `overflow-x-auto` scroll area. `TaskTable` hoists a single `{ id, variant: "desktop" | "mobile" }` open key so exactly one portalled dialog mounts (the desktop row and mobile card are both in the tree), and clears it on filter/pagination.
+- Loading skeleton / error-retry / empty / no-matches states.
 
-Required decision points:
-- whether a reminder is a lightweight variant of a Task or a separate model
-- time trigger and how it surfaces without background workers on serverless
-- snooze / dismiss behavior
-- ticket/customer linkage
-- relationship to Notifications and to SLA alerts
+## Detail page (`/tasks/:id`)
+
+Read-only: title heading, status + overdue badges, description, assignee, creator, due date, created date, linked ticket. Back / mark-done-reopen / Edit actions per rights; Delete button for creator or ADMIN/MANAGER.
+
+## Form page (`/tasks/new`, `/tasks/:id/edit`)
+
+- Fields: Title, Description, Due date (`datetime-local`), Status (`AppSelect`, edit only), Assignee (`AppSelect` of active agents, only for ADMIN/MANAGER).
+- Assignee-only `AGENT` editors see a status-only form (all other fields disabled) with an explanatory note — mirrors the server field-level matrix.
+- Create payload sends only the fields provided; empty description/due clear to `null` on edit.
+
+## Reminders
+
+A reminder is **not** a separate model — it is the due-date sweep over `Task`. Cron-only `GET /api/internal/task-reminders` (reuses `CRON_SECRET`, `*/5` Vercel cron) finds `OPEN` past-due tasks with `remindedAt IS NULL`, stamps `remindedAt`, and sends one `TASK_REMINDER` notification to the assignee. No snooze UI (reopen/adjust due date re-arms it); surfaces through the existing Notifications center only; in-app only, no email/push. Serverless-safe: no background worker, the scheduler drives it and the conditional `updateMany` guard makes overlapping runs idempotent.
 
 ## Team Collaboration
 

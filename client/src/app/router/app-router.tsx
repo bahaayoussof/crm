@@ -28,6 +28,9 @@ import { UserManageRoute } from "./user-manage-route";
 import { TicketEditRoute } from "./ticket-edit-route";
 import { SettingsPage } from "@/features/settings/settings-page";
 import { SettingsRoute } from "./settings-route";
+import { TaskDetailPage } from "@/features/tasks/task-detail-page";
+import { TaskFormPage } from "@/features/tasks/task-form-page";
+import { TaskListPage } from "@/features/tasks/task-list-page";
 
 export function AppRouter() {
   return <BrowserRouter><Routes>
@@ -51,6 +54,10 @@ export function AppRouter() {
         <Route path="/knowledge-base/:id/edit" element={<KnowledgeArticleFormPage />} />
       </Route>
       <Route path="/knowledge-base/:id" element={<KnowledgeBaseDetailPage />} />
+      <Route path="/tasks" element={<TaskListPage />} />
+      <Route path="/tasks/new" element={<TaskFormPage />} />
+      <Route path="/tasks/:id" element={<TaskDetailPage />} />
+      <Route path="/tasks/:id/edit" element={<TaskFormPage />} />
       <Route element={<QuickReplyManageRoute />}>
         <Route path="/quick-replies" element={<QuickReplyListPage />} />
         <Route path="/quick-replies/new" element={<QuickReplyFormPage />} />

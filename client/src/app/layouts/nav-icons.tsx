@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  CheckSquare,
   LayoutDashboard,
   LogOut,
   MessageSquareQuote,
@@ -36,6 +37,10 @@ export function ReportsNavIcon(props: LucideProps) {
 
 export function QuickRepliesNavIcon(props: LucideProps) {
   return <MessageSquareQuote size={18} strokeWidth={1.75} aria-hidden="true" {...props} />;
+}
+
+export function TasksNavIcon(props: LucideProps) {
+  return <CheckSquare size={18} strokeWidth={1.75} aria-hidden="true" {...props} />;
 }
 
 export function UsersNavIcon(props: LucideProps) {

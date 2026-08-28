@@ -15,6 +15,7 @@ import {
   KnowledgeBaseNavIcon,
   QuickRepliesNavIcon,
   ReportsNavIcon,
+  TasksNavIcon,
   TicketsNavIcon,
   UsersNavIcon,
   SettingsNavIcon,
@@ -52,6 +53,7 @@ export function Sidebar({ user, collapsed, onToggleCollapsed, onLogout }: Sideba
       { to: "/tickets", key: "tickets", icon: TicketsNavIcon },
       { to: "/customers", key: "customers", icon: CustomersNavIcon },
       { to: "/knowledge-base", key: "knowledgeBase", icon: KnowledgeBaseNavIcon },
+      { to: "/tasks", key: "tasks", icon: TasksNavIcon },
     ],
   };
 

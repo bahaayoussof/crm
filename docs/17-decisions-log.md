@@ -699,3 +699,38 @@ The CRM required a cohesive, modern visual identity aligned with high-end SaaS d
 
 All UI components (buttons, badges, inputs, selects, cards, tables, popovers, modals, ticket timeline) consume semantic CSS variables instead of hardcoded tailwind color classes. Automated tests (353 client tests) and browser visual verification in both Light and Dark modes pass with 100% success.
 
+
+---
+
+## ADR-029: Tasks & Reminders — new `Task` model, internal-only, due-date reminder sweep reuses `CRON_SECRET`
+
+**Status:** Accepted (implemented on `feature/tasks-reminders`, uncommitted; automated-verified only)
+
+**Context**
+
+Roadmap order 10. The original assignment asks for agent tasks/to-dos with due dates and reminders. `docs/06` and `docs/19` flagged ownership, assignment, linkage, and role-visibility as an unresolved product decision. No `Task` model existed. A prior session scaffolded `server/src/modules/tasks/` (schema/service/controller/routes) plus schema + migration but never wired or tested it; this cycle resolves the contract and completes the feature.
+
+**Decision**
+
+- **New schema** (`migration 20260827200533_add_tasks`): `Task { id, title, description?, status TaskStatus(OPEN|DONE) @default(OPEN), dueAt?, remindedAt?, ticketId?, creatorId, assigneeId, createdAt, updatedAt }` with `creator`/`assignee` → `User` (`Restrict`), `ticket` → `Ticket` (`SetNull`), and `Notification` gains a nullable `taskId` (`SetNull`) + index. `remindedAt` is a sweep bookmark, not a user field.
+- **Internal-only.** `taskRouter` at `/api/tasks` behind `requireAuth` + `requireRole(ADMIN, MANAGER, AGENT)`. No Portal route, no `CUSTOMER` access.
+- **Visibility:** `ADMIN`/`MANAGER` see all tasks; `AGENT` sees only tasks they created **or** are assigned (`OR: [creatorId, assigneeId]`). An `AGENT`'s `assigneeId` list filter is silently ignored (they cannot browse another user's queue).
+- **Assignment:** `AGENT` may only self-assign (any other `assigneeId` → `403 FORBIDDEN`); `ADMIN`/`MANAGER` may assign to any **active `AGENT`** or themselves (`404 ASSIGNEE_NOT_FOUND` otherwise). Assigning to someone other than the actor emits one `TASK_ASSIGNED` in-app notification inside the create/update transaction.
+- **Ticket linkage** is optional and validated against the existing ticket-visibility policy for **both** the actor and the effective assignee (`404 TICKET_NOT_FOUND` for the actor, `422 TICKET_NOT_ACCESSIBLE_BY_ASSIGNEE` for the assignee). No new ticket history rows.
+- **Field-level update matrix** (server-enforced, mirrored client-side in `task-permissions.ts`): `ADMIN`/`MANAGER` → all fields; `AGENT` creator → content + status + dueAt + ticketId, never `assigneeId` (`403`); `AGENT` assignee-only → **status only** (any other field → `403`). `remindedAt` resets to `null` when `dueAt` changes, the assignee changes, or a `DONE` task is reopened.
+- **Delete:** `ADMIN`/`MANAGER` or the creator; assignee-only `AGENT` → `403`. Hard delete (`Restrict` FKs are creator/assignee only, always satisfiable).
+- **Reminder sweep:** new cron-only `GET /api/internal/task-reminders` reusing `requireCronSecret` (the same `CRON_SECRET` bearer check as SLA monitoring — no separate secret) and a `*/5 * * * *` Vercel cron entry. `runTaskReminders(now)` selects `status=OPEN, remindedAt=null, dueAt<=now` in bounded batches of 100, and per task, inside a transaction, guards with `updateMany({ remindedAt: null }) → count===1` before stamping `remindedAt` and sending one `TASK_REMINDER` notification to the assignee. Idempotent; no persisted derived state beyond `remindedAt`.
+- **Frontend `client/src/features/tasks/`:** `/tasks` list (search + status filter always; assignee filter for `ADMIN`/`MANAGER`; TanStack table + mobile cards; per-row mark-done/reopen, edit, delete-confirm gated by the field-level scope), `/tasks/:id` read-only detail, `/tasks/new` + `/tasks/:id/edit` form (assignee-only editors see a status-only form). Nav item in the **Support** section for all internal roles. `tasks.*` + `navigation.tasks` EN/AR (763/763 parity), RTL, LTR-isolated dates, overdue badge computed client-side.
+- **Out of scope (explicit):** recurring tasks, subtasks/checklists, task comments, email/push reminders (in-app only), calendar view, bulk actions, per-task watchers (that is `feature/team-collaboration`), reminder lead-time configuration (fires once at/after `dueAt`).
+
+**Reason**
+
+Tasks have their own lifecycle, ownership, and due dates — unlike Feedback/Quick Replies/Reports there is no existing row to reuse, so a dedicated model is the honest choice. The visibility and assignment rules track the existing agent/ticket ownership model (ADR-015) so there is nothing new to learn. Reusing `CRON_SECRET` and the SLA-monitor auth/route/transaction pattern keeps the second cron job consistent and avoids a second deployment secret. A single `remindedAt` bookmark plus a guarded `updateMany` is the smallest idempotent design that survives overlapping cron runs.
+
+**Alternatives Considered**
+
+Reuse `TicketHistory`/notes as ad-hoc reminders (rejected — no due date, no assignment, no status). A separate `TASK_REMINDER_SECRET` (rejected — nothing distinguishes it from SLA monitoring operationally). Persisting a full reminder/queue table (rejected — `dueAt` + `remindedAt` on the task is enough at assessment scale). Letting `AGENT` assign to peers (rejected — not requested; self-assign + manager-assign covers the workflow). A dedicated route guard component for `/tasks` (rejected — `ProtectedRoute audience="internal"` already blocks `CUSTOMER`; the list page redirects a non-internal role defensively).
+
+**Consequences**
+
+One migration (`Task` + `Notification.taskId`). `notification.service.ts` `createNotifications` signature widened: `ticketId` is now `string | null` with an optional trailing `taskId` — existing callers pass `null` for the new arg implicitly and are unaffected. `app.ts` gains two routers. `server/vercel.json` gains one cron entry. Full suites: **server 383 / client 380**, 0 failed. Server lint/typecheck green; client typecheck/build green (client repo lint keeps its 10 pre-existing unused-import errors, none in `features/tasks/`). PostgreSQL, live Vercel Cron, and authenticated English/Arabic browser verification were not performed. Suggested commit: `feat: implement tasks and reminders`. Next roadmap branch: `feature/team-collaboration` (order 11).
