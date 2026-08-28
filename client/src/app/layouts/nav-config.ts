@@ -1,0 +1,94 @@
+import type { AuthUser } from "@/features/auth/auth.types";
+import type { ProtectedAudience } from "@/features/auth/auth-routing";
+import { canManageQuickReplies } from "@/features/quick-replies/quick-reply-permissions";
+import { canViewReports } from "@/features/reports/reports-permissions";
+import { canManageUsers } from "@/features/users/user-permissions";
+import {
+  CustomersNavIcon,
+  DashboardNavIcon,
+  KnowledgeBaseNavIcon,
+  NewRequestNavIcon,
+  QuickRepliesNavIcon,
+  ReportsNavIcon,
+  SettingsNavIcon,
+  TasksNavIcon,
+  TicketsNavIcon,
+  UsersNavIcon,
+} from "./nav-icons";
+import type { NavSectionConfig } from "./sidebar/sidebar-types";
+
+/**
+ * Single source of truth for primary navigation, consumed by both the desktop
+ * `Sidebar` and the responsive drawer in `AppShell`. Role/permission gating and
+ * audience (internal CRM vs. customer portal) selection live here only — the
+ * shell components render whatever sections this returns.
+ *
+ * Frontend gating is presentation only. Backend RBAC and data-ownership scoping
+ * remain the authoritative access boundary for every route listed here.
+ */
+export function getNavigationSections(
+  user: AuthUser | null,
+  audience: ProtectedAudience,
+): NavSectionConfig[] {
+  if (audience === "customer") {
+    return [
+      {
+        id: "portal",
+        labelKey: "navigation.sections.support",
+        label: "Support",
+        items: [
+          { to: "/portal", key: "portalOverview", icon: DashboardNavIcon, end: true },
+          { to: "/portal/tickets", key: "portalRequests", icon: TicketsNavIcon },
+          { to: "/portal/tickets/new", key: "portalNewRequest", icon: NewRequestNavIcon },
+          { to: "/portal/knowledge-base", key: "portalKnowledgeBase", icon: KnowledgeBaseNavIcon },
+        ],
+      },
+    ];
+  }
+
+  const sections: NavSectionConfig[] = [
+    {
+      id: "main",
+      labelKey: "navigation.sections.main",
+      label: "Main",
+      items: [{ to: "/dashboard", key: "dashboard", icon: DashboardNavIcon }],
+    },
+    {
+      id: "support",
+      labelKey: "navigation.sections.support",
+      label: "Support",
+      items: [
+        { to: "/tickets", key: "tickets", icon: TicketsNavIcon },
+        { to: "/customers", key: "customers", icon: CustomersNavIcon },
+        { to: "/knowledge-base", key: "knowledgeBase", icon: KnowledgeBaseNavIcon },
+        { to: "/tasks", key: "tasks", icon: TasksNavIcon },
+      ],
+    },
+  ];
+
+  const managementItems = [
+    ...(user && canViewReports(user.role)
+      ? [{ to: "/reports", key: "reports", icon: ReportsNavIcon }]
+      : []),
+    ...(user && canManageQuickReplies(user.role)
+      ? [{ to: "/quick-replies", key: "quickReplies", icon: QuickRepliesNavIcon }]
+      : []),
+    ...(user && canManageUsers(user.role)
+      ? [{ to: "/users", key: "users", icon: UsersNavIcon }]
+      : []),
+    ...(user?.role === "ADMIN"
+      ? [{ to: "/settings", key: "settings", icon: SettingsNavIcon }]
+      : []),
+  ];
+
+  if (managementItems.length > 0) {
+    sections.push({
+      id: "management",
+      labelKey: "navigation.sections.management",
+      label: "Management",
+      items: managementItems,
+    });
+  }
+
+  return sections;
+}

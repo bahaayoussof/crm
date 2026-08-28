@@ -7,22 +7,10 @@ import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { useAuth } from "@/features/auth/auth-state";
 import { NotificationBell } from "@/features/notifications/notification-bell";
 import type { ProtectedAudience } from "@/features/auth/auth-routing";
-import { canManageQuickReplies } from "@/features/quick-replies/quick-reply-permissions";
-import { canViewReports } from "@/features/reports/reports-permissions";
-import { canManageUsers } from "@/features/users/user-permissions";
 import { cn } from "@/lib/utils";
 import { Menu, X } from "lucide-react";
-import {
-  CustomersNavIcon,
-  DashboardNavIcon,
-  KnowledgeBaseNavIcon,
-  LogoutIcon,
-  QuickRepliesNavIcon,
-  ReportsNavIcon,
-  TicketsNavIcon,
-  UsersNavIcon,
-  SettingsNavIcon,
-} from "./nav-icons";
+import { LogoutIcon } from "./nav-icons";
+import { getNavigationSections } from "./nav-config";
 import { Sidebar } from "./sidebar/sidebar";
 
 function getStoredCollapsed(): boolean {
@@ -78,73 +66,10 @@ export function AppShell({ audience, children }: PropsWithChildren<{ audience: P
         .join("") || user.name.slice(0, 2).toUpperCase()
     : "U";
 
-  // Customer Portal Layout
-  if (audience === "customer") {
-    return (
-      <div className="min-h-[100dvh] bg-background text-foreground">
-        <header className="sticky top-0 z-40 border-b border-border bg-surface shadow-xs">
-          <div className="mx-auto flex min-h-16 w-full max-w-7xl flex-wrap items-center justify-between gap-x-3 px-4 py-2 sm:px-6 lg:px-8">
-            <div className="flex items-center gap-3">
-              <div className="flex size-8 items-center justify-center rounded-lg bg-foreground text-background font-bold text-sm shadow-xs">
-                CS
-              </div>
-              <span className="min-w-0 truncate text-sm font-semibold tracking-tight text-foreground">
-                {t("app.title")}
-              </span>
-            </div>
-            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-              <div className="hidden text-end sm:block">
-                <p className="max-w-40 truncate text-sm font-medium text-foreground" dir="auto">
-                  {user?.name}
-                </p>
-                <p className="text-xs text-muted-foreground">{t("navigation.portalContext")}</p>
-              </div>
-              <LanguageSwitcher />
-              <button
-                type="button"
-                className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-surface-subtle hover:text-foreground"
-                onClick={signOut}
-              >
-                <LogoutIcon className="size-3.5" />
-                <span>{t("auth.logout")}</span>
-              </button>
-            </div>
-            <nav className="order-last mt-2 flex h-9 w-full items-end gap-6" aria-label={t("navigation.primary")}>
-              <NavLink
-                to="/portal"
-                end
-                className={({ isActive }) =>
-                  cn(
-                    "flex h-9 items-center border-b-2 px-1 text-xs font-medium transition-colors",
-                    isActive
-                      ? "border-primary text-primary font-semibold"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
-                  )
-                }
-              >
-                {t("navigation.portalHome")}
-              </NavLink>
-            </nav>
-          </div>
-        </header>
-        <div className="min-h-[calc(100dvh-4rem)]">{children}</div>
-      </div>
-    );
-  }
-
-  // Role-aware Navigation list
-  const navigation = [
-    { to: "/dashboard", key: "dashboard", icon: DashboardNavIcon },
-    { to: "/tickets", key: "tickets", icon: TicketsNavIcon },
-    { to: "/customers", key: "customers", icon: CustomersNavIcon },
-    { to: "/knowledge-base", key: "knowledgeBase", icon: KnowledgeBaseNavIcon },
-    ...(user && canViewReports(user.role) ? [{ to: "/reports", key: "reports", icon: ReportsNavIcon } as const] : []),
-    ...(user && canManageQuickReplies(user.role)
-      ? [{ to: "/quick-replies", key: "quickReplies", icon: QuickRepliesNavIcon } as const]
-      : []),
-    ...(user && canManageUsers(user.role) ? [{ to: "/users", key: "users", icon: UsersNavIcon } as const] : []),
-    ...(user?.role === "ADMIN" ? [{ to: "/settings", key: "settings", icon: SettingsNavIcon } as const] : []),
-  ];
+  // Single source of truth for navigation — shared by the desktop `Sidebar`
+  // and the responsive drawer below. Role/audience gating lives in nav-config.
+  const navItems = getNavigationSections(user, audience).flatMap((section) => section.items);
+  const isInternal = audience === "internal";
 
   return (
     <div
@@ -156,6 +81,7 @@ export function AppShell({ audience, children }: PropsWithChildren<{ audience: P
       {/* Desktop Redesigned Sidebar */}
       <Sidebar
         user={user}
+        audience={audience}
         collapsed={collapsed}
         onToggleCollapsed={toggleCollapsed}
         onLogout={signOut}
@@ -193,19 +119,19 @@ export function AppShell({ audience, children }: PropsWithChildren<{ audience: P
                 <span className="font-medium text-foreground" dir="auto">
                   {user?.name}
                 </span>{" "}
-                · {t("navigation.workspaceContext")}
+                · {t(isInternal ? "navigation.workspaceContext" : "navigation.portalContext")}
               </p>
             </div>
 
             {/* Desktop Header Right Controls */}
             <div className="hidden lg:flex shrink-0 items-center gap-3">
-              <NotificationBell />
+              {isInternal && <NotificationBell />}
               <LanguageSwitcher />
             </div>
 
             {/* Mobile Header Right Profile Avatar Button */}
             <div className="lg:hidden flex shrink-0 items-center gap-2">
-              <NotificationBell />
+              {isInternal && <NotificationBell />}
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(true)}
@@ -263,13 +189,14 @@ export function AppShell({ audience, children }: PropsWithChildren<{ audience: P
 
                 {/* Drawer Navigation Links */}
                 <nav className="space-y-1" aria-label={t("navigation.primary")}>
-                  {navigation.map((item) => {
-                    const label = t(`navigation.${item.key}`);
+                  {navItems.map((item) => {
+                    const label = t(`navigation.${item.key}`, { defaultValue: item.label || item.key });
                     const Icon = item.icon;
                     return (
                       <NavLink
                         key={item.to}
                         to={item.to}
+                        end={item.end}
                         onClick={() => setMobileMenuOpen(false)}
                         className={({ isActive }) =>
                           cn(

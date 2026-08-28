@@ -25,7 +25,7 @@ describe("portal pages", () => {
     mocks.feedback.mockReturnValue({ mutateAsync: mocks.mutate, isPending: false });
   });
   it("shows overview metrics and responsive recent requests", () => { renderPage(<PortalHomePage />); expect(screen.getByRole("heading", { name: "Welcome, Ahmed" })).toBeInTheDocument(); expect(screen.getByText("Waiting for You")).toBeInTheDocument(); expect(screen.getAllByText("Payment help")).toHaveLength(2); expect(screen.getByRole("table")).toBeInTheDocument(); });
-  it("renders loading and retry states", () => { mocks.overview.mockReturnValue({ isLoading: true }); const view = renderPage(<PortalHomePage />); expect(screen.getByText(/Loading your support overview/)).toBeInTheDocument(); view.unmount(); mocks.overview.mockReturnValue({ isError: true, refetch: mocks.refetch }); renderPage(<PortalHomePage />); fireEvent.click(screen.getByRole("button", { name: "Retry" })); expect(mocks.refetch).toHaveBeenCalled(); });
+  it("renders loading and retry states", () => { mocks.overview.mockReturnValue({ isLoading: true }); const view = renderPage(<PortalHomePage />); expect(screen.getByTestId("portal-overview-skeleton")).toBeInTheDocument(); view.unmount(); mocks.overview.mockReturnValue({ isError: true, refetch: mocks.refetch }); renderPage(<PortalHomePage />); fireEvent.click(screen.getByRole("button", { name: "Retry" })); expect(mocks.refetch).toHaveBeenCalled(); });
   it("owns filters in the URL and renders no results", () => {
     mocks.tickets.mockReturnValue({ data: { data: [], meta: { page: 1, totalPages: 0 } } });
     renderPage(<PortalTicketsPage />, "/portal/tickets?search=missing&status=RESOLVED");
@@ -204,7 +204,7 @@ describe("portal ticket details shares the internal ticket design", () => {
     mocks.detail.mockReturnValue({ data: detail() });
     renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
     const heading = screen.getByRole("heading", { name: "Attachments" });
-    const card = heading.closest("section.rounded-md.border.bg-white") as HTMLElement;
+    const card = heading.closest("section.rounded-md.border.bg-card") as HTMLElement;
     expect(card).toBeTruthy();
   });
 

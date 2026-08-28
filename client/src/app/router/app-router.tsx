@@ -12,7 +12,6 @@ import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { CustomerManageRoute } from "./customer-manage-route";
 import { PortalHomePage, PortalNewTicketPage, PortalTicketDetailPage, PortalTicketsPage } from "@/features/portal/portal-pages";
 import { PortalKnowledgeArticlePage, PortalKnowledgeBasePage } from "@/features/portal/portal-knowledge-pages";
-import { PortalShell } from "@/features/portal/portal-ui";
 import { KnowledgeArticleFormPage } from "@/features/knowledge-base/knowledge-article-form-page";
 import { KnowledgeBaseDetailPage } from "@/features/knowledge-base/knowledge-base-detail-page";
 import { KnowledgeBaseListPage } from "@/features/knowledge-base/knowledge-base-list-page";
@@ -73,7 +72,14 @@ export function AppRouter() {
       </Route>
       <Route element={<SettingsRoute />}><Route path="/settings" element={<SettingsPage />} /></Route>
     </Route>
-    <Route element={<ProtectedRoute audience="customer" />}><Route path="/portal" element={<PortalShell />}><Route index element={<PortalHomePage />} /><Route path="tickets" element={<PortalTicketsPage />} /><Route path="tickets/new" element={<PortalNewTicketPage />} /><Route path="tickets/:id" element={<PortalTicketDetailPage />} /><Route path="knowledge-base" element={<PortalKnowledgeBasePage />} /><Route path="knowledge-base/:id" element={<PortalKnowledgeArticlePage />} /></Route></Route>
+    <Route element={<ProtectedRoute audience="customer" />}>
+      <Route path="/portal" element={<PortalHomePage />} />
+      <Route path="/portal/tickets" element={<PortalTicketsPage />} />
+      <Route path="/portal/tickets/new" element={<PortalNewTicketPage />} />
+      <Route path="/portal/tickets/:id" element={<PortalTicketDetailPage />} />
+      <Route path="/portal/knowledge-base" element={<PortalKnowledgeBasePage />} />
+      <Route path="/portal/knowledge-base/:id" element={<PortalKnowledgeArticlePage />} />
+    </Route>
     <Route path="*" element={<Navigate to="/login" replace />} />
   </Routes></BrowserRouter>;
 }

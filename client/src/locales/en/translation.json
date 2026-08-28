@@ -6,6 +6,7 @@
     "languageSwitcher": "Choose language", "primary": "Primary navigation", "dashboard": "Dashboard", "tickets": "Tickets", "customers": "Customers", "knowledgeBase": "Knowledge Base", "tasks": "Tasks", "reports": "Reports", "quickReplies": "Quick Replies", "users": "Users", "settings": "Settings",
     "collapseSidebar": "Collapse sidebar", "expandSidebar": "Expand sidebar",
     "portalHome": "Portal home", "portalContext": "Support portal", "workspaceContext": "Support workspace", "openCustomers": "Open customer records",
+    "portalOverview": "Overview", "portalRequests": "My Requests", "portalNewRequest": "New Request", "portalKnowledgeBase": "Help Center",
     "sections": { "main": "Main", "support": "Support", "management": "Management" }
   },
   "common": {
@@ -388,7 +389,7 @@
     "loadingOverview": "Loading your support overview…", "overviewError": "Unable to load your support overview.", "myRequests": "My Requests", "requestsDescription": "Review and follow your support requests.", "newRequest": "New Request",
     "ticketId": "Ticket ID", "subject": "Subject", "statusLabel": "Status", "category": "Category", "optional": "(optional)", "created": "Created", "updated": "Updated", "search": "Search requests…", "filters": "Request filters", "allStatuses": "All statuses",
     "status": { "OPEN": "Open", "IN_PROGRESS": "In progress", "WAITING_FOR_YOU": "Waiting for you", "RESOLVED": "Resolved", "CLOSED": "Closed" },
-    "loadingRequests": "Loading your requests…", "requestsError": "Unable to load your requests.", "empty": "You have no support requests yet.", "noMatches": "No requests match your search or filter.", "pagination": "Request pages", "page": "Page {{page}} of {{total}}",
+    "loadingRequests": "Loading your requests…", "requestsError": "Unable to load your requests.", "empty": "You have no support requests yet.", "emptyRecentHint": "Create a request and our support team will help you.", "noMatches": "No requests match your search or filter.", "noMatchesTitle": "No matching requests", "pagination": "Request pages", "page": "Page {{page}} of {{total}}",
     "newDescription": "Tell us what you need help with.", "selectCategory": "Select a category (optional)", "categoriesError": "Categories could not be loaded", "descriptionLabel": "Description", "createError": "Unable to create this request. Your content has been preserved.", "creating": "Creating…",
     "validation": { "subject": "Subject must be between 3 and 200 characters.", "description": "Description is required and must be 20,000 characters or fewer." },
     "loadingDetail": "Loading request details…", "notFound": "This request was not found.", "detailError": "Unable to load this request.", "back": "Back to My Requests", "conversation": "Conversation", "conversationDescription": "Messages between you and the support team.", "timelineLabel": "Request conversation", "noMessages": "No public replies yet.",

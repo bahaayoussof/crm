@@ -1,5 +1,5 @@
 import axios from "axios";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { formatTicketDate } from "@/features/tickets/ticket-format";
@@ -7,6 +7,7 @@ import { usePortalKnowledgeArticle, usePortalKnowledgeArticles } from "./portal-
 import type { PortalKnowledgeArticle } from "./portal.types";
 import { PortalPage, PortalPageHeader, PortalState } from "./portal-ui";
 import { FilterBar } from "@/components/shared/filter-bar";
+import { EmptyState } from "@/components/shared/empty-state";
 
 const errorCode = (error: unknown) => (axios.isAxiosError(error) ? (error.response?.data?.error?.code as string | undefined) : undefined);
 
@@ -14,7 +15,7 @@ function ArticleCard({ article }: { article: PortalKnowledgeArticle }) {
   const { t, i18n } = useTranslation();
   return (
     <Link
-      className="block rounded-xl border border-border bg-surface p-5 shadow-subtle transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+      className="block rounded-lg border border-border bg-card p-5 transition-colors hover:border-border-strong hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
       to={`/portal/knowledge-base/${article.id}`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -74,7 +75,11 @@ export function PortalKnowledgeBasePage() {
           )}
         </>
       ) : (
-        <PortalState>{search || category.trim() ? t("portal.knowledgeBase.noMatches") : t("portal.knowledgeBase.empty")}</PortalState>
+        <EmptyState
+          className="mt-4"
+          icon={<Search className="size-5" aria-hidden="true" />}
+          title={search || category.trim() ? t("portal.knowledgeBase.noMatches") : t("portal.knowledgeBase.empty")}
+        />
       )}
     </PortalPage>
   );
@@ -113,7 +118,7 @@ export function PortalKnowledgeArticlePage() {
           <span>{t("portal.updated")}: <bdi dir="ltr">{formatTicketDate(article.updatedAt, i18n.language)}</bdi></span>
         </p>
       </header>
-      <article className="mt-6 max-w-3xl rounded-xl border border-border bg-surface p-6 sm:p-8 whitespace-pre-wrap break-words text-sm leading-7 text-foreground shadow-subtle" dir="auto">
+      <article className="mt-6 max-w-3xl rounded-md border border-border bg-card p-6 sm:p-8 whitespace-pre-wrap break-words text-sm leading-7 text-foreground" dir="auto">
         {article.content}
       </article>
     </PortalPage>

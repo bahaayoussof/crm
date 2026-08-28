@@ -14,6 +14,8 @@ export interface NavItemConfig {
   icon: ComponentType<LucideProps>;
   label?: string;
   badge?: string | number;
+  /** Pass-through to React Router `NavLink` — exact-match active state. */
+  end?: boolean;
   children?: NavChildItem[];
 }
 

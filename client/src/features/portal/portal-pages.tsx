@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
-import { ArrowLeft, Star } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clock, Inbox, Star } from "lucide-react";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
@@ -13,10 +13,9 @@ import { AttachmentPanel, MessageAttachmentList } from "@/features/attachments/a
 import { usePortalTicketAttachments, useUploadPortalTicketAttachment } from "@/features/attachments/attachment-hooks";
 import { portalTicketSchema, type PortalTicketForm } from "./portal.schemas";
 import { useCreatePortalTicket, usePortalCategories, usePortalOverview, usePortalTicket, usePortalTickets, useReplyPortalTicket, useSubmitPortalFeedback } from "./portal-hooks";
-import type { PortalTicket, PortalTicketDetail, PortalTicketStatus } from "./portal.types";
+import type { PortalOverview, PortalTicket, PortalTicketDetail, PortalTicketStatus } from "./portal.types";
 import { PortalPage, PortalPageHeader, PortalState, PortalStatus, TicketRef } from "./portal-ui";
 import {
-  TableContainer,
   Table,
   TableHeader,
   TableBody,
@@ -28,8 +27,11 @@ import {
   DataTableSurface,
   DataTableToolbar,
   DataTableSearch,
+  DataTableSkeleton,
 } from "@/components/shared/data-table";
 import { DataTablePagination } from "@/components/shared/data-table/data-table-pagination";
+import { MetricCard } from "@/components/shared/metric-card";
+import { EmptyState } from "@/components/shared/empty-state";
 
 const statuses: PortalTicketStatus[] = ["OPEN", "IN_PROGRESS", "WAITING_FOR_YOU", "RESOLVED", "CLOSED"];
 const errorCode = (error: unknown) => axios.isAxiosError(error) ? error.response?.data?.error?.code as string | undefined : undefined;
@@ -111,21 +113,38 @@ function TicketRows({ tickets }: { tickets: PortalTicket[] }) {
   );
 }
 
+const homeMetrics: { key: keyof PortalOverview["counts"]; icon: React.ReactNode; variant: "primary" | "warning" | "success" }[] = [
+  { key: "open", icon: <Inbox className="size-4" aria-hidden="true" />, variant: "primary" },
+  { key: "waitingForYou", icon: <Clock className="size-4" aria-hidden="true" />, variant: "warning" },
+  { key: "resolved", icon: <CheckCircle2 className="size-4" aria-hidden="true" />, variant: "success" },
+];
+
 export function PortalHomePage() {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const query = usePortalOverview();
+  const nf = new Intl.NumberFormat(i18n.language === "ar" ? "ar-EG" : "en-US");
   return <PortalPage>
     <PortalPageHeader title={t("portal.welcome", { name: user?.name })} description={t("portal.homeDescription")} action={<Link className="button-link w-full sm:w-auto" to="/portal/tickets/new">{t("portal.createAction")}</Link>} />
-    {query.isLoading ? <PortalState>{t("portal.loadingOverview")}</PortalState> : query.isError ? <PortalState retry={() => query.refetch()}>{t("portal.overviewError")}</PortalState> : <>
+    {query.isLoading ? (
+      <div className="mt-6 space-y-8" data-testid="portal-overview-skeleton" aria-label={t("portal.loadingOverview")}>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {homeMetrics.map((metric) => <div className="h-[4.75rem] animate-pulse rounded-lg bg-muted" key={metric.key} />)}
+        </div>
+        <div className="h-52 animate-pulse rounded-lg bg-muted" />
+      </div>
+    ) : query.isError ? (
+      <PortalState retry={() => query.refetch()}>{t("portal.overviewError")}</PortalState>
+    ) : <>
       <section aria-label={t("portal.summary")} className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {[["open", query.data!.counts.open], ["waitingForYou", query.data!.counts.waitingForYou], ["resolved", query.data!.counts.resolved]].map(([key, count]) => (
-          <div className="flex flex-col justify-between rounded-xl border border-border bg-surface p-5 shadow-subtle" key={key}>
-            <p className="text-xs font-medium text-muted-foreground">{t(`portal.metrics.${key}`)}</p>
-            <strong className="mt-2 text-2xl font-bold tracking-tight text-foreground tabular-nums">
-              {new Intl.NumberFormat(i18n.language === "ar" ? "ar-EG" : "en-US").format(count as number)}
-            </strong>
-          </div>
+        {homeMetrics.map((metric) => (
+          <MetricCard
+            key={metric.key}
+            label={t(`portal.metrics.${metric.key}`)}
+            value={nf.format(query.data!.counts[metric.key])}
+            icon={metric.icon}
+            variant={metric.variant}
+          />
         ))}
       </section>
       <section className="mt-8" aria-labelledby="recent-requests-title">
@@ -138,7 +157,12 @@ export function PortalHomePage() {
             <TicketRows tickets={query.data!.recentTickets} />
           </DataTableSurface>
         ) : (
-          <PortalState>{t("portal.empty")}</PortalState>
+          <EmptyState
+            icon={<Inbox className="size-5" aria-hidden="true" />}
+            title={t("portal.empty")}
+            description={t("portal.emptyRecentHint")}
+            action={<Link className="button-link w-full sm:w-auto" to="/portal/tickets/new">{t("portal.createAction")}</Link>}
+          />
         )}
       </section>
     </>}
@@ -192,8 +216,8 @@ export function PortalTicketsPage() {
             </div>
           </DataTableToolbar>
           {query.isLoading ? (
-            <div className="p-6">
-              <PortalState>{t("portal.loadingRequests")}</PortalState>
+            <div className="p-4" aria-label={t("portal.loadingRequests")}>
+              <DataTableSkeleton columns={6} />
             </div>
           ) : query.isError ? (
             <div className="p-6">
@@ -220,7 +244,13 @@ export function PortalTicketsPage() {
             </>
           ) : (
             <div className="p-6">
-              <PortalState>{search || status ? t("portal.noMatches") : t("portal.empty")}</PortalState>
+              <EmptyState
+                className="border-0 bg-transparent p-2"
+                icon={<Inbox className="size-5" aria-hidden="true" />}
+                title={search || status ? t("portal.noMatchesTitle") : t("portal.empty")}
+                description={search || status ? t("portal.noMatches") : t("portal.emptyRecentHint")}
+                action={search || status ? undefined : <Link className="button-link w-full sm:w-auto" to="/portal/tickets/new">{t("portal.createAction")}</Link>}
+              />
             </div>
           )}
         </DataTableSurface>
@@ -248,7 +278,7 @@ export function PortalNewTicketPage() {
   });
   return <PortalPage>
     <PortalPageHeader title={t("portal.newRequest")} description={t("portal.newDescription")} />
-    <form className="mt-6 max-w-3xl rounded-xl border border-border bg-surface p-5 sm:p-6 shadow-subtle" noValidate onSubmit={submit}>
+    <form className="mt-6 max-w-3xl rounded-lg border border-border bg-card p-5 sm:p-6" noValidate onSubmit={submit}>
       <div className="space-y-5">
         <Field id="portal-subject" label={t("portal.subject")} error={form.formState.errors.subject ? t("portal.validation.subject") : undefined}>
           <input aria-describedby={form.formState.errors.subject ? "portal-subject-error" : undefined} aria-invalid={Boolean(form.formState.errors.subject)} className="input" id="portal-subject" {...form.register("subject")} />
@@ -322,7 +352,7 @@ function TicketFeedback({ ticket }: { ticket: PortalTicketDetail }) {
 
   if (ticket.feedback) {
     return (
-      <section className="mt-7 max-w-3xl rounded-xl border border-border bg-surface p-5 shadow-subtle">
+      <section className="mt-7 max-w-3xl rounded-md border border-border bg-card p-5">
         <h2 className="text-base font-semibold text-foreground">{t("portal.feedback.submittedTitle")}</h2>
         <div className="mt-3"><StarRating name="submitted-rating" readOnly value={ticket.feedback.rating} /></div>
         {ticket.feedback.comment && <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-foreground">{ticket.feedback.comment}</p>}
@@ -339,7 +369,7 @@ function TicketFeedback({ ticket }: { ticket: PortalTicketDetail }) {
     await mutation.mutateAsync({ rating, comment: comment.trim() || undefined });
   };
   return (
-    <form className="mt-7 max-w-3xl rounded-xl border border-border bg-surface p-5 shadow-subtle" onSubmit={submit}>
+    <form className="mt-7 max-w-3xl rounded-md border border-border bg-card p-5" onSubmit={submit}>
       <h2 className="text-base font-semibold text-foreground">{t("portal.feedback.title")}</h2>
       <p className="mt-1.5 text-sm text-muted-foreground">{t("portal.feedback.prompt")}</p>
       <div className="mt-4"><span className="mb-1.5 block text-sm font-medium text-foreground">{t("portal.feedback.ratingLabel")}</span><StarRating name="feedback-rating" onChange={(value) => { setRating(value); setShowRequired(false); }} value={rating} /></div>
@@ -370,7 +400,19 @@ export function PortalTicketDetailPage() {
   const attachments = usePortalTicketAttachments(id);
   const uploadAttachment = useUploadPortalTicketAttachment(id);
   const [body, setBody] = useState("");
-  if (query.isLoading) return <PortalPage><PortalState>{t("portal.loadingDetail")}</PortalState></PortalPage>;
+  if (query.isLoading) return (
+    <PortalPage>
+      <div className="space-y-6" aria-label={t("portal.loadingDetail")}>
+        <div className="space-y-3 border-b border-border pb-5">
+          <div className="h-3.5 w-24 animate-pulse rounded bg-muted" />
+          <div className="h-7 w-2/3 animate-pulse rounded bg-muted" />
+          <div className="h-5 w-40 animate-pulse rounded bg-muted" />
+        </div>
+        <div className="h-28 animate-pulse rounded-md bg-muted" />
+        <div className="h-64 animate-pulse rounded-md bg-muted" />
+      </div>
+    </PortalPage>
+  );
   if (query.isError) return <PortalPage><PortalState retry={() => query.refetch()}>{errorCode(query.error) === "TICKET_NOT_FOUND" ? t("portal.notFound") : t("portal.detailError")}</PortalState></PortalPage>;
   const ticket = query.data!;
   const ticketLevelAttachments = attachments.data?.filter((item) => item.messageId === null) ?? [];
@@ -409,7 +451,7 @@ export function PortalTicketDetailPage() {
       </dl>
     </header>
     <div className="mt-6 space-y-6">
-      <section className="rounded-xl border border-border bg-surface p-5 shadow-subtle">
+      <section className="rounded-md border border-border bg-card p-5">
         <h2 className="text-base font-semibold text-foreground">{t("portal.descriptionLabel")}</h2>
         <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-foreground [overflow-wrap:anywhere]">{ticket.description}</p>
       </section>
@@ -433,7 +475,7 @@ export function PortalTicketDetailPage() {
           />
         ))}
       </ConversationSection>
-      <section className="rounded-md border bg-white p-5">
+      <section className="rounded-md border border-border bg-card p-5">
         <AttachmentPanel attachments={ticketLevelAttachments} isLoading={attachments.isLoading} isError={attachments.isError} onRetry={() => attachments.refetch()} scope="portal" locale={i18n.language} canUpload={!closed} upload={{ mutateAsync: (file) => uploadAttachment.mutateAsync(file), isPending: uploadAttachment.isPending }} disabledReason={closed ? t("attachments.closedTicketUpload") : undefined} />
       </section>
       <TicketFeedback ticket={ticket} />

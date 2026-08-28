@@ -6,6 +6,7 @@
     "languageSwitcher": "اختيار اللغة", "primary": "التنقل الرئيسي", "dashboard": "لوحة التحكم", "tickets": "التذاكر", "customers": "العملاء", "knowledgeBase": "قاعدة المعرفة", "tasks": "المهام", "reports": "التقارير", "quickReplies": "الردود السريعة", "users": "المستخدمون", "settings": "الإعدادات",
     "collapseSidebar": "طي الشريط الجانبي", "expandSidebar": "توسيع الشريط الجانبي",
     "portalHome": "الصفحة الرئيسية للبوابة", "portalContext": "بوابة الدعم", "workspaceContext": "مساحة عمل الدعم", "openCustomers": "فتح سجلات العملاء",
+    "portalOverview": "نظرة عامة", "portalRequests": "طلباتي", "portalNewRequest": "طلب جديد", "portalKnowledgeBase": "مركز المساعدة",
     "sections": { "main": "الرئيسية", "support": "الدعم", "management": "الإدارة" }
   },
   "common": {
@@ -388,7 +389,7 @@
     "loadingOverview": "جارٍ تحميل ملخص الدعم…", "overviewError": "تعذر تحميل ملخص الدعم.", "myRequests": "طلباتي", "requestsDescription": "راجع طلبات الدعم وتابعها.", "newRequest": "طلب جديد",
     "ticketId": "رقم التذكرة", "subject": "الموضوع", "statusLabel": "الحالة", "category": "التصنيف", "optional": "(اختياري)", "created": "تاريخ الإنشاء", "updated": "آخر تحديث", "search": "البحث في الطلبات…", "filters": "عوامل تصفية الطلبات", "allStatuses": "كل الحالات",
     "status": { "OPEN": "مفتوحة", "IN_PROGRESS": "قيد التنفيذ", "WAITING_FOR_YOU": "بانتظارك", "RESOLVED": "تم حلها", "CLOSED": "مغلقة" },
-    "loadingRequests": "جارٍ تحميل طلباتك…", "requestsError": "تعذر تحميل طلباتك.", "empty": "لا توجد لديك طلبات دعم بعد.", "noMatches": "لا توجد طلبات تطابق البحث أو التصفية.", "pagination": "صفحات الطلبات", "page": "الصفحة {{page}} من {{total}}",
+    "loadingRequests": "جارٍ تحميل طلباتك…", "requestsError": "تعذر تحميل طلباتك.", "empty": "لا توجد لديك طلبات دعم بعد.", "emptyRecentHint": "أنشئ طلبًا وسيقوم فريق الدعم بمساعدتك.", "noMatches": "لا توجد طلبات تطابق البحث أو التصفية.", "noMatchesTitle": "لا توجد طلبات مطابقة", "pagination": "صفحات الطلبات", "page": "الصفحة {{page}} من {{total}}",
     "newDescription": "أخبرنا بما تحتاج إلى مساعدة فيه.", "selectCategory": "اختر تصنيفًا (اختياري)", "categoriesError": "تعذر تحميل التصنيفات", "descriptionLabel": "الوصف", "createError": "تعذر إنشاء الطلب. تم الاحتفاظ بالمحتوى.", "creating": "جارٍ الإنشاء…",
     "validation": { "subject": "يجب أن يتراوح الموضوع بين 3 و200 حرف.", "description": "الوصف مطلوب ويجب ألا يزيد عن 20000 حرف." },
     "loadingDetail": "جارٍ تحميل تفاصيل الطلب…", "notFound": "لم يتم العثور على هذا الطلب.", "detailError": "تعذر تحميل هذا الطلب.", "back": "العودة إلى طلباتي", "conversation": "المحادثة", "conversationDescription": "الرسائل المتبادلة بينك وبين فريق الدعم.", "timelineLabel": "محادثة الطلب", "noMessages": "لا توجد ردود عامة بعد.",

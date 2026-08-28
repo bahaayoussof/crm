@@ -4,46 +4,101 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { AuthContext, type AuthContextValue } from "@/features/auth/auth-state";
 import { ProtectedRoute } from "@/app/router/protected-route";
 import { changeAppLanguage } from "@/lib/i18n";
-import { PortalShell } from "./portal-ui";
 
-const customer = { id: "customer-user", name: "Ahmed", email: "ahmed@example.com", role: "CUSTOMER" as const, customer: { id: "customer", name: "Ahmed", email: "ahmed@example.com", phone: null } };
+const customer = {
+  id: "customer-user",
+  name: "Ahmed",
+  email: "ahmed@example.com",
+  role: "CUSTOMER" as const,
+  customer: { id: "customer", name: "Ahmed", email: "ahmed@example.com", phone: null },
+};
 const auth: AuthContextValue = { user: customer, isLoading: false, login: vi.fn(), register: vi.fn(), logout: vi.fn() };
+
+const CUSTOMER_NAV = [
+  ["Overview", "/portal"],
+  ["My Requests", "/portal/tickets"],
+  ["New Request", "/portal/tickets/new"],
+  ["Help Center", "/portal/knowledge-base"],
+] as const;
+
+const INTERNAL_ONLY_NAV = ["Dashboard", "Tickets", "Customers", "Knowledge Base", "Reports", "Users", "Settings"];
 
 describe("Portal shell routing", () => {
   afterEach(cleanup);
-  beforeEach(async () => { await changeAppLanguage("en"); vi.clearAllMocks(); });
+  beforeEach(async () => {
+    await changeAppLanguage("en");
+    vi.clearAllMocks();
+  });
+
+  it("renders the customer Portal inside the shared application shell", () => {
+    renderPortal("/portal");
+
+    // Shared shell: the same primary navigation landmark as the internal CRM
+    const nav = screen.getByRole("navigation", { name: "Primary navigation" });
+    expect(nav).toBeInTheDocument();
+
+    // Customer-safe items are present with the real Portal routes
+    for (const [label, href] of CUSTOMER_NAV) {
+      expect(screen.getByRole("link", { name: label })).toHaveAttribute("href", href);
+    }
+  });
+
+  it("never exposes internal CRM navigation to a CUSTOMER", () => {
+    renderPortal("/portal/tickets");
+    for (const name of INTERNAL_ONLY_NAV) {
+      expect(screen.queryByRole("link", { name })).not.toBeInTheDocument();
+    }
+  });
 
   it.each([
-    ["/portal", "Home"],
+    ["/portal", "Overview"],
     ["/portal/tickets", "My Requests"],
     ["/portal/tickets/new", "New Request"],
     ["/portal/tickets/ticket-1", "My Requests"],
     ["/portal/knowledge-base", "Help Center"],
     ["/portal/knowledge-base/article-1", "Help Center"],
-  ])("activates only the expected navigation item at %s", (path, activeLabel) => {
+  ])("marks the active navigation item at %s", (path, activeLabel) => {
     renderPortal(path);
-    expect(screen.getAllByTestId("portal-header")).toHaveLength(1);
-    expect(screen.queryByText("Customer Support CRM")).not.toBeInTheDocument();
-    const current = screen.getAllByRole("link").filter((link) => link.getAttribute("aria-current") === "page");
-    expect(current).toHaveLength(1);
-    expect(current[0]).toHaveAccessibleName(activeLabel);
-  });
-
-  it("keeps the customer Portal outside the internal application shell", () => {
-    renderPortal("/portal/tickets/new");
-    expect(screen.getByRole("banner")).toHaveAttribute("data-testid", "portal-header");
-    expect(screen.getByRole("navigation", { name: "Portal navigation" })).toBeInTheDocument();
-    expect(screen.queryByRole("navigation", { name: "Primary navigation" })).not.toBeInTheDocument();
+    const active = screen
+      .getAllByRole("link")
+      .filter((link) => link.getAttribute("aria-current") === "page");
+    expect(active.map((link) => link.textContent?.trim())).toContain(activeLabel);
   });
 
   it("redirects an internal role away from customer routes", () => {
     const internalAuth = { ...auth, user: { ...customer, role: "AGENT" as const, customer: null } };
-    render(<AuthContext.Provider value={internalAuth}><MemoryRouter initialEntries={["/portal"]}><Routes><Route element={<ProtectedRoute audience="customer" />}><Route path="/portal" element={<PortalShell />} /></Route><Route path="/dashboard" element={<h1>Internal dashboard</h1>} /></Routes></MemoryRouter></AuthContext.Provider>);
+    render(
+      <AuthContext.Provider value={internalAuth}>
+        <MemoryRouter initialEntries={["/portal"]}>
+          <Routes>
+            <Route element={<ProtectedRoute audience="customer" />}>
+              <Route path="/portal" element={<h1>Portal home content</h1>} />
+            </Route>
+            <Route path="/dashboard" element={<h1>Internal dashboard</h1>} />
+          </Routes>
+        </MemoryRouter>
+      </AuthContext.Provider>,
+    );
     expect(screen.getByRole("heading", { name: "Internal dashboard" })).toBeInTheDocument();
-    expect(screen.queryByTestId("portal-header")).not.toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Primary navigation" })).not.toBeInTheDocument();
   });
 });
 
 function renderPortal(path: string) {
-  return render(<AuthContext.Provider value={auth}><MemoryRouter initialEntries={[path]}><Routes><Route element={<ProtectedRoute audience="customer" />}><Route path="/portal" element={<PortalShell />}><Route index element={<h1>Portal home content</h1>} /><Route path="tickets" element={<h1>Requests content</h1>} /><Route path="tickets/new" element={<h1>New request content</h1>} /><Route path="tickets/:id" element={<h1>Request detail content</h1>} /><Route path="knowledge-base" element={<h1>Help center content</h1>} /><Route path="knowledge-base/:id" element={<h1>Help article content</h1>} /></Route></Route></Routes></MemoryRouter></AuthContext.Provider>);
+  return render(
+    <AuthContext.Provider value={auth}>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route element={<ProtectedRoute audience="customer" />}>
+            <Route path="/portal" element={<h1>Portal home content</h1>} />
+            <Route path="/portal/tickets" element={<h1>Requests content</h1>} />
+            <Route path="/portal/tickets/new" element={<h1>New request content</h1>} />
+            <Route path="/portal/tickets/:id" element={<h1>Request detail content</h1>} />
+            <Route path="/portal/knowledge-base" element={<h1>Help center content</h1>} />
+            <Route path="/portal/knowledge-base/:id" element={<h1>Help article content</h1>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    </AuthContext.Provider>,
+  );
 }

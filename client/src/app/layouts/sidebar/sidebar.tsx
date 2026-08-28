@@ -3,90 +3,26 @@ import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { AuthUser } from "@/features/auth/auth.types";
-import { canManageQuickReplies } from "@/features/quick-replies/quick-reply-permissions";
-import { canViewReports } from "@/features/reports/reports-permissions";
-import { canManageUsers } from "@/features/users/user-permissions";
+import type { ProtectedAudience } from "@/features/auth/auth-routing";
 import { cn } from "@/lib/utils";
-import {
-  CollapseIcon,
-  CustomersNavIcon,
-  DashboardNavIcon,
-  ExpandIcon,
-  KnowledgeBaseNavIcon,
-  QuickRepliesNavIcon,
-  ReportsNavIcon,
-  TasksNavIcon,
-  TicketsNavIcon,
-  UsersNavIcon,
-  SettingsNavIcon,
-} from "../nav-icons";
+import { CollapseIcon, ExpandIcon } from "../nav-icons";
+import { getNavigationSections } from "../nav-config";
 import { SidebarFlyout } from "./sidebar-flyout";
-import type { NavSectionConfig } from "./sidebar-types";
 import { SidebarUserMenu } from "./sidebar-user-menu";
 
 interface SidebarProps {
   user: AuthUser | null;
+  audience: ProtectedAudience;
   collapsed: boolean;
   onToggleCollapsed: () => void;
   onLogout: () => void;
 }
 
-export function Sidebar({ user, collapsed, onToggleCollapsed, onLogout }: SidebarProps) {
+export function Sidebar({ user, audience, collapsed, onToggleCollapsed, onLogout }: SidebarProps) {
   const { t } = useTranslation();
   const [activeFlyoutKey, setActiveFlyoutKey] = useState<string | null>(null);
 
-  // Grouped Navigation Sections
-  const mainSection: NavSectionConfig = {
-    id: "main",
-    label: "Main",
-    labelKey: "navigation.sections.main",
-    items: [
-      { to: "/dashboard", key: "dashboard", icon: DashboardNavIcon },
-    ],
-  };
-
-  const supportSection: NavSectionConfig = {
-    id: "support",
-    label: "Support",
-    labelKey: "navigation.sections.support",
-    items: [
-      { to: "/tickets", key: "tickets", icon: TicketsNavIcon },
-      { to: "/customers", key: "customers", icon: CustomersNavIcon },
-      { to: "/knowledge-base", key: "knowledgeBase", icon: KnowledgeBaseNavIcon },
-      { to: "/tasks", key: "tasks", icon: TasksNavIcon },
-    ],
-  };
-
-  const managementItems = [
-    ...(user && canViewReports(user.role)
-      ? [{ to: "/reports", key: "reports", icon: ReportsNavIcon }]
-      : []),
-    ...(user && canManageQuickReplies(user.role)
-      ? [{ to: "/quick-replies", key: "quickReplies", icon: QuickRepliesNavIcon }]
-      : []),
-    ...(user && canManageUsers(user.role)
-      ? [{ to: "/users", key: "users", icon: UsersNavIcon }]
-      : []),
-    ...(user?.role === "ADMIN"
-      ? [{ to: "/settings", key: "settings", icon: SettingsNavIcon }]
-      : []),
-  ];
-
-  const managementSection: NavSectionConfig | null =
-    managementItems.length > 0
-      ? {
-          id: "management",
-          label: "Management",
-          labelKey: "navigation.sections.management",
-          items: managementItems,
-        }
-      : null;
-
-  const sections: NavSectionConfig[] = [
-    mainSection,
-    supportSection,
-    ...(managementSection ? [managementSection] : []),
-  ];
+  const sections = getNavigationSections(user, audience);
 
   return (
     <aside
@@ -168,6 +104,7 @@ export function Sidebar({ user, collapsed, onToggleCollapsed, onLogout }: Sideba
                       <Tooltip content={label} enabled={collapsed && activeFlyoutKey !== item.key} side="right" className={collapsed ? "w-full flex justify-center" : undefined}>
                         <NavLink
                           to={item.to}
+                          end={item.end}
                           aria-label={collapsed ? label : undefined}
                           onClick={() => {
                             if (collapsed && hasChildren) {

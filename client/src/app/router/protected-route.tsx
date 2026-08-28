@@ -10,6 +10,5 @@ export function ProtectedRoute({ audience }: { audience: ProtectedAudience }) {
   if (isLoading) return <main className="grid min-h-[100dvh] place-items-center bg-background px-4"><div className="w-full max-w-sm" aria-label={t("common.loading")}><div className="h-4 w-28 animate-pulse rounded bg-muted" /><div className="mt-4 h-10 animate-pulse rounded bg-muted" /><div className="mt-3 h-10 animate-pulse rounded bg-muted" /></div></main>;
   const redirect = getProtectedRedirect(user, audience);
   if (redirect) return <Navigate to={redirect} replace />;
-  if (audience === "customer") return <Outlet />;
   return <AppShell audience={audience}><Outlet /></AppShell>;
 }

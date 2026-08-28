@@ -21,8 +21,17 @@ const agentUser: AuthUser = {
   customer: null,
 };
 
+const customerUser: AuthUser = {
+  id: "u-customer",
+  name: "Ahmed Customer",
+  email: "ahmed@example.com",
+  role: "CUSTOMER",
+  customer: { id: "c-1", name: "Ahmed Customer", email: "ahmed@example.com", phone: null },
+};
+
 function renderSidebar(props: {
   user?: AuthUser | null;
+  audience?: "internal" | "customer";
   collapsed?: boolean;
   onToggleCollapsed?: () => void;
   onLogout?: () => void;
@@ -31,6 +40,7 @@ function renderSidebar(props: {
     <BrowserRouter>
       <Sidebar
         user={props.user ?? adminUser}
+        audience={props.audience ?? "internal"}
         collapsed={props.collapsed ?? false}
         onToggleCollapsed={props.onToggleCollapsed ?? vi.fn()}
         onLogout={props.onLogout ?? vi.fn()}
@@ -158,5 +168,26 @@ describe("Sidebar component", () => {
     expect(screen.queryByRole("link", { name: "Quick Replies" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Users" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Settings" })).not.toBeInTheDocument();
+  });
+
+  it("renders only customer-safe navigation for the customer audience", () => {
+    renderSidebar({ user: customerUser, audience: "customer", collapsed: false });
+
+    // Customer-facing items only
+    expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute("href", "/portal");
+    expect(screen.getByRole("link", { name: "My Requests" })).toHaveAttribute("href", "/portal/tickets");
+    expect(screen.getByRole("link", { name: "New Request" })).toHaveAttribute("href", "/portal/tickets/new");
+    expect(screen.getByRole("link", { name: "Help Center" })).toHaveAttribute("href", "/portal/knowledge-base");
+
+    // No internal CRM routes leak into the customer sidebar
+    for (const name of ["Dashboard", "Tickets", "Customers", "Knowledge Base", "Reports", "Quick Replies", "Users", "Settings"]) {
+      expect(screen.queryByRole("link", { name })).not.toBeInTheDocument();
+    }
+    expect(screen.queryByText("Management")).not.toBeInTheDocument();
+    expect(screen.queryByText("Main")).not.toBeInTheDocument();
+
+    // Shared shell behavior is preserved (collapse control + user menu)
+    expect(screen.getByRole("button", { name: "Collapse sidebar" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Ahmed Customer/i })).toBeInTheDocument();
   });
 });
