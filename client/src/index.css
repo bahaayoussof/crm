@@ -410,6 +410,15 @@ button, input, select, textarea { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 ::selection { background: color-mix(in srgb, var(--foreground) 15%, transparent); }
 
+/* Global themed scrollbars — visual only, native behavior untouched.
+   Uses existing semantic border tokens so it adapts to light/dark. */
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 9999px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+
 @layer components {
   .page-container { @apply mx-auto min-h-[calc(100dvh-4rem)] w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8; }
 
