@@ -233,5 +233,44 @@ describe("portal ticket details shares the internal ticket design", () => {
     expect(screen.getByText("فريق الدعم")).toBeInTheDocument();
     expect(document.documentElement).toHaveAttribute("dir", "rtl");
   });
+
+  it("composes the shared TicketDetailHeader with only customer-safe content", () => {
+    mocks.detail.mockReturnValue({ data: detail({ status: "IN_PROGRESS" }) });
+    renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
+    const header = screen.getByRole("heading", { level: 1, name: "Payment help" }).closest("header") as HTMLElement;
+    expect(header).toBeTruthy();
+    // shared header shell: back link + reference + status chip + customer-safe meta
+    expect(within(header).getByRole("link", { name: "Back to My Requests" })).toHaveAttribute("href", "/portal/tickets");
+    expect(within(header).getByText("#12345678")).toBeInTheDocument();
+    expect(within(header).getByText("In progress")).toBeInTheDocument();
+    expect(within(header).getByText("Category")).toBeInTheDocument();
+    expect(within(header).getByText("Created")).toBeInTheDocument();
+    expect(within(header).getByText("Updated")).toBeInTheDocument();
+    // internal-only header affordances never appear
+    expect(within(header).queryByRole("link", { name: "Edit" })).not.toBeInTheDocument();
+    expect(within(header).queryByText(/priority|channel|web|email|whatsapp/i)).not.toBeInTheDocument();
+  });
+
+  it("excludes every internal-only Ticket Details section from the customer view", () => {
+    mocks.detail.mockReturnValue({
+      data: detail({ status: "IN_PROGRESS", slaState: "BREACHED", priority: "URGENT", assignedAgent: { id: "a", name: "Mariam" }, history: [{ id: "h", action: "ESCALATED" }] }),
+    });
+    const { container } = renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
+    // customer-safe sections ARE present
+    expect(screen.getByRole("heading", { name: "Description" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Conversation" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Attachments" })).toBeInTheDocument();
+    // internal-only sections / controls / data are NOT
+    for (const pattern of [
+      /internal note/i, /add note/i, /manage ticket/i, /ticket properties/i, /assigned agent/i, /assignee/i,
+      /watch|follow ticket|watcher/i, /mention/i, /\bactivity\b/i, /history/i, /\bSLA\b/i, /breached/i, /at risk/i,
+      /on track/i, /first response due/i, /resolution due/i, /escalat/i, /save changes/i, /close ticket/i,
+    ]) {
+      expect(screen.queryByText(pattern)).not.toBeInTheDocument();
+    }
+    expect(container.textContent).not.toMatch(/BREACHED|URGENT|ESCALATED|FIRST_RESPONSE|Mariam/);
+    // no internal two-column workspace grid
+    expect(container.querySelector(".grid.gap-6")).toBeNull();
+  });
 });
 function renderPage(element: React.ReactNode, path = "/portal") { return render(<MemoryRouter initialEntries={[path]}><Routes><Route path="/portal/*" element={element}/></Routes></MemoryRouter>); }

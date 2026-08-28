@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
-import { ArrowLeft, CheckCircle2, Clock, Inbox, Star } from "lucide-react";
+import { CheckCircle2, Clock, Inbox, Star } from "lucide-react";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
@@ -18,6 +18,7 @@ import type { PortalOverview, PortalTicket, PortalTicketDetail, PortalTicketStat
 import { PortalPage, PortalState, PortalStatus, TicketRef } from "./portal-ui";
 import { PortalTicketsTable } from "./portal-tickets-table";
 import { PageHeader } from "@/components/shared/page-header";
+import { TicketDetailHeader, TicketDetailSection } from "@/features/tickets/ticket-detail-header";
 import {
   Table,
   TableHeader,
@@ -417,12 +418,12 @@ function TicketFeedback({ ticket }: { ticket: PortalTicketDetail }) {
 
   if (ticket.feedback) {
     return (
-      <section className="mt-7 max-w-3xl rounded-md border border-border bg-card p-5">
+      <TicketDetailSection className="max-w-3xl">
         <h2 className="text-base font-semibold text-foreground">{t("portal.feedback.submittedTitle")}</h2>
         <div className="mt-3"><StarRating name="submitted-rating" readOnly value={ticket.feedback.rating} /></div>
         {ticket.feedback.comment && <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-foreground">{ticket.feedback.comment}</p>}
         <p className="mt-3 text-xs text-muted-foreground">{t("portal.feedback.submittedOn", { date: formatTicketDate(ticket.feedback.createdAt, i18n.language) })}</p>
-      </section>
+      </TicketDetailSection>
     );
   }
   if (!ticket.feedbackEligible) return null;
@@ -434,15 +435,17 @@ function TicketFeedback({ ticket }: { ticket: PortalTicketDetail }) {
     await mutation.mutateAsync({ rating, comment: comment.trim() || undefined });
   };
   return (
-    <form className="mt-7 max-w-3xl rounded-md border border-border bg-card p-5" onSubmit={submit}>
-      <h2 className="text-base font-semibold text-foreground">{t("portal.feedback.title")}</h2>
-      <p className="mt-1.5 text-sm text-muted-foreground">{t("portal.feedback.prompt")}</p>
-      <div className="mt-4"><span className="mb-1.5 block text-sm font-medium text-foreground">{t("portal.feedback.ratingLabel")}</span><StarRating name="feedback-rating" onChange={(value) => { setRating(value); setShowRequired(false); }} value={rating} /></div>
-      {showRequired && <p className="mt-2 text-sm text-danger" role="alert">{t("portal.feedback.ratingRequired")}</p>}
-      <label className="mt-4 block" htmlFor="portal-feedback-comment"><span className="text-sm font-medium text-foreground">{t("portal.feedback.commentLabel")}</span><textarea className="input mt-1.5 min-h-24 resize-y" id="portal-feedback-comment" maxLength={2000} onChange={(event) => setComment(event.target.value)} value={comment} /></label>
-      {mutation.isError && <p className="mt-2 text-sm text-danger" role="alert">{t("portal.feedback.error")}</p>}
-      <div className="mt-4 flex justify-end"><button className="button-primary w-full sm:w-auto" disabled={mutation.isPending} type="submit">{mutation.isPending ? t("portal.feedback.submitting") : t("portal.feedback.submit")}</button></div>
-    </form>
+    <TicketDetailSection className="max-w-3xl">
+      <form onSubmit={submit}>
+        <h2 className="text-base font-semibold text-foreground">{t("portal.feedback.title")}</h2>
+        <p className="mt-1.5 text-sm text-muted-foreground">{t("portal.feedback.prompt")}</p>
+        <div className="mt-4"><span className="mb-1.5 block text-sm font-medium text-foreground">{t("portal.feedback.ratingLabel")}</span><StarRating name="feedback-rating" onChange={(value) => { setRating(value); setShowRequired(false); }} value={rating} /></div>
+        {showRequired && <p className="mt-2 text-sm text-danger" role="alert">{t("portal.feedback.ratingRequired")}</p>}
+        <label className="mt-4 block" htmlFor="portal-feedback-comment"><span className="text-sm font-medium text-foreground">{t("portal.feedback.commentLabel")}</span><textarea className="input mt-1.5 min-h-24 resize-y" id="portal-feedback-comment" maxLength={2000} onChange={(event) => setComment(event.target.value)} value={comment} /></label>
+        {mutation.isError && <p className="mt-2 text-sm text-danger" role="alert">{t("portal.feedback.error")}</p>}
+        <div className="mt-4 flex justify-end"><button className="button-primary w-full sm:w-auto" disabled={mutation.isPending} type="submit">{mutation.isPending ? t("portal.feedback.submitting") : t("portal.feedback.submit")}</button></div>
+      </form>
+    </TicketDetailSection>
   );
 }
 
@@ -501,25 +504,23 @@ export function PortalTicketDetailPage() {
     </form>
   );
   return <PortalPage>
-    <Link className="inline-flex items-center gap-1.5 rounded-sm text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" to="/portal/tickets">
-      <ArrowLeft className="size-3.5 rtl:rotate-180" strokeWidth={1.75} aria-hidden="true" />
-      <span>{t("portal.back")}</span>
-    </Link>
-    <header className="mt-4 border-b border-border pb-5">
-      <TicketRef id={ticket.id} />
-      <h1 className="mt-1 break-words text-2xl font-bold tracking-tight text-foreground [overflow-wrap:anywhere]">{ticket.subject}</h1>
-      <div className="mt-3 flex flex-wrap items-center gap-3"><PortalStatus status={ticket.status} /></div>
+    <TicketDetailHeader
+      backTo="/portal/tickets"
+      backLabel={t("portal.back")}
+      reference={ticket.id}
+      subject={ticket.subject}
+      badges={<PortalStatus status={ticket.status} />}
+    >
       <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-3 text-sm text-muted-foreground">
-        <div><dt className="font-medium text-foreground text-xs">{t("portal.category")}</dt><dd className="mt-0.5">{ticket.category?.name ?? t("common.notProvided")}</dd></div>
-        <div><dt className="font-medium text-foreground text-xs">{t("portal.created")}</dt><dd className="mt-0.5"><bdi dir="ltr">{formatTicketDate(ticket.createdAt, i18n.language)}</bdi></dd></div>
-        <div><dt className="font-medium text-foreground text-xs">{t("portal.updated")}</dt><dd className="mt-0.5"><bdi dir="ltr">{formatTicketDate(ticket.updatedAt, i18n.language)}</bdi></dd></div>
+        <div><dt className="text-xs font-medium text-foreground">{t("portal.category")}</dt><dd className="mt-0.5">{ticket.category?.name ?? t("common.notProvided")}</dd></div>
+        <div><dt className="text-xs font-medium text-foreground">{t("portal.created")}</dt><dd className="mt-0.5"><bdi dir="ltr">{formatTicketDate(ticket.createdAt, i18n.language)}</bdi></dd></div>
+        <div><dt className="text-xs font-medium text-foreground">{t("portal.updated")}</dt><dd className="mt-0.5"><bdi dir="ltr">{formatTicketDate(ticket.updatedAt, i18n.language)}</bdi></dd></div>
       </dl>
-    </header>
+    </TicketDetailHeader>
     <div className="mt-6 space-y-6">
-      <section className="rounded-md border border-border bg-card p-5">
-        <h2 className="text-base font-semibold text-foreground">{t("portal.descriptionLabel")}</h2>
-        <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-foreground [overflow-wrap:anywhere]">{ticket.description}</p>
-      </section>
+      <TicketDetailSection heading={t("portal.descriptionLabel")} headingId="portal-ticket-description">
+        <p className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground [overflow-wrap:anywhere]">{ticket.description}</p>
+      </TicketDetailSection>
       <ConversationSection
         heading={t("portal.conversation")}
         description={t("portal.conversationDescription")}
@@ -540,9 +541,9 @@ export function PortalTicketDetailPage() {
           />
         ))}
       </ConversationSection>
-      <section className="rounded-md border border-border bg-card p-5">
+      <TicketDetailSection>
         <AttachmentPanel attachments={ticketLevelAttachments} isLoading={attachments.isLoading} isError={attachments.isError} onRetry={() => attachments.refetch()} scope="portal" locale={i18n.language} canUpload={!closed} upload={{ mutateAsync: (file) => uploadAttachment.mutateAsync(file), isPending: uploadAttachment.isPending }} disabledReason={closed ? t("attachments.closedTicketUpload") : undefined} />
-      </section>
+      </TicketDetailSection>
       <TicketFeedback ticket={ticket} />
     </div>
   </PortalPage>;

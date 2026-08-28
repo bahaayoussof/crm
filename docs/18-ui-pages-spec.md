@@ -1623,6 +1623,16 @@ Customer can:
 
 If RESOLVED can be reopened through reply, make behavior clear in UX.
 
+## Shared presentation (`feature/unified-portal-ui`, Phase 4)
+
+The Portal ticket detail composes the same primitives as the internal agent workspace — it is one visual system, differentiated by which slots are filled, not a separate design:
+
+- **`TicketDetailHeader`** (`features/tickets/ticket-detail-header.tsx`): back link + subject `<h1>` + a chip row after the reference id + optional right-aligned actions + an optional metadata block. Internal fills the chip row with status badge / priority / channel and passes an Edit action; the Portal fills it with only the customer-friendly status badge and a Category / Created / Updated `<dl>`, and passes **no actions**.
+- **`TicketDetailSection`** (same file): the shared headed-card shell (border / radius / `bg-card` / `shadow-subtle`), also used by `TicketAttachments`. The Portal Description card, the attachments card, and the feedback card use it.
+- **`ConversationSection` / `ConversationMessage` / `MessageBody`** (`ticket-conversation-ui.tsx`) and the shared attachment UI (`AttachmentPanel` / `MessageAttachmentList`) are unchanged and already shared — long-message progressive disclosure and width-bounded bubbles apply to the Portal for free.
+
+No customer-visible field was added for visual parity: the Portal detail contract is unchanged (no `priority`, no SLA, no assignee, no history). Internal-only sections — Properties / status-priority-category-assignee editor, SLA panel, internal Activity/history timeline, Save changes / Close ticket, watchers, mentions, internal notes — are simply never composed into the Portal page.
+
 ---
 
 # 21. Customer Portal: Knowledge Base

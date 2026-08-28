@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { AttachmentRows } from "@/features/attachments/attachment-ui";
+import { TicketDetailSection } from "./ticket-detail-header";
 
 type AttachmentItem = { id: string; fileName: string; mimeType: string; createdAt: string };
 
@@ -23,37 +24,32 @@ export function TicketAttachments({
 }) {
   const { t } = useTranslation();
   return (
-    <section
-      className={`overflow-hidden rounded-md border border-border bg-card text-card-foreground shadow-subtle ${className}`}
-      aria-labelledby="ticket-attachments-heading"
+    <TicketDetailSection
+      heading={t("attachments.title")}
+      headingId="ticket-attachments-heading"
+      headerSlot={<span className="shrink-0 text-xs font-medium text-muted-foreground">{attachments.length}</span>}
+      className={className}
+      bodyClassName="lg:max-h-[20rem] lg:overflow-y-auto"
     >
-      <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-3">
-        <h2 className="text-base font-semibold" id="ticket-attachments-heading">
-          {t("attachments.title")}
-        </h2>
-        <span className="shrink-0 text-xs font-medium text-muted-foreground">{attachments.length}</span>
-      </div>
-      <div className="px-4 py-3 sm:px-5 lg:max-h-[20rem] lg:overflow-y-auto">
-        {isLoading ? (
-          <p className="text-sm text-muted-foreground" role="status">
-            {t("common.loading")}
-          </p>
-        ) : isError ? (
-          <div
-            className="rounded-md border border-danger-subtle bg-danger-subtle/50 p-3 text-sm text-danger-foreground"
-            role="alert"
-          >
-            {t("attachments.loadError")}{" "}
-            <button type="button" className="button-secondary mt-2" onClick={onRetry}>
-              {t("common.retry")}
-            </button>
-          </div>
-        ) : attachments.length > 0 ? (
-          <AttachmentRows attachments={attachments} scope="internal" locale={locale} />
-        ) : (
-          <p className="text-sm text-muted-foreground">{t("attachments.none")}</p>
-        )}
-      </div>
-    </section>
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground" role="status">
+          {t("common.loading")}
+        </p>
+      ) : isError ? (
+        <div
+          className="rounded-md border border-danger-subtle bg-danger-subtle/50 p-3 text-sm text-danger-foreground"
+          role="alert"
+        >
+          {t("attachments.loadError")}{" "}
+          <button type="button" className="button-secondary mt-2" onClick={onRetry}>
+            {t("common.retry")}
+          </button>
+        </div>
+      ) : attachments.length > 0 ? (
+        <AttachmentRows attachments={attachments} scope="internal" locale={locale} />
+      ) : (
+        <p className="text-sm text-muted-foreground">{t("attachments.none")}</p>
+      )}
+    </TicketDetailSection>
   );
 }

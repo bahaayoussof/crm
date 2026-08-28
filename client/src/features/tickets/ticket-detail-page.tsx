@@ -1,8 +1,9 @@
 import { useTranslation } from "react-i18next";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useAuth } from "@/features/auth/auth-state";
 import { useTicketAttachments, useUploadTicketAttachment } from "@/features/attachments/attachment-hooks";
 import { TicketAttachments } from "./ticket-attachments";
+import { TicketPriorityText, TicketStatusBadge } from "./ticket-badges";
 import { TicketConversation } from "./ticket-conversation";
 import { TicketDetailHeader } from "./ticket-detail-header";
 import { getTicketErrorStatus } from "./ticket-error";
@@ -53,7 +54,26 @@ export function TicketDetailPage() {
 
   return (
     <TicketPage>
-      <TicketDetailHeader record={record} canManage={canManage} />
+      <TicketDetailHeader
+        backTo="/tickets"
+        backLabel={t("tickets.backToList")}
+        reference={record.id}
+        subject={record.subject}
+        badges={
+          <>
+            <TicketStatusBadge status={record.status} />
+            <TicketPriorityText priority={record.priority} />
+            <span className="text-xs text-muted-foreground">{t(`tickets.channel.${record.channel}`)}</span>
+          </>
+        }
+        actions={
+          canManage && (
+            <Link className="button-secondary" to={`/tickets/${record.id}/edit`}>
+              {t("common.edit")}
+            </Link>
+          )
+        }
+      />
       <div className="mt-6 grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start xl:grid-cols-[minmax(0,1fr)_24rem]">
         <div className="flex min-w-0 flex-col gap-4 lg:h-[calc(100dvh-4rem)] lg:overflow-hidden">
           <div className="min-w-0 lg:min-h-0 lg:flex-1">
