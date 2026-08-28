@@ -15,7 +15,7 @@ import {
   TicketsNavIcon,
   UsersNavIcon,
 } from "./nav-icons";
-import type { NavSectionConfig } from "./sidebar/sidebar-types";
+import type { NavItemConfig, NavSectionConfig } from "./sidebar/sidebar-types";
 
 /**
  * Single source of truth for primary navigation, consumed by both the desktop
@@ -91,4 +91,30 @@ export function getNavigationSections(
   }
 
   return sections;
+}
+
+/** Flatten every section into one item list (both shells render the same set). */
+export function getFlatNavItems(sections: NavSectionConfig[]): NavItemConfig[] {
+  return sections.flatMap((section) => section.items);
+}
+
+/**
+ * True when another nav item targets a route nested under `item.to` and the
+ * current path is inside that more-specific item. Used to force an exact
+ * (`end`) match on the parent so, e.g., `/portal/tickets/new` highlights only
+ * "New Request" — never also "My Requests" — while `/portal/tickets/:id` (which
+ * has no dedicated nav item) still highlights "My Requests".
+ */
+export function isNavItemShadowed(
+  item: NavItemConfig,
+  allItems: NavItemConfig[],
+  pathname: string,
+): boolean {
+  const prefix = (item.to.endsWith("/") ? item.to.slice(0, -1) : item.to) + "/";
+  return allItems.some(
+    (other) =>
+      other.to !== item.to &&
+      other.to.startsWith(prefix) &&
+      (pathname === other.to || pathname.startsWith(other.to + "/")),
+  );
 }

@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { AuthUser } from "@/features/auth/auth.types";
 import type { ProtectedAudience } from "@/features/auth/auth-routing";
 import { cn } from "@/lib/utils";
 import { CollapseIcon, ExpandIcon } from "../nav-icons";
-import { getNavigationSections } from "../nav-config";
+import { getFlatNavItems, getNavigationSections, isNavItemShadowed } from "../nav-config";
 import { SidebarFlyout } from "./sidebar-flyout";
 import { SidebarUserMenu } from "./sidebar-user-menu";
 
@@ -20,9 +20,11 @@ interface SidebarProps {
 
 export function Sidebar({ user, audience, collapsed, onToggleCollapsed, onLogout }: SidebarProps) {
   const { t } = useTranslation();
+  const { pathname } = useLocation();
   const [activeFlyoutKey, setActiveFlyoutKey] = useState<string | null>(null);
 
   const sections = getNavigationSections(user, audience);
+  const flatItems = getFlatNavItems(sections);
 
   return (
     <aside
@@ -104,7 +106,7 @@ export function Sidebar({ user, audience, collapsed, onToggleCollapsed, onLogout
                       <Tooltip content={label} enabled={collapsed && activeFlyoutKey !== item.key} side="right" className={collapsed ? "w-full flex justify-center" : undefined}>
                         <NavLink
                           to={item.to}
-                          end={item.end}
+                          end={item.end || isNavItemShadowed(item, flatItems, pathname)}
                           aria-label={collapsed ? label : undefined}
                           onClick={() => {
                             if (collapsed && hasChildren) {

@@ -14,7 +14,8 @@ import { usePortalTicketAttachments, useUploadPortalTicketAttachment } from "@/f
 import { portalTicketSchema, type PortalTicketForm } from "./portal.schemas";
 import { useCreatePortalTicket, usePortalCategories, usePortalOverview, usePortalTicket, usePortalTickets, useReplyPortalTicket, useSubmitPortalFeedback } from "./portal-hooks";
 import type { PortalOverview, PortalTicket, PortalTicketDetail, PortalTicketStatus } from "./portal.types";
-import { PortalPage, PortalPageHeader, PortalState, PortalStatus, TicketRef } from "./portal-ui";
+import { PortalPage, PortalState, PortalStatus, TicketRef } from "./portal-ui";
+import { PageHeader } from "@/components/shared/page-header";
 import {
   Table,
   TableHeader,
@@ -125,7 +126,7 @@ export function PortalHomePage() {
   const query = usePortalOverview();
   const nf = new Intl.NumberFormat(i18n.language === "ar" ? "ar-EG" : "en-US");
   return <PortalPage>
-    <PortalPageHeader title={t("portal.welcome", { name: user?.name })} description={t("portal.homeDescription")} action={<Link className="button-link w-full sm:w-auto" to="/portal/tickets/new">{t("portal.createAction")}</Link>} />
+    <PageHeader title={t("portal.welcome", { name: user?.name })} description={t("portal.homeDescription")} actions={<Link className="button-link w-full sm:w-auto" to="/portal/tickets/new">{t("portal.createAction")}</Link>} />
     {query.isLoading ? (
       <div className="mt-6 space-y-8" data-testid="portal-overview-skeleton" aria-label={t("portal.loadingOverview")}>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -190,10 +191,10 @@ export function PortalTicketsPage() {
 
   return (
     <PortalPage>
-      <PortalPageHeader
+      <PageHeader
         title={t("portal.myRequests")}
         description={t("portal.requestsDescription")}
-        action={<Link className="button-link w-full sm:w-auto" to="/portal/tickets/new">{t("portal.newRequest")}</Link>}
+        actions={<Link className="button-link w-full sm:w-auto" to="/portal/tickets/new">{t("portal.newRequest")}</Link>}
       />
       <div className="mt-5">
         <DataTableSurface>
@@ -277,7 +278,7 @@ export function PortalNewTicketPage() {
     navigate(`/portal/tickets/${ticket.id}`);
   });
   return <PortalPage>
-    <PortalPageHeader title={t("portal.newRequest")} description={t("portal.newDescription")} />
+    <PageHeader title={t("portal.newRequest")} description={t("portal.newDescription")} />
     <form className="mt-6 max-w-3xl rounded-lg border border-border bg-card p-5 sm:p-6" noValidate onSubmit={submit}>
       <div className="space-y-5">
         <Field id="portal-subject" label={t("portal.subject")} error={form.formState.errors.subject ? t("portal.validation.subject") : undefined}>

@@ -1,7 +1,7 @@
 import { useEffect, useState, type PropsWithChildren } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { useAuth } from "@/features/auth/auth-state";
@@ -10,7 +10,7 @@ import type { ProtectedAudience } from "@/features/auth/auth-routing";
 import { cn } from "@/lib/utils";
 import { Menu, X } from "lucide-react";
 import { LogoutIcon } from "./nav-icons";
-import { getNavigationSections } from "./nav-config";
+import { getNavigationSections, isNavItemShadowed } from "./nav-config";
 import { Sidebar } from "./sidebar/sidebar";
 
 function getStoredCollapsed(): boolean {
@@ -25,6 +25,7 @@ export function AppShell({ audience, children }: PropsWithChildren<{ audience: P
   const { t } = useTranslation();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [collapsed, setCollapsed] = useState(getStoredCollapsed);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -196,7 +197,7 @@ export function AppShell({ audience, children }: PropsWithChildren<{ audience: P
                       <NavLink
                         key={item.to}
                         to={item.to}
-                        end={item.end}
+                        end={item.end || isNavItemShadowed(item, navItems, pathname)}
                         onClick={() => setMobileMenuOpen(false)}
                         className={({ isActive }) =>
                           cn(

@@ -51,18 +51,21 @@ describe("Portal shell routing", () => {
   });
 
   it.each([
-    ["/portal", "Overview"],
-    ["/portal/tickets", "My Requests"],
-    ["/portal/tickets/new", "New Request"],
-    ["/portal/tickets/ticket-1", "My Requests"],
-    ["/portal/knowledge-base", "Help Center"],
-    ["/portal/knowledge-base/article-1", "Help Center"],
-  ])("marks the active navigation item at %s", (path, activeLabel) => {
+    ["/portal", ["Overview"]],
+    ["/portal/tickets", ["My Requests"]],
+    // `/portal/tickets/new` has its own nav item — the parent "My Requests" must NOT also light up
+    ["/portal/tickets/new", ["New Request"]],
+    // ticket detail has no dedicated nav item — the section parent stays active
+    ["/portal/tickets/ticket-1", ["My Requests"]],
+    ["/portal/knowledge-base", ["Help Center"]],
+    ["/portal/knowledge-base/article-1", ["Help Center"]],
+  ])("marks exactly the expected active navigation item at %s", (path, expected) => {
     renderPortal(path);
     const active = screen
       .getAllByRole("link")
-      .filter((link) => link.getAttribute("aria-current") === "page");
-    expect(active.map((link) => link.textContent?.trim())).toContain(activeLabel);
+      .filter((link) => link.getAttribute("aria-current") === "page")
+      .map((link) => link.textContent?.trim());
+    expect(active).toEqual(expected);
   });
 
   it("redirects an internal role away from customer routes", () => {

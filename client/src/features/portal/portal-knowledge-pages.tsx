@@ -5,7 +5,8 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { formatTicketDate } from "@/features/tickets/ticket-format";
 import { usePortalKnowledgeArticle, usePortalKnowledgeArticles } from "./portal-hooks";
 import type { PortalKnowledgeArticle } from "./portal.types";
-import { PortalPage, PortalPageHeader, PortalState } from "./portal-ui";
+import { PortalPage, PortalState } from "./portal-ui";
+import { PageHeader } from "@/components/shared/page-header";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { EmptyState } from "@/components/shared/empty-state";
 
@@ -46,7 +47,7 @@ export function PortalKnowledgeBasePage() {
 
   return (
     <PortalPage>
-      <PortalPageHeader title={t("portal.knowledgeBase.title")} description={t("portal.knowledgeBase.description")} />
+      <PageHeader title={t("portal.knowledgeBase.title")} description={t("portal.knowledgeBase.description")} />
       <FilterBar className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_15rem]">
         <label className="block" htmlFor="portal-kb-search">
           <span className="sr-only">{t("portal.knowledgeBase.search")}</span>
