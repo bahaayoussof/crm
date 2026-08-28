@@ -8,6 +8,7 @@ import { useAnchoredPopover } from "@/components/shared/use-anchored-popover";
 interface Option {
   value: string;
   label: string;
+  searchText?: string;
 }
 
 interface TicketFiltersPopoverProps {
@@ -150,6 +151,9 @@ export function TicketFiltersPopover({
                 </label>
                 <AppSelect
                   ariaLabel={t("tickets.assignedAgent")}
+                  searchable
+                  searchPlaceholder={t("tickets.searchAssignee")}
+                  emptySearchMessage={t("tickets.noAssigneesFound")}
                   value={assignedAgentId ?? ""}
                   onValueChange={(val) => onFilterChange("assignedAgentId", val)}
                   options={agentOptions}

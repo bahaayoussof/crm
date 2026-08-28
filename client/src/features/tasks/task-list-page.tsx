@@ -61,7 +61,7 @@ export function TaskListPage() {
   ];
   const assigneeOptions = [
     { value: "", label: t("tasks.allAssignees") },
-    ...(agents.data?.map((agent) => ({ value: agent.id, label: agent.name })) ?? []),
+    ...(agents.data?.map((agent) => ({ value: agent.id, label: agent.name, searchText: agent.email })) ?? []),
   ];
 
   return (
@@ -98,6 +98,9 @@ export function TaskListPage() {
               {canAssign && (
                 <AppSelect
                   ariaLabel={t("tasks.columns.assignee")}
+                  searchable
+                  searchPlaceholder={t("tickets.searchAssignee")}
+                  emptySearchMessage={t("tickets.noAssigneesFound")}
                   value={assigneeId ?? ""}
                   onValueChange={(value) => setFilter("assigneeId", value)}
                   options={assigneeOptions}

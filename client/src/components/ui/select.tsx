@@ -6,6 +6,14 @@ export const Select = SelectPrimitive.Root;
 export const SelectGroup = SelectPrimitive.Group;
 export const SelectValue = SelectPrimitive.Value;
 
+/**
+ * Shared trigger styling for the select surface. Exported so the searchable
+ * `AppSelect` variant (a plain button + portalled listbox) can present an
+ * identical control without depending on the Radix Select primitive.
+ */
+export const selectTriggerClassName =
+  "group flex min-h-10 w-full items-center justify-between gap-2 rounded-md border border-border bg-surface px-3 py-2 text-start text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/75 hover:border-border-strong focus:border-ring focus:ring-2 focus:ring-ring/20 disabled:cursor-not-allowed disabled:bg-muted disabled:text-disabled-foreground data-[placeholder]:text-muted-foreground/75 aria-invalid:border-danger aria-invalid:ring-2 aria-invalid:ring-danger/20";
+
 export const SelectTrigger = React.forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger> & {
@@ -16,7 +24,7 @@ export const SelectTrigger = React.forwardRef<
     <SelectPrimitive.Trigger
       ref={ref}
       aria-invalid={invalid ? "true" : props["aria-invalid"]}
-      className={`group flex min-h-10 w-full items-center justify-between gap-2 rounded-md border border-border bg-surface px-3 py-2 text-start text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/75 hover:border-border-strong focus:border-ring focus:ring-2 focus:ring-ring/20 disabled:cursor-not-allowed disabled:bg-muted disabled:text-disabled-foreground data-[placeholder]:text-muted-foreground/75 aria-invalid:border-danger aria-invalid:ring-2 aria-invalid:ring-danger/20 ${className}`}
+      className={`${selectTriggerClassName} ${className}`}
       {...props}
     >
       <span className="min-w-0 flex-1 truncate">{children}</span>

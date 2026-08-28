@@ -10,7 +10,7 @@
   },
   "common": {
     "retry": "Retry", "previous": "Previous", "next": "Next", "cancel": "Cancel", "save": "Save", "saving": "Saving…", "clearSearch": "Clear search",
-    "edit": "Edit", "delete": "Delete", "notProvided": "Not provided", "loading": "Loading…"
+    "edit": "Edit", "delete": "Delete", "notProvided": "Not provided", "loading": "Loading…", "search": "Search", "noResults": "No results found"
   },
   "validation": {
     "email": "Enter a valid email address", "passwordRequired": "Password is required", "nameMin": "Name must be at least 2 characters",
@@ -49,7 +49,7 @@
     "title": "Tickets", "description": "Manage and track customer support requests", "new": "New ticket", "create": "Create ticket", "createTitle": "Create ticket", "editTitle": "Edit ticket", "edit": "Edit ticket",
     "formDescription": "Record the issue, classification, and operational ownership.", "ticketDetails": "Ticket details", "classification": "Classification", "subject": "Subject", "descriptionLabel": "Description",
     "customer": "Customer", "customerComboboxPlaceholder": "Search or select customer…", "customerResults": "Customer search results", "customerSearching": "Searching customers…", "customerSearchError": "Unable to search customers.", "noCustomerResults": "No customers match your search.", "category": "Category", "selectCategory": "Select a category",
-    "assignedAgent": "Assigned agent", "unassigned": "Unassigned", "statusLabel": "Status", "priorityLabel": "Priority", "created": "Created", "updated": "Updated", "history": "History", "metadata": "Ticket metadata", "operations": "Manage ticket",
+    "assignedAgent": "Assigned agent", "unassigned": "Unassigned", "searchAssignee": "Search assignee…", "noAssigneesFound": "No assignees found", "statusLabel": "Status", "priorityLabel": "Priority", "created": "Created", "updated": "Updated", "history": "History", "metadata": "Ticket metadata", "operations": "Manage ticket",
     "search": "Search tickets by ID, subject, or customer…", "allStatuses": "All statuses", "allPriorities": "All priorities", "allCategories": "All categories", "allAgents": "All agents", "clearFilters": "Clear filters",
     "empty": "No tickets yet.", "noSearchMatches": "No tickets found for “{{search}}”.", "noStatusMatches": "No tickets with status “{{status}}”.", "noPriorityMatches": "No tickets with priority “{{priority}}”.", "noCategoryMatches": "No tickets in category “{{category}}”.", "noAgentMatches": "No tickets assigned to “{{agent}}”.", "noMatches": "No tickets match the current filters.", "loadError": "Unable to load tickets.", "loadDetailError": "Unable to load this ticket.", "notFound": "Ticket not found.", "unauthorized": "You do not have access to this ticket.",
     "saveError": "Unable to save ticket.", "updateError": "Unable to update ticket.", "saveOperations": "Save changes", "backToList": "Back to tickets", "pagination": "Ticket list pages", "page": "Page {{page}} of {{total}}", "noHistory": "No ticket history yet.", "systemActor": "System", "closeTicket": "Close ticket", "closeConfirmation": "Closing is final and prevents further customer replies. Close this ticket?", "confirmClose": "Confirm close", "cancelClose": "Cancel", "closing": "Closing...", "closeError": "Unable to close ticket.", "unassignedReadOnly": "This ticket must be assigned to you before you can change its workflow or conversation.",

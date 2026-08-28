@@ -174,7 +174,7 @@ export function useAnchoredPopover<T extends HTMLElement = HTMLElement, P extend
       if (
         target instanceof Element &&
         target.closest(
-          "[data-radix-popper-content-wrapper], [data-radix-select-content], [data-radix-portal], [role='listbox'], [role='option'], [role='menu'], [role='menuitem']"
+          "[data-radix-popper-content-wrapper], [data-radix-select-content], [data-radix-portal], [data-app-select-search], [role='listbox'], [role='option'], [role='menu'], [role='menuitem']"
         )
       ) {
         return;

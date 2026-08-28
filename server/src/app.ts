@@ -52,8 +52,6 @@ app.disable("x-powered-by");
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// اترك بقية routes الموجودة كما هي
-
 app.get("/api/health", (_request, response) => {
   response.status(200).json({ status: "ok" });
 });

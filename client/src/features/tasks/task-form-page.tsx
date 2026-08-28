@@ -61,7 +61,7 @@ export function TaskFormPage() {
 
   const assigneeOptions = [
     { value: "", label: t("tasks.assigneeSelf") },
-    ...(agents.data?.map((agent) => ({ value: agent.id, label: agent.name })) ?? []),
+    ...(agents.data?.map((agent) => ({ value: agent.id, label: agent.name, searchText: agent.email })) ?? []),
   ];
   const statusOptions = (["OPEN", "DONE"] as const).map((value) => ({
     value,
@@ -195,6 +195,9 @@ export function TaskFormPage() {
                 <AppSelect
                   id="task-assignee"
                   ariaLabel={t("tasks.fieldAssignee")}
+                  searchable
+                  searchPlaceholder={t("tickets.searchAssignee")}
+                  emptySearchMessage={t("tickets.noAssigneesFound")}
                   value={watch("assigneeId") ?? ""}
                   onValueChange={(value) => setValue("assigneeId", value)}
                   options={assigneeOptions}

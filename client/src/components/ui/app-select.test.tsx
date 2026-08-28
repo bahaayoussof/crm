@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 import { useForm, Controller } from "react-hook-form";
+import "@/lib/i18n";
 import { AppSelect, AppSelectField, type AppSelectOption } from "./app-select";
 
 describe("AppSelect and AppSelectField", () => {
@@ -293,5 +294,152 @@ describe("AppSelect and AppSelectField", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Reset" }));
     expect(trigger).toHaveTextContent("Option Two");
+  });
+});
+
+describe("AppSelect searchable mode", () => {
+  beforeEach(() => {
+    if (!window.HTMLElement.prototype.scrollIntoView) {
+      window.HTMLElement.prototype.scrollIntoView = vi.fn();
+    }
+  });
+
+  afterEach(cleanup);
+
+  const people: AppSelectOption[] = [
+    { value: "u1", label: "Ahmed Hassan", searchText: "ahmed@example.com" },
+    { value: "u2", label: "Ahmed Ali", searchText: "a.ali@example.com" },
+    { value: "u3", label: "Mohamed Salah", searchText: "m.salah@example.com" },
+    { value: "u4", label: "Sara Mostafa", searchText: "sara@example.com" },
+  ];
+
+  function openSearchable() {
+    fireEvent.click(screen.getByRole("combobox"));
+  }
+
+  it("does not render a search input unless searchable is enabled", () => {
+    render(<AppSelect id="plain" placeholder="Pick" options={people} />);
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "ArrowDown", code: "ArrowDown" });
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  it("shows a search input at the top of the dropdown when opened", () => {
+    render(
+      <AppSelect id="s1" searchable searchPlaceholder="Search assignee…" options={people} />
+    );
+    openSearchable();
+    expect(screen.getByPlaceholderText("Search assignee…")).toBeInTheDocument();
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+    expect(screen.getAllByRole("option")).toHaveLength(4);
+  });
+
+  it("filters options as the user types, case-insensitively and whitespace-normalised", () => {
+    render(<AppSelect id="s2" searchable options={people} />);
+    openSearchable();
+    const input = screen.getByRole("textbox");
+
+    fireEvent.change(input, { target: { value: "AHMED" } });
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "Ahmed Hassan",
+      "Ahmed Ali",
+    ]);
+
+    fireEvent.change(input, { target: { value: "  ahmed   hassan  " } });
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(["Ahmed Hassan"]);
+  });
+
+  it("matches against searchText (e.g. email) in addition to the label", () => {
+    render(<AppSelect id="s3" searchable options={people} />);
+    openSearchable();
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "m.salah@example" } });
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(["Mohamed Salah"]);
+  });
+
+  it("supports a custom getSearchText resolver", () => {
+    render(
+      <AppSelect
+        id="s3b"
+        searchable
+        options={people}
+        getSearchText={(o) => o.value}
+      />
+    );
+    openSearchable();
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "u4" } });
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(["Sara Mostafa"]);
+  });
+
+  it("selects a filtered option by click and reports the raw value", () => {
+    const onValueChange = vi.fn();
+    render(<AppSelect id="s4" searchable options={people} onValueChange={onValueChange} />);
+    openSearchable();
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "salah" } });
+    fireEvent.click(screen.getByRole("option", { name: "Mohamed Salah" }));
+    expect(onValueChange).toHaveBeenCalledWith("u3");
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  });
+
+  it("selects the highlighted option with the keyboard", () => {
+    const onValueChange = vi.fn();
+    render(<AppSelect id="s5" searchable options={people} onValueChange={onValueChange} />);
+    openSearchable();
+    const input = screen.getByRole("textbox");
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onValueChange).toHaveBeenCalledWith("u2");
+  });
+
+  it("renders a configurable empty state when nothing matches", () => {
+    render(
+      <AppSelect
+        id="s6"
+        searchable
+        options={people}
+        emptySearchMessage="No assignees found"
+      />
+    );
+    openSearchable();
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "zzzz" } });
+    expect(screen.queryAllByRole("option")).toHaveLength(0);
+    expect(screen.getByText("No assignees found")).toBeInTheDocument();
+  });
+
+  it("keeps rendering the selected label even when the query excludes it", () => {
+    render(<AppSelect id="s7" searchable value="u4" options={people} />);
+    const trigger = screen.getByRole("combobox");
+    expect(trigger).toHaveTextContent("Sara Mostafa");
+    openSearchable();
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "ahmed" } });
+    expect(trigger).toHaveTextContent("Sara Mostafa");
+  });
+
+  it("clears the query when closed and shows the full list when reopened", () => {
+    render(<AppSelect id="s8" searchable options={people} />);
+    openSearchable();
+    const input = screen.getByRole("textbox");
+    fireEvent.change(input, { target: { value: "sara" } });
+    expect(screen.getAllByRole("option")).toHaveLength(1);
+
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+
+    openSearchable();
+    expect((screen.getByRole("textbox") as HTMLInputElement).value).toBe("");
+    expect(screen.getAllByRole("option")).toHaveLength(4);
+  });
+
+  it("marks the currently selected option", () => {
+    render(<AppSelect id="s9" searchable value="u1" options={people} />);
+    openSearchable();
+    expect(screen.getByRole("option", { name: "Ahmed Hassan" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+  });
+
+  it("does not open when disabled", () => {
+    render(<AppSelect id="s10" searchable value="u1" options={people} disabled />);
+    fireEvent.click(screen.getByRole("combobox"));
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
 });

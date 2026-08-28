@@ -63,7 +63,7 @@ export function TicketListPage() {
 
   const agentOptions = [
     { value: "", label: t("tickets.allAgents") },
-    ...(agents.data?.map((item) => ({ value: item.id, label: item.name })) ?? []),
+    ...(agents.data?.map((item) => ({ value: item.id, label: item.name, searchText: item.email })) ?? []),
   ];
 
   return (

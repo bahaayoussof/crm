@@ -49,7 +49,7 @@ export function TicketDetailPage() {
 
   const agentOptions = [
     { value: "", label: t("tickets.unassigned") },
-    ...(agents.data?.map((item) => ({ value: item.id, label: item.name })) ?? []),
+    ...(agents.data?.map((item) => ({ value: item.id, label: item.name, searchText: item.email })) ?? []),
   ];
 
   const saveOperations = async () => { setError(null); const changes: { status?: TicketStatus; priority?: TicketPriority; categoryId?: string | null; assignedAgentId?: string | null } = {};
@@ -124,7 +124,7 @@ export function TicketDetailPage() {
                 <AppSelectField id="ticket-detail-status" label={t("tickets.statusLabel")} labelClassName="block text-sm font-medium text-foreground" value={status} disabled={!canWorkflow || availableStatuses.length === 0} onValueChange={(value) => setStatus(value as TicketStatus)} options={statusOptions} />
                 <AppSelectField id="ticket-detail-priority" label={t("tickets.priorityLabel")} labelClassName="block text-sm font-medium text-foreground" value={priority} disabled={!canWorkflow} onValueChange={(value) => setPriority(value as TicketPriority)} options={priorityOptions} />
                 {canManage && <AppSelectField id="ticket-detail-category" label={t("tickets.category")} labelClassName="block text-sm font-medium text-foreground" value={categoryId} onValueChange={setCategoryId} options={categoryOptions} />}
-                {canManage && <AppSelectField id="ticket-detail-agent" label={t("tickets.assignedAgent")} labelClassName="block text-sm font-medium text-foreground" value={assignedAgentId} onValueChange={setAssignedAgentId} options={agentOptions} />}
+                {canManage && <AppSelectField id="ticket-detail-agent" label={t("tickets.assignedAgent")} labelClassName="block text-sm font-medium text-foreground" searchable searchPlaceholder={t("tickets.searchAssignee")} emptySearchMessage={t("tickets.noAssigneesFound")} value={assignedAgentId} onValueChange={setAssignedAgentId} options={agentOptions} />}
               </div>
               <div className="mt-4 flex">
                 <button className="button-primary sm:ms-auto sm:w-auto" disabled={update.isPending} onClick={saveOperations}>

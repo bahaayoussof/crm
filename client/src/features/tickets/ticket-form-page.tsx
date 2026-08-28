@@ -60,7 +60,7 @@ export function TicketFormPage() {
 
   const agentOptions = [
     { value: "", label: t("tickets.unassigned") },
-    ...(agents.data?.map((agent) => ({ value: agent.id, label: agent.name })) ?? []),
+    ...(agents.data?.map((agent) => ({ value: agent.id, label: agent.name, searchText: agent.email })) ?? []),
   ];
 
   const submit = handleSubmit(async (values) => {
@@ -182,6 +182,9 @@ export function TicketFormPage() {
                       id="ticket-agent"
                       label={t("tickets.assignedAgent")}
                       labelClassName="block text-sm font-medium text-foreground"
+                      searchable
+                      searchPlaceholder={t("tickets.searchAssignee")}
+                      emptySearchMessage={t("tickets.noAssigneesFound")}
                       value={field.value}
                       onValueChange={field.onChange}
                       options={agentOptions}
