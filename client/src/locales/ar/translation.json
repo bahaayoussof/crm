@@ -12,6 +12,28 @@
     "retry": "إعادة المحاولة", "previous": "السابق", "next": "التالي", "cancel": "إلغاء", "save": "حفظ", "saving": "جارٍ الحفظ…", "clearSearch": "مسح البحث",
     "edit": "تعديل", "delete": "حذف", "notProvided": "غير متوفر", "loading": "جارٍ التحميل…", "search": "بحث", "noResults": "لا توجد نتائج"
   },
+  "datePicker": {
+    "placeholder": "اختر التاريخ",
+    "rangePlaceholder": "اختر نطاقًا زمنيًا",
+    "previousMonth": "الشهر السابق",
+    "nextMonth": "الشهر التالي",
+    "month": "الشهر",
+    "year": "السنة",
+    "today": "اليوم",
+    "clear": "مسح",
+    "apply": "تطبيق",
+    "time": "الوقت",
+    "hours": "الساعات",
+    "minutes": "الدقائق",
+    "presets": {
+      "today": "اليوم",
+      "yesterday": "أمس",
+      "last7": "آخر 7 أيام",
+      "last30": "آخر 30 يومًا",
+      "thisMonth": "هذا الشهر",
+      "lastMonth": "الشهر الماضي"
+    }
+  },
   "validation": {
     "email": "أدخل بريدًا إلكترونيًا صحيحًا", "passwordRequired": "كلمة المرور مطلوبة", "nameMin": "يجب ألا يقل الاسم عن حرفين",
     "phoneMax": "يجب ألا يزيد رقم الهاتف عن 30 حرفًا", "passwordMin": "يجب ألا تقل كلمة المرور عن 8 أحرف", "passwordMatch": "كلمتا المرور غير متطابقتين"

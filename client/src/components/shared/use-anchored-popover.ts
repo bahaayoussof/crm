@@ -166,8 +166,22 @@ export function useAnchoredPopover<T extends HTMLElement = HTMLElement, P extend
     if (!open) return;
 
     const onPointerDown = (event: Event) => {
-      const target = event.target as Node | null;
+      let target = event.target as Node | null;
       if (!target) return;
+
+      // A nested Radix overlay (Select / Menu) sets `pointer-events: none` on
+      // <body> while it is open, so a click that is visually inside our panel
+      // lands on <body> / <html>. Re-resolve the real element under the pointer
+      // before treating it as an outside click.
+      if (
+        (target === document.body || target === document.documentElement) &&
+        typeof (event as PointerEvent).clientX === "number"
+      ) {
+        const pointer = event as PointerEvent;
+        const resolved = document.elementFromPoint(pointer.clientX, pointer.clientY);
+        if (resolved) target = resolved;
+      }
+
       if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) return;
 
       // Do not dismiss when interacting with portalled select / menu / dialog items

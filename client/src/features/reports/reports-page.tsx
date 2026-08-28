@@ -26,8 +26,17 @@ import {
   CHART_THEME_TOKENS,
 } from "@/components/shared/charts";
 import { cn } from "@/lib/utils";
+import { DateRangePicker, type DateRange } from "@/components/date-picker/date-range-picker";
 
 const PRESETS = [7, 30, 90] as const;
+
+/** Local calendar day → the same day at 00:00:00 UTC (matches the old date-input serialization). */
+function toUtcMidnightIso(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}T00:00:00.000Z`;
+}
 
 export function ReportsPage() {
   const { t, i18n } = useTranslation();
@@ -55,15 +64,22 @@ export function ReportsPage() {
     return PRESETS.includes(days as (typeof PRESETS)[number]) ? days : null;
   }, [range]);
 
-  const setBound = (key: "from" | "to", value: string) => {
-    const next = new URLSearchParams(params);
-    if (value) next.set(key, new Date(value).toISOString());
-    else next.delete(key);
-    setParams(next);
-  };
-  const boundValue = (key: "from" | "to") => {
-    const raw = params.get(key);
-    return raw ? raw.slice(0, 10) : "";
+  const rangeValue = useMemo<DateRange>(
+    () => ({
+      from: range.from ? new Date(range.from) : undefined,
+      to: range.to ? new Date(range.to) : undefined,
+    }),
+    [range],
+  );
+
+  const setRange = (next: DateRange) => {
+    const params2 = new URLSearchParams(params);
+    // Preserve the previous date-only → UTC-midnight serialization.
+    if (next.from) params2.set("from", toUtcMidnightIso(next.from));
+    else params2.delete("from");
+    if (next.to) params2.set("to", toUtcMidnightIso(next.to));
+    else params2.delete("to");
+    setParams(params2);
   };
 
   if (overview.isLoading) {
@@ -126,14 +142,17 @@ export function ReportsPage() {
               </button>
             ))}
           </div>
-          <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-            {t("reports.filters.from")}
-            <input type="date" className="input text-xs" value={boundValue("from")} max={boundValue("to") || undefined} onChange={(event) => setBound("from", event.target.value)} />
-          </label>
-          <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-            {t("reports.filters.to")}
-            <input type="date" className="input text-xs" value={boundValue("to")} min={boundValue("from") || undefined} onChange={(event) => setBound("to", event.target.value)} />
-          </label>
+          <div className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+            <span>{t("reports.filters.from")} – {t("reports.filters.to")}</span>
+            <DateRangePicker
+              ariaLabel={`${t("reports.filters.from")} – ${t("reports.filters.to")}`}
+              value={rangeValue}
+              onChange={setRange}
+              maxDate={new Date()}
+              className="w-64"
+              triggerClassName="h-9 min-h-9 text-xs"
+            />
+          </div>
           {(range.from || range.to) && <button type="button" className="button-ghost px-2 text-xs" onClick={() => setParams({})}>{t("reports.filters.reset")}</button>}
         </div>
         <p className="mt-3 text-xs text-muted-foreground" dir="ltr">

@@ -12,6 +12,28 @@
     "retry": "Retry", "previous": "Previous", "next": "Next", "cancel": "Cancel", "save": "Save", "saving": "Saving…", "clearSearch": "Clear search",
     "edit": "Edit", "delete": "Delete", "notProvided": "Not provided", "loading": "Loading…", "search": "Search", "noResults": "No results found"
   },
+  "datePicker": {
+    "placeholder": "Select date",
+    "rangePlaceholder": "Select date range",
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month",
+    "month": "Month",
+    "year": "Year",
+    "today": "Today",
+    "clear": "Clear",
+    "apply": "Apply",
+    "time": "Time",
+    "hours": "Hours",
+    "minutes": "Minutes",
+    "presets": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "last7": "Last 7 days",
+      "last30": "Last 30 days",
+      "thisMonth": "This month",
+      "lastMonth": "Last month"
+    }
+  },
   "validation": {
     "email": "Enter a valid email address", "passwordRequired": "Password is required", "nameMin": "Name must be at least 2 characters",
     "phoneMax": "Phone must be 30 characters or fewer", "passwordMin": "Password must be at least 8 characters", "passwordMatch": "Passwords do not match"

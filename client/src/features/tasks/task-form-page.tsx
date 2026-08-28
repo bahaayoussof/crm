@@ -4,11 +4,11 @@ import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AppSelect } from "@/components/ui/app-select";
+import { DatePicker } from "@/components/date-picker/date-picker";
 import { useAuth } from "@/features/auth/auth-state";
 import { useAgents } from "@/features/tickets/ticket-hooks";
 import { localInputToIso, type TaskCreatePayload, type TaskUpdatePayload } from "./task-api";
 import { getLocalizedTaskError, getTaskError } from "./task-error";
-import { isoToLocalInput } from "./task-format";
 import { useCreateTask, useTask, useUpdateTask } from "./task-hooks";
 import { canAssignTasks, taskEditScope } from "./task-permissions";
 import { taskFormSchema, type TaskFormValues } from "./task.schemas";
@@ -42,7 +42,7 @@ export function TaskFormPage() {
       reset({
         title: task.data.title,
         description: task.data.description ?? "",
-        dueAt: isoToLocalInput(task.data.dueAt),
+        dueAt: task.data.dueAt ?? "",
         status: task.data.status,
         assigneeId: task.data.assigneeId,
       });
@@ -166,12 +166,15 @@ export function TaskFormPage() {
 
             <div className="grid gap-5 sm:grid-cols-2">
               <Field id="task-due" label={t("tasks.fieldDueAt")}>
-                <input
+                <DatePicker
                   id="task-due"
-                  type="datetime-local"
-                  className="input"
+                  ariaLabel={t("tasks.fieldDueAt")}
+                  showTime
                   disabled={contentDisabled}
-                  {...register("dueAt")}
+                  value={watch("dueAt") ? new Date(watch("dueAt")) : undefined}
+                  onChange={(date) =>
+                    setValue("dueAt", date ? date.toISOString() : "", { shouldDirty: true })
+                  }
                 />
                 <span className="mt-1.5 block text-xs text-muted-foreground">{t("tasks.dueAtHelp")}</span>
               </Field>
