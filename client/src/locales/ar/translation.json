@@ -92,13 +92,21 @@
       "sendReply": "إرسال الرد", "addNote": "إضافة الملاحظة", "sending": "جارٍ الإرسال…", "adding": "جارٍ الإضافة…", "replySuccess": "تم إرسال الرد.", "noteSuccess": "تمت إضافة الملاحظة الداخلية.",
       "replyError": "تعذر إرسال الرد.", "noteError": "تعذرت إضافة الملاحظة الداخلية.", "internalLabel": "ملاحظة داخلية", "publicLabel": "ظاهر للعميل",
       "showMore": "عرض المزيد", "showLess": "عرض أقل",
+      "whatsappReplyHint": "سيُرسَل هذا الرد إلى العميل عبر واتساب:",
+      "whatsappNoPhone": "لا يوجد رقم هاتف مسجَّل، وسيتعذر التسليم",
+      "whatsappDelivery": {
+        "INTEGRATION_NOT_CONFIGURED": "تم حفظ الرد، لكن واتساب غير مُهيَّأ، لذا لم يُسلَّم.",
+        "NO_RECIPIENT_PHONE": "تم حفظ الرد، لكن لا يوجد رقم هاتف للعميل، لذا لم يُسلَّم عبر واتساب.",
+        "PROVIDER_REJECTED": "تم حفظ الرد، لكن واتساب رفض الرسالة، لذا لم تُسلَّم.",
+        "PROVIDER_UNREACHABLE": "تم حفظ الرد، لكن تعذّر الوصول إلى واتساب، لذا لم يُسلَّم."
+      },
       "roles": { "ADMIN": "مسؤول", "MANAGER": "مدير", "AGENT": "وكيل دعم", "CUSTOMER": "عميل" }
     },
     "columns": { "id": "المعرّف", "ticket": "التذكرة" },
     "status": { "NEW": "جديدة", "OPEN": "مفتوحة", "IN_PROGRESS": "قيد التنفيذ", "WAITING_CUSTOMER": "بانتظار العميل", "RESOLVED": "تم حلها", "CLOSED": "مغلقة", "ESCALATED": "مصعّدة" },
     "priority": { "LOW": "منخفضة", "MEDIUM": "متوسطة", "HIGH": "عالية", "URGENT": "عاجلة" },
     "channel": { "WEB": "الويب", "EMAIL": "البريد الإلكتروني", "WHATSAPP": "واتساب", "SMS": "رسالة نصية", "LIVE_CHAT": "محادثة مباشرة" },
-    "historyActions": { "TICKET_CREATED": "تم إنشاء التذكرة", "STATUS_CHANGED": "تم تغيير الحالة", "PRIORITY_CHANGED": "تم تغيير الأولوية", "ASSIGNMENT_CHANGED": "تم تغيير الموظف المسؤول", "CATEGORY_CHANGED": "تم تغيير التصنيف" },
+    "historyActions": { "TICKET_CREATED": "تم إنشاء التذكرة", "STATUS_CHANGED": "تم تغيير الحالة", "PRIORITY_CHANGED": "تم تغيير الأولوية", "ASSIGNMENT_CHANGED": "تم تغيير الموظف المسؤول", "CATEGORY_CHANGED": "تم تغيير التصنيف", "WHATSAPP_DELIVERY_FAILED": "فشل التسليم عبر واتساب" },
     "validation": { "customer": "اختر عميلاً", "subject": "يجب ألا يقل الموضوع عن 3 أحرف", "subjectMax": "يجب ألا يزيد الموضوع عن 200 حرف", "description": "الوصف مطلوب", "descriptionMax": "الوصف طويل جدًا", "category": "اختر تصنيفًا" },
     "errors": { "TICKET_NOT_FOUND": "التذكرة غير موجودة.", "CUSTOMER_NOT_FOUND": "العميل غير موجود.", "INVALID_STATUS_TRANSITION": "لا يُسمح بهذا الانتقال بين الحالات.", "INVALID_ASSIGNED_AGENT": "اختر موظف دعم صالحًا.", "CATEGORY_NOT_FOUND": "التصنيف غير موجود.", "FORBIDDEN": "ليست لديك صلاحية لإجراء هذا التغيير.", "DEPARTMENT_BRANCH_MISMATCH": "القسم لا يتبع الفرع المحدد." }
   },

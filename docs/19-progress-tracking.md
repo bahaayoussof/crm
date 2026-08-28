@@ -1,10 +1,10 @@
 # Customer Support CRM — Progress Tracking
 
-Last Updated: 2026-08-27 (`master`/`origin/master` reconciled at `e28962b`; Notifications is integrated. SLA automation is implemented and automated-verified on uncommitted `feature/sla-automation`.)
+Last Updated: 2026-08-28 (WhatsApp Cloud API integration implemented and automated-verified on uncommitted `feature/whatsapp-integration`. NOTE: sections below this header still carry pre-`feature/whatsapp-integration` drift — several branches integrated per `.wolf/STATUS.md` (`feature/reports` `827b3ff`, `feature/user-management` `8db4a83`, `feature/settings`, tasks-reminders on branch, reports-ui redesign `9682a88`) are not fully reflected in §5/§10 here; this update was scoped to WhatsApp and did not reconcile that backlog.)
 
-Current Integration Branch: `master` at `c846d96`, equal to the `origin/master` tracking ref (ahead 0, behind 0). Historical verification evidence below is preserved without claiming reruns.
+Current Integration Branch: `master` — local `master` is at `9682a88 feat: redesign reports ui` per `git log` (the older commit hashes elsewhere in this file are stale).
 
-Current Working Branch: `feature/sla-automation`, branched from `origin/master` at `e28962b`. Bounded SLA automation is implemented and automated-verified: client 356 and server 345 tests pass (701 total across the separately successful complete suites); root/client/server builds, server lint/typecheck, and whitespace checks pass. The combined root test command encountered one transient existing attachment-preview timeout, then that focused file passed 44/44 and the complete client suite passed 356/356; the complete server suite passed 345/345. The existing Vite chunk-size warning remains. No schema or migration change. PostgreSQL, live Vercel Cron, and deployment verification were not performed. Changes are unstaged and uncommitted; nothing was staged, committed, pushed, merged, rebased, amended, or tagged.
+Current Working Branch: `feature/whatsapp-integration`, branched from `master`. WhatsApp Cloud API MVP (ADR-030) is implemented and automated-verified: server 409 tests pass (22 files), client 411 tests pass (40 files); server lint/typecheck clean, `tsc -p tsconfig.json` compiles clean; client `tsc -b` clean, `vite build` succeeds (pre-existing >500 kB chunk warning); client `eslint` keeps its 10 pre-existing problems (verified identical on a clean tree, none in touched files); i18n parity 811/811. One schema change: `TicketMessage.externalId String? @unique` + migration `20260828120000_add_ticketmessage_external_id`, **not applied to any database**. `server npm run build` hits the pre-existing Windows `prisma generate` EPERM (unrelated). PostgreSQL, live Meta webhook/Graph API, and authenticated browser verification were not performed. Changes are unstaged and uncommitted; nothing was staged, committed, pushed, merged, rebased, amended, or tagged.
 
 > This file is a status summary and the single authoritative status-and-roadmap document. Requirements, architecture, API contracts, RBAC rules, workflows, UI specifications, and architecture decisions remain authoritative in their respective documents.
 
@@ -168,7 +168,7 @@ Every bullet from the original assignment appears exactly once. `Status` is the 
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | APIs | PARTIAL | Internal REST API (`/api/*`) for implemented domains; consistent error shape | Axios client consumes it | route/controller tests | PostgreSQL-verified (prior) | No external/public API program, API keys, webhooks, or versioning | not scheduled |
 | ERP | ARCHITECTURE_ONLY | none | none | none | N/A | Documented only (ADR-002) | demo-only |
-| Email, SMS, and WhatsApp | ARCHITECTURE_ONLY | `Channel` enum values only | none | none | N/A | No provider adapters | demo-only (ADR-002) |
+| Email, SMS, and WhatsApp | PARTIAL | **WhatsApp:** Meta Cloud API adapter `modules/integrations/whatsapp/*` — signed inbound webhook → Customer/Ticket/TicketMessage; outbound reply from the existing composer → Graph API (`feature/whatsapp-integration`, ADR-030). Email/SMS: `Channel` enum values only | Existing "WhatsApp" channel badge + a composer hint + delivery-failure warning; no separate UI | `whatsapp.test.ts` (23) + `ticket.test.ts` outbound (3); Meta HTTP mocked | Not PostgreSQL/live-Meta/browser verified; migration `20260828120000_add_ticketmessage_external_id` not applied | `feature/whatsapp-integration` (on branch); Email/SMS demo-only (ADR-002) |
 | External systems | ARCHITECTURE_ONLY | none | none | none | N/A | No integration framework | demo-only |
 
 ### 12. Platform
@@ -186,13 +186,13 @@ Every bullet from the original assignment appears exactly once. `Status` is the 
 | Status | Count |
 | --- | ---: |
 | COMPLETE | 24 |
-| PARTIAL | 7 |
+| PARTIAL | 8 |
 | NOT_STARTED | 18 |
-| ARCHITECTURE_ONLY | 9 |
+| ARCHITECTURE_ONLY | 8 |
 | INTENTIONALLY_DEFERRED | 1 |
 | **Total requirement rows** | **59** |
 
-Recount proof (every §1–§12 sub-table row counted once): 5 + 5 + 5 + 6 + 6 + 4 + 5 + 5 + 5 + 4 + 4 + 5 = 59 rows. COMPLETE 24 (§1 profiles/contact/notes/**Attachments** = 4, §2 = 5, §3 web forms = 1, §4 = 2, §5 = 2, §6 = 4, §8 = 4, §12 = 2) + PARTIAL 7 (§1 interaction history, §4 team collaboration, §5 escalation rules, §9 management dashboards, §10 users+permissions, §11 APIs) + NOT_STARTED 18 + ARCHITECTURE_ONLY 9 + INTENTIONALLY_DEFERRED 1 = 59. Attachments moved PARTIAL → COMPLETE on integration at `8e24d22`; no other status changed.
+Recount proof (every §1–§12 sub-table row counted once): 5 + 5 + 5 + 6 + 6 + 4 + 5 + 5 + 5 + 4 + 4 + 5 = 59 rows. COMPLETE 24 (§1 profiles/contact/notes/**Attachments** = 4, §2 = 5, §3 web forms = 1, §4 = 2, §5 = 2, §6 = 4, §8 = 4, §12 = 2) + PARTIAL 8 (§1 interaction history, §4 team collaboration, §5 escalation rules, §9 management dashboards, §10 users+permissions, §11 APIs, §11 Email/SMS/**WhatsApp**) + NOT_STARTED 18 + ARCHITECTURE_ONLY 8 + INTENTIONALLY_DEFERRED 1 = 59. Attachments moved PARTIAL → COMPLETE on integration at `8e24d22`; "Email, SMS, and WhatsApp" moved ARCHITECTURE_ONLY → PARTIAL on `feature/whatsapp-integration` (ADR-030); no other status changed.
 
 COMPLETE includes 5 rows delivered by `feature/knowledge-base` (Knowledge Base FAQs / Help articles / Solutions and guides / Search, and Customer Portal "Access FAQs"), integrated into `master` at `ef647ef`, plus the Customer-Management Attachments row, integrated at `8e24d22`. Both are automated-verified; PostgreSQL, private Vercel Blob (attachments), and authenticated browser verification of both remain outstanding.
 
@@ -362,7 +362,7 @@ A minimal temporary developer fixture may be introduced by an earlier feature br
 - No refresh-token, token-revocation, or production session infrastructure.
 - Customer Portal feedback, notifications, profile editing, and external messaging integrations remain deferred. Customer Portal owned-ticket attachments (`8e24d22`) and the Portal Knowledge Base / Help Center (`ef647ef`) are integrated into `master`.
 - Attachment upload/download with a private Vercel Blob store, 4 MiB signature-validated single-file uploads (no textual multipart fields accepted — reserved names → `422 INVALID_ATTACHMENT_CONTEXT`, others → `422 INVALID_UPLOAD`), service-level context/ownership validation, a safe authenticated download proxy, orphan cleanup, an icon-only Download action, and an accessible in-browser Preview dialog (image / built-in PDF viewer / escaped text from a temporary authenticated Blob URL) are integrated into `master` at `8e24d22` (automated-verified; live PostgreSQL / private Vercel Blob / authenticated browser verification outstanding). No malware scanning, no attachment deletion, **no thumbnails or image transformations** (Preview is a client presentation of the same authorized download, not a public URL and not malware scanning), no multi-file or resumable upload, no background orphan-cleanup worker; the model records no uploader, size, or checksum.
-- No real-time messaging or provider-backed communication channel.
+- No real-time messaging. A **WhatsApp Cloud API** provider channel is implemented on the uncommitted `feature/whatsapp-integration` branch (ADR-030, automated-verified only): signed inbound webhook → Customer/Ticket/`TicketMessage` (idempotent via `TicketMessage.externalId`), and outbound agent replies from the existing composer → Meta Graph API with a `WHATSAPP_DELIVERY_FAILED` history row on failure. Text only, in and out; no media/templates/interactive messages, no delivery/read-receipt lifecycle, no multi-number/multi-WABA, no historical import; a message after a ticket is `RESOLVED`/`CLOSED` opens a new ticket rather than reopening; ambiguous phone matches route to one existing customer (logged, never merged); auto-created customers carry a non-routable `@no-email.invalid` placeholder email (`Customer.email` is required + unique). Migration `20260828120000_add_ticketmessage_external_id` is not applied to any database. Email and SMS channels remain `Channel` enum values only.
 - Basic SLA presentation exists: deadline snapshots on creation, eligible priority-change recalculation, one-time first-response recording, and one shared request-time `deriveSla` helper (`ON_TRACK` / `AT_RISK` / `BREACHED` / `MET` / `NOT_CONFIGURED` plus an explicit `FIRST_RESPONSE` / `RESOLUTION` / null target) consumed by the Agent Dashboard and authorized internal Ticket Details. Integrated into `master` at `e7d9b14`: internal Ticket Details renders a compact localized SLA subsection; Portal behavior remains SLA-safe without exposing raw or derived internal fields. Background workers, scheduled monitoring, persisted SLA state or breach events, notifications, automatic escalation/assignment, SLA reports, and SLA administration do not exist.
 - No notifications, reports, feedback workflow, or AI actions. Knowledge Base is integrated into `master` at `ef647ef`; it has no popularity/view tracking, no article versioning, no rich-text editing, and no related-article recommendations.
 - No seed script or realistic required demo dataset.
@@ -379,6 +379,22 @@ A minimal temporary developer fixture may be introduced by an earlier feature br
 - Deployment: no deployed frontend/API verification or deployment configuration is present.
 
 ## 9. Testing Status
+
+### `feature/whatsapp-integration` (2026-08-28, implemented on the uncommitted branch, NOT integrated)
+
+WhatsApp Cloud API MVP (ADR-030). Adapter module `server/src/modules/integrations/whatsapp/` (routes/controller/service/client/signature/schema/config/types); mounted at `/api/integrations/whatsapp` in `app.ts` **before** `express.json()` with `express.raw()` on `POST /webhook` for HMAC. One schema change: `TicketMessage.externalId String? @unique` (migration `20260828120000_add_ticketmessage_external_id`, **not applied to any database** here). Five optional `WHATSAPP_*` env vars added to `config/env.ts` + `server/.env.example`. `ticket.service.addTicketMessage` gains a post-commit outbound dispatch for `channel === WHATSAPP` tickets (response may carry `data.delivery`); `requireConversationMutationAccess` also selects `channel` + `customer.phone`. Frontend: composer WhatsApp hint + delivery-failure warning + `tickets.historyActions.WHATSAPP_DELIVERY_FAILED` (EN/AR, i18n parity 811/811).
+
+| Command / category | Files | Passed | Failed | Skipped | Todo | Exit code | Evidence |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| Server tests: `npm --prefix server run test` | 22 | 409 | 0 | 0 | 0 | 0 | +26 vs prior 383: new `whatsapp.test.ts` (23) — GET verify (valid/invalid token, unconfigured 503); POST signature (valid, invalid, missing header, unconfigured 503, non-JSON 400); inbound text (new customer + WHATSAPP ticket; existing customer matched by phone; append to active WHATSAPP ticket; `WAITING_CUSTOMER → IN_PROGRESS`; duplicate `wamid` → no writes; P2002 race → duplicate; non-text ignored; status-only event ignored; unexpected shape acknowledged; system author provisioned); `deliverOutboundReply` unit (SENT + provider id stored; not-configured; no phone; PROVIDER_REJECTED + history; PROVIDER_UNREACHABLE). `ticket.test.ts` +3 — WHATSAPP reply invokes `deliverOutboundReply` and returns `delivery`; WEB reply does not; RBAC (unassigned agent) 403 before any send. Meta HTTP fully mocked; no network. |
+| Client tests: `npm --prefix client run test` | 40 | 411 | 0 | 0 | 0 | 0 | Existing `ticket-pages.test.tsx` / `ticket-details-layout.test.tsx` (74 in `features/tickets`) green with the added `channel`/`customerPhone` props and `delivery`-aware `submit()`. No new client test file. |
+| Server lint / typecheck | — | — | — | — | — | 0 | `eslint .` clean; `tsc -p tsconfig.json --noEmit` clean. |
+| Client lint / typecheck | — | — | — | — | — | 0 / 0 | `tsc -b` clean. `eslint` keeps the repo's 10 pre-existing problems (9 unused-import errors + 1 `react-refresh` warning), none in touched files — verified identical on a clean tree. |
+| Server build | — | — | — | — | — | — | `tsc -p tsconfig.json` compiles clean (exit 0). `npm run build` additionally runs `prisma generate`, which hits the pre-existing Windows `EPERM` on the locked engine binary (documented in `.wolf/buglog.json`); unrelated to this change. |
+| Client build | — | — | — | — | — | 0 | `vite build` succeeds; pre-existing >500 kB chunk warning preserved (~1,455 kB). |
+| Translation parity | — | — | — | — | — | — | `tickets.conversation.whatsappReplyHint` / `whatsappNoPhone` / `whatsappDelivery.*` (4) + `tickets.historyActions.WHATSAPP_DELIVERY_FAILED`; en 811 / ar 811, identical key sets. |
+
+PostgreSQL, live Meta webhook/Graph API, and authenticated English/Arabic browser verification were NOT performed (no reachable DB / no Meta credentials / no dev-server browser session in this environment). Deterministic mocked tests cover webhook verification, signature security, inbound customer/ticket/message idempotency, and outbound success/failure/RBAC. Changes are unstaged and uncommitted; nothing was staged, committed, pushed, merged, rebased, or tagged. Suggested commit: `feat: implement WhatsApp Cloud API integration`.
 
 ### `feature/customer-feedback` (2026-08-27, implemented on the uncommitted branch, NOT integrated)
 

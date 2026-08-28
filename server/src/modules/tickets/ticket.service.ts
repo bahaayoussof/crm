@@ -1,8 +1,9 @@
-import { Prisma, Role, TicketStatus } from "@prisma/client";
+import { Channel, Prisma, Role, TicketStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import { deriveSla } from "../../shared/sla/derive-sla.js";
 import { createNotifications } from "../notifications/notification.service.js";
+import { deliverOutboundReply } from "../integrations/whatsapp/whatsapp.service.js";
 import type { CreateTicketInput, TicketConversationInput, TicketListQuery, UpdateTicketInput } from "./ticket.schema.js";
 import { ticketVisibilityWhere, type TicketActor as Actor } from "./ticket-visibility.js";
 
@@ -78,15 +79,28 @@ export async function getTicket(ticketId: string, actor: Actor, now = new Date()
 
 export async function addTicketMessage(ticketId: string, input: TicketConversationInput, actor: Actor) {
   const createdAt = new Date();
-  return prisma.$transaction(async (tx) => {
-    await requireConversationMutationAccess(tx, ticketId, actor);
-    const message = await tx.ticketMessage.create({
+  const { message, channel, customerPhone } = await prisma.$transaction(async (tx) => {
+    const ticket = await requireConversationMutationAccess(tx, ticketId, actor);
+    const created = await tx.ticketMessage.create({
       data: { ticketId, authorUserId: actor.userId, body: input.body, createdAt },
       select: conversationSelect,
     });
     await tx.ticket.updateMany({ where: { id: ticketId, firstRespondedAt: null }, data: { firstRespondedAt: createdAt } });
-    return { ...message, kind: "PUBLIC_MESSAGE" as const };
+    return {
+      message: { ...created, kind: "PUBLIC_MESSAGE" as const },
+      channel: ticket.channel,
+      customerPhone: ticket.customer?.phone ?? null,
+    };
   });
+
+  // Outbound transport for WhatsApp-originated tickets. The message is already
+  // committed above, so a delivery failure never corrupts the conversation — it
+  // is reported back to the caller and recorded as a ticket history row.
+  if (channel === Channel.WHATSAPP) {
+    const delivery = await deliverOutboundReply({ ticketId, messageId: message.id, to: customerPhone, text: input.body });
+    return { ...message, delivery };
+  }
+  return message;
 }
 
 export async function addTicketNote(ticketId: string, input: TicketConversationInput, actor: Actor) {
@@ -200,9 +214,13 @@ const conversationSelect = {
 } satisfies Prisma.TicketMessageSelect & Prisma.TicketNoteSelect;
 
 async function requireConversationMutationAccess(tx: Prisma.TransactionClient, ticketId: string, actor: Actor) {
-  const ticket = await tx.ticket.findFirst({ where: { id: ticketId, ...ticketVisibilityWhere(actor) }, select: { id: true, assignedAgentId: true } });
+  const ticket = await tx.ticket.findFirst({
+    where: { id: ticketId, ...ticketVisibilityWhere(actor) },
+    select: { id: true, assignedAgentId: true, channel: true, customer: { select: { phone: true } } },
+  });
   if (!ticket) throw new AppError(404, "TICKET_NOT_FOUND", "Ticket not found");
   if (actor.role === Role.AGENT && ticket.assignedAgentId !== actor.userId) throw forbidden("Ticket must be assigned to the agent before adding conversation content");
+  return ticket;
 }
 
 function compareConversation(left: { createdAt: Date; kind: string; id: string }, right: { createdAt: Date; kind: string; id: string }) {

@@ -13,6 +13,9 @@ export interface TicketListItem {
 export interface TicketHistory { id: string; action: string; oldValue: string | null; newValue: string | null; createdAt: string; actor: { id: string; name: string; role: string } | null }
 export type TicketConversationKind = "PUBLIC_MESSAGE" | "INTERNAL_NOTE";
 export interface TicketConversationItem { id: string; kind: TicketConversationKind; body: string; createdAt: string; author: { id: string; name: string; role: string } }
+export type WhatsappDeliveryReason = "INTEGRATION_NOT_CONFIGURED" | "NO_RECIPIENT_PHONE" | "PROVIDER_REJECTED" | "PROVIDER_UNREACHABLE";
+export interface MessageDelivery { channel: "WHATSAPP"; status: "SENT" | "FAILED"; externalId?: string; reason?: WhatsappDeliveryReason }
+export type TicketMessageResult = TicketConversationItem & { delivery?: MessageDelivery };
 export interface TicketDetail extends TicketListItem {
   description: string; resolvedAt: string | null; closedAt: string | null;
   slaState: SlaState; effectiveSlaDueAt: string | null; effectiveSlaTarget: SlaTarget;

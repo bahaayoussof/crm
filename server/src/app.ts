@@ -22,6 +22,7 @@ import { attachmentRouter } from "./modules/attachments/attachment.routes.js";
 import { portalAttachmentRouter } from "./modules/attachments/attachment.portal.routes.js";
 import { taskRouter } from "./modules/tasks/task.routes.js";
 import { taskReminderRouter } from "./modules/tasks/task-reminder.routes.js";
+import { whatsappRouter } from "./modules/integrations/whatsapp/whatsapp.routes.js";
 
 
 const allowedOrigins = new Set(env.CLIENT_URLS ?? [env.CLIENT_URL]);
@@ -50,6 +51,11 @@ export const app = express();
 
 app.disable("x-powered-by");
 app.use(cors(corsOptions));
+
+// WhatsApp webhook is mounted before express.json() so its POST body stays a raw
+// Buffer for HMAC signature verification. All other routes use parsed JSON below.
+app.use("/api/integrations/whatsapp", whatsappRouter);
+
 app.use(express.json());
 
 app.get("/api/health", (_request, response) => {

@@ -49,9 +49,12 @@ This is the planned logical model. Exact Prisma syntax may be implemented during
 - ticketId
 - authorUserId required; customer authors use their linked `User` identity
 - body
+- externalId optional, unique; external provider message id (e.g. WhatsApp Cloud API `wamid`). Inbound: the idempotency anchor for webhook de-duplication. Outbound: stored for traceability. `NULL` for WEB/Portal messages (`feature/whatsapp-integration`, ADR-030).
 - createdAt
 
 `TicketMessage` contains public, customer-visible conversation only.
+
+Inbound WhatsApp messages are authored by a single login-less system `User` (`whatsapp-inbound@system.invalid`, role `CUSTOMER`, `isActive = false`) because WhatsApp senders usually have no account and `authorUserId` is required.
 
 ### TicketNote
 - id

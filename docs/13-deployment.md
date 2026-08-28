@@ -38,4 +38,15 @@ Expected categories:
 - Server-proxied multipart upload is capped at 4 MiB per request, keeping it below the common Vercel serverless request-body limit; a larger limit would require an explicitly designed direct-client upload flow.
 - The legacy `server/uploads/` directory and its `.gitignore` rules are unused by this feature and are retained only as pre-Blob scaffolding.
 
+### WhatsApp Cloud API (`feature/whatsapp-integration`)
+
+- `WHATSAPP_ACCESS_TOKEN` — bearer token for the WhatsApp Business phone number (outbound replies).
+- `WHATSAPP_PHONE_NUMBER_ID` — the Phone Number **ID** (not the phone number) from the Meta app (outbound replies).
+- `WHATSAPP_VERIFY_TOKEN` — arbitrary string; also pasted into the Meta webhook "Verify token" field (webhook GET verification).
+- `WHATSAPP_APP_SECRET` — the Meta **App Secret**; verifies the `X-Hub-Signature-256` header on inbound webhooks.
+- `WHATSAPP_API_VERSION` — Graph API version; optional, defaults to `v22.0`.
+- All five are **optional**. When unset, the CRM runs unchanged and the WhatsApp endpoints return `503 WHATSAPP_NOT_CONFIGURED`. Server-side only; never exposed to the browser or returned in any response.
+- The webhook needs a public **HTTPS** URL: `https://<api-domain>/api/integrations/whatsapp/webhook`. Subscribe the Meta app to the **`messages`** webhook field only. The hostname is never hard-coded in application logic.
+- Full setup steps: `docs/20-whatsapp-integration.md`.
+
 Never commit secrets.

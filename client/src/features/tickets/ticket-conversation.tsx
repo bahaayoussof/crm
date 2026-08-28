@@ -5,7 +5,7 @@ import { QuickReplyPicker } from "@/features/quick-replies/quick-reply-picker";
 import { ConversationMessage, ConversationSection } from "./ticket-conversation-ui";
 import { getTicketError } from "./ticket-error";
 import { useCreateTicketMessage, useCreateTicketNote } from "./ticket-hooks";
-import type { TicketConversationItem } from "./ticket.types";
+import type { TicketChannel, TicketConversationItem, TicketMessageResult } from "./ticket.types";
 
 type Mode = "reply" | "note";
 type MessageAttachment = { id: string; fileName: string; mimeType: string; createdAt: string };
@@ -13,8 +13,9 @@ type MessageAttachment = { id: string; fileName: string; mimeType: string; creat
 // Matches the server public-reply limit (`ticketConversationBodySchema` / `portalReplySchema`: body max 20_000).
 const MAX_PUBLIC_REPLY_LENGTH = 20_000;
 
-export function TicketConversation({ ticketId, items, canMutate, messageAttachments }: { ticketId: string; items: TicketConversationItem[]; canMutate: boolean; messageAttachments?: Map<string, MessageAttachment[]> }) {
+export function TicketConversation({ ticketId, items, canMutate, messageAttachments, channel, customerPhone }: { ticketId: string; items: TicketConversationItem[]; canMutate: boolean; messageAttachments?: Map<string, MessageAttachment[]>; channel?: TicketChannel; customerPhone?: string | null }) {
   const { t, i18n } = useTranslation();
+  const isWhatsapp = channel === "WHATSAPP";
   const [mode, setMode] = useState<Mode>("reply");
   const [reply, setReply] = useState("");
   const [note, setNote] = useState("");
@@ -62,9 +63,17 @@ export function TicketConversation({ ticketId, items, canMutate, messageAttachme
     if (!canMutate || !body.trim() || pending) return;
     setError(null); setSuccess(null);
     try {
-      await mutation.mutateAsync({ body });
+      const result = (await mutation.mutateAsync({ body })) as TicketMessageResult;
       if (mode === "reply") setReply(""); else setNote("");
-      setSuccess(t(mode === "reply" ? "tickets.conversation.replySuccess" : "tickets.conversation.noteSuccess"));
+      // The message is persisted even when WhatsApp delivery fails — surface the
+      // failure as a warning rather than a success, and keep the sent text out of the box.
+      if (mode === "reply" && result?.delivery?.status === "FAILED") {
+        setError(t(`tickets.conversation.whatsappDelivery.${result.delivery.reason ?? "PROVIDER_REJECTED"}`, {
+          defaultValue: t("tickets.conversation.whatsappDelivery.PROVIDER_REJECTED"),
+        }));
+      } else {
+        setSuccess(t(mode === "reply" ? "tickets.conversation.replySuccess" : "tickets.conversation.noteSuccess"));
+      }
     } catch (caught) {
       setError(getTicketError(caught, t(mode === "reply" ? "tickets.conversation.replyError" : "tickets.conversation.noteError"), t));
     }
@@ -76,6 +85,12 @@ export function TicketConversation({ ticketId, items, canMutate, messageAttachme
       <div className="pt-4" id="conversation-composer-panel" role="tabpanel">
         <label className="text-sm font-medium" htmlFor={`conversation-${mode}`}>{t(mode === "reply" ? "tickets.conversation.replyLabel" : "tickets.conversation.noteLabel")}</label>
         <p className="mt-1 text-xs text-muted-foreground" id={`conversation-${mode}-help`}>{t(mode === "reply" ? "tickets.conversation.replyHelp" : "tickets.conversation.noteHelp")}</p>
+        {isWhatsapp && mode === "reply" && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            {t("tickets.conversation.whatsappReplyHint")}
+            {customerPhone ? <> <span dir="ltr">{customerPhone}</span></> : <> — {t("tickets.conversation.whatsappNoPhone")}</>}
+          </p>
+        )}
         <textarea ref={mode === "reply" ? replyRef : undefined} id={`conversation-${mode}`} className="input mt-3 min-h-28 resize-y py-3" value={body} disabled={!canMutate || pending} aria-describedby={`conversation-${mode}-help`} onChange={(event) => { if (mode === "reply") { setReply(event.target.value); setInsertError(null); } else setNote(event.target.value); }} />
         {!canMutate && <p className="mt-2 text-sm text-warning-foreground" role="status">{t("tickets.conversation.readOnly")}</p>}
         {insertError && <p className="mt-2 text-sm text-danger-foreground" role="alert">{insertError}</p>}

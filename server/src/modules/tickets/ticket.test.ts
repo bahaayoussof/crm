@@ -22,8 +22,14 @@ vi.mock("../../config/prisma.js", () => {
   return { prisma };
 });
 
+vi.mock("../integrations/whatsapp/whatsapp.service.js", () => ({
+  deliverOutboundReply: vi.fn().mockResolvedValue({ channel: "WHATSAPP", status: "SENT", externalId: "wamid.OUT" }),
+}));
+
 import { app } from "../../app.js";
 import { createAccessToken } from "../auth/auth-token.js";
+import { deliverOutboundReply } from "../integrations/whatsapp/whatsapp.service.js";
+const deliverOutboundReplyMock = vi.mocked(deliverOutboundReply);
 
 const admin = { id: "admin-1", role: Role.ADMIN };
 const manager = { id: "manager-1", role: Role.MANAGER };
@@ -241,6 +247,29 @@ describe("ticket API", () => {
     expect((await request(app).post("/api/tickets/ticket-1/notes").set(auth(agent)).send({ body: "Hidden" })).status).toBe(404);
     const customerToken = createAccessToken({ id: "customer-user", role: Role.CUSTOMER });
     expect((await request(app).post("/api/tickets/ticket-1/notes").set({ Authorization: `Bearer ${customerToken}` }).send({ body: "No" })).status).toBe(403);
+  });
+
+  it("sends the reply through the WhatsApp service for WHATSAPP-channel tickets", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: agent.id, channel: "WHATSAPP", customer: { phone: "+15551230000" } });
+    const response = await request(app).post("/api/tickets/ticket-1/messages").set(auth(agent)).send({ body: "On our way" });
+    expect(response.status).toBe(201);
+    expect(deliverOutboundReplyMock).toHaveBeenCalledWith({ ticketId: "ticket-1", messageId: "message-1", to: "+15551230000", text: "On our way" });
+    expect(response.body.data.delivery).toMatchObject({ channel: "WHATSAPP", status: "SENT" });
+  });
+
+  it("does not invoke WhatsApp transport for non-WHATSAPP tickets", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: agent.id, channel: "WEB", customer: { phone: "+15551230000" } });
+    const response = await request(app).post("/api/tickets/ticket-1/messages").set(auth(agent)).send({ body: "Web reply" });
+    expect(response.status).toBe(201);
+    expect(deliverOutboundReplyMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps RBAC ahead of WhatsApp transport for an unassigned agent", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: otherAgent.id, channel: "WHATSAPP", customer: { phone: "+15551230000" } });
+    const response = await request(app).post("/api/tickets/ticket-1/messages").set(auth(agent)).send({ body: "nope" });
+    expect(response.status).toBe(403);
+    expect(deliverOutboundReplyMock).not.toHaveBeenCalled();
+    expect(mocks.messageCreate).not.toHaveBeenCalled();
   });
 
   it("does not record first response when reply creation fails", async () => {

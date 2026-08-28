@@ -23,6 +23,15 @@ const envSchema = z.object({
   BLOB_READ_WRITE_TOKEN: z.string().min(1).optional(),
   // Shared only with the deployment scheduler. It never authenticates product users.
   CRON_SECRET: z.string().min(32, "CRON_SECRET must be at least 32 characters").optional(),
+  // WhatsApp Cloud API integration (server/src/modules/integrations/whatsapp).
+  // All optional: when unset the rest of the CRM is unaffected and WhatsApp
+  // transport reports a structured WHATSAPP_NOT_CONFIGURED error when invoked.
+  // Never exposed to the browser.
+  WHATSAPP_ACCESS_TOKEN: z.string().min(1).optional(),
+  WHATSAPP_PHONE_NUMBER_ID: z.string().min(1).optional(),
+  WHATSAPP_VERIFY_TOKEN: z.string().min(1).optional(),
+  WHATSAPP_APP_SECRET: z.string().min(1).optional(),
+  WHATSAPP_API_VERSION: z.string().regex(/^v\d+\.\d+$/, "WHATSAPP_API_VERSION must look like v22.0").default("v22.0"),
 });
 
 const result = envSchema.safeParse(process.env);

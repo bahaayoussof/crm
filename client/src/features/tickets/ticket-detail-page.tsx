@@ -81,7 +81,7 @@ export function TicketDetailPage() {
     </header>
     <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
       <div className="min-w-0 space-y-6">
-        <TicketConversation ticketId={record.id} items={record.conversation} canMutate={canWorkflow} messageAttachments={messageAttachments} />
+        <TicketConversation ticketId={record.id} items={record.conversation} canMutate={canWorkflow} messageAttachments={messageAttachments} channel={record.channel} customerPhone={record.customer.phone} />
         <section className="rounded-xl border border-border bg-surface p-5 shadow-subtle">
           <h2 className="text-base font-semibold text-foreground">{t("tickets.descriptionLabel")}</h2>
           <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-foreground [overflow-wrap:anywhere]">{record.description}</p>

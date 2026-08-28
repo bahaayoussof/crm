@@ -144,6 +144,9 @@ model TicketMessage {
   ticketId     String
   authorUserId String
   body         String
+  // External provider message id (e.g. WhatsApp Cloud API wamid). Inbound: the
+  // idempotency anchor for webhook de-duplication. Outbound: stored for traceability.
+  externalId   String?  @unique
   createdAt    DateTime @default(now())
 
   ticket      Ticket       @relation(fields: [ticketId], references: [id], onDelete: Restrict)

@@ -92,13 +92,21 @@
       "sendReply": "Send reply", "addNote": "Add note", "sending": "Sending…", "adding": "Adding…", "replySuccess": "Reply sent.", "noteSuccess": "Internal note added.",
       "replyError": "Unable to send the reply.", "noteError": "Unable to add the internal note.", "internalLabel": "Internal note", "publicLabel": "Visible to customer",
       "showMore": "Show more", "showLess": "Show less",
+      "whatsappReplyHint": "This reply is sent to the customer on WhatsApp:",
+      "whatsappNoPhone": "no phone number on file, delivery will fail",
+      "whatsappDelivery": {
+        "INTEGRATION_NOT_CONFIGURED": "Reply saved, but WhatsApp is not configured, so it was not delivered.",
+        "NO_RECIPIENT_PHONE": "Reply saved, but the customer has no phone number, so it was not delivered on WhatsApp.",
+        "PROVIDER_REJECTED": "Reply saved, but WhatsApp rejected the message, so it was not delivered.",
+        "PROVIDER_UNREACHABLE": "Reply saved, but WhatsApp could not be reached, so it was not delivered."
+      },
       "roles": { "ADMIN": "Admin", "MANAGER": "Manager", "AGENT": "Agent", "CUSTOMER": "Customer" }
     },
     "columns": { "id": "ID", "ticket": "Ticket" },
     "status": { "NEW": "New", "OPEN": "Open", "IN_PROGRESS": "In progress", "WAITING_CUSTOMER": "Waiting for customer", "RESOLVED": "Resolved", "CLOSED": "Closed", "ESCALATED": "Escalated" },
     "priority": { "LOW": "Low", "MEDIUM": "Medium", "HIGH": "High", "URGENT": "Urgent" },
     "channel": { "WEB": "Web", "EMAIL": "Email", "WHATSAPP": "WhatsApp", "SMS": "SMS", "LIVE_CHAT": "Live chat" },
-    "historyActions": { "TICKET_CREATED": "Ticket created", "STATUS_CHANGED": "Status changed", "PRIORITY_CHANGED": "Priority changed", "ASSIGNMENT_CHANGED": "Assignment changed", "CATEGORY_CHANGED": "Category changed" },
+    "historyActions": { "TICKET_CREATED": "Ticket created", "STATUS_CHANGED": "Status changed", "PRIORITY_CHANGED": "Priority changed", "ASSIGNMENT_CHANGED": "Assignment changed", "CATEGORY_CHANGED": "Category changed", "WHATSAPP_DELIVERY_FAILED": "WhatsApp delivery failed" },
     "validation": { "customer": "Select a customer", "subject": "Subject must be at least 3 characters", "subjectMax": "Subject must be 200 characters or fewer", "description": "Description is required", "descriptionMax": "Description is too long", "category": "Select a category" },
     "errors": { "TICKET_NOT_FOUND": "Ticket not found.", "CUSTOMER_NOT_FOUND": "Customer not found.", "INVALID_STATUS_TRANSITION": "This status transition is not allowed.", "INVALID_ASSIGNED_AGENT": "Select a valid support agent.", "CATEGORY_NOT_FOUND": "Category not found.", "FORBIDDEN": "You do not have permission to make this change.", "DEPARTMENT_BRANCH_MISMATCH": "The department does not belong to the selected branch." }
   },
