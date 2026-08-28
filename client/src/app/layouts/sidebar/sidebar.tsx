@@ -91,7 +91,7 @@ export function Sidebar({ user, collapsed, onToggleCollapsed, onLogout }: Sideba
   return (
     <aside
       className={cn(
-        "relative hidden lg:flex lg:flex-col lg:justify-between select-none bg-sidebar border-e border-sidebar-border transition-all duration-200 ease-out z-40",
+        "relative hidden lg:flex lg:flex-col lg:justify-between lg:h-[100dvh] select-none bg-sidebar border-e border-sidebar-border transition-all duration-200 ease-out z-40",
         collapsed ? "w-[68px]" : "w-60"
       )}
     >
@@ -114,7 +114,7 @@ export function Sidebar({ user, collapsed, onToggleCollapsed, onLogout }: Sideba
       </button>
 
       {/* Top Half: Brand Logo, Minimal Search, Navigation List */}
-      <div className="flex flex-col w-full">
+      <div className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto">
         {/* Brand Header */}
         <div
           className={cn(
@@ -255,7 +255,7 @@ export function Sidebar({ user, collapsed, onToggleCollapsed, onLogout }: Sideba
       {/* Bottom Half: Pinned User Profile Menu */}
       <div
         className={cn(
-          "w-full border-t border-sidebar-border bg-sidebar",
+          "w-full shrink-0 border-t border-sidebar-border bg-sidebar",
           collapsed ? "py-2 px-0 flex items-center justify-center" : "p-3"
         )}
       >

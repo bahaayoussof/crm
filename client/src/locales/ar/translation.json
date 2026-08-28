@@ -53,19 +53,21 @@
   "reports": {
     "title": "التقارير", "description": "تتبّع حجم التذاكر وأداء اتفاقية مستوى الخدمة ونشاط الفريق ضمن نطاق زمني.",
     "loadError": "تعذّر تحميل التقارير.", "sectionError": "تعذّر تحميل هذا القسم.",
-    "kpisLabel": "أبرز مؤشرات التقرير", "uncategorized": "بدون تصنيف",
+    "kpisLabel": "أبرز مؤشرات التقرير", "uncategorized": "بدون تصنيف", "total": "الإجمالي",
+    "sections": { "insights": "تحليلات التذاكر", "performance": "الأداء والجودة", "trends": "اتجاهات التذاكر", "trendsDescription": "كيف يتغيّر إنشاء التذاكر وحلّها عبر الزمن.", "operational": "الأداء التشغيلي", "feedback": "آراء العملاء" },
     "filters": { "label": "مرشّحات التقرير", "presetLabel": "نطاقات سريعة", "lastDays": "آخر {{count}} يوم", "from": "من", "to": "إلى", "reset": "إعادة تعيين", "timezone": "الأوقات معروضة بتوقيت UTC" },
     "kpis": { "createdTickets": "التذاكر المُنشأة", "resolvedTickets": "التذاكر المُحلّة", "slaCompliance": "الالتزام باتفاقية الخدمة", "averageResponse": "متوسط أول ردّ", "satisfaction": "رضا العملاء", "satisfactionResponses": "{{count}} ردّ" },
     "volumeTitle": "حجم التذاكر", "volumeDescription": "التذاكر المُنشأة مقابل المُحلّة يوميًا.", "emptyVolume": "لا يوجد نشاط تذاكر في هذا النطاق.",
     "statusTitle": "توزيع الحالات", "emptyStatus": "لا توجد بيانات لهذا النطاق.",
     "slaTitle": "أداء اتفاقية مستوى الخدمة", "slaDescription": "نتائج أول ردّ والحلّ للتذاكر المُنشأة ضمن النطاق.",
-    "sla": { "firstResponse": "أول ردّ", "resolution": "الحلّ", "avgFirstResponse": "متوسط أول ردّ", "avgResolution": "متوسط الحلّ", "metShort": "مستوفاة", "breachedShort": "متجاوزة", "pendingShort": "معلّقة", "complianceShort": "الالتزام" },
+    "sla": { "firstResponse": "أول ردّ", "resolution": "الحلّ", "avgFirstResponse": "متوسط أول ردّ", "avgResolution": "متوسط الحلّ", "metShort": "مستوفاة", "breachedShort": "متجاوزة", "pendingShort": "معلّقة", "complianceShort": "الالتزام", "priorityBreakdown": "التفصيل حسب الأولوية" },
     "satisfactionTitle": "رضا العملاء", "satisfactionDescription": "التقييمات المُقدّمة عبر بوابة العملاء.", "emptySatisfaction": "لم يُقدَّم أي تقييم في هذا النطاق.", "satisfactionSummary": "متوسط {{rating}} من 5 من {{count}} ردّ.",
+    "satisfaction": { "distributionLabel": "توزيع التقييمات" },
     "agentsTitle": "أداء الوكلاء", "agentsDescription": "أرقام الإسناد والحلّ واتفاقية الخدمة لكل وكيل للتذاكر المُنشأة ضمن النطاق.", "emptyAgents": "لا يوجد نشاط وكلاء في هذا النطاق.",
     "agents": { "name": "الوكيل", "assigned": "مُسندة", "resolved": "محلولة", "open": "مفتوحة", "slaMet": "نسبة استيفاء الخدمة", "avgResponse": "متوسط الردّ" },
     "breakdownTitle": "تفصيل التذاكر", "byPriority": "حسب الأولوية", "byCategory": "حسب التصنيف",
     "legend": { "created": "مُنشأة", "resolved": "محلولة" },
-    "duration": { "minutes": "{{count}} دقيقة", "hours": "{{count}} ساعة" }
+    "duration": { "minutes": "{{count}} دقيقة", "hours": "{{count}} ساعة", "hoursUnit_one": "ساعة", "hoursUnit_two": "ساعتان", "hoursUnit_few": "ساعات", "hoursUnit_many": "ساعة", "hoursUnit_other": "ساعة", "minutesUnit_one": "دقيقة", "minutesUnit_two": "دقيقتان", "minutesUnit_few": "دقائق", "minutesUnit_many": "دقيقة", "minutesUnit_other": "دقيقة" }
   },
   "tickets": {
     "title": "التذاكر", "description": "إدارة طلبات دعم العملاء ومتابعتها", "new": "تذكرة جديدة", "create": "إنشاء التذكرة", "createTitle": "إنشاء تذكرة", "editTitle": "تعديل التذكرة", "edit": "تعديل التذكرة",

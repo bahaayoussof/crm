@@ -53,19 +53,21 @@
   "reports": {
     "title": "Reports", "description": "Track ticket volume, SLA performance, and team activity across a date range.",
     "loadError": "Unable to load reports.", "sectionError": "This section could not be loaded.",
-    "kpisLabel": "Report highlights", "uncategorized": "Uncategorized",
+    "kpisLabel": "Report highlights", "uncategorized": "Uncategorized", "total": "Total",
+    "sections": { "insights": "Ticket insights", "performance": "Performance & quality", "trends": "Ticket trends", "trendsDescription": "How ticket creation and resolution change over time.", "operational": "Operational performance", "feedback": "Customer feedback" },
     "filters": { "label": "Report filters", "presetLabel": "Quick ranges", "lastDays": "Last {{count}} days", "from": "From", "to": "To", "reset": "Reset", "timezone": "Times shown in UTC" },
     "kpis": { "createdTickets": "Created tickets", "resolvedTickets": "Resolved tickets", "slaCompliance": "SLA compliance", "averageResponse": "Avg. first response", "satisfaction": "Customer satisfaction", "satisfactionResponses": "{{count}} responses" },
     "volumeTitle": "Ticket volume", "volumeDescription": "Created vs. resolved tickets per day.", "emptyVolume": "No ticket activity in this range.",
     "statusTitle": "Status distribution", "emptyStatus": "No data for this range.",
     "slaTitle": "SLA performance", "slaDescription": "First-response and resolution outcomes for tickets created in range.",
-    "sla": { "firstResponse": "First response", "resolution": "Resolution", "avgFirstResponse": "Avg. first response", "avgResolution": "Avg. resolution", "metShort": "Met", "breachedShort": "Breached", "pendingShort": "Pending", "complianceShort": "Compliance" },
+    "sla": { "firstResponse": "First response", "resolution": "Resolution", "avgFirstResponse": "Avg. first response", "avgResolution": "Avg. resolution", "metShort": "Met", "breachedShort": "Breached", "pendingShort": "Pending", "complianceShort": "Compliance", "priorityBreakdown": "Priority breakdown" },
     "satisfactionTitle": "Customer satisfaction", "satisfactionDescription": "Ratings submitted through the customer portal.", "emptySatisfaction": "No feedback submitted in this range.", "satisfactionSummary": "Average {{rating}} out of 5 from {{count}} responses.",
+    "satisfaction": { "distributionLabel": "Rating distribution" },
     "agentsTitle": "Agent performance", "agentsDescription": "Assigned, resolved, and SLA figures per agent for tickets created in range.", "emptyAgents": "No agent activity in this range.",
     "agents": { "name": "Agent", "assigned": "Assigned", "resolved": "Resolved", "open": "Open", "slaMet": "SLA met %", "avgResponse": "Avg. response" },
     "breakdownTitle": "Ticket breakdown", "byPriority": "By priority", "byCategory": "By category",
     "legend": { "created": "Created", "resolved": "Resolved" },
-    "duration": { "minutes": "{{count}} min", "hours": "{{count}} h" }
+    "duration": { "minutes": "{{count}} min", "hours": "{{count}} h", "hoursUnit_one": "h", "hoursUnit_two": "h", "hoursUnit_few": "h", "hoursUnit_many": "h", "hoursUnit_other": "h", "minutesUnit_one": "min", "minutesUnit_two": "min", "minutesUnit_few": "min", "minutesUnit_many": "min", "minutesUnit_other": "min" }
   },
   "tickets": {
     "title": "Tickets", "description": "Manage and track customer support requests", "new": "New ticket", "create": "Create ticket", "createTitle": "Create ticket", "editTitle": "Edit ticket", "edit": "Edit ticket",

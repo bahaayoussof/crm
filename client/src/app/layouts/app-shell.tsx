@@ -149,7 +149,7 @@ export function AppShell({ audience, children }: PropsWithChildren<{ audience: P
   return (
     <div
       className={cn(
-        "min-h-[100dvh] bg-background text-foreground lg:grid transition-[grid-template-columns] duration-200 ease-out",
+        "min-h-[100dvh] bg-background text-foreground lg:grid lg:h-[100dvh] lg:min-h-0 lg:overflow-hidden transition-[grid-template-columns] duration-200 ease-out",
         collapsed ? "lg:grid-cols-[68px_minmax(0,1fr)]" : "lg:grid-cols-[240px_minmax(0,1fr)]"
       )}
     >
@@ -162,7 +162,7 @@ export function AppShell({ audience, children }: PropsWithChildren<{ audience: P
       />
 
       {/* Main Workspace Canvas */}
-      <div className="min-w-0 flex flex-col">
+      <div className="min-w-0 flex flex-col lg:h-[100dvh] lg:min-h-0 lg:overflow-hidden">
         {/* Top Header */}
         <header className="sticky top-0 z-30 border-b border-border bg-surface/90 backdrop-blur-xs">
           <div className="flex min-h-14 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
@@ -218,8 +218,8 @@ export function AppShell({ audience, children }: PropsWithChildren<{ audience: P
           </div>
         </header>
 
-        {/* Page Content */}
-        <div className="min-w-0 flex-1">{children}</div>
+        {/* Page Content — the primary vertical scroll container on desktop */}
+        <div className="min-w-0 flex-1 lg:min-h-0 lg:overflow-y-auto">{children}</div>
       </div>
 
       {/* Mobile Slide-Over Navigation Drawer */}

@@ -22,6 +22,8 @@ vi.mock("recharts", () => ({
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   BarChart: ({ data, children }: { data: unknown; children: React.ReactNode }) => <div data-chart={JSON.stringify(data)}>{children}</div>,
   Bar: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  PieChart: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  Pie: ({ data, children }: { data: unknown; children?: React.ReactNode }) => <div data-chart={JSON.stringify(data)}>{children}</div>,
   Cell: () => null,
   CartesianGrid: () => null,
   XAxis: () => null,
@@ -121,7 +123,9 @@ describe("ReportsPage", () => {
     expect(within(kpis).getByText("42")).toBeInTheDocument();
     expect(within(kpis).getByText("30")).toBeInTheDocument();
     expect(within(kpis).getByText("80%")).toBeInTheDocument();
-    expect(within(kpis).getByText("1 h 15 min")).toBeInTheDocument();
+    expect(within(kpis).getByText("Avg. first response").closest("div")).toHaveTextContent(
+      /1\s*h\s*15\s*min/,
+    );
     expect(within(kpis).getByText("3.75 / 5")).toBeInTheDocument();
   });
 
