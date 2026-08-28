@@ -1,8 +1,7 @@
-import { Bar, BarChart, CartesianGrid, Cell, Tooltip, XAxis, YAxis } from "recharts";
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { PageHeader } from "@/components/shared/page-header";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "../auth/auth-state";
@@ -20,26 +19,22 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { AssigneeCell } from "@/components/shared/data-table/assignee-cell";
-import {
-  ChartContainer,
-  ChartTooltipContent,
-  ChartEmptyState,
-  ChartSkeleton,
-  CANONICAL_STATUS_ORDER,
-  getStatusChartColor,
-  getSlaChartColor,
-  CHART_THEME_TOKENS,
-} from "@/components/shared/charts";
-import { cn } from "@/lib/utils";
+import { ChartSkeleton } from "@/components/shared/charts";
+import { DashboardSectionHeader } from "./components/dashboard-section-header";
+import { DashboardMetricCard, type DashboardMetricTone } from "./components/dashboard-metric-card";
+import { TicketStatusDonut } from "./components/ticket-status-donut";
+import { TicketActivityChart } from "./components/ticket-activity-chart";
+import { SlaHealthCard } from "./components/sla-health-card";
+import { OperationalSummary } from "./components/operational-summary";
 
 export function DashboardPage() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const query = useDashboardOverview();
 
   if (query.isLoading) {
     return (
-      <main className="page-container space-y-6" aria-label={t("common.loading")}>
+      <main className="page-container space-y-8" aria-label={t("common.loading")}>
         <DashboardSkeleton />
       </main>
     );
@@ -66,72 +61,39 @@ export function DashboardPage() {
   const primaryTickets = data.primaryTickets ?? (isAgent ? [] : legacyData.needsAttention ?? []);
   const primaryIds = new Set(primaryTickets.map((ticket) => ticket.id));
   const recentTickets = (data.recentTickets ?? []).filter((ticket) => !primaryIds.has(ticket.id));
+  const activity = data.ticketActivity ?? [];
 
-  const metrics = isAgent
-    ? ([
+  const metrics: Array<[key: string, value: number, tone: DashboardMetricTone]> = isAgent
+    ? [
         ["assignedToMe", data.metrics.assignedToMe, "primary"],
         ["slaBreached", data.metrics.slaBreached, "danger"],
         ["slaAtRisk", data.metrics.slaAtRisk, "warning"],
-        ["waitingCustomer", data.metrics.waitingCustomer, "default"],
+        ["waitingCustomer", data.metrics.waitingCustomer, "neutral"],
         ["resolvedToday", data.metrics.resolvedToday, "success"],
-      ] as const)
-    : ([
+      ]
+    : [
         ["openTickets", data.metrics.openTickets, "primary"],
-        ["unassignedTickets", data.metrics.unassignedTickets, "default"],
-        ["slaBreached", data.metrics.slaBreached, "danger"],
+        ["unassignedTickets", data.metrics.unassignedTickets, "neutral"],
         ["slaAtRisk", data.metrics.slaAtRisk, "warning"],
+        ["slaBreached", data.metrics.slaBreached, "danger"],
         ["resolvedToday", data.metrics.resolvedToday, "success"],
-      ] as const);
+      ];
 
   return (
-    <main className="page-container space-y-7">
-      <PageHeader
-        title={t("dashboard.title")}
-        description={t("dashboard.description")}
-      />
+    <main className="page-container space-y-8">
+      <PageHeader title={t("dashboard.title")} description={t("dashboard.description")} />
 
-      {/* Metric Cards Row */}
+      {/* KPI snapshot */}
       <section
-        className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5"
+        className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
         aria-label={t("dashboard.metricsLabel")}
       >
-        {metrics.map(([key, value, variant]) => (
-          <div
-            key={key}
-            className={cn(
-              "flex flex-col justify-between rounded-xl border bg-card p-4 shadow-subtle transition-all",
-              variant === "danger" && value > 0 && "border-danger-soft bg-danger-soft/20",
-              variant === "warning" && value > 0 && "border-warning-soft bg-warning-soft/20",
-              variant === "primary" && "border-border",
-              variant === "default" && "border-border",
-              variant === "success" && "border-border"
-            )}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <p className="truncate text-xs font-medium text-muted-foreground">
-                {t(`dashboard.metrics.${key}`)}
-              </p>
-              {variant === "danger" && value > 0 && (
-                <span className="flex size-2 rounded-full bg-danger animate-pulse" />
-              )}
-              {variant === "warning" && value > 0 && (
-                <span className="flex size-2 rounded-full bg-warning" />
-              )}
-            </div>
-            <p
-              className={cn(
-                "mt-2 text-2xl font-bold tracking-tight tabular-nums",
-                variant === "danger" && value > 0 ? "text-danger-foreground font-semibold" : "text-card-foreground"
-              )}
-              dir="ltr"
-            >
-              {new Intl.NumberFormat(i18n.language === "ar" ? "ar-EG" : "en-US").format(value)}
-            </p>
-          </div>
+        {metrics.map(([key, value, tone]) => (
+          <DashboardMetricCard key={key} label={t(`dashboard.metrics.${key}`)} value={value} tone={tone} />
         ))}
       </section>
 
-      {/* Primary Workload Section (Needs Attention / My Assigned Tickets) */}
+      {/* Needs attention / My assigned tickets */}
       <TicketSection
         title={t(`dashboard.${isAgent ? "myAssignedTickets" : "needsAttention"}`)}
         empty={t(`dashboard.${isAgent ? "emptyAssigned" : "emptyAttention"}`)}
@@ -139,198 +101,35 @@ export function DashboardPage() {
         detailed
       />
 
-      {/* Operational Analytics & Summary Grid */}
-      <section className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
-        <StatusDistribution data={data} />
-        <SlaHealth data={data} />
-        <OperationalSummary data={data} isAgent={isAgent} />
+      {/* Ticket activity (primary) + status distribution */}
+      <section className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <TicketActivityChart points={activity} />
+        </div>
+        <TicketStatusDonut data={data} />
       </section>
 
-      {/* Recent Tickets Section */}
+      {/* SLA health + operational summary */}
+      <section className="grid gap-6 lg:grid-cols-2">
+        <SlaHealthCard data={data} />
+        <OperationalSummary data={data} isAgent={!!isAgent} />
+      </section>
+
+      {/* Recent tickets */}
       <TicketSection
         title={t("dashboard.recentTickets")}
         empty={t("dashboard.emptyRecent")}
         tickets={recentTickets}
+        action={
+          <Link
+            className="text-sm font-medium text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            to="/tickets"
+          >
+            {t("dashboard.viewAll")}
+          </Link>
+        }
       />
-
-      <div>
-        <Link className="text-sm font-medium text-foreground hover:underline" to="/tickets">
-          {t("dashboard.viewAll")}
-        </Link>
-      </div>
     </main>
-  );
-}
-
-function StatusDistribution({ data }: { data: DashboardOverview }) {
-  const { t } = useTranslation();
-  const statusMap = new Map(data.statusDistribution.map((item) => [item.status, item.count]));
-
-  const chart = CANONICAL_STATUS_ORDER
-    .map((status) => ({
-      status,
-      count: statusMap.get(status) ?? 0,
-      label: t(`tickets.status.${status}`),
-      color: getStatusChartColor(status),
-    }))
-    .filter((item) => (statusMap.has(item.status) ? (statusMap.get(item.status) ?? 0) > 0 : false));
-
-  return (
-    <Card aria-labelledby="dashboard-chart-title" aria-describedby="dashboard-chart-description">
-      <CardHeader>
-        <CardTitle id="dashboard-chart-title">{t("dashboard.chartTitle")}</CardTitle>
-        <CardDescription id="dashboard-chart-description">{t("dashboard.chartDescription")}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {chart.length ? (
-          <>
-            <div className="h-56" data-testid="status-chart">
-              <ChartContainer label={t("dashboard.chartTitle")}>
-                <BarChart data={chart} layout="vertical" margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={CHART_THEME_TOKENS.grid} />
-                  <XAxis type="number" allowDecimals={false} stroke={CHART_THEME_TOKENS.axis} fontSize={11} />
-                  <YAxis
-                    dataKey="label"
-                    type="category"
-                    width={105}
-                    tick={{ fontSize: 11, fill: "var(--foreground)" }}
-                    stroke={CHART_THEME_TOKENS.axis}
-                  />
-                  <Tooltip
-                    content={
-                      <ChartTooltipContent
-                        formatter={(value) => [value, t("dashboard.ticketsCount")]}
-                      />
-                    }
-                  />
-                  <Bar dataKey="count" radius={[0, 4, 4, 0]} isAnimationActive={false}>
-                    {chart.map((entry) => (
-                      <Cell key={entry.status} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ChartContainer>
-            </div>
-            <ul className="sr-only">
-              {chart.map((item) => (
-                <li key={item.status}>
-                  {item.label}: {item.count}
-                </li>
-              ))}
-            </ul>
-          </>
-        ) : (
-          <ChartEmptyState description={t("dashboard.emptyDistribution")} minHeight="14rem" />
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function SlaHealth({ data }: { data: DashboardOverview }) {
-  const { t } = useTranslation();
-  const openTickets = data.metrics.openTickets;
-  const breached = data.metrics.slaBreached;
-  const atRisk = data.metrics.slaAtRisk;
-  const onTrack = Math.max(0, openTickets - breached - atRisk);
-
-  const slaData = [
-    {
-      key: "ON_TRACK" as const,
-      label: t("dashboard.slaStates.ON_TRACK"),
-      count: onTrack,
-      color: getSlaChartColor("ON_TRACK"),
-    },
-    {
-      key: "AT_RISK" as const,
-      label: t("dashboard.slaStates.AT_RISK"),
-      count: atRisk,
-      color: getSlaChartColor("AT_RISK"),
-    },
-    {
-      key: "BREACHED" as const,
-      label: t("dashboard.slaStates.BREACHED"),
-      count: breached,
-      color: getSlaChartColor("BREACHED"),
-    },
-  ];
-
-  const hasActivity = openTickets > 0 || breached > 0 || atRisk > 0;
-
-  return (
-    <Card aria-labelledby="dashboard-sla-chart-title" aria-describedby="dashboard-sla-chart-description">
-      <CardHeader>
-        <CardTitle id="dashboard-sla-chart-title">{t("dashboard.slaHealthTitle")}</CardTitle>
-        <CardDescription id="dashboard-sla-chart-description">{t("dashboard.slaHealthDescription")}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {hasActivity ? (
-          <>
-            <div className="h-56" data-testid="sla-chart">
-              <ChartContainer label={t("dashboard.slaHealthTitle")}>
-                <BarChart data={slaData} layout="vertical" margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={CHART_THEME_TOKENS.grid} />
-                  <XAxis type="number" allowDecimals={false} stroke={CHART_THEME_TOKENS.axis} fontSize={11} />
-                  <YAxis
-                    dataKey="label"
-                    type="category"
-                    width={90}
-                    tick={{ fontSize: 11, fill: "var(--foreground)" }}
-                    stroke={CHART_THEME_TOKENS.axis}
-                  />
-                  <Tooltip
-                    content={
-                      <ChartTooltipContent
-                        formatter={(value) => [value, t("dashboard.ticketsCount")]}
-                      />
-                    }
-                  />
-                  <Bar dataKey="count" radius={[0, 4, 4, 0]} isAnimationActive={false}>
-                    {slaData.map((entry) => (
-                      <Cell key={entry.key} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ChartContainer>
-            </div>
-            <ul className="sr-only">
-              {slaData.map((item) => (
-                <li key={item.key}>
-                  {item.label}: {item.count}
-                </li>
-              ))}
-            </ul>
-          </>
-        ) : (
-          <ChartEmptyState description={t("dashboard.emptySlaHealth")} minHeight="14rem" />
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function OperationalSummary({ data, isAgent }: { data: DashboardOverview; isAgent: boolean }) {
-  const { t, i18n } = useTranslation();
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("dashboard.summaryTitle")}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <dl className="divide-y divide-border-subtle">
-          <Summary label={t("dashboard.metrics.waitingCustomer")} value={data.metrics.waitingCustomer} />
-          <Summary
-            label={t(`dashboard.metrics.${isAgent ? "assignedToMe" : "unassignedTickets"}`)}
-            value={isAgent ? data.metrics.assignedToMe : data.metrics.unassignedTickets}
-          />
-          <Summary
-            label={t("dashboard.generatedAt")}
-            value={formatTicketDate(data.generatedAt, i18n.language)}
-            technical
-          />
-        </dl>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -339,24 +138,19 @@ function TicketSection({
   empty,
   tickets,
   detailed = false,
+  action,
 }: {
   title: string;
   empty: string;
   tickets: DashboardTicket[];
   detailed?: boolean;
+  action?: ReactNode;
 }) {
   const { t, i18n } = useTranslation();
 
   return (
     <section className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
-        {tickets.length > 0 && (
-          <Badge variant="secondary" size="sm">
-            {tickets.length}
-          </Badge>
-        )}
-      </div>
+      <DashboardSectionHeader title={title} count={tickets.length} action={action} />
 
       {tickets.length ? (
         <>
@@ -499,32 +293,25 @@ function Sla({ state }: { state: DashboardTicket["slaState"] }) {
   );
 }
 
-function Summary({ label, value, technical }: { label: string; value: string | number; technical?: boolean }) {
-  return (
-    <div className="flex items-start justify-between gap-4 py-2.5 first:pt-0 last:pb-0">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="text-end text-xs font-semibold tabular-nums text-foreground" dir={technical ? "ltr" : undefined}>
-        {value}
-      </dd>
-    </div>
-  );
-}
-
 function DashboardSkeleton() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="h-16 animate-pulse rounded-xl bg-muted" />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {Array.from({ length: 5 }, (_, i) => (
-          <div className="h-24 animate-pulse rounded-xl bg-muted" key={i} />
+          <div className="h-20 animate-pulse rounded-lg bg-muted" key={i} />
         ))}
       </div>
       <div className="h-64 animate-pulse rounded-xl bg-muted" />
       <div className="grid gap-6 lg:grid-cols-3">
-        <ChartSkeleton height={260} />
-        <ChartSkeleton height={260} />
-        <div className="h-64 animate-pulse rounded-xl bg-muted" />
+        <ChartSkeleton className="lg:col-span-2" height={340} />
+        <ChartSkeleton height={340} />
       </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="h-56 animate-pulse rounded-xl bg-muted" />
+        <div className="h-56 animate-pulse rounded-xl bg-muted" />
+      </div>
+      <div className="h-64 animate-pulse rounded-xl bg-muted" />
     </div>
   );
 }

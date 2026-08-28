@@ -5,6 +5,10 @@ import { ticketVisibilityWhere, type TicketActor } from "../tickets/ticket-visib
 
 export const ACTIVE_STATUSES = [TicketStatus.NEW, TicketStatus.OPEN, TicketStatus.IN_PROGRESS, TicketStatus.WAITING_CUSTOMER, TicketStatus.ESCALATED] as const;
 
+/** Rolling window (inclusive of today) for the dashboard opened/resolved activity series. */
+export const ACTIVITY_WINDOW_DAYS = 30;
+const DAY_MS = 86_400_000;
+
 const dashboardTicketSelect = {
   id: true, subject: true, status: true, priority: true, updatedAt: true,
   firstResponseDueAt: true, firstRespondedAt: true, resolutionDueAt: true, resolvedAt: true, closedAt: true,
@@ -25,8 +29,9 @@ export async function getDashboardOverview(actor: TicketActor, now = new Date())
   const ticketArgs = { select: dashboardTicketSelect, take: 10, orderBy: [{ updatedAt: "asc" as const }, { id: "asc" as const }] };
   const isAgent = actor.role === "AGENT";
   const primaryScope = isAgent ? { ...active, assignedAgentId: actor.userId } satisfies Prisma.TicketWhereInput : active;
+  const activityStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - (ACTIVITY_WINDOW_DAYS - 1)));
 
-  const [openTickets, assignedToMe, unassignedTickets, slaBreached, slaAtRisk, resolvedToday, waitingCustomer, distribution, breachedRows, riskRows, urgentRows, highRows, mediumRows, lowRows, unassignedRows, oldestRows] = await Promise.all([
+  const [openTickets, assignedToMe, unassignedTickets, slaBreached, slaAtRisk, resolvedToday, waitingCustomer, distribution, breachedRows, riskRows, urgentRows, highRows, mediumRows, lowRows, unassignedRows, oldestRows, activityRows] = await Promise.all([
     prisma.ticket.count({ where: active }),
     prisma.ticket.count({ where: { ...active, assignedAgentId: actor.userId } }),
     prisma.ticket.count({ where: { ...active, assignedAgentId: null } }),
@@ -43,6 +48,10 @@ export async function getDashboardOverview(actor: TicketActor, now = new Date())
     prisma.ticket.findMany({ where: { ...primaryScope, priority: TicketPriority.LOW }, ...ticketArgs }),
     prisma.ticket.findMany({ where: { ...active, assignedAgentId: null }, ...ticketArgs }),
     prisma.ticket.findMany({ where: primaryScope, ...ticketArgs }),
+    prisma.ticket.findMany({
+      where: andWhere(visible, { OR: [{ createdAt: { gte: activityStart, lte: now } }, { resolvedAt: { gte: activityStart, lte: now } }] }),
+      select: { createdAt: true, resolvedAt: true },
+    }),
   ]);
 
   const primaryQueueType: PrimaryQueueType = isAgent ? "MY_ASSIGNED_TICKETS" : "NEEDS_ATTENTION";
@@ -62,11 +71,44 @@ export async function getDashboardOverview(actor: TicketActor, now = new Date())
   return {
     metrics: { openTickets, assignedToMe, unassignedTickets, slaAtRisk, slaBreached, resolvedToday, waitingCustomer },
     statusDistribution: distribution.map((item) => ({ status: item.status, count: item._count._all })),
+    ticketActivity: buildTicketActivity(activityRows, activityStart),
     primaryQueueType,
     primaryTickets: primaryTickets.map((ticket) => serialize(ticket, now)),
     recentTickets: recent.map((ticket) => serialize(ticket, now)),
     generatedAt: now.toISOString(),
   };
+}
+
+/** UTC `YYYY-MM-DD` day key. */
+function utcDayKey(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * One `{ date, opened, resolved }` bucket per UTC day from `start` through today,
+ * always `ACTIVITY_WINDOW_DAYS` long and zero-filled. `opened` counts `createdAt`,
+ * `resolved` counts `resolvedAt`; rows outside the window are ignored defensively.
+ */
+function buildTicketActivity(rows: Array<{ createdAt: Date; resolvedAt: Date | null }>, start: Date) {
+  const startTime = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
+  const opened = new Map<string, number>();
+  const resolved = new Map<string, number>();
+  const keys: string[] = [];
+  for (let index = 0; index < ACTIVITY_WINDOW_DAYS; index += 1) {
+    const key = utcDayKey(new Date(startTime + index * DAY_MS));
+    keys.push(key);
+    opened.set(key, 0);
+    resolved.set(key, 0);
+  }
+  for (const row of rows) {
+    const createdKey = utcDayKey(row.createdAt);
+    if (opened.has(createdKey)) opened.set(createdKey, (opened.get(createdKey) ?? 0) + 1);
+    if (row.resolvedAt) {
+      const resolvedKey = utcDayKey(row.resolvedAt);
+      if (resolved.has(resolvedKey)) resolved.set(resolvedKey, (resolved.get(resolvedKey) ?? 0) + 1);
+    }
+  }
+  return keys.map((date) => ({ date, opened: opened.get(date) ?? 0, resolved: resolved.get(date) ?? 0 }));
 }
 
 function slaWindowWhere(end: Date): Prisma.TicketWhereInput {

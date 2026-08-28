@@ -10,18 +10,27 @@ vi.mock("recharts", () => ({
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   BarChart: ({ data, children }: { data: unknown; children: React.ReactNode }) => <div data-chart={JSON.stringify(data)}>{children}</div>,
   Bar: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  AreaChart: ({ data, children }: { data: unknown; children: React.ReactNode }) => <div data-chart={JSON.stringify(data)}>{children}</div>,
+  Area: () => null,
+  PieChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Pie: ({ data, children }: { data: unknown; children?: React.ReactNode }) => <div data-chart={JSON.stringify(data)}>{children}</div>,
   Cell: () => null,
   CartesianGrid: () => null,
   XAxis: () => null,
   YAxis: () => null,
   Tooltip: () => null,
+  Legend: () => null,
 }));
 
 import { DashboardPage } from "./dashboard-page";
 
 const ticket = { id: "ticket-12345678", subject: "Payment failed", status: "OPEN" as const, priority: "URGENT" as const, updatedAt: "2026-08-25T10:00:00.000Z", effectiveSlaDueAt: "2026-08-25T11:00:00.000Z", slaState: "BREACHED" as const, customer: { id: "c-1", name: "Ahmed" }, assignedAgent: { id: "a-1", name: "Mariam" } };
 const recentTicket = { ...ticket, id: "ticket-recent-87654321", subject: "Unassigned follow-up", assignedAgent: null };
-const data = { metrics: { openTickets: 12, assignedToMe: 4, unassignedTickets: 3, slaAtRisk: 2, slaBreached: 1, resolvedToday: 5, waitingCustomer: 6 }, statusDistribution: [{ status: "OPEN" as const, count: 7 }], primaryQueueType: "MY_ASSIGNED_TICKETS" as const, primaryTickets: [ticket], recentTickets: [recentTicket], generatedAt: "2026-08-25T12:00:00.000Z" };
+const ticketActivity = [
+  { date: "2026-08-24", opened: 2, resolved: 1 },
+  { date: "2026-08-25", opened: 3, resolved: 4 },
+];
+const data = { metrics: { openTickets: 12, assignedToMe: 4, unassignedTickets: 3, slaAtRisk: 2, slaBreached: 1, resolvedToday: 5, waitingCustomer: 6 }, statusDistribution: [{ status: "OPEN" as const, count: 7 }], ticketActivity, primaryQueueType: "MY_ASSIGNED_TICKETS" as const, primaryTickets: [ticket], recentTickets: [recentTicket], generatedAt: "2026-08-25T12:00:00.000Z" };
 
 describe("DashboardPage", () => {
   afterEach(cleanup);
@@ -35,7 +44,10 @@ describe("DashboardPage", () => {
   it("renders distinct assigned and unassigned tickets with correct detail links and charts", () => {
     const view = renderPage();
     expect(screen.getByTestId("status-chart").querySelector("[data-chart]")?.getAttribute("data-chart")).toContain('"label":"Open"');
-    expect(screen.getByTestId("sla-chart").querySelector("[data-chart]")?.getAttribute("data-chart")).toContain('"key":"ON_TRACK"');
+    expect(screen.getByTestId("activity-chart").querySelector("[data-chart]")?.getAttribute("data-chart")).toContain('"opened":3');
+    const slaCard = screen.getByText("SLA health").closest("div[class*='rounded-lg']") as HTMLElement;
+    expect(within(slaCard).getByText("75%")).toBeInTheDocument();
+    expect(within(slaCard).getByText("On track")).toBeInTheDocument();
     expect(screen.getAllByText("Payment failed").length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText("Unassigned follow-up").length).toBeGreaterThanOrEqual(2);
     expect(view.container.querySelectorAll('a[href="/tickets/ticket-12345678"]').length).toBe(2);

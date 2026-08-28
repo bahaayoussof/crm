@@ -62,7 +62,7 @@ describe("dashboard overview", () => {
     const urgent = { ...base, id: "u", priority: TicketPriority.URGENT };
     const highA = { ...base, id: "a", priority: TicketPriority.HIGH };
     const highZ = { ...base, id: "z", priority: TicketPriority.HIGH };
-    mocks.findMany.mockReset().mockResolvedValueOnce([breached]).mockResolvedValueOnce([]).mockResolvedValueOnce([urgent]).mockResolvedValueOnce([highZ, highA]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    mocks.findMany.mockReset().mockResolvedValueOnce([breached]).mockResolvedValueOnce([]).mockResolvedValueOnce([urgent]).mockResolvedValueOnce([highZ, highA]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     const data = await getDashboardOverview({ userId: "admin", role: Role.ADMIN }, now);
     expect(data.primaryTickets.map((item) => item.id)).toEqual(["b", "u", "a", "z"]);
     expect(Object.keys(data.primaryTickets[0]).sort()).toEqual(["assignedAgent", "customer", "effectiveSlaDueAt", "id", "priority", "slaState", "status", "subject", "updatedAt"].sort());
@@ -77,7 +77,7 @@ describe("dashboard overview", () => {
     const high = { ...base, id: "high", assignedAgent: agent, priority: TicketPriority.HIGH };
     const mediumOld = { ...base, id: "medium-a", assignedAgent: agent, updatedAt: new Date("2026-08-24T10:00:00.000Z") };
     const mediumTie = { ...base, id: "medium-b", assignedAgent: agent, updatedAt: mediumOld.updatedAt };
-    mocks.findMany.mockReset().mockResolvedValueOnce([breached]).mockResolvedValueOnce([risk]).mockResolvedValueOnce([urgent]).mockResolvedValueOnce([high]).mockResolvedValueOnce([mediumTie, mediumOld]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    mocks.findMany.mockReset().mockResolvedValueOnce([breached]).mockResolvedValueOnce([risk]).mockResolvedValueOnce([urgent]).mockResolvedValueOnce([high]).mockResolvedValueOnce([mediumTie, mediumOld]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     const data = await getDashboardOverview({ userId: "agent-1", role: Role.AGENT }, now);
     expect(data.primaryQueueType).toBe("MY_ASSIGNED_TICKETS");
     expect(data.primaryTickets.map((item) => item.id)).toEqual(["breached", "risk", "urgent", "high", "medium-a", "medium-b"]);
@@ -95,9 +95,33 @@ describe("dashboard overview", () => {
     expect(mocks.groupBy.mock.calls[0][0]).toMatchObject({ by: ["status"], where: { OR: [{ assignedAgentId: "agent-1" }, { assignedAgentId: null }] } });
   });
 
+  it("returns a 30-day zero-filled opened/resolved activity series bucketed by UTC day", async () => {
+    const inWindow = { createdAt: new Date("2026-08-20T09:00:00.000Z"), resolvedAt: new Date("2026-08-24T15:00:00.000Z") };
+    const openedOnly = { createdAt: new Date("2026-08-25T01:00:00.000Z"), resolvedAt: null };
+    const beforeWindow = { createdAt: new Date("2026-06-01T00:00:00.000Z"), resolvedAt: new Date("2026-06-02T00:00:00.000Z") };
+    mocks.findMany.mockReset()
+      .mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([])
+      .mockResolvedValueOnce([inWindow, openedOnly, beforeWindow])
+      .mockResolvedValueOnce([]);
+    const data = await getDashboardOverview({ userId: "admin", role: Role.ADMIN }, now);
+
+    expect(data.ticketActivity).toHaveLength(30);
+    expect(data.ticketActivity[0].date).toBe("2026-07-27");
+    expect(data.ticketActivity.at(-1)?.date).toBe("2026-08-25");
+    expect(data.ticketActivity.every((b) => Object.keys(b).sort().join() === "date,opened,resolved")).toBe(true);
+    expect(data.ticketActivity.find((b) => b.date === "2026-08-20")).toEqual({ date: "2026-08-20", opened: 1, resolved: 0 });
+    expect(data.ticketActivity.find((b) => b.date === "2026-08-24")).toEqual({ date: "2026-08-24", opened: 0, resolved: 1 });
+    expect(data.ticketActivity.find((b) => b.date === "2026-08-25")).toEqual({ date: "2026-08-25", opened: 1, resolved: 0 });
+
+    const activityWhere = JSON.stringify(mocks.findMany.mock.calls[8][0]);
+    expect(activityWhere).toContain('"createdAt":{"gte":"2026-07-27T00:00:00.000Z","lte":"2026-08-25T12:00:00.000Z"}');
+    expect(activityWhere).toContain('"resolvedAt":true');
+  });
+
   it("preserves AGENT assigned-or-unassigned visibility in Recent Tickets and excludes primary IDs", async () => {
     const assigned = { ...base, id: "primary", assignedAgent: { id: "agent-1", name: "Agent" } };
-    mocks.findMany.mockReset().mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([assigned]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    mocks.findMany.mockReset().mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([assigned]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     await getDashboardOverview({ userId: "agent-1", role: Role.AGENT }, now);
     const recentWhere = mocks.findMany.mock.calls.at(-1)?.[0].where;
     expect(recentWhere).toEqual({ AND: [{ OR: [{ assignedAgentId: "agent-1" }, { assignedAgentId: null }] }, { id: { notIn: ["primary"] } }] });

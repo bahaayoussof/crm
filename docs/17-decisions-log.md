@@ -734,3 +734,31 @@ Reuse `TicketHistory`/notes as ad-hoc reminders (rejected — no due date, no as
 **Consequences**
 
 One migration (`Task` + `Notification.taskId`). `notification.service.ts` `createNotifications` signature widened: `ticketId` is now `string | null` with an optional trailing `taskId` — existing callers pass `null` for the new arg implicitly and are unaffected. `app.ts` gains two routers. `server/vercel.json` gains one cron entry. Full suites: **server 383 / client 380**, 0 failed. Server lint/typecheck green; client typecheck/build green (client repo lint keeps its 10 pre-existing unused-import errors, none in `features/tasks/`). PostgreSQL, live Vercel Cron, and authenticated English/Arabic browser verification were not performed. Suggested commit: `feat: implement tasks and reminders`. Next roadmap branch: `feature/team-collaboration` (order 11).
+
+---
+
+## ADR-031: Dashboard opened/resolved activity series as an additive field on the existing overview
+
+**Date:** 2026-08-28
+
+**Status:** Accepted (implemented on `feature/dashboard-redesign`, uncommitted; automated-verified only)
+
+**Context**
+
+The Support Dashboard redesign makes "Ticket activity" (opened vs. resolved over time) the primary analytics chart. `GET /dashboard/overview` returned only current-state data — counts, `statusDistribution`, and at most ~18 ticket rows carrying `updatedAt` only — so no historical series was available to render. The `/reports` endpoints already compute a created-vs-resolved daily volume series, but `reportsRouter` is `requireRole(ADMIN, MANAGER)` and the dashboard is also served to `AGENT`, so it cannot back an AGENT-visible chart.
+
+**Decision**
+
+Add a `ticketActivity` field to the existing `GET /dashboard/overview` response: exactly 30 `{ date, opened, resolved }` objects, one per UTC day, oldest first, ending on the current UTC day, zero-filled. It is computed from one additional `prisma.ticket.findMany` (selecting only `createdAt` / `resolvedAt`) constrained by the **same** `ticketVisibilityWhere(actor)` already used for every other field, then bucketed in memory. `opened` counts `createdAt` in the window; `resolved` counts `resolvedAt` in the window. The 7/14/30-day range control in the UI is pure client-side slicing of this 30-element array — no query parameter, no refetch.
+
+**Reason**
+
+Additive, non-breaking, and role-consistent: existing consumers ignore the new field, AGENT keeps parity with ADMIN/MANAGER, and the query cost is one lightweight indexed scan added to the existing `Promise.all`. Reusing the ADMIN/MANAGER `/reports` aggregates on the dashboard would either leak manager-scoped data to agents or require a second permission model. Extracting the reports bucketing helpers into a shared module was rejected as scope creep for a UI redesign; the two ~6-line helpers are duplicated locally instead.
+
+**Alternatives Considered**
+
+Empty/"unavailable" state with no backend change (rejected — leaves the redesign's dominant chart permanently blank). Deriving a series from the ~18 returned ticket rows (rejected — biased tiny sample, effectively fabricated). A new `GET /dashboard/activity` endpoint with a range query param (rejected — heavier than needed; a fixed 30-day window plus client slicing covers the three offered ranges). Persisting a daily rollup table (rejected — unnecessary at assessment scale).
+
+**Consequences**
+
+`dashboard.service.ts` gains `ACTIVITY_WINDOW_DAYS = 30`, one query in the `Promise.all`, and a `buildTicketActivity` helper. Three existing `dashboard.test.ts` cases that pin exact `findMany.mockResolvedValueOnce` chain lengths each gained one `[]` entry; one new test covers the 30-day zero-filled bucketing and visibility scoping. `docs/05` documents the field. No schema change, no migration, no contract-breaking change, no auth/RBAC/workflow/SLA-rule change. Server suite 384, client suite 411, all green; server + client lint/typecheck/build green (pre-existing client >500 kB chunk warning unchanged). PostgreSQL and browser verification not performed. Suggested commit: `feat: redesign support dashboard`.
