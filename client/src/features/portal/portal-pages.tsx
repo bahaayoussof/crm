@@ -7,14 +7,16 @@ import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AppSelect, AppSelectField } from "@/components/ui/app-select";
 import { useAuth } from "@/features/auth/auth-state";
+import { useDebouncedValue } from "@/features/customers/use-debounced-value";
 import { formatTicketDate } from "@/features/tickets/ticket-format";
 import { ConversationMessage, ConversationSection } from "@/features/tickets/ticket-conversation-ui";
 import { AttachmentPanel, MessageAttachmentList } from "@/features/attachments/attachment-ui";
 import { usePortalTicketAttachments, useUploadPortalTicketAttachment } from "@/features/attachments/attachment-hooks";
 import { portalTicketSchema, type PortalTicketForm } from "./portal.schemas";
 import { useCreatePortalTicket, usePortalCategories, usePortalOverview, usePortalTicket, usePortalTickets, useReplyPortalTicket, useSubmitPortalFeedback } from "./portal-hooks";
-import type { PortalOverview, PortalTicket, PortalTicketDetail, PortalTicketStatus } from "./portal.types";
+import type { PortalOverview, PortalTicket, PortalTicketDetail, PortalTicketStatus, TicketPriority } from "./portal.types";
 import { PortalPage, PortalState, PortalStatus, TicketRef } from "./portal-ui";
+import { PortalTicketsTable } from "./portal-tickets-table";
 import { PageHeader } from "@/components/shared/page-header";
 import {
   Table,
@@ -25,16 +27,17 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import {
+  DataTableFiltersPopover,
   DataTableSurface,
   DataTableToolbar,
   DataTableSearch,
   DataTableSkeleton,
 } from "@/components/shared/data-table";
-import { DataTablePagination } from "@/components/shared/data-table/data-table-pagination";
 import { MetricCard } from "@/components/shared/metric-card";
 import { EmptyState } from "@/components/shared/empty-state";
 
 const statuses: PortalTicketStatus[] = ["OPEN", "IN_PROGRESS", "WAITING_FOR_YOU", "RESOLVED", "CLOSED"];
+const priorities: TicketPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 const errorCode = (error: unknown) => axios.isAxiosError(error) ? error.response?.data?.error?.code as string | undefined : undefined;
 
 function TicketRows({ tickets }: { tickets: PortalTicket[] }) {
@@ -175,18 +178,44 @@ export function PortalTicketsPage() {
   const [params, setParams] = useSearchParams();
   const page = Math.max(1, Number(params.get("page")) || 1);
   const search = params.get("search") ?? "";
-  const status = (params.get("status") || undefined) as PortalTicketStatus | undefined;
-  const query = usePortalTickets({ page, limit: 10, search, status });
+  const debouncedSearch = useDebouncedValue(search);
+  const status = statuses.includes(params.get("status") as PortalTicketStatus)
+    ? (params.get("status") as PortalTicketStatus)
+    : undefined;
+  const priority = priorities.includes(params.get("priority") as TicketPriority)
+    ? (params.get("priority") as TicketPriority)
+    : undefined;
+  const categoryId = params.get("categoryId") || undefined;
+
+  const query = usePortalTickets({ page, limit: 10, search: debouncedSearch, status, priority, categoryId });
+  const categories = usePortalCategories();
+
   const update = (key: string, value: string) => {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value); else next.delete(key);
     if (key !== "page") next.delete("page");
+    setParams(next, { replace: key === "search" });
+  };
+  const clearFilterParams = () => {
+    const next = new URLSearchParams(params);
+    for (const key of ["status", "priority", "categoryId", "page"]) next.delete(key);
     setParams(next);
   };
+
+  const activeFilterCount = [status, priority, categoryId].filter(Boolean).length;
+  const hasAnyFilter = Boolean(debouncedSearch || activeFilterCount);
 
   const statusOptions = [
     { value: "", label: t("portal.allStatuses") },
     ...statuses.map((value) => ({ value, label: t(`portal.status.${value}`) })),
+  ];
+  const priorityOptions = [
+    { value: "", label: t("portal.allPriorities") },
+    ...priorities.map((value) => ({ value, label: t(`tickets.priority.${value}`) })),
+  ];
+  const categoryOptions = [
+    { value: "", label: t("portal.allCategories") },
+    ...(categories.data?.map((item) => ({ value: item.id, label: item.name })) ?? []),
   ];
 
   return (
@@ -206,14 +235,59 @@ export function PortalTicketsPage() {
               onChange={(val) => update("search", val)}
               placeholder={t("portal.search")}
             />
-            <div className="w-36 sm:ms-auto">
-              <AppSelect
-                id="portal-status"
-                ariaLabel={t("portal.statusLabel")}
-                value={status ?? ""}
-                onValueChange={(val) => update("status", val)}
-                options={statusOptions}
+            <div className="flex items-center gap-2 shrink-0 sm:ms-auto">
+              <DataTableFiltersPopover
+                title={t("portal.filters")}
+                triggerLabel={t("portal.filters")}
+                activeCount={activeFilterCount}
+                onClearFilters={clearFilterParams}
+                fields={[
+                  {
+                    id: "status",
+                    label: t("portal.statusLabel"),
+                    render: () => (
+                      <AppSelect
+                        ariaLabel={t("portal.statusLabel")}
+                        value={status ?? ""}
+                        onValueChange={(val) => update("status", val)}
+                        options={statusOptions}
+                      />
+                    ),
+                  },
+                  {
+                    id: "priority",
+                    label: t("portal.priority"),
+                    render: () => (
+                      <AppSelect
+                        ariaLabel={t("portal.priority")}
+                        value={priority ?? ""}
+                        onValueChange={(val) => update("priority", val)}
+                        options={priorityOptions}
+                      />
+                    ),
+                  },
+                  {
+                    id: "category",
+                    label: t("portal.category"),
+                    render: () => (
+                      <AppSelect
+                        ariaLabel={t("portal.category")}
+                        value={categoryId ?? ""}
+                        onValueChange={(val) => update("categoryId", val)}
+                        options={categoryOptions}
+                      />
+                    ),
+                  },
+                ]}
               />
+              {hasAnyFilter && (
+                <button
+                  className="button-ghost h-8.5 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setParams({})}
+                >
+                  {t("portal.clearFilters")}
+                </button>
+              )}
             </div>
           </DataTableToolbar>
           {query.isLoading ? (
@@ -225,32 +299,22 @@ export function PortalTicketsPage() {
               <PortalState retry={() => query.refetch()}>{t("portal.requestsError")}</PortalState>
             </div>
           ) : query.data!.data.length ? (
-            <>
-              <TicketRows tickets={query.data!.data} />
-              {query.data!.meta.totalPages > 1 && (
-                <div className="border-t border-table-border bg-table-background px-3.5 py-2">
-                  <DataTablePagination
-                    page={page}
-                    pageCount={query.data!.meta.totalPages || 1}
-                    pageSize={query.data!.meta.limit || 10}
-                    totalCount={query.data!.meta.total}
-                    canPreviousPage={page > 1}
-                    canNextPage={page < query.data!.meta.totalPages}
-                    onPreviousPage={() => update("page", String(page - 1))}
-                    onNextPage={() => update("page", String(page + 1))}
-                    ariaLabel={t("portal.pagination")}
-                  />
-                </div>
-              )}
-            </>
+            <PortalTicketsTable
+              tickets={query.data!.data}
+              page={page}
+              pageSize={query.data!.meta.limit || 10}
+              pageCount={query.data!.meta.totalPages || 0}
+              totalCount={query.data!.meta.total}
+              onPageChange={(next) => update("page", next > 1 ? String(next) : "")}
+            />
           ) : (
             <div className="p-6">
               <EmptyState
                 className="border-0 bg-transparent p-2"
                 icon={<Inbox className="size-5" aria-hidden="true" />}
-                title={search || status ? t("portal.noMatchesTitle") : t("portal.empty")}
-                description={search || status ? t("portal.noMatches") : t("portal.emptyRecentHint")}
-                action={search || status ? undefined : <Link className="button-link w-full sm:w-auto" to="/portal/tickets/new">{t("portal.createAction")}</Link>}
+                title={hasAnyFilter ? t("portal.noMatchesTitle") : t("portal.empty")}
+                description={hasAnyFilter ? t("portal.noMatches") : t("portal.emptyRecentHint")}
+                action={hasAnyFilter ? undefined : <Link className="button-link w-full sm:w-auto" to="/portal/tickets/new">{t("portal.createAction")}</Link>}
               />
             </div>
           )}

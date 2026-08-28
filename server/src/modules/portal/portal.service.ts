@@ -5,6 +5,9 @@ import { createNotifications } from "../notifications/notification.service.js";
 import type { PortalCreateTicketInput, PortalReplyInput, PortalStatus, PortalTicketListQuery } from "./portal.schema.js";
 
 const listSelect = { id: true, subject: true, status: true, category: { select: { id: true, name: true } }, createdAt: true, updatedAt: true } satisfies Prisma.TicketSelect;
+// "My Requests" table only — adds the customer-safe `priority` column/filter support.
+// Kept separate from `listSelect` so overview / detail / create response shapes are unchanged.
+const ticketListSelect = { ...listSelect, priority: true } satisfies Prisma.TicketSelect;
 const messageSelect = { id: true, body: true, createdAt: true, author: { select: { id: true, name: true, role: true } } } satisfies Prisma.TicketMessageSelect;
 const statusMap: Record<TicketStatus, PortalStatus> = {
   NEW: "OPEN", OPEN: "OPEN", IN_PROGRESS: "IN_PROGRESS", ESCALATED: "IN_PROGRESS",
@@ -40,12 +43,15 @@ export async function categories(userId: string) {
 
 export async function tickets(query: PortalTicketListQuery, userId: string) {
   const customerId = await customerIdFor(userId);
+  // Ownership is enforced in the query: every branch below is ANDed with `customerId`.
   const where: Prisma.TicketWhereInput = { customerId,
     ...(query.status && { status: { in: storedStatuses[query.status] } }),
+    ...(query.priority && { priority: query.priority }),
+    ...(query.categoryId && { categoryId: query.categoryId }),
     ...(query.search && { AND: [{ OR: [{ id: query.search }, { subject: { contains: query.search, mode: "insensitive" } }, { description: { contains: query.search, mode: "insensitive" } }] }] }),
   };
   const [records, total] = await prisma.$transaction([
-    prisma.ticket.findMany({ where, skip: (query.page - 1) * query.limit, take: query.limit, orderBy: [{ updatedAt: "desc" }, { id: "asc" }], select: listSelect }),
+    prisma.ticket.findMany({ where, skip: (query.page - 1) * query.limit, take: query.limit, orderBy: [{ updatedAt: "desc" }, { id: "asc" }], select: ticketListSelect }),
     prisma.ticket.count({ where }),
   ]);
   return { data: records.map(ticketItem), meta: { page: query.page, limit: query.limit, total, totalPages: total ? Math.ceil(total / query.limit) : 0 } };

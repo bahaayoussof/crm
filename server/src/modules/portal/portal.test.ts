@@ -1,4 +1,4 @@
-import { Role, TicketStatus } from "@prisma/client";
+import { Role, TicketPriority, TicketStatus } from "@prisma/client";
 import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -27,6 +27,45 @@ describe("customer portal", () => {
   it("scopes overview counts and recent tickets", async () => { mocks.ticket.count.mockResolvedValueOnce(4).mockResolvedValueOnce(2).mockResolvedValueOnce(1); mocks.ticket.findMany.mockResolvedValue([{ ...base, status: TicketStatus.ESCALATED }]); const response = await request(app).get("/api/portal/overview").set(auth("customer", Role.CUSTOMER)); expect(response.body.data.counts).toEqual({ open: 4, waitingForYou: 2, resolved: 1 }); expect(response.body.data.recentTickets[0].status).toBe("IN_PROGRESS"); expect(mocks.ticket.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { customerId: "customer-a" }, take: 5, orderBy: [{ updatedAt: "desc" }, { id: "asc" }] })); });
   it("maps every stored status centrally", () => { expect(portalStatus.map).toEqual({ NEW: "OPEN", OPEN: "OPEN", IN_PROGRESS: "IN_PROGRESS", ESCALATED: "IN_PROGRESS", WAITING_CUSTOMER: "WAITING_FOR_YOU", RESOLVED: "RESOLVED", CLOSED: "CLOSED" }); });
   it("lists owned tickets with search, portal status, and pagination", async () => { mocks.ticket.findMany.mockResolvedValue([base]); mocks.ticket.count.mockResolvedValue(21); const response = await request(app).get("/api/portal/tickets?page=2&limit=10&search=Help&status=OPEN").set(auth("customer", Role.CUSTOMER)); expect(response.body.meta).toMatchObject({ page: 2, total: 21, totalPages: 3 }); expect(mocks.ticket.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 10, take: 10, where: expect.objectContaining({ customerId: "customer-a", status: { in: [TicketStatus.NEW, TicketStatus.OPEN] } }) })); });
+
+  it("filters owned tickets by priority and category, always ANDed with the authenticated customer", async () => {
+    const listTicket = { ...base, priority: TicketPriority.HIGH };
+    mocks.ticket.findMany.mockResolvedValue([listTicket]);
+    mocks.ticket.count.mockResolvedValue(1);
+    const response = await request(app)
+      .get("/api/portal/tickets?priority=HIGH&categoryId=cat-1&status=IN_PROGRESS&search=Help")
+      .set(auth("customer", Role.CUSTOMER));
+    expect(response.status).toBe(200);
+    expect(response.body.data[0].priority).toBe("HIGH");
+    const call = mocks.ticket.findMany.mock.calls[0][0];
+    expect(call.select).toEqual(expect.objectContaining({ priority: true }));
+    expect(call.where).toEqual(expect.objectContaining({
+      customerId: "customer-a",
+      priority: TicketPriority.HIGH,
+      categoryId: "cat-1",
+      status: { in: [TicketStatus.IN_PROGRESS, TicketStatus.ESCALATED] },
+      AND: [{ OR: expect.arrayContaining([{ id: "Help" }]) }],
+    }));
+    // count uses the identical ownership-scoped predicate
+    expect(mocks.ticket.count).toHaveBeenCalledWith({ where: call.where });
+  });
+
+  it("rejects unknown / internal-only ticket list filters", async () => {
+    for (const qs of ["assignedAgentId=agent-1", "departmentId=dep-1", "branchId=br-1", "customerId=other", "priority=SUPER"]) {
+      const response = await request(app).get(`/api/portal/tickets?${qs}`).set(auth("customer", Role.CUSTOMER));
+      expect(response.status).toBe(400);
+    }
+  });
+
+  it("keeps one customer's filtered list from ever returning another customer's tickets", async () => {
+    // customerIdFor resolves strictly from the authenticated user's linked profile
+    mocks.customer.findUnique.mockResolvedValue({ id: "customer-b" });
+    mocks.ticket.findMany.mockResolvedValue([]);
+    mocks.ticket.count.mockResolvedValue(0);
+    await request(app).get("/api/portal/tickets?priority=LOW&categoryId=cat-9").set(auth("customer-b-user", Role.CUSTOMER));
+    expect(mocks.customer.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: "customer-b-user" } }));
+    expect(mocks.ticket.findMany.mock.calls[0][0].where.customerId).toBe("customer-b");
+  });
   it("returns IDOR-safe not found and a public-only detail shape", async () => { mocks.ticket.findFirst.mockResolvedValueOnce(null); const missing = await request(app).get("/api/portal/tickets/other").set(auth("customer", Role.CUSTOMER)); expect(missing.status).toBe(404); mocks.ticket.findFirst.mockResolvedValueOnce({ ...base, description: "Details", messages: [{ id: "m", body: "Reply", createdAt: new Date(), author: { id: "agent", name: "Mariam", role: Role.ADMIN } }] }); const own = await request(app).get("/api/portal/tickets/ticket-a").set(auth("customer", Role.CUSTOMER)); expect(own.body.data.messages[0].author).toEqual({ id: "agent", name: "Mariam", kind: "SUPPORT" }); expect(JSON.stringify(own.body)).not.toMatch(/priority|assignee|sla|history|notes|email/i); for (const field of ["slaState", "effectiveSlaDueAt", "effectiveSlaTarget", "firstResponseDueAt", "firstRespondedAt", "resolutionDueAt"]) expect(own.body.data).not.toHaveProperty(field); });
   it("returns active safe categories only", async () => { mocks.category.findMany.mockResolvedValue([{ id: "cat", name: "Billing" }]); const response = await request(app).get("/api/portal/categories").set(auth("customer", Role.CUSTOMER)); expect(response.body.data).toEqual([{ id: "cat", name: "Billing" }]); expect(mocks.category.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { isActive: true }, select: { id: true, name: true } })); });
   it("rejects client-owned ticket fields and creates with server defaults plus SLA history", async () => { const rejected = await request(app).post("/api/portal/tickets").set(auth("customer", Role.CUSTOMER)).send({ subject: "Need help", description: "Text", customerId: "other" }); expect(rejected.status).toBe(400); mocks.slaRule.findFirst.mockResolvedValue({ firstResponseMinutes: 30, resolutionMinutes: 120 }); mocks.ticket.create.mockResolvedValue(base); const response = await request(app).post("/api/portal/tickets").set(auth("customer", Role.CUSTOMER)).send({ subject: "Need help", description: "Text" }); expect(response.status).toBe(201); expect(mocks.ticket.create.mock.calls[0][0].data).toMatchObject({ customerId: "customer-a", status: "NEW", priority: "MEDIUM", channel: "WEB", assignedAgentId: null }); expect(mocks.ticket.create.mock.calls[0][0].data.firstResponseDueAt).toBeInstanceOf(Date); expect(mocks.ticketHistory.create).toHaveBeenCalledWith({ data: expect.objectContaining({ actorUserId: "customer", action: "TICKET_CREATED" }) }); });

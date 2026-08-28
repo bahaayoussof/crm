@@ -762,3 +762,34 @@ Empty/"unavailable" state with no backend change (rejected — leaves the redesi
 **Consequences**
 
 `dashboard.service.ts` gains `ACTIVITY_WINDOW_DAYS = 30`, one query in the `Promise.all`, and a `buildTicketActivity` helper. Three existing `dashboard.test.ts` cases that pin exact `findMany.mockResolvedValueOnce` chain lengths each gained one `[]` entry; one new test covers the 30-day zero-filled bucketing and visibility scoping. `docs/05` documents the field. No schema change, no migration, no contract-breaking change, no auth/RBAC/workflow/SLA-rule change. Server suite 384, client suite 411, all green; server + client lint/typecheck/build green (pre-existing client >500 kB chunk warning unchanged). PostgreSQL and browser verification not performed. Suggested commit: `feat: redesign support dashboard`.
+
+---
+
+## ADR-033: Customer Portal "My Requests" — minimal `priority`/`category` filter support on the existing endpoint
+
+**Date:** 2026-08-28
+
+**Context**
+
+`feature/unified-portal-ui` Phase 3 moves the Portal "My Requests" list onto the shared internal DataTable system (toolbar, filter popover, pagination, in-table empty/skeleton). The shared table needs customer-safe **search + Status/Priority/Category filters + pagination**. Audit of `server/src/modules/portal/portal.*` found `GET /api/portal/tickets` already supported `page`, `limit`, `search` (exact `id` OR `subject`/`description` contains), and portal-mapped `status`; it did **not** support `priority` or `categoryId`, and the list projection did not return `priority`. No `sort` param exists on the internal `GET /api/tickets` either.
+
+**Decision**
+
+Extend only what the table needs, reusing the internal ticket-list query conventions:
+
+- `portalTicketListSchema` gains `priority: z.nativeEnum(TicketPriority).optional()` and `categoryId: z.string().trim().min(1).optional()`. The schema stays `.strict()`, so `assignedAgentId`, `departmentId`, `branchId`, `customerId`, `sort`, and any unknown param are rejected (`400`).
+- `portal.service.tickets()` spreads `...(query.priority && { priority })` and `...(query.categoryId && { categoryId })` into the **same `where` object that already carries `customerId`** — every filter is ANDed with the authenticated customer's id, which is resolved server-side from `Customer.userId` and never accepted from the client. `count` reuses the identical predicate.
+- A dedicated `ticketListSelect = { ...listSelect, priority: true }` is used **only** by `tickets()`. `overview`, `ticketDetail`, and `createTicket` keep the priority-free `listSelect`, so the ticket-detail response contract and every other Portal shape are byte-unchanged. The only response change is that `GET /api/portal/tickets` list rows now include `priority` (`LOW|MEDIUM|HIGH|URGENT`).
+- No `sort` param, no ordering change (fixed `updatedAt DESC, id ASC`), no new endpoint, no schema/migration change.
+
+**Reason**
+
+Priority is a customer-safe ticket property (shown on customer portals in Zendesk/Freshdesk) and is explicitly in the Phase 3 filter scope; it is not internal SLA state, assignment, or escalation. Scoping the projection change to the list keeps the detail contract and its regression test (`portal.test.ts` — "detail never leaks `priority|assignee|sla|history|notes|email`") intact. ANDing filters into the existing ownership-scoped `where` reuses the exact internal `listTickets` pattern and keeps ownership authoritative in the database query.
+
+**Alternatives Considered**
+
+Adding `priority` to the shared `listSelect` (rejected — would leak `priority` into ticket detail / overview and break the detail leak-guard test). A new `GET /api/portal/tickets` `sort` param (rejected — no internal precedent, out of Phase 3 scope). Client-side filtering of a full fetch (rejected — violates the "never fetch all and filter in React" rule and ownership scoping). Exposing assignee/department/branch/SLA filters (rejected — internal-only).
+
+**Consequences**
+
+`portal.schema.ts`, `portal.service.ts` change; `portal.test.ts` gains 4 cases (priority+category filtering ANDed with `customerId`, rejection of internal/unknown filters, cross-customer isolation, `priority` present in the list row). Frontend `PortalTicket` is unchanged; a new `PortalTicketListItem extends PortalTicket { priority }` types the list rows. `docs/05` documents the params and the single list-row field. No schema change, no migration, no auth/RBAC/route change. Server suite 413, client suite 418, all green; server + client lint/typecheck/build green (pre-existing client ~1,488 kB chunk warning unchanged). PostgreSQL and browser verification not performed. Suggested branch commit: `feat: unify customer portal UI`.

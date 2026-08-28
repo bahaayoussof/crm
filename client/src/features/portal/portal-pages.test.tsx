@@ -26,12 +26,29 @@ describe("portal pages", () => {
   });
   it("shows overview metrics and responsive recent requests", () => { renderPage(<PortalHomePage />); expect(screen.getByRole("heading", { name: "Welcome, Ahmed" })).toBeInTheDocument(); expect(screen.getByText("Waiting for You")).toBeInTheDocument(); expect(screen.getAllByText("Payment help")).toHaveLength(2); expect(screen.getByRole("table")).toBeInTheDocument(); });
   it("renders loading and retry states", () => { mocks.overview.mockReturnValue({ isLoading: true }); const view = renderPage(<PortalHomePage />); expect(screen.getByTestId("portal-overview-skeleton")).toBeInTheDocument(); view.unmount(); mocks.overview.mockReturnValue({ isError: true, refetch: mocks.refetch }); renderPage(<PortalHomePage />); fireEvent.click(screen.getByRole("button", { name: "Retry" })); expect(mocks.refetch).toHaveBeenCalled(); });
-  it("owns filters in the URL and renders no results", () => {
+  it("owns search + status/priority/category filters in the URL and renders no results", () => {
     mocks.tickets.mockReturnValue({ data: { data: [], meta: { page: 1, totalPages: 0 } } });
-    renderPage(<PortalTicketsPage />, "/portal/tickets?search=missing&status=RESOLVED");
+    renderPage(<PortalTicketsPage />, "/portal/tickets?search=missing&status=RESOLVED&priority=HIGH&categoryId=cat");
     expect(screen.getByDisplayValue("missing")).toBeInTheDocument();
+    // filters live in the shared filter popover
+    fireEvent.click(screen.getByRole("button", { name: "Request filters" }));
     expect(screen.getByRole("combobox", { name: "Status" })).toHaveTextContent("Resolved");
+    expect(screen.getByRole("combobox", { name: "Priority" })).toHaveTextContent("High");
+    expect(screen.getByRole("combobox", { name: "Category" })).toHaveTextContent("Billing");
     expect(screen.getByText("No requests match your search or filter.")).toBeInTheDocument();
+    // the query is scoped server-side, never client-filtered
+    expect(mocks.tickets).toHaveBeenCalledWith(expect.objectContaining({ status: "RESOLVED", priority: "HIGH", categoryId: "cat", page: 1, limit: 10 }));
+  });
+
+  it("renders the shared DataTable with customer-safe columns only", () => {
+    mocks.tickets.mockReturnValue({ data: { data: [{ ...ticket, priority: "MEDIUM" }], meta: { page: 1, limit: 10, total: 1, totalPages: 1 } } });
+    renderPage(<PortalTicketsPage />, "/portal/tickets");
+    expect(screen.getByRole("columnheader", { name: "Priority" })).toBeInTheDocument();
+    expect(screen.getAllByText("Payment help").length).toBeGreaterThan(0);
+    // internal-only columns never appear
+    for (const name of ["Customer", "Assigned agent", "Channel", "SLA"]) {
+      expect(screen.queryByRole("columnheader", { name })).not.toBeInTheDocument();
+    }
   });
   it("renders visible accessible creation controls and only Portal fields", () => {
     renderPage(<PortalNewTicketPage />);
