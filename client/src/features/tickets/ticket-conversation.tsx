@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { MessageAttachmentList } from "@/features/attachments/attachment-ui";
+import { AttachmentUploadForm, MessageAttachmentList } from "@/features/attachments/attachment-ui";
 import { QuickReplyPicker } from "@/features/quick-replies/quick-reply-picker";
 import { ConversationMessage, ConversationSection } from "./ticket-conversation-ui";
 import { getTicketError } from "./ticket-error";
@@ -13,9 +13,24 @@ type MessageAttachment = { id: string; fileName: string; mimeType: string; creat
 // Matches the server public-reply limit (`ticketConversationBodySchema` / `portalReplySchema`: body max 20_000).
 const MAX_PUBLIC_REPLY_LENGTH = 20_000;
 
-export function TicketConversation({ ticketId, items, canMutate, messageAttachments }: { ticketId: string; items: TicketConversationItem[]; canMutate: boolean; messageAttachments?: Map<string, MessageAttachment[]> }) {
+export function TicketConversation({
+  ticketId,
+  items,
+  canMutate,
+  messageAttachments,
+  canUpload = false,
+  upload,
+}: {
+  ticketId: string;
+  items: TicketConversationItem[];
+  canMutate: boolean;
+  messageAttachments?: Map<string, MessageAttachment[]>;
+  canUpload?: boolean;
+  upload?: { mutateAsync: (file: File) => Promise<unknown>; isPending: boolean };
+}) {
   const { t, i18n } = useTranslation();
   const [mode, setMode] = useState<Mode>("reply");
+  const [attachOpen, setAttachOpen] = useState(false);
   const [reply, setReply] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +85,29 @@ export function TicketConversation({ ticketId, items, canMutate, messageAttachme
     }
   };
 
+  const attachBand = (
+    <div className="p-3 sm:p-4">
+      {!canUpload || !upload ? (
+        <p className="text-xs text-muted-foreground">{t("attachments.uploadRequiresAssignment")}</p>
+      ) : attachOpen ? (
+        <AttachmentUploadForm
+          onUpload={(file) => upload.mutateAsync(file)}
+          isPending={upload.isPending}
+          onClose={() => setAttachOpen(false)}
+          uploadLabel={t("attachments.uploadShort")}
+        />
+      ) : (
+        <button
+          type="button"
+          className="button-secondary sm:w-auto"
+          onClick={() => setAttachOpen(true)}
+        >
+          {t("attachments.attachFile")}
+        </button>
+      )}
+    </div>
+  );
+
   const composer = (
     <>
       <div className="flex w-full border-b border-border" role="tablist" aria-label={t("tickets.conversation.composerMode")}>{(["reply", "note"] as Mode[]).map((value) => <button type="button" role="tab" aria-selected={mode === value} aria-controls="conversation-composer-panel" className={`min-h-11 border-b-2 px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${mode === value ? "border-foreground text-foreground font-semibold" : "border-transparent text-muted-foreground hover:text-foreground"}`} onClick={() => { setMode(value); setError(null); setSuccess(null); setInsertError(null); }} key={value}>{t(`tickets.conversation.${value}Tab`)}</button>)}</div>
@@ -91,12 +129,15 @@ export function TicketConversation({ ticketId, items, canMutate, messageAttachme
 
   return (
     <ConversationSection
+      bounded
       heading={t("tickets.conversation.title")}
       description={t("tickets.conversation.description")}
       timelineLabel={t("tickets.conversation.timelineLabel")}
+      countLabel={items.length > 0 ? t("tickets.conversation.messageCount", { total: items.length }) : undefined}
       isEmpty={items.length === 0}
       emptyTitle={t("tickets.conversation.emptyTitle")}
       emptyDescription={t("tickets.conversation.emptyDescription")}
+      belowBody={attachBand}
       footer={composer}
     >
       {items.map((item) => {

@@ -1,4 +1,5 @@
 import { useId, useRef, useState } from "react";
+import { FileText, Image as ImageIcon, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { formatTicketDate } from "@/features/tickets/ticket-format";
 import { AttachmentActions } from "./attachment-actions";
@@ -21,6 +22,18 @@ function formatBytes(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${bytes} B`;
+}
+
+/** Human-friendly short type label for the selected-file preview (falls back to the raw MIME type). */
+function shortType(mimeType: string): string {
+  const map: Record<string, string> = {
+    "application/pdf": "PDF",
+    "image/png": "PNG",
+    "image/jpeg": "JPEG",
+    "image/webp": "WebP",
+    "text/plain": "TXT",
+  };
+  return map[mimeType] ?? mimeType;
 }
 
 /** Read-only list of attachments with compact Preview + Download icon actions per row. */
@@ -87,9 +100,15 @@ export function AttachmentRows({
 export function AttachmentUploadForm({
   onUpload,
   isPending,
+  onClose,
+  uploadLabel,
 }: {
   onUpload: (file: File) => Promise<unknown>;
   isPending: boolean;
+  /** When provided, the Cancel button also collapses the form (and is never disabled while idle). */
+  onClose?: () => void;
+  /** Overrides the submit button label (default: `attachments.upload`). */
+  uploadLabel?: string;
 }) {
   const { t } = useTranslation();
   const inputId = useId();
@@ -149,29 +168,56 @@ export function AttachmentUploadForm({
     }
   };
 
+  const FileIcon = file?.type.startsWith("image/") ? ImageIcon : FileText;
   return (
     <div className="rounded-xl border border-border bg-surface-subtle/50 p-4">
-      <label className="block text-sm font-medium text-foreground" htmlFor={inputId}>
-        {t("attachments.selectFile")}
-      </label>
-      <p className="mt-1 text-xs text-muted-foreground" id={helpId}>
-        {t("attachments.acceptedTypes")} · {t("attachments.maxSize", { size: `${MAX_MIB} MiB` })}
-      </p>
+      <p className="text-sm font-medium text-foreground">{t("attachments.selectFile")}</p>
+      <div className="mt-1 space-y-0.5 text-xs text-muted-foreground" id={helpId}>
+        <p className="break-words">{t("attachments.acceptedTypes")}</p>
+        <p className="break-words">{t("attachments.maxSize", { size: `${MAX_MIB} MiB` })}</p>
+      </div>
       <input
         ref={inputRef}
         id={inputId}
         type="file"
-        className="mt-2 block w-full text-sm file:me-3 file:rounded-md file:border file:border-border file:bg-surface file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-foreground hover:file:bg-surface-hover cursor-pointer"
+        className="peer sr-only"
         accept={ACCEPTED_INPUT_ACCEPT}
+        aria-label={t("attachments.selectFile")}
         aria-describedby={helpId}
         disabled={isPending}
         onChange={(event) => pick(event.target.files?.[0])}
       />
+      <label
+        htmlFor={inputId}
+        className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-hover peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-disabled:cursor-not-allowed peer-disabled:opacity-55"
+      >
+        <FileText className="size-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+        {t("attachments.chooseFile")}
+      </label>
       {file && (
-        <p className="mt-2 text-sm">
-          {t("attachments.selectedFile")}: <bdi dir="auto" className="font-semibold text-foreground">{file.name}</bdi>{" "}
-          <span className="text-muted-foreground">({formatBytes(file.size)})</span>
-        </p>
+        <div className="mt-3 flex items-center gap-3 rounded-md border border-border bg-surface p-3">
+          <FileIcon className="size-5 shrink-0 text-muted-foreground" strokeWidth={1.75} aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-foreground" title={file.name}>
+              <bdi dir="auto">{file.name}</bdi>
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              <bdi dir="ltr">
+                {shortType(file.type)} · {formatBytes(file.size)}
+              </bdi>
+            </p>
+          </div>
+          <button
+            type="button"
+            className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-55"
+            aria-label={t("attachments.removeFile")}
+            title={t("attachments.removeFile")}
+            disabled={isPending}
+            onClick={reset}
+          >
+            <X className="size-4" strokeWidth={1.75} aria-hidden="true" />
+          </button>
+        </div>
       )}
       {error && (
         <p className="mt-2 text-sm text-danger" role="alert">
@@ -183,17 +229,24 @@ export function AttachmentUploadForm({
           {t("attachments.uploadSuccess")}
         </p>
       )}
-      <div className="mt-3 flex flex-wrap gap-2 sm:justify-end">
-        <button type="button" className="button-primary sm:w-auto" disabled={!file || isPending} onClick={submit}>
-          {isPending ? t("attachments.uploadPending") : failed ? t("attachments.retry") : t("attachments.upload")}
-        </button>
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:justify-end">
         <button
           type="button"
-          className="button-secondary"
-          disabled={isPending || (!file && !error && !success)}
-          onClick={reset}
+          className="button-secondary sm:w-auto"
+          disabled={isPending || (!onClose && !file && !error && !success)}
+          onClick={() => {
+            reset();
+            onClose?.();
+          }}
         >
           {t("attachments.cancel")}
+        </button>
+        <button type="button" className="button-primary sm:w-auto" disabled={!file || isPending} onClick={submit}>
+          {isPending
+            ? t("attachments.uploadPending")
+            : failed
+              ? t("attachments.retry")
+              : (uploadLabel ?? t("attachments.upload"))}
         </button>
       </div>
     </div>

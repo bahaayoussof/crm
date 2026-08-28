@@ -98,43 +98,66 @@ export function ConversationSection({
   heading,
   description,
   timelineLabel,
+  countLabel,
   isEmpty,
   emptyTitle,
   emptyDescription,
   children,
+  belowBody,
   footer,
+  bounded = false,
 }: {
   headingId?: string;
   heading: string;
   description?: string;
   timelineLabel: string;
+  countLabel?: string;
   isEmpty: boolean;
   emptyTitle: string;
   emptyDescription?: string;
   children: React.ReactNode;
+  /** Rendered between the scrollable message region and the footer (e.g. an attach-file band). */
+  belowBody?: React.ReactNode;
   footer?: React.ReactNode;
+  /** Desktop only: turn the section into a bounded flex column whose message region scrolls internally. */
+  bounded?: boolean;
 }) {
   return (
-    <section className="overflow-hidden rounded-md border border-border bg-card text-card-foreground shadow-subtle" aria-labelledby={headingId}>
-      <div className="border-b border-border px-5 py-4">
-        <h2 className="text-base font-semibold" id={headingId}>
-          {heading}
-        </h2>
+    <section
+      className={`overflow-hidden rounded-md border border-border bg-card text-card-foreground shadow-subtle ${
+        bounded ? "lg:flex lg:h-full lg:flex-col" : ""
+      }`}
+      aria-labelledby={headingId}
+    >
+      <div className="border-b border-border px-5 py-4 lg:shrink-0">
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="text-base font-semibold" id={headingId}>
+            {heading}
+          </h2>
+          {countLabel && <span className="shrink-0 text-xs text-muted-foreground">{countLabel}</span>}
+        </div>
         {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
       </div>
-      <div className="min-h-48 px-4 py-2 sm:px-5">
+      <div
+        className={`min-h-48 px-4 sm:px-5 ${
+          bounded ? "py-4 overflow-y-auto lg:min-h-0 lg:flex-1" : "py-2"
+        }`}
+      >
         {isEmpty ? (
           <div className="flex min-h-44 flex-col items-center justify-center text-center">
             <p className="text-sm font-medium">{emptyTitle}</p>
             {emptyDescription && <p className="mt-1 max-w-md text-sm text-muted-foreground">{emptyDescription}</p>}
           </div>
         ) : (
-          <ol className="space-y-4 py-2" aria-label={timelineLabel}>
+          <ol className={bounded ? "space-y-5" : "space-y-4 py-2"} aria-label={timelineLabel}>
             {children}
           </ol>
         )}
       </div>
-      {footer && <div className="border-t border-border bg-surface-secondary p-4 sm:p-5">{footer}</div>}
+      {belowBody && <div className="border-t border-border lg:shrink-0">{belowBody}</div>}
+      {footer && (
+        <div className="border-t border-border bg-surface-secondary p-4 sm:p-5 lg:shrink-0">{footer}</div>
+      )}
     </section>
   );
 }
