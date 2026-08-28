@@ -94,6 +94,14 @@
       "sendReply": "إرسال الرد", "addNote": "إضافة الملاحظة", "sending": "جارٍ الإرسال…", "adding": "جارٍ الإضافة…", "replySuccess": "تم إرسال الرد.", "noteSuccess": "تمت إضافة الملاحظة الداخلية.",
       "replyError": "تعذر إرسال الرد.", "noteError": "تعذرت إضافة الملاحظة الداخلية.", "internalLabel": "ملاحظة داخلية", "publicLabel": "ظاهر للعميل",
       "showMore": "عرض المزيد", "showLess": "عرض أقل", "messageCount": "{{total}} رسالة",
+      "whatsappReplyHint": "سيُرسَل هذا الرد إلى العميل عبر واتساب:",
+      "whatsappNoPhone": "لا يوجد رقم هاتف مسجَّل، وسيتعذر التسليم",
+      "whatsappDelivery": {
+        "INTEGRATION_NOT_CONFIGURED": "تم حفظ الرد، لكن واتساب غير مُهيَّأ، لذا لم يُسلَّم.",
+        "NO_RECIPIENT_PHONE": "تم حفظ الرد، لكن لا يوجد رقم هاتف للعميل، لذا لم يُسلَّم عبر واتساب.",
+        "PROVIDER_REJECTED": "تم حفظ الرد، لكن واتساب رفض الرسالة، لذا لم تُسلَّم.",
+        "PROVIDER_UNREACHABLE": "تم حفظ الرد، لكن تعذّر الوصول إلى واتساب، لذا لم يُسلَّم."
+      },
       "roles": { "ADMIN": "مسؤول", "MANAGER": "مدير", "AGENT": "وكيل دعم", "CUSTOMER": "عميل" }
     },
     "columns": { "id": "المعرّف", "ticket": "التذكرة" },

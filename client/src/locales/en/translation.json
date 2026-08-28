@@ -94,6 +94,14 @@
       "sendReply": "Send reply", "addNote": "Add note", "sending": "Sending…", "adding": "Adding…", "replySuccess": "Reply sent.", "noteSuccess": "Internal note added.",
       "replyError": "Unable to send the reply.", "noteError": "Unable to add the internal note.", "internalLabel": "Internal note", "publicLabel": "Visible to customer",
       "showMore": "Show more", "showLess": "Show less", "messageCount": "{{total}} messages",
+      "whatsappReplyHint": "This reply is sent to the customer on WhatsApp:",
+      "whatsappNoPhone": "no phone number on file, delivery will fail",
+      "whatsappDelivery": {
+        "INTEGRATION_NOT_CONFIGURED": "Reply saved, but WhatsApp is not configured, so it was not delivered.",
+        "NO_RECIPIENT_PHONE": "Reply saved, but the customer has no phone number, so it was not delivered on WhatsApp.",
+        "PROVIDER_REJECTED": "Reply saved, but WhatsApp rejected the message, so it was not delivered.",
+        "PROVIDER_UNREACHABLE": "Reply saved, but WhatsApp could not be reached, so it was not delivered."
+      },
       "roles": { "ADMIN": "Admin", "MANAGER": "Manager", "AGENT": "Agent", "CUSTOMER": "Customer" }
     },
     "columns": { "id": "ID", "ticket": "Ticket" },
