@@ -72,4 +72,21 @@ describe("customer portal", () => {
   it("rejects client-owned ticket fields and creates with server defaults plus SLA history", async () => { const rejected = await request(app).post("/api/portal/tickets").set(auth("customer", Role.CUSTOMER)).send({ subject: "Need help", description: "Text", customerId: "other" }); expect(rejected.status).toBe(400); mocks.slaRule.findFirst.mockResolvedValue({ firstResponseMinutes: 30, resolutionMinutes: 120 }); mocks.ticket.create.mockResolvedValue(base); const response = await request(app).post("/api/portal/tickets").set(auth("customer", Role.CUSTOMER)).send({ subject: "Need help", description: "Text" }); expect(response.status).toBe(201); expect(mocks.ticket.create.mock.calls[0][0].data).toMatchObject({ customerId: "customer-a", status: "NEW", priority: "MEDIUM", channel: "WEB", assignedAgentId: null }); expect(mocks.ticket.create.mock.calls[0][0].data.firstResponseDueAt).toBeInstanceOf(Date); expect(mocks.ticketHistory.create).toHaveBeenCalledWith({ data: expect.objectContaining({ actorUserId: "customer", action: "TICKET_CREATED" }) }); });
   it.each([[TicketStatus.WAITING_CUSTOMER, TicketStatus.IN_PROGRESS], [TicketStatus.RESOLVED, TicketStatus.OPEN]])("atomically replies and transitions %s", async (from, to) => { mocks.ticket.findFirst.mockResolvedValue({ id: "ticket-a", status: from }); mocks.ticketMessage.create.mockResolvedValue({ id: "m", body: "Please reopen", createdAt: new Date(), author: { id: "customer", name: "Ahmed", role: Role.CUSTOMER } }); const response = await request(app).post("/api/portal/tickets/ticket-a/messages").set(auth("customer", Role.CUSTOMER)).send({ body: "  Please reopen  " }); expect(response.status).toBe(201); expect(mocks.ticketMessage.create.mock.calls[0][0].data).toMatchObject({ authorUserId: "customer", body: "Please reopen" }); expect(mocks.ticket.update).toHaveBeenCalledWith({ where: { id: "ticket-a" }, data: expect.objectContaining({ status: to }) }); expect(mocks.ticketHistory.create).toHaveBeenCalledWith({ data: expect.objectContaining({ oldValue: from, newValue: to }) }); expect(JSON.stringify(mocks.ticket.update.mock.calls)).not.toContain("firstRespondedAt"); });
   it("rejects closed and non-owned replies safely", async () => { mocks.ticket.findFirst.mockResolvedValueOnce({ id: "ticket-a", status: TicketStatus.CLOSED }); expect((await request(app).post("/api/portal/tickets/ticket-a/messages").set(auth("customer", Role.CUSTOMER)).send({ body: "reply" })).body.error.code).toBe("TICKET_CLOSED"); mocks.ticket.findFirst.mockResolvedValueOnce(null); expect((await request(app).post("/api/portal/tickets/other/messages").set(auth("customer", Role.CUSTOMER)).send({ body: "reply" })).status).toBe(404); });
+
+  it("sanitizes the rich portal reply HTML and rejects a markup-only body", async () => {
+    mocks.ticket.findFirst.mockResolvedValue({ id: "ticket-a", status: TicketStatus.OPEN });
+    mocks.ticketMessage.create.mockResolvedValue({ id: "m", body: "x", createdAt: new Date(), author: { id: "customer", name: "Ahmed", role: Role.CUSTOMER } });
+    const ok = await request(app).post("/api/portal/tickets/ticket-a/messages").set(auth("customer", Role.CUSTOMER)).send({
+      body: '<p>Still <strong>broken</strong></p><script>alert(1)</script>',
+    });
+    expect(ok.status).toBe(201);
+    const stored = mocks.ticketMessage.create.mock.calls.at(-1)![0].data.body as string;
+    expect(stored).toContain("<strong>broken</strong>");
+    expect(stored).not.toMatch(/<script/i);
+
+    mocks.ticket.findFirst.mockResolvedValueOnce({ id: "ticket-a", status: TicketStatus.OPEN });
+    const empty = await request(app).post("/api/portal/tickets/ticket-a/messages").set(auth("customer", Role.CUSTOMER)).send({ body: "<p></p>" });
+    expect(empty.status).toBe(422);
+    expect(empty.body.error.code).toBe("EMPTY_MESSAGE");
+  });
 });

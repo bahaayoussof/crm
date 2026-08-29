@@ -1,11 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
 import { AppSelectField } from "@/components/ui/app-select";
-import { AiAssistantPanel } from "@/features/ai-assistant/ai-assistant-panel";
-import type { CategoryApplyApi, ReplyInsertionApi } from "@/features/ai-assistant/ai-assistant.types";
-import { WatchToggle } from "@/features/collaboration/watch-toggle";
 import { getTicketError } from "./ticket-error";
 import { formatTicketDate } from "./ticket-format";
 import { useAgents, useCategories, useUpdateTicket } from "./ticket-hooks";
@@ -27,49 +22,17 @@ interface TicketSidebarProps {
   canWorkflow: boolean;
   canClose: boolean;
   locale: string;
-  /** Bridge to the public reply composer for AI "Insert into Reply". Omitted
-   * when the caller cannot post a reply (read-only / unassigned agent). */
-  replyInsertion?: ReplyInsertionApi;
-  /** Adapter for AI "Apply Category". Omitted when the caller cannot change the
-   * ticket category under normal CRM rules (`canManage`). */
-  categoryApply?: CategoryApplyApi;
 }
 
-/** Contextual ticket information beside the conversation. One subtle container,
- * sections separated by dividers rather than a card per subsection. Attachments
- * live in the main conversation column, not here. */
-export function TicketSidebar({
-  record,
-  canManage,
-  canWorkflow,
-  canClose,
-  locale,
-  replyInsertion,
-  categoryApply,
-}: TicketSidebarProps) {
-  const { t } = useTranslation();
+/** The right context rail: exactly two cards — Ticket details and SLA. Customer,
+ * Description, Activity, Followers, metadata and AI Assistant all live elsewhere
+ * on the page now. */
+export function TicketSidebar({ record, canManage, canWorkflow, canClose, locale }: TicketSidebarProps) {
   return (
     <aside className="min-w-0">
-      <div className="divide-y divide-border-subtle rounded-md border border-border bg-surface shadow-subtle">
+      <div className="space-y-3">
         <PropertiesSection record={record} canManage={canManage} canWorkflow={canWorkflow} canClose={canClose} />
-        <Section title={t("collaboration.followTicket")}>
-          <WatchToggle
-            ticketId={record.id}
-            watching={record.viewerIsWatching ?? false}
-            watcherCount={record.watcherCount ?? 0}
-          />
-        </Section>
-        <AiAssistantPanel
-          ticketId={record.id}
-          replyInsertion={replyInsertion}
-          currentCategoryId={record.category?.id ?? null}
-          categoryApply={categoryApply}
-        />
-        <CustomerSection record={record} />
-        <DescriptionSection description={record.description} />
         <SlaSection record={record} language={locale} />
-        <MetadataSection record={record} language={locale} />
-        <ActivitySection history={record.history} language={locale} />
       </div>
     </aside>
   );
@@ -77,7 +40,7 @@ export function TicketSidebar({
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="space-y-3 p-4 sm:p-5">
+    <section className="space-y-3 rounded-lg border border-border bg-card p-4 sm:p-5">
       <h2 className="text-sm font-semibold text-foreground">{title}</h2>
       {children}
     </section>
@@ -224,6 +187,10 @@ function PropertiesSection({
                 options={categoryOptions}
               />
             )}
+            <div>
+              <p className={labelClassName}>{t("tickets.channelLabel")}</p>
+              <p className="mt-1 text-sm text-foreground">{t(`tickets.channel.${record.channel}`)}</p>
+            </div>
             {canManage && (
               <AppSelectField
                 id="ticket-detail-agent"
@@ -289,71 +256,13 @@ function PropertiesSection({
   );
 }
 
-function CustomerSection({ record }: { record: TicketDetail }) {
-  const { t } = useTranslation();
-  return (
-    <Section title={t("tickets.customer")}>
-      <Link
-        className="block break-words font-semibold text-primary hover:underline [overflow-wrap:anywhere]"
-        to={`/customers/${record.customer.id}`}
-      >
-        {record.customer.name}
-      </Link>
-      <p className="break-words text-sm text-muted-foreground [overflow-wrap:anywhere]">
-        <bdi dir="ltr">{record.customer.email}</bdi>
-      </p>
-      {record.customer.phone && (
-        <p className="break-words text-sm text-muted-foreground [overflow-wrap:anywhere]">
-          <bdi dir="ltr">{record.customer.phone}</bdi>
-        </p>
-      )}
-      <Link
-        className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-        to={`/customers/${record.customer.id}`}
-      >
-        {t("tickets.viewCustomer")}
-        <span aria-hidden="true" className="rtl:rotate-180">
-          →
-        </span>
-      </Link>
-    </Section>
-  );
-}
-
-const DESC_LONG_CHARS = 400;
-const DESC_LONG_LINES = 6;
-
-function DescriptionSection({ description }: { description: string }) {
-  const { t } = useTranslation();
-  const [expanded, setExpanded] = useState(false);
-  const isLong = description.length > DESC_LONG_CHARS || description.split("\n").length > DESC_LONG_LINES;
-  return (
-    <Section title={t("tickets.descriptionLabel")}>
-      <p
-        className={`whitespace-pre-wrap break-words text-sm leading-6 text-foreground [overflow-wrap:anywhere] ${
-          isLong && !expanded ? "line-clamp-6" : ""
-        }`}
-      >
-        {description}
-      </p>
-      {isLong && (
-        <button
-          type="button"
-          className="rounded-sm text-xs font-medium text-foreground transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-expanded={expanded}
-          onClick={() => setExpanded((value) => !value)}
-        >
-          {expanded ? t("tickets.conversation.showLess") : t("tickets.conversation.showMore")}
-        </button>
-      )}
-    </Section>
-  );
-}
-
 function SlaSection({ record, language }: { record: TicketDetail; language: string }) {
   const { t } = useTranslation();
   return (
-    <section className="space-y-3 p-4 sm:p-5" aria-labelledby="ticket-sla-heading">
+    <section
+      className="space-y-3 rounded-lg border border-border bg-card p-4 sm:p-5"
+      aria-labelledby="ticket-sla-heading"
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-foreground" id="ticket-sla-heading">
           {t("tickets.sla.title")}
@@ -411,85 +320,6 @@ function SlaSection({ record, language }: { record: TicketDetail; language: stri
   );
 }
 
-function MetadataSection({ record, language }: { record: TicketDetail; language: string }) {
-  const { t } = useTranslation();
-  return (
-    <Section title={t("tickets.metadata")}>
-      <dl className="space-y-3 text-sm">
-        <Meta label={t("tickets.created")} value={<DateValue value={record.createdAt} language={language} />} />
-        <Meta label={t("tickets.updated")} value={<DateValue value={record.updatedAt} language={language} />} />
-      </dl>
-    </Section>
-  );
-}
-
-const ACTIVITY_PREVIEW_COUNT = 5;
-
-function ActivitySection({
-  history,
-  language,
-}: {
-  history: TicketDetail["history"];
-  language: string;
-}) {
-  const { t } = useTranslation();
-  const [showAll, setShowAll] = useState(false);
-  const hasMore = history.length > ACTIVITY_PREVIEW_COUNT;
-  const visible = showAll ? history : history.slice(0, ACTIVITY_PREVIEW_COUNT);
-  return (
-    <Section title={t("tickets.activity")}>
-      {history.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t("tickets.noHistory")}</p>
-      ) : (
-        <>
-          <ol
-            className={`space-y-3 ${showAll && hasMore ? "max-h-[20rem] overflow-y-auto pe-1" : ""}`}
-          >
-            {visible.map((event) => (
-              <li className="relative ps-4" key={event.id}>
-                <span
-                  className="absolute start-0 top-1.5 size-1.5 rounded-full bg-border-strong"
-                  aria-hidden="true"
-                />
-                <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-x-3">
-                  <p className="min-w-0 break-words text-sm font-medium text-foreground">
-                    {t(`tickets.historyActions.${event.action}`, { defaultValue: event.action })}
-                  </p>
-                  <time
-                    className="shrink-0 whitespace-nowrap text-xs text-muted-foreground"
-                    dir="ltr"
-                    dateTime={event.createdAt}
-                  >
-                    {formatTicketDate(event.createdAt, language)}
-                  </time>
-                </div>
-                <p className="mt-0.5 break-words text-xs text-muted-foreground [overflow-wrap:anywhere]">
-                  {event.actor?.name ?? t("tickets.systemActor")}
-                  {event.oldValue || event.newValue
-                    ? `: ${event.oldValue ? displayValue(event.oldValue, t) : t("common.notProvided")} → ${
-                        event.newValue ? displayValue(event.newValue, t) : t("common.notProvided")
-                      }`
-                    : ""}
-                </p>
-              </li>
-            ))}
-          </ol>
-          {hasMore && (
-            <button
-              type="button"
-              className="rounded-sm text-xs font-medium text-primary transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-expanded={showAll}
-              onClick={() => setShowAll((value) => !value)}
-            >
-              {showAll ? t("tickets.conversation.showLess") : t("tickets.viewAllActivity")}
-            </button>
-          )}
-        </>
-      )}
-    </Section>
-  );
-}
-
 function SlaStateLabel({ state }: { state: SlaState }) {
   const { t } = useTranslation();
   const styles: Record<SlaState, string> = {
@@ -521,11 +351,4 @@ function Meta({ label, value }: { label: string; value: React.ReactNode }) {
       <dd className="min-w-0 break-words font-medium text-foreground sm:text-end">{value}</dd>
     </div>
   );
-}
-
-function displayValue(value: string, t: TFunction) {
-  if (["NEW", "OPEN", "IN_PROGRESS", "WAITING_CUSTOMER", "RESOLVED", "CLOSED", "ESCALATED"].includes(value))
-    return t(`tickets.status.${value}`);
-  if (["LOW", "MEDIUM", "HIGH", "URGENT"].includes(value)) return t(`tickets.priority.${value}`);
-  return value;
 }

@@ -19,9 +19,13 @@ vi.mock("./ticket-hooks", () => ({
   useCreateTicketMessage: () => ({ mutateAsync: mocks.createMessage, isPending: false }),
   useCreateTicketNote: () => ({ mutateAsync: mocks.createNote, isPending: false }),
 }));
-vi.mock("@/features/attachments/attachment-ui", () => ({ MessageAttachmentList: () => null, ConversationAttachmentBand: () => null }));
+vi.mock("@/features/attachments/attachment-ui", () => ({
+  MessageAttachmentList: () => null,
+  ConversationAttachmentBand: () => null,
+  AttachmentCompactGrid: () => null,
+}));
 
-import { TicketConversation, type TicketConversationHandle } from "./ticket-conversation";
+import { TicketWorkspaceTabs, type TicketWorkspaceHandle } from "./ticket-workspace-tabs";
 
 const qr = (id: string, title: string, body: string) => ({
   id, title, body,
@@ -43,29 +47,48 @@ function defaultSearch({ search }: { search?: string }) {
   return Promise.resolve(listResponse(data));
 }
 
-function renderConversation(props: Partial<React.ComponentProps<typeof TicketConversation>> = {}) {
+let lastRef: React.RefObject<TicketWorkspaceHandle | null>;
+
+function renderConversation(props: Partial<React.ComponentProps<typeof TicketWorkspaceTabs>> = {}) {
+  const ref = createRef<TicketWorkspaceHandle>();
+  lastRef = ref;
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const result = render(
     <QueryClientProvider client={client}>
-      <TicketConversation ticketId="ticket-1" items={[]} canMutate {...props} />
+      <TicketWorkspaceTabs
+        ref={ref}
+        ticketId="ticket-1"
+        canMutate
+        attachments={[]}
+        attachmentsLoading={false}
+        attachmentsError={false}
+        onRetryAttachments={() => {}}
+        history={[]}
+        description=""
+        locale="en"
+        {...props}
+      />
     </QueryClientProvider>,
   );
-  return { ...result, client };
+  return { ...result, client, ref };
 }
 
 const trigger = () => screen.getByRole("button", { name: "Insert quick reply" });
 const combobox = () => screen.getByRole("combobox", { name: "Quick reply" });
-const replyBox = () => screen.getByLabelText("Public reply") as HTMLTextAreaElement;
+const replyBox = () => document.querySelector("#conversation-reply") as HTMLElement;
+const replyText = () => replyBox().textContent ?? "";
 
 function openPicker() {
   fireEvent.click(trigger());
   return combobox();
 }
 
-function setDraft(value: string, caretStart = value.length, caretEnd = caretStart) {
-  const textarea = replyBox();
-  fireEvent.change(textarea, { target: { value } });
-  textarea.setSelectionRange(caretStart, caretEnd);
+/** Seed the Lexical reply draft (the old string-textarea + caret helper is gone;
+ * insertion no longer manages caret position or blank-line separators). */
+function setDraft(value: string) {
+  act(() => {
+    lastRef.current!.insertSuggestedReply(value, "replace");
+  });
 }
 
 async function openAndPick(name: RegExp) {
@@ -108,7 +131,7 @@ describe("quick reply composer integration", () => {
     expect(panel.parentElement).toBe(document.body);
     expect(panel.className).toMatch(/\bfixed\b/);
     expect(panel.style.maxHeight).not.toBe("");
-    const card = screen.getByRole("region", { name: "Conversation" });
+    const card = screen.getByRole("region", { name: "Ticket workspace" });
     expect(card).not.toContainElement(panel);
     expect(card.className).toMatch(/overflow-hidden/); // the known clipping ancestor is untouched
     // listbox lives in the portalled panel, not in the card
@@ -182,7 +205,7 @@ describe("quick reply composer integration", () => {
     openPicker();
     expect(await screen.findByText("Unable to search quick replies. Try again.")).toBeInTheDocument();
     expect(combobox()).not.toBeDisabled();
-    expect(replyBox().value).toBe("keep me");
+    expect(replyText()).toBe("keep me");
     expect(mocks.createMessage).not.toHaveBeenCalled();
   });
 
@@ -193,49 +216,31 @@ describe("quick reply composer integration", () => {
     await screen.findByRole("option", { name: /Greeting/ });
     fireEvent.keyDown(input, { key: "ArrowDown" });
     fireEvent.keyDown(input, { key: "Enter" });
-    await waitFor(() => expect(replyBox().value).toBe("Hello and welcome to our support team."));
+    await waitFor(() => expect(replyText()).toContain("Hello and welcome to our support team."));
     expect(mocks.createMessage).not.toHaveBeenCalled();
   });
 
-  it("inserts at the beginning of the draft, preserving the trailing text", async () => {
+  it("inserts the quick reply text into the existing draft", async () => {
     renderConversation();
-    setDraft("existing draft", 0, 0);
+    setDraft("current note ");
     await openAndPick(/Greeting/);
-    await waitFor(() => expect(replyBox().value).toBe("Hello and welcome to our support team.\n\nexisting draft"));
-    expect(replyBox().selectionStart).toBe("Hello and welcome to our support team.".length);
-    expect(document.activeElement).toBe(replyBox());
+    await waitFor(() => expect(replyText()).toContain("Hello and welcome to our support team."));
+    expect(replyText()).toContain("current note");
   });
 
-  it("inserts in the middle of the draft, preserving both sides", async () => {
+  it("inserts into an empty draft", async () => {
     renderConversation();
-    setDraft("aaabbb", 3, 3);
+    setDraft("");
     await openAndPick(/Greeting/);
-    await waitFor(() => expect(replyBox().value).toBe("aaa\n\nHello and welcome to our support team.\n\nbbb"));
-    expect(replyBox().selectionStart).toBe(3 + 2 + "Hello and welcome to our support team.".length);
-  });
-
-  it("inserts at the end of the draft", async () => {
-    renderConversation();
-    setDraft("current note");
-    await openAndPick(/Greeting/);
-    await waitFor(() => expect(replyBox().value).toBe("current note\n\nHello and welcome to our support team."));
-  });
-
-  it("replaces the selected range without adding stray blank lines", async () => {
-    renderConversation();
-    setDraft("keep OLD keep", 5, 8);
-    await openAndPick(/Greeting/);
-    await waitFor(() => expect(replyBox().value).toBe("keep Hello and welcome to our support team. keep"));
-    expect(replyBox().selectionStart).toBe(5 + "Hello and welcome to our support team.".length);
+    await waitFor(() => expect(replyText()).toBe("Hello and welcome to our support team."));
   });
 
   it("keeps the inserted draft editable", async () => {
     renderConversation();
-    setDraft("start");
+    setDraft("start ");
     await openAndPick(/Greeting/);
-    await waitFor(() => expect(replyBox().value).toContain("Hello and welcome"));
-    fireEvent.change(replyBox(), { target: { value: `${replyBox().value} extra` } });
-    expect(replyBox().value).toContain("extra");
+    await waitFor(() => expect(replyText()).toContain("Hello and welcome"));
+    expect(replyBox().getAttribute("contenteditable")).toBe("true");
   });
 
   it("blocks insertion that would exceed the public-reply maximum length and keeps the draft", async () => {
@@ -243,20 +248,18 @@ describe("quick reply composer integration", () => {
     setDraft("a".repeat(19_999));
     await openAndPick(/Greeting/);
     expect(await screen.findByRole("alert")).toHaveTextContent("Inserting this quick reply would exceed the maximum reply length. Your draft is unchanged.");
-    expect(replyBox().value).toBe("a".repeat(19_999));
+    expect(replyText()).toBe("a".repeat(19_999));
     expect(mocks.createMessage).not.toHaveBeenCalled();
   });
 
   it("shows the localized Arabic length error", async () => {
     await changeAppLanguage("ar");
     renderConversation();
-    const textarea = screen.getByLabelText("رد عام") as HTMLTextAreaElement;
-    fireEvent.change(textarea, { target: { value: "ا".repeat(19_999) } });
-    textarea.setSelectionRange(19_999, 19_999);
+    setDraft("ا".repeat(19_999));
     fireEvent.click(screen.getByRole("button", { name: "إدراج رد سريع" }));
     fireEvent.click(await screen.findByRole("option", { name: /Greeting/ }));
     expect(await screen.findByRole("alert")).toHaveTextContent("إدراج هذا الرد السريع سيتجاوز الحد الأقصى لطول الرد. لم تتغيّر مسودتك.");
-    expect(textarea.value).toBe("ا".repeat(19_999));
+    expect(replyText()).toBe("ا".repeat(19_999));
   });
 
   it("hides the trigger in Internal Note mode", () => {
@@ -265,15 +268,17 @@ describe("quick reply composer integration", () => {
     expect(screen.queryByRole("button", { name: "Insert quick reply" })).not.toBeInTheDocument();
   });
 
-  it("bounds both the public reply and internal note textareas (min/max height + internal scroll)", () => {
+  it("bounds both the public reply and internal note editors (min/max height + internal scroll)", () => {
     renderConversation();
     const reply = replyBox();
-    for (const token of ["min-h-28", "max-h-56", "overflow-y-auto", "[field-sizing:content]"]) {
+    for (const token of ["min-h-[7rem]", "max-h-60", "overflow-y-auto"]) {
       expect(reply.className).toContain(token);
     }
     fireEvent.click(screen.getByRole("tab", { name: "Internal note" }));
-    const note = screen.getByLabelText("Internal note") as HTMLTextAreaElement;
-    for (const token of ["min-h-28", "max-h-56", "overflow-y-auto", "[field-sizing:content]"]) {
+    // Internal note is the same Lexical editor as Reply — same bounded contenteditable.
+    const note = document.querySelector("#conversation-note") as HTMLElement;
+    expect(note.getAttribute("contenteditable")).toBe("true");
+    for (const token of ["min-h-[7rem]", "max-h-60", "overflow-y-auto"]) {
       expect(note.className).toContain(token);
     }
   });
@@ -284,15 +289,17 @@ describe("quick reply composer integration", () => {
     expect(screen.getByText("This ticket must be assigned to you before you can reply or add a note.")).toBeInTheDocument();
   });
 
-  it("lays out the composer footer with the trigger at the start and Send at the end", () => {
+  it("keeps Send in the composer footer and moves the quick reply trigger up beside the reply heading", () => {
     renderConversation();
-    const send = screen.getByRole("button", { name: "Send reply" });
+    const send = screen.getByRole("button", { name: "Reply" });
     const footer = send.parentElement as HTMLElement;
-    expect(footer).toContainElement(trigger());
     expect(footer.className).toMatch(/flex-col/);
     expect(footer.className).toMatch(/sm:flex-row/);
     expect(send.className).toMatch(/sm:ms-auto/);
     expect(send.className).toMatch(/sm:w-auto/);
+    // the quick reply trigger is no longer in the footer — it sits by the reply heading
+    expect(footer).not.toContainElement(trigger());
+    expect(screen.getByText("Reply to customer")).toBeInTheDocument();
   });
 
   it("keeps mobile composer actions full-width so they stack without overflow", () => {
@@ -327,7 +334,7 @@ describe("quick reply composer integration", () => {
     fireEvent.change(combobox(), { target: { value: "zebra" } });
     const option = await screen.findByRole("option", { name: /Zebra escalation/ });
     fireEvent.click(option);
-    await waitFor(() => expect(replyBox().value).toBe("Escalate to the zebra team immediately."));
+    await waitFor(() => expect(replyText()).toBe("Escalate to the zebra team immediately."));
   });
 });
 
@@ -339,19 +346,8 @@ describe("TicketConversation imperative reply insertion (AI 'Insert into Reply')
     mocks.getQuickReplies.mockImplementation(defaultSearch);
   });
 
-  function renderWithHandle() {
-    const ref = createRef<TicketConversationHandle>();
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(
-      <QueryClientProvider client={client}>
-        <TicketConversation ref={ref} ticketId="ticket-1" items={[]} canMutate />
-      </QueryClientProvider>,
-    );
-    return ref;
-  }
-
   it("reports whether the public reply draft has text", () => {
-    const ref = renderWithHandle();
+    const { ref } = renderConversation();
     expect(ref.current?.hasReplyText()).toBe(false);
     setDraft("hello");
     expect(ref.current?.hasReplyText()).toBe(true);
@@ -359,51 +355,50 @@ describe("TicketConversation imperative reply insertion (AI 'Insert into Reply')
     expect(ref.current?.hasReplyText()).toBe(false);
   });
 
-  it("inserts an AI draft into an empty composer and focuses the textarea", () => {
-    const ref = renderWithHandle();
+  it("inserts an AI draft into an empty composer", () => {
+    const { ref } = renderConversation();
     let outcome: string | undefined;
     act(() => {
       outcome = ref.current?.insertSuggestedReply("Thanks for the update.", "cursor");
     });
     expect(outcome).toBe("inserted");
-    expect(replyBox().value).toBe("Thanks for the update.");
-    expect(document.activeElement).toBe(replyBox());
+    expect(replyText()).toBe("Thanks for the update.");
   });
 
-  it("splices at the caret and separates from existing text", () => {
-    const ref = renderWithHandle();
-    setDraft("Hello.There.", 6, 6); // caret after "Hello."
+  it("appends the AI draft to existing text at the cursor", () => {
+    const { ref } = renderConversation();
+    setDraft("Hello there. ");
     act(() => {
       ref.current?.insertSuggestedReply("INSERTED", "cursor");
     });
-    expect(replyBox().value).toBe("Hello.\n\nINSERTED\n\nThere.");
+    expect(replyText()).toBe("Hello there. INSERTED");
   });
 
   it("replace swaps the whole draft only on the replace mode", () => {
-    const ref = renderWithHandle();
+    const { ref } = renderConversation();
     setDraft("agent typed this");
     act(() => {
       ref.current?.insertSuggestedReply("AI DRAFT", "replace");
     });
-    expect(replyBox().value).toBe("AI DRAFT");
+    expect(replyText()).toBe("AI DRAFT");
   });
 
   it("rejects an over-limit insertion without changing the draft", () => {
-    const ref = renderWithHandle();
+    const { ref } = renderConversation();
     setDraft("existing draft");
     let outcome: string | undefined;
     act(() => {
       outcome = ref.current?.insertSuggestedReply("x".repeat(20_001), "cursor");
     });
     expect(outcome).toBe("too-long");
-    expect(replyBox().value).toBe("existing draft");
+    expect(replyText()).toBe("existing draft");
   });
 
-  it("Quick Reply insertion still works after the shared splice refactor", async () => {
+  it("Quick Reply insertion still works with the Lexical editor", async () => {
     renderConversation();
-    setDraft("Intro.");
+    setDraft("Intro. ");
     await openAndPick(/Greeting/);
-    await waitFor(() => expect(replyBox().value).toBe("Intro.\n\nHello and welcome to our support team."));
+    await waitFor(() => expect(replyText()).toBe("Intro. Hello and welcome to our support team."));
   });
 });
 

@@ -3,6 +3,7 @@ import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import { createNotifications } from "../notifications/notification.service.js";
 import { notifyWatchers, NOTIFICATION_WATCH_ACTIVITY } from "../collaboration/collaboration.service.js";
+import { sanitizeReplyHtml } from "../../shared/rich-text/reply-html.js";
 import type { PortalCreateTicketInput, PortalReplyInput, PortalStatus, PortalTicketListQuery } from "./portal.schema.js";
 
 const listSelect = { id: true, subject: true, status: true, category: { select: { id: true, name: true } }, createdAt: true, updatedAt: true } satisfies Prisma.TicketSelect;
@@ -97,7 +98,12 @@ export async function reply(id: string, input: PortalReplyInput, userId: string)
     const ticket = await tx.ticket.findFirst({ where: { id, customerId }, select: { id: true, status: true, subject: true, assignedAgentId: true } });
     if (!ticket) throw new AppError(404, "TICKET_NOT_FOUND", "Ticket not found");
     if (ticket.status === TicketStatus.CLOSED) throw new AppError(409, "TICKET_CLOSED", "Closed tickets do not accept replies");
-    const message = await tx.ticketMessage.create({ data: { ticketId: id, authorUserId: userId, body: input.body }, select: messageSelect });
+    // The Portal composer is the shared rich Lexical editor. Sanitize the HTML to
+    // the support allowlist at this trust boundary (same as staff replies); the
+    // `MessageBody` render guard re-sanitizes as defence in depth.
+    const body = sanitizeReplyHtml(input.body);
+    if (!body) throw new AppError(422, "EMPTY_MESSAGE", "Reply body is required");
+    const message = await tx.ticketMessage.create({ data: { ticketId: id, authorUserId: userId, body }, select: messageSelect });
     const next = ticket.status === TicketStatus.WAITING_CUSTOMER ? TicketStatus.IN_PROGRESS : ticket.status === TicketStatus.RESOLVED ? TicketStatus.OPEN : null;
     if (next) {
       await tx.ticket.update({ where: { id }, data: { status: next, ...(ticket.status === TicketStatus.RESOLVED && { resolvedAt: null }) } });

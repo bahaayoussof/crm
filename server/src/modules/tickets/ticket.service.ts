@@ -9,6 +9,7 @@ import {
   NOTIFICATION_WATCH_ACTIVITY,
 } from "../collaboration/collaboration.service.js";
 import { deliverOutboundReply } from "../integrations/whatsapp/whatsapp.service.js";
+import { replyHtmlToPlainText, sanitizeReplyHtml } from "../../shared/rich-text/reply-html.js";
 import type { CreateTicketInput, TicketConversationInput, TicketListQuery, UpdateTicketInput } from "./ticket.schema.js";
 import { ticketVisibilityWhere, type TicketActor as Actor } from "./ticket-visibility.js";
 
@@ -88,10 +89,14 @@ export async function getTicket(ticketId: string, actor: Actor, now = new Date()
 
 export async function addTicketMessage(ticketId: string, input: TicketConversationInput, actor: Actor) {
   const createdAt = new Date();
+  // Public replies are rich text from the Lexical composer. Sanitize to the
+  // support-reply allowlist here — this is the trust boundary, not the client.
+  const body = sanitizeReplyHtml(input.body);
+  if (!body) throw new AppError(422, "EMPTY_MESSAGE", "Message body is required");
   const { message, channel, customerPhone } = await prisma.$transaction(async (tx) => {
     const ticket = await requireConversationMutationAccess(tx, ticketId, actor);
     const created = await tx.ticketMessage.create({
-      data: { ticketId, authorUserId: actor.userId, body: input.body, createdAt },
+      data: { ticketId, authorUserId: actor.userId, body, createdAt },
       select: conversationSelect,
     });
     await tx.ticket.updateMany({ where: { id: ticketId, firstRespondedAt: null }, data: { firstRespondedAt: createdAt } });
@@ -114,17 +119,28 @@ export async function addTicketMessage(ticketId: string, input: TicketConversati
   // committed above, so a delivery failure never corrupts the conversation — it
   // is reported back to the caller and recorded as a ticket history row.
   if (channel === Channel.WHATSAPP) {
-    const delivery = await deliverOutboundReply({ ticketId, messageId: message.id, to: customerPhone, text: input.body });
+    // WhatsApp carries plain text only — never send reply markup to the customer.
+    const delivery = await deliverOutboundReply({
+      ticketId,
+      messageId: message.id,
+      to: customerPhone,
+      text: replyHtmlToPlainText(body),
+    });
     return { ...message, delivery };
   }
   return message;
 }
 
 export async function addTicketNote(ticketId: string, input: TicketConversationInput, actor: Actor) {
+  // Internal notes are rich text from the same Lexical editor as public replies
+  // (with @mentions). Sanitize to the support allowlist at this trust boundary;
+  // the `@[Name](userId)` mention tokens are plain text and survive intact.
+  const body = sanitizeReplyHtml(input.body);
+  if (!body) throw new AppError(422, "EMPTY_MESSAGE", "Note body is required");
   return prisma.$transaction(async (tx) => {
     const ticket = await requireConversationMutationAccess(tx, ticketId, actor);
     const note = await tx.ticketNote.create({
-      data: { ticketId, authorUserId: actor.userId, body: input.body },
+      data: { ticketId, authorUserId: actor.userId, body },
       select: conversationSelect,
     });
     // @mentions: records + auto-watch + mention notifications. Returns the
@@ -132,7 +148,7 @@ export async function addTicketNote(ticketId: string, input: TicketConversationI
     const mentionedIds = await applyNoteMentions(tx, {
       ticketId,
       noteId: note.id,
-      body: input.body,
+      body,
       authorUserId: actor.userId,
       authorName: note.author.name,
       ticketSubject: ticket.subject,

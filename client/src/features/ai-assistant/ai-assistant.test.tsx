@@ -17,6 +17,7 @@ vi.mock("./ai-assistant-api", () => ({
   requestTicketKbSuggestions: mocks.requestTicketKbSuggestions,
 }));
 
+import { useState } from "react";
 import { AiAssistantPanel } from "./ai-assistant-panel";
 import type { CategoryApplyApi, ReplyInsertionApi } from "./ai-assistant.types";
 
@@ -80,22 +81,35 @@ function renderPanel(
 ) {
   const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
   const invalidateSpy = vi.spyOn(client, "invalidateQueries");
-  const utils = render(
-    <MemoryRouter>
-      <QueryClientProvider client={client}>
+  // The panel is controlled by the page (header "AI Assistant" button). This
+  // harness stands in for that trigger.
+  function Harness() {
+    const [open, setOpen] = useState(false);
+    return (
+      <>
+        <button type="button" onClick={() => setOpen(true)}>
+          Open AI
+        </button>
         <AiAssistantPanel
+          open={open}
+          onClose={() => setOpen(false)}
           ticketId="ticket-1"
           replyInsertion={replyInsertion}
           currentCategoryId={extra.currentCategoryId}
           categoryApply={extra.categoryApply}
         />
+      </>
+    );
+  }
+  const utils = render(
+    <MemoryRouter>
+      <QueryClientProvider client={client}>
+        <Harness />
       </QueryClientProvider>
     </MemoryRouter>,
   );
-  // The interactive AI workspace lives in a drawer; before it is opened the only
-  // control rendered is the sidebar launcher. Open it so the existing action
-  // assertions below operate on the workspace.
-  if (extra.openDrawer !== false) fireEvent.click(screen.getByRole("button"));
+  // Open the drawer so the existing action assertions operate on the workspace.
+  if (extra.openDrawer !== false) fireEvent.click(screen.getByRole("button", { name: "Open AI" }));
   return { ...utils, invalidateSpy };
 }
 
@@ -228,20 +242,18 @@ describe("AiAssistantPanel", () => {
   });
 });
 
-describe("AiAssistantPanel — launcher & drawer", () => {
-  it("shows only a compact launcher (no AI results) before the drawer is opened", () => {
+describe("AiAssistantPanel — controlled drawer", () => {
+  it("renders no dialog and no AI actions while closed", () => {
     renderPanel(makeReplyInsertion(), { categoryApply: makeCategoryApply(), openDrawer: false });
-    expect(screen.getByRole("button", { name: "Open AI Assistant" })).toBeInTheDocument();
-    expect(screen.getByText("Use AI to summarize, draft replies, classify and find relevant solutions.")).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     for (const name of ["Summarize Ticket", "Suggest Reply", "Suggest Category", "Find Solution"]) {
       expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
     }
   });
 
-  it("opens the workspace on launcher click and closes it with the Close control", () => {
+  it("opens when the page trigger fires and closes with the Close control", () => {
     renderPanel(makeReplyInsertion(), { openDrawer: false });
-    fireEvent.click(screen.getByRole("button", { name: "Open AI Assistant" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open AI" }));
     const dialog = screen.getByRole("dialog", { name: "AI Assistant" });
     expect(within(dialog).getByRole("button", { name: "Summarize Ticket" })).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole("button", { name: "Close AI Assistant" }));
@@ -264,20 +276,11 @@ describe("AiAssistantPanel — launcher & drawer", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close AI Assistant" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Open AI Assistant" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open AI" }));
     // Result is still there — no re-request needed.
     expect(screen.getByText("AI Summary")).toBeInTheDocument();
     expect(screen.getByText(SUMMARY.result.issue)).toBeInTheDocument();
     expect(mocks.requestTicketSummary).toHaveBeenCalledTimes(1);
-  });
-
-  it("reflects a ready-results count on the launcher", async () => {
-    renderPanel(makeReplyInsertion());
-    fireEvent.click(screen.getByRole("button", { name: "Summarize Ticket" }));
-    await screen.findByText("AI Summary");
-    fireEvent.click(screen.getByRole("button", { name: "Close AI Assistant" }));
-    expect(screen.getByRole("button", { name: "Open AI Assistant" })).toBeInTheDocument();
-    expect(screen.getByText("1 results ready")).toBeInTheDocument();
   });
 });
 

@@ -66,7 +66,9 @@ describe("portal pages", () => {
     mocks.detail.mockReturnValue({ data: { ...ticket, status: "RESOLVED", description: "Details", messages: [{ id: "m", body: "We can help", createdAt: ticket.updatedAt, author: { id: "a", name: "Mariam", kind: "SUPPORT" } }] } });
     mocks.reply.mockReturnValue({ mutateAsync: mocks.mutate, isPending: false, isError: true }); renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
     expect(screen.getByText("Support Team")).toBeInTheDocument(); expect(screen.getByText("Replying will reopen this request.")).toBeInTheDocument();
-    const field = screen.getByRole("textbox"); fireEvent.change(field, { target: { value: "Still broken" } }); expect(field).toHaveValue("Still broken"); expect(screen.getByText(/message has been preserved/)).toBeInTheDocument();
+    // The composer is the shared rich (contenteditable) editor; the failed-reply notice stays.
+    expect((document.querySelector("#portal-reply") as HTMLElement).getAttribute("contenteditable")).toBe("true");
+    expect(screen.getByText(/message has been preserved/)).toBeInTheDocument();
   });
   it("never renders internal SLA state, target, or deadlines even if present in the payload", () => {
     mocks.detail.mockReturnValue({ data: { ...ticket, status: "OPEN", description: "Details", messages: [], slaState: "BREACHED", effectiveSlaTarget: "FIRST_RESPONSE", effectiveSlaDueAt: "2026-08-25T09:00:00Z", firstResponseDueAt: "2026-08-25T09:00:00Z", firstRespondedAt: null, resolutionDueAt: "2026-08-26T09:00:00Z" } });
@@ -142,17 +144,18 @@ describe("portal ticket details shares the internal ticket design", () => {
     expect(container.querySelector(".grid.gap-6")).toBeNull(); // no internal sidebar grid
   });
 
-  it("aligns customer messages to the start and support messages to the end as width-bounded bubbles", () => {
+  it("aligns the customer's own messages to the end and support messages to the start (viewer-relative)", () => {
     mocks.detail.mockReturnValue({ data: detail() });
     renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
     const customer = bubble("Hi, my card was charged twice.");
     const support = longBody().closest("article") as HTMLElement;
     for (const b of [customer, support]) {
-      expect(b.className).toMatch(/max-w-\[min\(85%,46rem\)\]/);
+      expect(b.className).toMatch(/sm:max-w-\[62%\]/);
       expect(b.className).toMatch(/min-w-0/);
     }
-    expect((customer.closest("li") as HTMLElement).className).toMatch(/justify-start/);
-    expect((support.closest("li") as HTMLElement).className).toMatch(/justify-end/);
+    // Portal alignment is viewer-relative — opposite of the internal staff view.
+    expect((customer.closest("li") as HTMLElement).className).toMatch(/justify-end/);
+    expect((support.closest("li") as HTMLElement).className).toMatch(/justify-start/);
   });
 
   it("contains long unbroken message content and preserves newlines", () => {
@@ -190,17 +193,22 @@ describe("portal ticket details shares the internal ticket design", () => {
     expect(container.textContent).not.toMatch(/BREACHED|URGENT|SLA/);
   });
 
-  it("gives the reply composer the shared footer layout with a content-sized Send on desktop", () => {
+  it("gives the reply composer the shared rich editor + footer layout with a content-sized Reply on desktop", () => {
     mocks.detail.mockReturnValue({ data: detail({ status: "OPEN" }) });
     renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
-    const send = screen.getByRole("button", { name: "Send Reply" });
+    const send = screen.getByRole("button", { name: "Reply" });
     expect(send.className).toMatch(/\bbutton-primary\b/);
     expect(send.className).toMatch(/sm:w-auto/);
     expect(send.className).toMatch(/sm:ms-auto/);
     const footer = send.parentElement as HTMLElement;
     expect(footer.className).toMatch(/flex-col/);
     expect(footer.className).toMatch(/sm:flex-row/);
-    expect(screen.getByLabelText("Your message")).toHaveClass("input");
+    expect(footer.className).toMatch(/border-t/);
+    // shared Lexical editor (contenteditable), not a plain textarea
+    const editor = document.querySelector("#portal-reply") as HTMLElement;
+    expect(editor.getAttribute("contenteditable")).toBe("true");
+    expect(editor.className).toMatch(/min-h-\[7rem\]/);
+    expect(screen.getByRole("button", { name: "Bold" })).toBeInTheDocument();
   });
 
   it("replaces the composer with a calm localized notice on a closed ticket", () => {
@@ -246,12 +254,13 @@ describe("portal ticket details shares the internal ticket design", () => {
     expect(within(header).getByRole("link", { name: "Back to My Requests" })).toHaveAttribute("href", "/portal/tickets");
     expect(within(header).getByText("#12345678")).toBeInTheDocument();
     expect(within(header).getByText("In progress")).toBeInTheDocument();
-    expect(within(header).getByText("Category")).toBeInTheDocument();
-    expect(within(header).getByText("Created")).toBeInTheDocument();
-    expect(within(header).getByText("Updated")).toBeInTheDocument();
+    // Category / Created / Updated moved to the customer-safe context strip (a sibling, not the header).
+    expect(screen.getByText("Category")).toBeInTheDocument();
+    expect(screen.getByText("Created")).toBeInTheDocument();
+    expect(screen.getByText("Updated")).toBeInTheDocument();
     // internal-only header affordances never appear
     expect(within(header).queryByRole("link", { name: "Edit" })).not.toBeInTheDocument();
-    expect(within(header).queryByText(/priority|channel|web|email|whatsapp/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/priority|channel|web|email|whatsapp|assignee|followers/i)).not.toBeInTheDocument();
   });
 
   it("excludes every internal-only Ticket Details section from the customer view", () => {
@@ -279,14 +288,16 @@ describe("portal ticket details shares the internal ticket design", () => {
     expect(container.querySelector(".grid.gap-6")).toBeNull();
   });
 
-  it("places the Attach file control inside the Conversation card, next to the composer", () => {
+  it("places the Attach file control in the composer card, next to the Reply button", () => {
     mocks.detail.mockReturnValue({ data: detail({ status: "OPEN" }) });
     renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
     const attach = screen.getByRole("button", { name: "Attach file" });
-    const send = screen.getByRole("button", { name: "Send Reply" });
-    // same section as the reply composer — the shared Conversation card
-    expect(attach.closest("section")).toBe(send.closest("section"));
-    expect(within(attach.closest("section") as HTMLElement).getByRole("heading", { name: "Conversation" })).toBeInTheDocument();
+    const send = screen.getByRole("button", { name: "Reply" });
+    // both live in the standalone composer card (not the Conversation card)
+    const section = attach.closest("section") as HTMLElement;
+    expect(section).toBe(send.closest("section"));
+    expect(within(section).getByRole("heading", { name: "Reply" })).toBeInTheDocument();
+    expect(within(section).queryByRole("heading", { name: "Conversation" })).not.toBeInTheDocument();
   });
 
   it("keeps the standalone Attachments card to existing files only — no upload controls", () => {
@@ -299,22 +310,24 @@ describe("portal ticket details shares the internal ticket design", () => {
     expect(within(card).getByText("No attachments yet.")).toBeInTheDocument();
   });
 
-  it("reveals the shared uploader from Attach file and uploads through the portal mutation", async () => {
+  it("opens the native picker on Attach file, then reveals the pre-filled uploader and uploads through the portal mutation", async () => {
     mocks.detail.mockReturnValue({ data: detail({ status: "OPEN" }) });
     renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
-    fireEvent.click(screen.getByRole("button", { name: "Attach file" }));
-    expect(await screen.findByText("Choose file")).toBeInTheDocument();
+    const native = document.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(native).toBeTruthy();
     const file = new File(["hello"], "receipt.png", { type: "image/png" });
-    fireEvent.change(screen.getByLabelText("Select file"), { target: { files: [file] } });
+    fireEvent.change(native, { target: { files: [file] } });
+    expect(await screen.findByTitle("receipt.png")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Upload" }));
     await waitFor(() => expect(mocks.uploadFn).toHaveBeenCalledWith(file));
   });
 
-  it("hides the uploader on a closed request and shows the disabled reason", () => {
+  it("hides the composer + Attach file on a closed request and shows the closed notice", () => {
     mocks.detail.mockReturnValue({ data: detail({ status: "CLOSED" }) });
     renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
     expect(screen.queryByRole("button", { name: "Attach file" })).not.toBeInTheDocument();
-    expect(screen.getByText("This request is closed and no longer accepts new attachments.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reply" })).not.toBeInTheDocument();
+    expect(screen.getByText("This request is closed and no longer accepts replies.")).toBeInTheDocument();
   });
 
   it("still renders existing ticket attachments with preview/download actions", () => {
@@ -340,31 +353,31 @@ describe("portal ticket details shares the internal ticket design", () => {
     expect(screen.queryByText(/internal note/i)).not.toBeInTheDocument();
   });
 
-  it("bounds the conversation message viewport and keeps the attach band + composer outside that scroll", () => {
+  it("bounds only the conversation message viewport; the composer card scrolls with the page", () => {
     mocks.detail.mockReturnValue({ data: detail({ status: "OPEN" }) });
     renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
     const list = screen.getByRole("list", { name: "Request conversation" });
     const scrollRegion = list.closest(".overflow-y-auto") as HTMLElement;
     expect(scrollRegion).toBeTruthy();
     expect(scrollRegion.className).toMatch(/lg:flex-1/);
-    // the conversation card is a bounded flex column with a desktop height cap on its wrapper
     const card = list.closest("section") as HTMLElement;
     expect(card.className).toMatch(/lg:flex\b/);
     expect(card.className).toMatch(/lg:h-full/);
     expect((card.parentElement as HTMLElement).className).toMatch(/lg:h-\[calc\(/);
-    // attach band + Send live AFTER the scroll region, never inside it
-    expect(scrollRegion.contains(screen.getByRole("button", { name: "Attach file" }))).toBe(false);
-    expect(scrollRegion.contains(screen.getByRole("button", { name: "Send Reply" }))).toBe(false);
+    // the composer (a separate card) is entirely outside the bounded conversation card
+    const send = screen.getByRole("button", { name: "Reply" });
+    expect(card.contains(send)).toBe(false);
+    expect(card.contains(screen.getByRole("button", { name: "Attach file" }))).toBe(false);
   });
 
-  it("does not change the conversation card shell when the attachment uploader is toggled open", async () => {
+  it("does not change the conversation card shell when the attachment uploader is toggled open", () => {
     mocks.detail.mockReturnValue({ data: detail({ status: "OPEN" }) });
     renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
     const card = screen.getByRole("list", { name: "Request conversation" }).closest("section") as HTMLElement;
     const shellBefore = card.className;
-    fireEvent.click(screen.getByRole("button", { name: "Attach file" }));
-    expect(await screen.findByText("Choose file")).toBeInTheDocument();
-    // the flex-1 message region absorbs the revealed form; card height classes are untouched
+    const native = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(native, { target: { files: [new File(["x"], "r.png", { type: "image/png" })] } });
+    expect(screen.getByTitle("r.png")).toBeInTheDocument();
     expect(card.className).toBe(shellBefore);
   });
 });

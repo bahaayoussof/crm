@@ -19,11 +19,8 @@ vi.mock("@/features/attachments/attachment-hooks", () => ({
   useUploadTicketAttachment: () => ({ mutateAsync: vi.fn().mockResolvedValue({}), isPending: false }),
 }));
 vi.mock("@/features/quick-replies/quick-reply-picker", () => ({ QuickReplyPicker: () => null }));
-vi.mock("@/features/collaboration/mention-textarea", () => ({
-  MentionTextarea: (props: { id: string; value: string; disabled?: boolean; ariaDescribedBy?: string; onChange: (v: string) => void }) => (
-    <textarea id={props.id} value={props.value} disabled={props.disabled} aria-describedby={props.ariaDescribedBy} onChange={(event) => props.onChange(event.target.value)} />
-  ),
-}));
+// The @mention typeahead needs a QueryClient; its behaviour is covered elsewhere.
+vi.mock("./ticket-mention-plugin", () => ({ TicketMentionPlugin: () => null }));
 vi.mock("@/features/collaboration/watch-toggle", () => ({ WatchToggle: () => null }));
 // Real behavior is covered in features/ai-assistant/ai-assistant.test.tsx; here we
 // only need a stand-in that proves the panel is placed in the internal sidebar.
@@ -101,9 +98,10 @@ describe("Ticket Details workspace layout & long-content containment", () => {
     for (const column of columns) expect(column.className).toMatch(/min-w-0/);
   });
 
-  it("shows the internal-only AI Assistant section in the sidebar", () => {
+  it("puts the AI Assistant trigger in the ticket header", () => {
     renderDetail();
-    expect(screen.getByRole("heading", { name: "AI Assistant" })).toBeInTheDocument();
+    const trigger = screen.getByRole("button", { name: "AI Assistant" });
+    expect(trigger.closest("header")).not.toBeNull();
   });
 
   it("bounds the conversation into an internally scrollable message region (desktop only)", () => {
@@ -121,7 +119,7 @@ describe("Ticket Details workspace layout & long-content containment", () => {
     }
     // the section is a bounded flex column on lg and the composer stays queryable
     expect(list.closest("section")!.className).toMatch(/lg:flex-col/);
-    expect(screen.getByRole("button", { name: "Send reply" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reply" })).toBeInTheDocument();
   });
 
   it("gives the desktop conversation column most of the viewport height", () => {
@@ -131,21 +129,20 @@ describe("Ticket Details workspace layout & long-content containment", () => {
     expect(leftColumn.className).toMatch(/lg:overflow-hidden/);
   });
 
-  it("bounds the public reply textarea so a long draft cannot swallow the message area", () => {
+  it("bounds the public reply editor so a long draft cannot swallow the message area", () => {
     const { container } = renderDetail();
-    const reply = container.querySelector("#conversation-reply") as HTMLTextAreaElement;
+    const reply = container.querySelector("#conversation-reply") as HTMLElement;
     expect(reply).toBeTruthy();
-    // comfortable floor, hard ceiling, then the textarea scrolls its own content
-    expect(reply.className).toMatch(/min-h-28/);
-    expect(reply.className).toMatch(/max-h-56/);
+    // comfortable floor, hard ceiling, then the editor scrolls its own content
+    expect(reply.className).toMatch(/min-h-\[7rem\]/);
+    expect(reply.className).toMatch(/max-h-60/);
     expect(reply.className).toMatch(/overflow-y-auto/);
-    expect(reply.className).toMatch(/\[field-sizing:content\]/);
   });
 
   it("gives consecutive messages breathing room", () => {
     renderDetail();
     const list = screen.getByRole("list", { name: "Ticket conversation timeline" });
-    expect(list.className).toMatch(/space-y-5/);
+    expect(list.className).toMatch(/space-y-4/);
   });
 
   it("wraps long unbroken content in the message body, subject, description, activity, and customer email", () => {
@@ -154,7 +151,10 @@ describe("Ticket Details workspace layout & long-content containment", () => {
     expect(longBody().className).toMatch(/whitespace-pre-wrap/);
 
     expect(screen.getByRole("heading", { level: 1 }).className).toMatch(/\[overflow-wrap:anywhere\]/);
+    // Description and Activity are lower-workspace tabs — open each before asserting.
+    fireEvent.click(screen.getByRole("tab", { name: "Description" }));
     expect(screen.getByText(baseTicket.description, { selector: "p" }).className).toMatch(/\[overflow-wrap:anywhere\]/);
+    fireEvent.click(screen.getByRole("tab", { name: /^Activity/ }));
     expect(screen.getByText(/NEW-/, { selector: "p" }).className).toMatch(/\[overflow-wrap:anywhere\]/);
     const email = screen.getByText(baseTicket.customer.email, { selector: "bdi" });
     expect(email.closest("p")?.className).toMatch(/\[overflow-wrap:anywhere\]/);
@@ -162,6 +162,7 @@ describe("Ticket Details workspace layout & long-content containment", () => {
 
   it("keeps a long filename inside its row: truncated with the full value in title, actions still reachable", () => {
     renderDetail();
+    fireEvent.click(screen.getByRole("tab", { name: /^Attachments/ }));
     const name = screen.getByTitle(LONG_FILENAME);
     expect(name.className).toMatch(/truncate/);
     expect(name.closest("li")).toContainElement(screen.getByRole("button", { name: "Download attachment" }));
@@ -169,7 +170,8 @@ describe("Ticket Details workspace layout & long-content containment", () => {
 
   it("keeps activity timestamps on their own non-wrapping line, separate from the actor/change line", () => {
     renderDetail();
-    const activitySection = screen.getByRole("heading", { name: "Activity" }).closest("section") as HTMLElement;
+    fireEvent.click(screen.getByRole("tab", { name: /^Activity/ }));
+    const activitySection = screen.getByRole("tab", { name: /^Activity/ }).closest("section") as HTMLElement;
     const time = activitySection.querySelector("li time") as HTMLElement;
     expect(time).toBeTruthy();
     expect(time.className).toMatch(/whitespace-nowrap/);
@@ -180,26 +182,54 @@ describe("Ticket Details workspace layout & long-content containment", () => {
   });
 });
 
-describe("Ticket Details conversation bubbles and long-message disclosure", () => {
+describe("Ticket Details conversation rows and long-message disclosure", () => {
   afterEach(cleanup);
   beforeEach(async () => { await changeAppLanguage("en"); vi.clearAllMocks(); baseMocks(); });
 
-  it("renders messages as width-bounded bubbles with logical side alignment", () => {
+  it("aligns customer messages to the start and staff replies + internal notes to the end (chat bubbles)", () => {
     renderDetail();
-    const shortBubble = screen.getByText("Thanks, that is resolved now.", { selector: "p" }).closest("article") as HTMLElement;
-    const staffBubble = longBubble();
-    for (const bubble of [shortBubble, staffBubble]) {
-      expect(bubble.className).toMatch(/max-w-\[min\(85%,46rem\)\]/);
-      expect(bubble.className).toMatch(/min-w-0/);
-    }
-    expect((shortBubble.closest("li") as HTMLElement).className).toMatch(/justify-start/);
-    expect((staffBubble.closest("li") as HTMLElement).className).toMatch(/justify-end/);
+    const customerRow = screen.getByText("Thanks, that is resolved now.", { selector: "p" }).closest("li") as HTMLElement;
+    const staffRow = longBubble().closest("li") as HTMLElement;
+    const noteRow = screen.getByText("Private investigation notes.", { selector: "p" }).closest("li") as HTMLElement;
+    expect(customerRow.className).toMatch(/justify-start/);
+    expect(staffRow.className).toMatch(/justify-end/);
+    expect(noteRow.className).toMatch(/justify-end/);
+    const staffArticle = longBubble();
+    expect(staffArticle.className).toMatch(/sm:max-w-\[62%\]/);
+    expect(staffArticle.className).not.toMatch(/flex-1/);
   });
 
   it("does not offer Show more for a short message", () => {
     renderDetail();
     const shortBubble = screen.getByText("Thanks, that is resolved now.", { selector: "p" }).closest("article") as HTMLElement;
     expect(within(shortBubble).queryByRole("button", { name: /show more/i })).not.toBeInTheDocument();
+  });
+
+  it("renders a staff reply's stored HTML as formatted text and strips anything unsafe", () => {
+    mocks.useTicket.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: {
+        ...baseTicket,
+        conversation: [
+          {
+            id: "m-html",
+            kind: "PUBLIC_MESSAGE",
+            createdAt: "2026-08-25T09:20:00.000Z",
+            author: { id: "agent-1", name: "Mariam Hassan", role: "AGENT" },
+            body:
+              '<p>Hello <strong>Ahmed</strong></p><ul><li>step one</li></ul>' +
+              '<script>alert(1)</script><a href="javascript:evil()">bad</a>',
+          },
+        ],
+      },
+    });
+    renderDetail();
+    const bubble = screen.getByText("step one").closest("article") as HTMLElement;
+    expect(bubble.querySelector("strong")?.textContent).toBe("Ahmed");
+    expect(bubble.querySelector("li")?.textContent).toBe("step one");
+    expect(bubble.querySelector("script")).toBeNull();
+    expect(bubble.innerHTML).not.toMatch(/javascript:/i);
   });
 
   it("progressively discloses a genuinely long message without discarding content", () => {
@@ -225,6 +255,31 @@ describe("Ticket Details conversation bubbles and long-message disclosure", () =
     expect(within(noteBubble).getByText("Internal note")).toBeInTheDocument();
     const staffBubble = longBubble();
     expect(within(staffBubble).getByText("Visible to customer")).toBeInTheDocument();
+  });
+
+  it("renders an internal note's sanitized HTML with @mention tokens as chips (no raw id, no script)", () => {
+    mocks.useTicket.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: {
+        ...baseTicket,
+        conversation: [
+          {
+            id: "note-html",
+            kind: "INTERNAL_NOTE",
+            createdAt: "2026-08-25T09:30:00.000Z",
+            author: { id: "admin-1", name: "Admin", role: "ADMIN" },
+            body: '<p>Please review <strong>this</strong> @[Ann Lee](user-9)</p><script>alert(1)</script>',
+          },
+        ],
+      },
+    });
+    renderDetail();
+    const note = screen.getByText(/Please review/).closest("article") as HTMLElement;
+    expect(note.querySelector("strong")?.textContent).toBe("this");
+    expect(within(note).getByText("@Ann Lee")).toBeInTheDocument();
+    expect(note.textContent).not.toMatch(/user-9|@\[/);
+    expect(note.querySelector("script")).toBeNull();
   });
 
   it("localizes Show more / Show less in Arabic and keeps RTL", async () => {
@@ -264,47 +319,50 @@ describe("Ticket Details sidebar controls & responsive sizing", () => {
 
   it("keeps the whole attachment workflow in the main column and out of the sidebar", () => {
     renderDetail();
-    // conversation column owns the Attach file trigger, next to the composer
+    // the lower workspace owns both the Attach file trigger and the Attachments tab
     const attach = screen.getByRole("button", { name: "Attach file" });
-    const send = screen.getByRole("button", { name: "Send reply" });
+    const send = screen.getByRole("button", { name: "Reply" });
     expect(attach.closest("section")).toBe(send.closest("section"));
     // sidebar is a pure context panel — no attachments, no file input, no attachment actions
     const sidebar = screen.getByRole("heading", { name: "Ticket details" }).closest("aside") as HTMLElement;
     expect(sidebar.querySelector('input[type="file"]')).toBeNull();
-    expect(within(sidebar).queryByRole("heading", { name: "Attachments" })).not.toBeInTheDocument();
-    expect(within(sidebar).queryByRole("button", { name: "Add attachment" })).not.toBeInTheDocument();
+    expect(within(sidebar).queryByRole("tab", { name: /^Attachments/ })).not.toBeInTheDocument();
     expect(within(sidebar).queryByRole("button", { name: "Download attachment" })).not.toBeInTheDocument();
     expect(within(sidebar).queryByRole("button", { name: "Preview attachment" })).not.toBeInTheDocument();
-    // the ticket-level Attachments list renders below the composer in the main column
-    const list = screen.getByRole("heading", { name: "Attachments" });
-    expect(list.closest("aside")).toBeNull();
-    const listSection = list.closest("section") as HTMLElement;
+    // ticket-level attachments live in the lower-workspace Attachments tab (main column)
+    fireEvent.click(screen.getByRole("tab", { name: /^Attachments/ }));
     const filename = screen.getByTitle(LONG_FILENAME);
-    expect(listSection).toContainElement(filename);
+    expect(filename.closest("aside")).toBeNull();
     expect(filename.className).toMatch(/truncate/);
     expect(within(filename.closest("li") as HTMLElement).getByRole("button", { name: "Download attachment" })).toBeInTheDocument();
     expect(within(filename.closest("li") as HTMLElement).getByRole("button", { name: "Preview attachment" })).toBeInTheDocument();
   });
 
-  it("reveals the uploader from Attach file and collapses it on Cancel", async () => {
+  it("opens the native file picker on the first Attach file click, then reveals the pre-filled uploader; Cancel restores messages", async () => {
     renderDetail();
     expect(screen.queryByRole("button", { name: "Upload" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Attach file" }));
-    const choose = await screen.findByText("Choose file");
+    // The trigger owns a hidden <input type=file>; clicking it opens the OS
+    // dialog directly. In jsdom we drive the resulting change event.
+    const native = document.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(native).toBeTruthy();
+    fireEvent.change(native, {
+      target: { files: [new File(["x".repeat(2048)], "evidence.pdf", { type: "application/pdf" })] },
+    });
+    // Workspace opens straight to the preview/upload state — the file is already chosen.
+    expect(await screen.findByTitle("evidence.pdf")).toBeInTheDocument();
     const upload = screen.getByRole("button", { name: "Upload" });
     const cancel = screen.getByRole("button", { name: "Cancel" });
-    expect(choose).toBeInTheDocument();
-    expect(upload.parentElement).toBe(cancel.parentElement); // Upload + Cancel one row
+    expect(upload.parentElement).toBe(cancel.parentElement);
     fireEvent.click(cancel);
     expect(screen.queryByRole("button", { name: "Upload" })).not.toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Ticket conversation timeline" })).toBeInTheDocument();
   });
 
   it("shows a themed selected-file card with a contained filename, metadata, and a Remove action", async () => {
     renderDetail();
-    fireEvent.click(screen.getByRole("button", { name: "Attach file" }));
-    const input = (await screen.findByLabelText("Select file")) as HTMLInputElement;
+    const native = document.querySelector('input[type="file"]') as HTMLInputElement;
     const longName = `azm_squad_customer_support_crm_super_long_filename_v12_final.pdf`;
-    fireEvent.change(input, { target: { files: [new File(["x".repeat(40 * 1024)], longName, { type: "application/pdf" })] } });
+    fireEvent.change(native, { target: { files: [new File(["x".repeat(40 * 1024)], longName, { type: "application/pdf" })] } });
     const name = await screen.findByTitle(longName);
     expect(name.className).toMatch(/truncate/);
     expect(screen.getByText(/PDF ·/)).toBeInTheDocument();
@@ -312,9 +370,9 @@ describe("Ticket Details sidebar controls & responsive sizing", () => {
     expect(screen.queryByTitle(longName)).not.toBeInTheDocument();
   });
 
-  it("keeps the Send reply composer footer as a start/end row that stacks on mobile", () => {
+  it("keeps the Reply composer footer as a start/end row that stacks on mobile", () => {
     renderDetail();
-    const send = screen.getByRole("button", { name: "Send reply" });
+    const send = screen.getByRole("button", { name: "Reply" });
     expect(send.className).toMatch(/\bbutton-primary\b/);
     expect(send.className).toMatch(/sm:w-auto/);
     const footer = send.parentElement as HTMLElement;
@@ -328,5 +386,143 @@ describe("Ticket Details sidebar controls & responsive sizing", () => {
     renderDetail();
     expect(screen.getByRole("combobox", { name: "الحالة" })).toBeInTheDocument();
     expect(document.documentElement).toHaveAttribute("dir", "rtl");
+  });
+});
+
+describe("Ticket Details right rail & lower workspace", () => {
+  afterEach(cleanup);
+  beforeEach(async () => { await changeAppLanguage("en"); vi.clearAllMocks(); baseMocks(); });
+
+  it("keeps the right rail to Ticket details and SLA only", () => {
+    renderDetail();
+    const rail = screen.getByRole("heading", { name: "Ticket details" }).closest("aside") as HTMLElement;
+    expect(within(rail).getByRole("combobox", { name: "Status" })).toBeVisible();
+    expect(within(rail).getByRole("heading", { name: "SLA" })).toBeVisible();
+    // everything else has left the rail
+    expect(within(rail).queryByRole("heading", { name: "Customer" })).not.toBeInTheDocument();
+    expect(within(rail).queryByRole("heading", { name: "AI Assistant" })).not.toBeInTheDocument();
+    expect(within(rail).queryByRole("button", { name: /^Activity/ })).not.toBeInTheDocument();
+    expect(within(rail).queryByRole("button", { name: /^Description/ })).not.toBeInTheDocument();
+    expect(within(rail).queryByRole("button", { name: /^Followers/ })).not.toBeInTheDocument();
+    expect(within(rail).queryByText("Ticket metadata")).not.toBeInTheDocument();
+    expect(within(rail).queryByRole("button", { name: /merge/i })).not.toBeInTheDocument();
+    expect(within(rail).queryByRole("button", { name: /duplicate/i })).not.toBeInTheDocument();
+  });
+
+  it("shows Followers in the context summary strip, not the rail", () => {
+    mocks.useTicket.mockReturnValue({
+      isLoading: false, isError: false,
+      data: { ...baseTicket, watcherCount: 3, viewerIsWatching: false },
+    });
+    renderDetail();
+    const rail = screen.getByRole("heading", { name: "Ticket details" }).closest("aside") as HTMLElement;
+    expect(within(rail).queryByText("Followers")).not.toBeInTheDocument();
+    expect(screen.getByText("Followers")).toBeInTheDocument(); // summary strip cell label
+  });
+
+  it("renders ticket-level attachments as a compact grid in the Attachments tab", () => {
+    renderDetail();
+    fireEvent.click(screen.getByRole("tab", { name: /^Attachments/ }));
+    const grid = screen.getByTitle(LONG_FILENAME).closest("ul") as HTMLElement;
+    expect(grid.className).toMatch(/grid/);
+    const card = screen.getByTitle(LONG_FILENAME).closest("li") as HTMLElement;
+    expect(within(card).getByRole("button", { name: "Download attachment" })).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "Preview attachment" })).toBeInTheDocument();
+  });
+
+  it("shows only the first 3 attachments in the Attachments tab with a View all / Show less toggle", () => {
+    const files = Array.from({ length: 5 }, (_, i) => ({
+      id: `att-${i}`, fileName: `file-${i}.pdf`, mimeType: "application/pdf",
+      createdAt: "2026-08-25T09:00:00.000Z", messageId: null,
+    }));
+    mocks.useTicketAttachments.mockReturnValue({ data: files, isLoading: false, isError: false, refetch: vi.fn() });
+    renderDetail();
+    fireEvent.click(screen.getByRole("tab", { name: /^Attachments/ }));
+    expect(screen.getByTitle("file-0.pdf")).toBeInTheDocument();
+    expect(screen.getByTitle("file-2.pdf")).toBeInTheDocument();
+    expect(screen.queryByTitle("file-3.pdf")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "View all" }));
+    expect(screen.getByTitle("file-4.pdf")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Show less" }));
+    expect(screen.queryByTitle("file-3.pdf")).not.toBeInTheDocument();
+  });
+
+  it("builds the rail as separate bordered cards (Ticket details + SLA)", () => {
+    renderDetail();
+    const railStack = screen.getByRole("heading", { name: "Ticket details" }).closest("section")!
+      .parentElement as HTMLElement;
+    expect(railStack.className).toMatch(/space-y-3/);
+    for (const name of ["Ticket details", "SLA"]) {
+      const card = screen.getByRole("heading", { name }).closest("section") as HTMLElement;
+      expect(card.className).toMatch(/rounded-lg/);
+      expect(card.className).toMatch(/border/);
+      expect(card.className).toMatch(/bg-card/);
+    }
+  });
+
+  it("gives the Reply tab a heading, a rich-text toolbar, a bounded editor, and an Attach + Reply footer", () => {
+    renderDetail();
+    expect(screen.getByText("Reply to customer")).toBeInTheDocument();
+    expect(screen.getByText("This response is visible to the customer.")).toBeInTheDocument();
+    // Lexical toolbar — Reply and Internal note share the same one, so there are two.
+    expect(screen.getAllByRole("button", { name: "Bold" }).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByRole("button", { name: "Bulleted list" }).length).toBeGreaterThanOrEqual(1);
+    const reply = document.querySelector("#conversation-reply") as HTMLElement;
+    expect(reply.getAttribute("contenteditable")).toBe("true");
+    expect(reply.className).toMatch(/min-h-\[7rem\]/);
+    expect(reply.className).toMatch(/max-h-60/);
+    const send = screen.getByRole("button", { name: "Reply" });
+    const footer = send.parentElement as HTMLElement;
+    expect(footer.className).toMatch(/border-t/);
+    expect(footer).toContainElement(screen.getByRole("button", { name: "Attach file" }));
+  });
+
+  it("swaps the message viewport for the upload workspace once a file is chosen, and back on Cancel", async () => {
+    renderDetail();
+    const viewport = screen.getByRole("list", { name: "Ticket conversation timeline" })
+      .closest("[data-conversation-scroll]") as HTMLElement;
+    expect(viewport).toBeTruthy();
+
+    const native = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(native, {
+      target: { files: [new File(["x".repeat(2048)], "note.pdf", { type: "application/pdf" })] },
+    });
+    // messages are gone from the viewport, the uploader took their place
+    expect(screen.queryByRole("list", { name: "Ticket conversation timeline" })).not.toBeInTheDocument();
+    expect(within(viewport).getByText("Upload files")).toBeInTheDocument();
+    expect(within(viewport).getByTitle("note.pdf")).toBeInTheDocument();
+    // the composer + tabs stay mounted; the Attach trigger hides while in attach mode
+    expect(screen.getByRole("button", { name: "Reply" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /^Attachments/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Attach file" })).not.toBeInTheDocument();
+
+    fireEvent.click(within(viewport).getByRole("button", { name: "Cancel" }));
+    expect(screen.getByRole("list", { name: "Ticket conversation timeline" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Attach file" })).toBeInTheDocument();
+  });
+
+  it("returns to the message viewport after a successful upload", async () => {
+    renderDetail();
+    const native = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(native, { target: { files: [new File(["x".repeat(2048)], "note.pdf", { type: "application/pdf" })] } });
+    fireEvent.click(await screen.findByRole("button", { name: "Upload" }));
+    await waitFor(() =>
+      expect(screen.getByRole("list", { name: "Ticket conversation timeline" })).toBeInTheDocument(),
+    );
+  });
+
+  it("keeps the context rail as a page-grid sibling of the conversation workspace, not inside it", () => {
+    const { container } = renderDetail();
+    const grid = container.querySelector("div.grid") as HTMLElement;
+    const [mainColumn, railColumn] = Array.from(grid.children) as HTMLElement[];
+    const conversation = screen.getByRole("region", { name: "Conversation" });
+    const ticketDetails = screen.getByRole("heading", { name: "Ticket details" });
+    expect(mainColumn).toContainElement(conversation);
+    expect(railColumn).toContainElement(ticketDetails);
+    expect(mainColumn).not.toContainElement(ticketDetails);
+    expect(conversation).not.toContainElement(ticketDetails);
+    // rail is not stretched by the conversation row
+    expect(grid.className).toMatch(/lg:items-start/);
+    expect(railColumn.className).toMatch(/lg:self-start/);
   });
 });

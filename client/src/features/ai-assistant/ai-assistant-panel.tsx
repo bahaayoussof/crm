@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import type { RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { BookOpen, FileText, MessageSquareText, Tags } from "lucide-react";
 import { Sheet } from "@/components/ui/sheet";
@@ -26,10 +26,11 @@ import type { AiLocale, CategoryApplyApi, ReplyInsertionApi } from "./ai-assista
  * AI results never grow the Ticket page or move its scroll position.
  *
  * State ownership: this component stays mounted for the life of the Ticket page
- * (it is rendered inside the always-mounted `TicketSidebar`) and owns all four
- * AI mutations. The sheet body unmounts when closed, but the mutation results
- * live here, so reopening the drawer shows the previously generated Summary,
- * Reply, Category and KB results unchanged. No global store is introduced.
+ * and owns all four AI mutations. The sheet body unmounts when closed, but the
+ * mutation results live here, so reopening the drawer shows the previously
+ * generated Summary, Reply, Category and KB results unchanged. Open/close is
+ * controlled by the page (the header "AI Assistant" button); this component
+ * renders no visible launcher of its own.
  *
  * Every action is on-demand: opening the drawer fires no request. Nothing here
  * mutates the ticket, sends a message, or creates a notification.
@@ -39,17 +40,23 @@ export function AiAssistantPanel({
   replyInsertion,
   currentCategoryId,
   categoryApply,
+  open,
+  onClose,
+  returnFocusRef,
 }: {
   ticketId: string;
   replyInsertion?: ReplyInsertionApi;
   currentCategoryId?: string | null;
   /** Present only when the current user may change the ticket category. */
   categoryApply?: CategoryApplyApi;
+  /** Drawer visibility — owned by the page. */
+  open: boolean;
+  onClose: () => void;
+  /** Focus returns here after the drawer closes (the header trigger). */
+  returnFocusRef?: RefObject<HTMLElement | null>;
 }) {
   const { t, i18n } = useTranslation();
   const locale: AiLocale = i18n.language === "ar" ? "ar" : "en";
-  const [open, setOpen] = useState(false);
-  const launcherRef = useRef<HTMLButtonElement>(null);
 
   const summary = useTicketAiSummary(ticketId, locale);
   const suggestedReply = useTicketAiSuggestedReply(ticketId);
@@ -64,33 +71,14 @@ export function AiAssistantPanel({
     isAiNotConfigured(classification.error) ||
     isAiNotConfigured(kbSuggestions.error);
 
-  const readyCount = [summary, suggestedReply, classification, kbSuggestions].filter(
-    (m) => m.data !== undefined,
-  ).length;
-
   return (
-    <section className="space-y-3 p-4 sm:p-5">
-      <h2 className="text-sm font-semibold text-foreground">{t("aiAssistant.title")}</h2>
-      <p className="text-xs text-muted-foreground">
-        {readyCount > 0
-          ? t("aiAssistant.launcherReady", { count: readyCount })
-          : t("aiAssistant.launcherDescription")}
-      </p>
-      <button
-        ref={launcherRef}
-        type="button"
-        className="button-secondary sm:w-auto"
-        onClick={() => setOpen(true)}
-      >
-        {t("aiAssistant.openAssistant")}
-      </button>
-
+    <>
       <Sheet
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={onClose}
         title={t("aiAssistant.title")}
         closeLabel={t("aiAssistant.closeAssistant")}
-        returnFocusRef={launcherRef}
+        returnFocusRef={returnFocusRef}
       >
         {unavailable ? (
           <div className="rounded-md border border-border bg-surface-subtle p-3">
@@ -148,7 +136,7 @@ export function AiAssistantPanel({
           </div>
         )}
       </Sheet>
-    </section>
+    </>
   );
 }
 

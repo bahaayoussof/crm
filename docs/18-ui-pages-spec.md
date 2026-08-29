@@ -681,9 +681,17 @@ Each entry shows:
 - whether the entry is a public reply (`"Visible to customer"`) or an Internal Note (`"Internal note"` label) — an explicit localized label, never conveyed by side or colour alone
 - message attachments (public messages only)
 
-### Implemented presentation
+### Implemented presentation (internal — chat bubbles, aligned by sender role)
 
-Entries are compact bordered cards, not edge-to-edge rows. Each card is `min-w-0`, full width on mobile and `max-w-[min(85%,46rem)]` on `sm+` so it never spans the whole content column on wide screens. Logical side alignment via flexbox `justify-*` (flips naturally under RTL): customer messages and Internal Notes at the logical start, staff public replies at the logical end. Internal Notes keep the tinted amber surface **and** the explicit `"Internal note"` label. Restrained borders/spacing — not casual social-media bubbles.
+**Chat-style side-aligned bubbles**, matching the approved reference screenshot. Alignment is by **sender role**, never by language direction:
+
+- **Customer** messages → logical **start** (`justify-start`).
+- **Agent / Admin / Manager** public replies → logical **end** (`justify-end`).
+- **Internal notes** → logical **end** (`justify-end`), with the tinted amber surface **and** the explicit `"Internal note"` label (never colour alone).
+
+Each bubble is `<article>` inside `<li className="flex justify-start|justify-end">`, `rounded-md border`, compact padding, `min-w-0 max-w-full` with a `sm:max-w-[62%]` ceiling (`ConversationMessage` `maxWidthClass` prop) so short messages stay compact and long ones wrap. Header: author (`font-semibold`), role, LTR `whitespace-nowrap` timestamp; the visibility indicator (`"Visible to customer"` / amber `"Internal note"`) sits below the body / in the header. RTL keeps the same role→side mapping (start/end are logical).
+
+The Customer Portal composes the same `ConversationMessage` with `sm:max-w-[62%]` and a **viewer-relative** author-kind → `side` mapping (customer/self → end, support → start — the mirror of the internal role mapping) — see §20.
 
 ### Long messages — progressive disclosure
 
@@ -710,19 +718,19 @@ Customer-visible.
 
 Controls:
 
-- editor/textarea
-- attachment button when implemented
-- quick reply selector if implemented
+- rich-text editor (**Lexical**) — see "Implemented composer" below
+- quick reply selector (top-right of the reply heading row)
 - AI suggest reply when available
-- send button
+- attach-file button (footer, inline-start) — opens the attachment workspace
+- send button (footer, inline-end)
 
 ### Internal Note
 
-Internal only.
+Internal only. Stays a plain `MentionTextarea` (mentions already work there); **not** migrated to Lexical.
 
 Controls:
 
-- textarea
+- textarea with `@mention` autocomplete
 - add note
 
 Must clearly communicate:
@@ -730,6 +738,31 @@ Must clearly communicate:
 ```text
 Only your team can see this note
 ```
+
+### Implemented lower workspace (Ticket Details, internal)
+
+Below the Conversation card is a **separate tabbed workspace card** (`ticket-workspace-tabs.tsx`), a sibling of the Conversation in the main column — never nested in it, never in the right rail. Four top-level tabs in fixed order:
+
+```text
+Reply | Attachments (count) | Activity (count) | Description
+```
+
+- **Reply tab** — the composer. A small `Reply | Internal note` mode sub-selector (`role="tablist"`, **not** a 5th top tab); a heading + helper with `Insert quick reply` at its top-right; the editor; then a `border-t pt-3` footer with a **plain icon+text `Attach file` link** (paperclip, no border/fill, real `<button>` semantics) at inline-start and the primary **`Reply`** button at inline-end. No selected-file chips ever appear in the footer.
+  - **Internal Note uses the same Lexical editor + toolbar as Reply** — two always-mounted `TicketReplyEditor` instances toggled by the mode sub-selector, so the two drafts are independent and survive the switch. The note editor additionally mounts the `@mention` typeahead (`ticket-mention-plugin.tsx` + `MentionNode`, passed via `extraNodes`/`extraPlugins` so the mention code never enters the Portal bundle); the `MentionNode`'s text content is the canonical `@[Name](userId)` token, so plain-text and HTML serialization both carry it and the server `parseMentions` is unchanged. Both modes serialize to server-sanitized HTML. The internal-note mode selector also swaps the helper copy (`Only your team can see this note`).
+  - **Native Attach file:** the trigger owns a hidden `<input type="file">` and opens the OS picker on the first click. Only after a valid file is chosen (client-validated with the shared `validateAttachmentFile`) does the page flip `attachMode` and swap the conversation message viewport for the upload workspace — pre-filled with the chosen file (no second "Choose file" step). Dismissing the dialog / an invalid file leaves the message view in place (an inline error near the trigger for the invalid case).
+- **Attachments tab** — `AttachmentCompactGrid`, first 3 with an inline `View all` / `Show less` toggle; per-card truncated filename + Preview + Download; permissions unchanged.
+- **Activity tab** — the ticket history timeline (moved out of the rail), first 5 + `View all`, bounded internal scroll.
+- **Description tab** — the full ticket description (moved out of the rail), clamp + `Show more`.
+
+The Reply panel is only ever shown/hidden with a `hidden` class — never unmounted — so the Lexical draft, undo history, Quick Reply insertion and the AI "Insert into Reply" handle survive every tab switch and attachment-mode toggle.
+
+**Reply editor = Lexical** (`ticket-reply-editor.tsx` + `ticket-reply-toolbar.tsx`). Minimal support-desk formatting only: **Bold / Italic / Underline / bulleted list / numbered list / link / undo / redo** — icon-only toolbar buttons with `aria-label` + `aria-pressed`, no headings / code blocks / tables / markdown / images / slash commands. The `contentEditable` region is `role="textbox"`, `min-h-[7rem] max-h-60 overflow-y-auto`. The internal note remains a plain `MentionTextarea` controlled by React state.
+
+**Persistence:** the editor serializes to HTML; `POST /tickets/:id/messages` sanitizes it server-side (see `docs/05`). `MessageBody` re-sanitizes with DOMPurify and renders HTML only when the body contains allow-listed markup; plain-text bodies render as before. `MAX_PUBLIC_REPLY_LENGTH = 20000` is enforced against plain-text length; Quick Reply and AI "Insert into Reply" insert at the end of the draft and are rejected — draft untouched — when they would exceed the limit.
+
+### Implemented attachment workspace (Ticket Details, internal)
+
+**Attach file** (Reply tab footer) opens the native OS file picker directly (hidden `<input type="file">`). Once a valid file is chosen, a page-level `attachMode` flag replaces the **Conversation card's message viewport** with the upload workspace (`AttachmentWorkspace` via `ConversationSection`'s `viewportOverride`), **pre-filled with the chosen file** — header + `Back to conversation`, then `AttachmentUploadForm` (`initialFile`). The Conversation card height is unchanged; the lower workspace tabs and both Lexical editors stay mounted and untouched; the message query is never unmounted or refetched. Success or Cancel/Back returns to the message list; an upload failure stays in the workspace with an inline error; dismissing the OS dialog does nothing. The uploaded file then appears in the Attachments tab (normal query invalidation); the page never auto-scrolls.
 
 ---
 
@@ -756,6 +789,27 @@ AI output must require human review.
 ---
 
 ## Customer Context Panel
+
+### Implemented layout (conversation-first, screenshot parity)
+
+**Header** — back link, subject `<h1>`, the `#REF · status · channel · created` chip row, and a right-aligned action group: **`AI Assistant`** button (opens the existing responsive AI drawer — right at `lg+`, bottom sheet below) then **`Edit`** (`ADMIN`/`MANAGER` only). No Merge / Duplicate / kebab.
+
+**Context summary strip** (`ticket-context-summary.tsx`) — one horizontal `rounded-lg border bg-card` surface directly under the header, cells split by subtle separators (`sm:divide-x rtl:sm:divide-x-reverse`; stacks `divide-y` below `sm`):
+
+```text
+Customer (wider) | Priority | Category | Channel | Followers
+```
+
+Customer cell: initials chip + name link + email + `View customer →`. Followers cell: the `WatchToggle` (follow/unfollow + watcher count). No Status here (it is in the header + rail), no SLA, no metadata.
+
+**Page grid** — `lg` two-column `grid-cols-[minmax(0,1fr)_20rem]` (`xl` `22rem`), `lg:items-start`. The **header + context summary strip live inside the left (main) column**, above the Conversation card, so the right rail (grid column 2) starts level with the "Back to tickets" link — not dragged down to the Conversation card. The left column is a bounded `lg:h-[calc(100dvh-2rem)] lg:overflow-hidden` flex column (header + strip `shrink-0`, Conversation `flex-1`, workspace tabs `shrink-0`). The rail is a **page-grid sibling** — never nested in the Conversation container, never inheriting its height or scroll — `lg:sticky lg:top-4 lg:self-start` with its own `overflow-y-auto`.
+
+**Right context rail** — exactly **two** cards (`space-y-3`, each `rounded-lg border border-border bg-card`), `lg:w-[20rem]` / `xl:w-[22rem]`, `lg:sticky` with internal scroll:
+
+1. **Ticket details** — Status / Priority / Category selects, a **readonly Channel** row, Assigned agent select, Save-changes, and the eligible Close action.
+2. **SLA** — SLA state + targets/deadlines only.
+
+Nothing else lives in the rail. Customer, Description, Activity, Followers, ticket metadata, Merge/Duplicate and the AI Assistant are **not** in the rail — they are in the summary strip, the lower workspace tabs, or the header (or removed).
 
 Sections:
 
@@ -1623,13 +1677,32 @@ Customer can:
 
 If RESOLVED can be reopened through reply, make behavior clear in UX.
 
-## Shared presentation (`feature/unified-portal-ui`, Phase 4)
+## Shared presentation — visual parity with internal Ticket Details (PASS 4b)
 
-The Portal ticket detail composes the same primitives as the internal agent workspace — it is one visual system, differentiated by which slots are filled, not a separate design:
+The Portal ticket page is the same product as the internal Ticket Details — same header, strip, conversation card, chat bubbles, rich composer, native attach flow, card styling, responsive rules, tokens, RTL. Only permissions / data / composition differ.
 
-- **`TicketDetailHeader`** (`features/tickets/ticket-detail-header.tsx`): back link + subject `<h1>` + a chip row after the reference id + optional right-aligned actions + an optional metadata block. Internal fills the chip row with status badge / priority / channel and passes an Edit action; the Portal fills it with only the customer-friendly status badge and a Category / Created / Updated `<dl>`, and passes **no actions**.
-- **`TicketDetailSection`** (same file): the shared headed-card shell (border / radius / `bg-card` / `shadow-subtle`), also used by `TicketAttachments`. The Portal Description card, the attachments card, and the feedback card use it.
-- **`ConversationSection` / `ConversationMessage` / `MessageBody`** (`ticket-conversation-ui.tsx`) and the shared attachment UI (`AttachmentPanel` / `MessageAttachmentList`) are unchanged and already shared — long-message progressive disclosure and width-bounded bubbles apply to the Portal for free.
+**Exact single-column order** (`PortalPage` → normal page scroll; no bounded page column, no right rail):
+
+```
+TicketDetailHeader
+PortalContextStrip   (customer-safe: Category | Created | Updated — the divide-x strip
+                      styling of the internal TicketContextSummary; no Customer cell,
+                      no Priority / Channel / Followers / Assignee)
+Description card
+Conversation card    (own lg:h-[calc(100dvh-13rem)] wrapper so ONLY its message viewport
+                      scrolls internally; owns header + messages + the attachment
+                      viewportOverride, nothing else)
+Reply composer card  (separate card — the shared Lexical TicketReplyEditor, reply-only:
+                      no Internal note / Quick Reply / AI / @mentions; borderless
+                      Attach file link + primary "Reply" button in a border-t footer)
+Attachments card     (existing TicketAttachments scope="portal", read-only)
+Feedback             (existing TicketFeedback)
+```
+
+- **Chat alignment is viewer-relative**: the customer's own messages sit on the **end** (right in LTR), support replies on the **start** — the mirror of the internal staff view (`side = author.kind === "CUSTOMER" ? "end" : "start"`), `sm:max-w-[62%]` to match internal density. RTL keeps the role→side mapping (logical properties).
+- **Native Attach file**: identical to internal — the composer's paperclip button opens the OS picker directly; a chosen file swaps the conversation message viewport for the pre-filled upload workspace; Cancel / success restore messages. No intermediate "Choose file" click.
+- **Rich reply persistence**: the Portal composer now produces HTML; `POST /portal/tickets/:id/messages` sanitizes server-side with the same allowlist (docs/05).
+- **Never leaks internal data**: no internal notes (server never sends them), no AI, Quick Replies, mentions, assignee, followers, SLA, escalation, or internal history — enforced by `portal-pages.test.tsx` + the `ai-portal-isolation.test.ts` import guard (no Portal source imports `ticket-mention-plugin` / `MentionNode` / quick replies / ai-assistant).
 
 No customer-visible field was added for visual parity: the Portal detail contract is unchanged (no `priority`, no SLA, no assignee, no history). Internal-only sections — Properties / status-priority-category-assignee editor, SLA panel, internal Activity/history timeline, Save changes / Close ticket, watchers, mentions, internal notes — are simply never composed into the Portal page.
 

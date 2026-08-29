@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from "react";
-import { FileText, Image as ImageIcon, X } from "lucide-react";
+import { ArrowLeft, FileText, Image as ImageIcon, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { formatTicketDate } from "@/features/tickets/ticket-format";
 import { AttachmentActions } from "./attachment-actions";
@@ -96,25 +96,106 @@ export function AttachmentRows({
   );
 }
 
+/**
+ * Compact horizontal attachment cards for the Ticket Details column, where the
+ * conversation is the visual priority and the band must stay one row tall. This
+ * component renders exactly the list it is given (the caller owns the "View all"
+ * limit); every card keeps the same Preview + Download actions as
+ * {@link AttachmentRows}. Read-only — upload lives in the composer footer.
+ */
+export function AttachmentCompactGrid({
+  attachments,
+  scope,
+  locale,
+}: {
+  attachments: AttachmentItem[];
+  scope: "internal" | "portal";
+  locale: string;
+}) {
+  const downloadCtl = useAttachmentDownload(scope);
+  const previewCtl = useAttachmentPreview(scope);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const openPreview = (trigger: HTMLButtonElement, attachment: { id: string; fileName: string; mimeType: string }) => {
+    triggerRef.current = trigger;
+    void previewCtl.openPreview(attachment);
+  };
+  const closePreview = () => {
+    previewCtl.close();
+    triggerRef.current?.focus();
+  };
+  return (
+    <div>
+      <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        {attachments.map((attachment) => {
+          const FileIcon = attachment.mimeType.startsWith("image/") ? ImageIcon : FileText;
+          return (
+            <li
+              className="flex items-center gap-2.5 rounded-md border border-border bg-surface px-3 py-2.5 transition-colors hover:bg-surface-hover"
+              key={attachment.id}
+            >
+              <FileIcon className="size-5 shrink-0 text-muted-foreground" strokeWidth={1.75} aria-hidden="true" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-foreground" title={attachment.fileName}>
+                  <bdi dir="auto">{attachment.fileName}</bdi>
+                </p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  <bdi dir="ltr">{attachment.mimeType}</bdi>
+                  <span aria-hidden="true"> · </span>
+                  <bdi dir="ltr">{formatTicketDate(attachment.createdAt, locale)}</bdi>
+                </p>
+              </div>
+              <AttachmentActions
+                attachment={attachment}
+                downloadPending={downloadCtl.pendingId === attachment.id}
+                onDownload={downloadCtl.download}
+                onPreview={openPreview}
+              />
+            </li>
+          );
+        })}
+      </ul>
+      {downloadCtl.error && (
+        <p className="mt-2 text-sm text-danger" role="alert">
+          {downloadCtl.error}
+        </p>
+      )}
+      <AttachmentPreviewDialog
+        state={previewCtl.state}
+        onClose={closePreview}
+        onRetry={previewCtl.retry}
+        download={{ download: downloadCtl.download, pendingId: downloadCtl.pendingId }}
+      />
+    </div>
+  );
+}
+
 /** Keyboard-accessible single-file upload control with client-side pre-validation. */
 export function AttachmentUploadForm({
   onUpload,
   isPending,
   onClose,
+  onUploaded,
   uploadLabel,
+  initialFile = null,
 }: {
   onUpload: (file: File) => Promise<unknown>;
   isPending: boolean;
   /** When provided, the Cancel button also collapses the form (and is never disabled while idle). */
   onClose?: () => void;
+  /** Fired once after a successful upload (e.g. to leave the attachment workspace). */
+  onUploaded?: () => void;
   /** Overrides the submit button label (default: `attachments.upload`). */
   uploadLabel?: string;
+  /** Pre-selected file — the workspace opens straight to the preview/upload state
+   * (the native picker already ran in the composer). The "Choose file" label
+   * stays available to swap the selection. */
+  initialFile?: File | null;
 }) {
   const { t } = useTranslation();
   const inputId = useId();
   const helpId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [file, setFile] = useState<File | null>(null);
+  const [file, setFile] = useState<File | null>(initialFile);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -162,6 +243,7 @@ export function AttachmentUploadForm({
       setSuccess(true);
       setFile(null);
       if (inputRef.current) inputRef.current.value = "";
+      onUploaded?.();
     } catch (caught) {
       setFailed(true);
       setError(getAttachmentError(caught, "attachments.uploadFailure", t));
@@ -254,6 +336,53 @@ export function AttachmentUploadForm({
 }
 
 /**
+ * Full-viewport attachment upload workspace. Rendered INSIDE the conversation's
+ * bounded message viewport (as `ConversationSection.viewportOverride`) so opening
+ * it swaps the message list for the uploader without changing the card height or
+ * pushing the composer down. Reuses {@link AttachmentUploadForm} for all upload
+ * behaviour — no storage/backend logic here.
+ */
+export function AttachmentWorkspace({
+  upload,
+  onDone,
+  onCancel,
+  initialFile = null,
+}: {
+  upload: { mutateAsync: (file: File) => Promise<unknown>; isPending: boolean };
+  /** Leave the workspace after a successful upload. */
+  onDone: () => void;
+  /** Leave the workspace without uploading (Cancel / Back). */
+  onCancel: () => void;
+  /** File already chosen via the composer's native picker. */
+  initialFile?: File | null;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex min-h-full flex-col">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-foreground">{t("attachments.uploadWorkspaceTitle")}</h3>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1.5 rounded-sm text-xs font-medium text-primary transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          onClick={onCancel}
+        >
+          <ArrowLeft className="size-3.5 rtl:rotate-180" strokeWidth={1.75} aria-hidden="true" />
+          {t("attachments.backToConversation")}
+        </button>
+      </div>
+      <AttachmentUploadForm
+        onUpload={(file) => upload.mutateAsync(file)}
+        isPending={upload.isPending}
+        onClose={onCancel}
+        onUploaded={onDone}
+        uploadLabel={t("attachments.uploadShort")}
+        initialFile={initialFile}
+      />
+    </div>
+  );
+}
+
+/**
  * The "Attach file" band that sits between the scrollable conversation and the
  * reply composer. Presentation only — the caller supplies the upload behaviour
  * (`upload`) and, when uploading is not available, the reason to show in its
@@ -265,6 +394,7 @@ export function ConversationAttachmentBand({
   upload,
   disabledReason,
   uploadLabel,
+  bare = false,
 }: {
   canUpload: boolean;
   upload?: { mutateAsync: (file: File) => Promise<unknown>; isPending: boolean };
@@ -272,11 +402,13 @@ export function ConversationAttachmentBand({
   disabledReason?: string;
   /** Overrides the submit button label inside the revealed form (default: `attachments.uploadShort`). */
   uploadLabel?: string;
+  /** Drop the standalone band padding — used when the band sits inside the composer footer. */
+  bare?: boolean;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   return (
-    <div className="p-3 sm:p-4">
+    <div className={bare ? "" : "p-3 sm:p-4"}>
       {!canUpload || !upload ? (
         <p className="text-xs text-muted-foreground">{disabledReason ?? t("attachments.uploadRequiresAssignment")}</p>
       ) : open ? (

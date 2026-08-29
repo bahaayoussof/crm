@@ -315,6 +315,71 @@ describe("ticket API", () => {
     expect(response.status).toBe(500); expect(mocks.ticketUpdateMany).not.toHaveBeenCalled();
   });
 
+  it("sanitizes public reply HTML: keeps support formatting, drops scripts / handlers / unsafe hrefs", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: agent.id });
+    const res = await request(app).post("/api/tickets/ticket-1/messages").set(auth(agent)).send({
+      body:
+        '<p>Hi <strong>there</strong> <em>team</em></p><ul><li>one</li></ul>' +
+        '<script>alert(1)</script><img src=x onerror="alert(1)">' +
+        '<a href="javascript:evil()">bad</a> <a href="https://example.com/help">good</a>' +
+        '<div style="position:fixed">x</div>',
+    });
+    expect(res.status).toBe(201);
+    const stored = (mocks.messageCreate.mock.calls.at(-1)![0] as { data: { body: string } }).data.body;
+    expect(stored).toContain("<strong>there</strong>");
+    expect(stored).toContain("<li>one</li>");
+    expect(stored).not.toMatch(/<script|onerror|<img|javascript:|<div|style=/i);
+    expect(stored).toContain('href="https://example.com/help"');
+    expect(stored).toMatch(/rel="noopener noreferrer nofollow"/);
+    expect(stored).toMatch(/target="_blank"/);
+  });
+
+  it("rejects a reply that is empty once sanitized (markup only)", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: agent.id });
+    const res = await request(app).post("/api/tickets/ticket-1/messages").set(auth(agent)).send({ body: "<br><br><p></p>" });
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe("EMPTY_MESSAGE");
+    expect(mocks.messageCreate).not.toHaveBeenCalled();
+  });
+
+  it("sanitizes internal-note HTML (same rich editor as replies) and keeps @mention tokens intact", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, subject: "Payment failed", assignedAgentId: agent.id });
+    mocks.userFindMany.mockResolvedValue([{ id: "manager-1" }]);
+    mocks.noteCreate.mockResolvedValue({ id: "note-h", body: "x", createdAt: now, author: { id: agent.id, name: "Assigned Agent", role: Role.AGENT } });
+    const res = await request(app).post("/api/tickets/ticket-1/notes").set(auth(agent)).send({
+      body: '<p>Please review <strong>this</strong> @[Manager](manager-1)</p><script>alert(1)</script>',
+    });
+    expect(res.status).toBe(201);
+    const stored = (mocks.noteCreate.mock.calls.at(-1)![0] as { data: { body: string } }).data.body;
+    expect(stored).toContain("<strong>this</strong>");
+    expect(stored).not.toMatch(/<script/i);
+    expect(stored).toContain("@[Manager](manager-1)");
+    // mention parsing runs on the sanitized body and still resolves the manager
+    expect(mocks.mentionCreateMany).toHaveBeenCalledWith({
+      data: [{ noteId: "note-h", mentionedUserId: "manager-1", ticketId: "ticket-1" }],
+      skipDuplicates: true,
+    });
+  });
+
+  it("rejects an internal note that is empty once sanitized (markup only)", async () => {
+    const res = await request(app).post("/api/tickets/ticket-1/notes").set(auth(agent)).send({ body: "<p></p><br>" });
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe("EMPTY_MESSAGE");
+    expect(mocks.noteCreate).not.toHaveBeenCalled();
+  });
+
+  it("delivers plain text (never markup) to WhatsApp", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: agent.id, channel: "WHATSAPP", customer: { phone: "+15551230000" } });
+    await request(app).post("/api/tickets/ticket-1/messages").set(auth(agent)).send({
+      body: "<p>Line one</p><ul><li>alpha</li><li>beta</li></ul>",
+    });
+    const arg = deliverOutboundReplyMock.mock.calls.at(-1)![0] as { text: string };
+    expect(arg.text).not.toMatch(/<[a-z/]/i);
+    expect(arg.text).toContain("Line one");
+    expect(arg.text).toContain("alpha");
+    expect(arg.text).toContain("beta");
+  });
+
   it("updates a valid status and owns resolution timestamps", async () => {
     mocks.ticketFindFirst.mockResolvedValue({ ...current, status: TicketStatus.IN_PROGRESS, assignedAgentId: agent.id });
     await request(app).patch("/api/tickets/ticket-1").set(auth(agent)).send({ status: "RESOLVED" });

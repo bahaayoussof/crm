@@ -125,9 +125,13 @@ export function TicketDetailSkeleton({
         <div className="h-5 w-40 animate-pulse rounded bg-muted" />
       </div>
       {variant === "workspace" ? (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_24rem]">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
           <div className="h-96 animate-pulse rounded-xl bg-muted/40" />
-          <div className="h-96 animate-pulse rounded-xl bg-muted/40" />
+          <div className="space-y-3">
+            <div className="h-40 animate-pulse rounded-lg bg-muted/40" />
+            <div className="h-24 animate-pulse rounded-lg bg-muted/40" />
+            <div className="h-28 animate-pulse rounded-lg bg-muted/40" />
+          </div>
         </div>
       ) : (
         <>

@@ -2,6 +2,7 @@ import { Prisma, Role } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import { ticketVisibilityWhere, type TicketActor } from "../tickets/ticket-visibility.js";
+import { replyHtmlToPlainText } from "../../shared/rich-text/reply-html.js";
 import type { AiTicketContext } from "./ai.types.js";
 
 /** Hard ceilings so a huge ticket never blows the provider context window. */
@@ -68,15 +69,25 @@ export async function buildTicketAiContext(
   });
   if (!ticket) throw new AppError(404, "TICKET_NOT_FOUND", "Ticket not found");
 
-  const publicMessages = ticket.messages.map((m) => ({
-    authorType: (m.author?.role === Role.CUSTOMER ? "CUSTOMER" : "AGENT") as "CUSTOMER" | "AGENT",
-    body: clip(m.body),
-    createdAt: m.createdAt.toISOString(),
-  }));
+  const publicMessages = ticket.messages.map((m) => {
+    const fromCustomer = m.author?.role === Role.CUSTOMER;
+    return {
+      authorType: (fromCustomer ? "CUSTOMER" : "AGENT") as "CUSTOMER" | "AGENT",
+      // Staff replies are stored as sanitized HTML — flatten to text so the prompt
+      // never carries markup. Customer inbound messages are already plain text.
+      body: clip(fromCustomer ? m.body : replyHtmlToPlainText(m.body)),
+      createdAt: m.createdAt.toISOString(),
+    };
+  });
   // Internal notes are dropped here (not just left unrendered) for actions that
   // request `internalNotes: "none"`, so they never reach the prompt builder.
   const internalNotes = includeNotes
-    ? ticket.notes.map((n) => ({ body: clip(n.body), createdAt: n.createdAt.toISOString() }))
+    ? ticket.notes.map((n) => ({
+        // Notes are stored as sanitized HTML from the shared rich editor — flatten
+        // to text (mention tokens included) so the prompt gets clean prose.
+        body: clip(replyHtmlToPlainText(n.body)),
+        createdAt: n.createdAt.toISOString(),
+      }))
     : [];
 
   // Keep the most recent messages within both budgets. The ticket description is

@@ -40,7 +40,10 @@ export const updateTicketSchema = z.object({
 }).strict().refine((value) => Object.keys(value).length > 0, { message: "At least one ticket field is required" });
 
 export const ticketConversationBodySchema = z.object({
-  body: z.string().trim().min(1).max(20_000),
+  // Public replies arrive as sanitized-on-write HTML from the Lexical composer;
+  // the ceiling has markup headroom over the 20k plain-text limit the client
+  // enforces (docs/18 §16). Internal notes (same shape) stay well under this.
+  body: z.string().trim().min(1).max(50_000),
 }).strict();
 
 export type TicketListQuery = z.infer<typeof ticketListQuerySchema>;

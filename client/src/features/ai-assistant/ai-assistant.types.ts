@@ -60,7 +60,7 @@ export type ReplyInsertOutcome = "inserted" | "too-long" | "unavailable";
 
 /**
  * The minimal bridge the AI panel uses to push a draft into the existing public
- * reply composer. Backed by `TicketConversationHandle` — the panel never touches
+ * reply composer. Backed by `TicketWorkspaceHandle` — the panel never touches
  * the composer's DOM or internal state.
  */
 export type ReplyInsertionApi = {

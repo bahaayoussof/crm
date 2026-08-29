@@ -1,171 +1,51 @@
-import { forwardRef, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ConversationAttachmentBand, MessageAttachmentList } from "@/features/attachments/attachment-ui";
-import { MentionTextarea } from "@/features/collaboration/mention-textarea";
-import { renderMentions } from "@/features/collaboration/render-mentions";
-import { QuickReplyPicker } from "@/features/quick-replies/quick-reply-picker";
-import { replaceReplyValue, spliceReply } from "./reply-insertion";
+import { AttachmentWorkspace, MessageAttachmentList } from "@/features/attachments/attachment-ui";
 import { ConversationMessage, ConversationSection } from "./ticket-conversation-ui";
-import { getTicketError } from "./ticket-error";
-import { useCreateTicketMessage, useCreateTicketNote } from "./ticket-hooks";
-import type { TicketChannel, TicketConversationItem, TicketMessageResult } from "./ticket.types";
+import type { TicketConversationItem } from "./ticket.types";
 
-type Mode = "reply" | "note";
 type MessageAttachment = { id: string; fileName: string; mimeType: string; createdAt: string };
 
-/** Narrow imperative surface for cross-column actions (AI "Insert into Reply").
- * Exposes only the public-reply operations — never internal composer state. */
-export type TicketConversationHandle = {
-  /** True when the public reply draft holds non-whitespace text. */
-  hasReplyText: () => boolean;
-  /** Insert an AI-suggested reply into the public reply draft: switches to the
-   * reply tab, reuses the caret-aware splice, and focuses the textarea. Returns
-   * "too-long" — leaving the draft untouched — when the limit would be exceeded. */
-  insertSuggestedReply: (text: string, mode: "cursor" | "replace") => "inserted" | "too-long";
-};
-
 type TicketConversationProps = {
-  ticketId: string;
   items: TicketConversationItem[];
-  canMutate: boolean;
   messageAttachments?: Map<string, MessageAttachment[]>;
-  canUpload?: boolean;
+  /** Bump on every successful local send so the message viewport scrolls to latest. */
+  autoScrollSendToken?: number;
+  /** When true, the message viewport is swapped for the attachment-upload
+   * workspace (the lower workspace tabs stay mounted and untouched). */
+  attachMode?: boolean;
+  /** Upload adapter for the attachment workspace. */
   upload?: { mutateAsync: (file: File) => Promise<unknown>; isPending: boolean };
-  channel?: TicketChannel;
-  customerPhone?: string | null;
+  /** File already chosen via the composer's native OS picker — the workspace
+   * opens straight to its preview/upload state. */
+  pendingAttachment?: File | null;
+  /** Leave attach mode (Cancel or a successful upload). */
+  onExitAttachMode?: () => void;
 };
 
-export const TicketConversation = forwardRef<TicketConversationHandle, TicketConversationProps>(
-  function TicketConversation(
-    { ticketId, items, canMutate, messageAttachments, canUpload = false, upload, channel, customerPhone },
-    ref,
-  ) {
+/**
+ * The conversation card: header + a bounded, internally-scrolling message region.
+ * Chat-style alignment by sender role — customer messages start-aligned, staff
+ * replies and internal notes end-aligned. The composer is NOT here; it lives in
+ * the lower workspace tabs. Clicking "Attach file" there flips `attachMode`,
+ * which swaps this card's message viewport for the upload workspace without
+ * changing the card geometry or unmounting anything.
+ */
+export function TicketConversation({
+  items,
+  messageAttachments,
+  autoScrollSendToken,
+  attachMode = false,
+  upload,
+  pendingAttachment = null,
+  onExitAttachMode,
+}: TicketConversationProps) {
   const { t, i18n } = useTranslation();
-  const isWhatsapp = channel === "WHATSAPP";
-  const [mode, setMode] = useState<Mode>("reply");
-  const [reply, setReply] = useState("");
-  const [note, setNote] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [insertError, setInsertError] = useState<string | null>(null);
-  const [sendToken, setSendToken] = useState(0);
-  const replyRef = useRef<HTMLTextAreaElement>(null);
-  const pendingCaretRef = useRef<number | null>(null);
-  const messageMutation = useCreateTicketMessage(ticketId);
-  const noteMutation = useCreateTicketNote(ticketId);
-  const mutation = mode === "reply" ? messageMutation : noteMutation;
-  const body = mode === "reply" ? reply : note;
-  const pending = messageMutation.isPending || noteMutation.isPending;
-
-  useLayoutEffect(() => {
-    const caret = pendingCaretRef.current;
-    if (caret === null) return;
-    pendingCaretRef.current = null;
-    const element = replyRef.current;
-    if (!element) return;
-    element.focus();
-    element.setSelectionRange(caret, caret);
-  }, [reply]);
-
-  const insertQuickReply = (snippet: string) => {
-    const element = replyRef.current;
-    const start = element?.selectionStart ?? reply.length;
-    const end = element?.selectionEnd ?? reply.length;
-    const outcome = spliceReply(reply, snippet, start, end);
-    if (outcome.status === "too-long") {
-      setInsertError(t("quickReplies.picker.lengthExceeded"));
-      return;
-    }
-    setInsertError(null);
-    pendingCaretRef.current = outcome.caret;
-    setReply(outcome.nextValue);
-  };
-
-  useImperativeHandle(
-    ref,
-    () => ({
-      hasReplyText: () => reply.trim().length > 0,
-      insertSuggestedReply: (text, mode) => {
-        const outcome =
-          mode === "replace"
-            ? replaceReplyValue(text)
-            : spliceReply(
-                reply,
-                text,
-                replyRef.current?.selectionStart ?? reply.length,
-                replyRef.current?.selectionEnd ?? reply.length,
-              );
-        if (outcome.status === "too-long") return "too-long";
-        // Explicit user action → land in the public reply tab and focus the box
-        // (the pendingCaret effect below restores the caret after the value change).
-        setError(null);
-        setSuccess(null);
-        setInsertError(null);
-        setMode("reply");
-        pendingCaretRef.current = outcome.caret;
-        setReply(outcome.nextValue);
-        return "inserted";
-      },
-    }),
-    [reply],
-  );
-
-  const submit = async () => {
-    if (!canMutate || !body.trim() || pending) return;
-    setError(null); setSuccess(null);
-    try {
-      const result = (await mutation.mutateAsync({ body })) as TicketMessageResult;
-      if (mode === "reply") setReply(""); else setNote("");
-      // The local user sent this — reveal it once the list updates.
-      setSendToken((token) => token + 1);
-      // The message is persisted even when WhatsApp delivery fails — surface the
-      // failure as a warning rather than a success, and keep the sent text out of the box.
-      if (mode === "reply" && result?.delivery?.status === "FAILED") {
-        setError(t(`tickets.conversation.whatsappDelivery.${result.delivery.reason ?? "PROVIDER_REJECTED"}`, {
-          defaultValue: t("tickets.conversation.whatsappDelivery.PROVIDER_REJECTED"),
-        }));
-      } else {
-        setSuccess(t(mode === "reply" ? "tickets.conversation.replySuccess" : "tickets.conversation.noteSuccess"));
-      }
-    } catch (caught) {
-      setError(getTicketError(caught, t(mode === "reply" ? "tickets.conversation.replyError" : "tickets.conversation.noteError"), t));
-    }
-  };
-
-  const composer = (
-    <>
-      <div className="flex w-full border-b border-border" role="tablist" aria-label={t("tickets.conversation.composerMode")}>{(["reply", "note"] as Mode[]).map((value) => <button type="button" role="tab" aria-selected={mode === value} aria-controls="conversation-composer-panel" className={`min-h-11 border-b-2 px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${mode === value ? "border-foreground text-foreground font-semibold" : "border-transparent text-muted-foreground hover:text-foreground"}`} onClick={() => { setMode(value); setError(null); setSuccess(null); setInsertError(null); }} key={value}>{t(`tickets.conversation.${value}Tab`)}</button>)}</div>
-      <div className="pt-4" id="conversation-composer-panel" role="tabpanel">
-        <label className="text-sm font-medium" htmlFor={`conversation-${mode}`}>{t(mode === "reply" ? "tickets.conversation.replyLabel" : "tickets.conversation.noteLabel")}</label>
-        <p className="mt-1 text-xs text-muted-foreground" id={`conversation-${mode}-help`}>{t(mode === "reply" ? "tickets.conversation.replyHelp" : "tickets.conversation.noteHelp")}</p>
-        {isWhatsapp && mode === "reply" && (
-          <p className="mt-1 text-xs text-muted-foreground">
-            {t("tickets.conversation.whatsappReplyHint")}
-            {customerPhone ? <> <span dir="ltr">{customerPhone}</span></> : <> — {t("tickets.conversation.whatsappNoPhone")}</>}
-          </p>
-        )}
-        {mode === "reply" ? (
-          <textarea ref={replyRef} id="conversation-reply" className="input mt-3 min-h-28 max-h-56 resize-y overflow-y-auto py-3 [field-sizing:content]" value={reply} disabled={!canMutate || pending} aria-describedby="conversation-reply-help" onChange={(event) => { setReply(event.target.value); setInsertError(null); }} />
-        ) : (
-          <MentionTextarea id="conversation-note" className="input mt-3 min-h-28 max-h-56 resize-y overflow-y-auto py-3 [field-sizing:content]" value={note} disabled={!canMutate || pending} ariaDescribedBy="conversation-note-help" onChange={setNote} />
-        )}
-        {!canMutate && <p className="mt-2 text-sm text-warning-foreground" role="status">{t("tickets.conversation.readOnly")}</p>}
-        {insertError && <p className="mt-2 text-sm text-danger-foreground" role="alert">{insertError}</p>}
-        {error && <p className="mt-2 text-sm text-danger-foreground" role="alert">{error}</p>}
-        {success && <p className="mt-2 text-sm text-success-foreground" role="status">{success}</p>}
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-          {mode === "reply" && canMutate && <QuickReplyPicker disabled={pending} onSelect={insertQuickReply} />}
-          <button type="button" className="button-primary sm:ms-auto sm:w-auto" disabled={!canMutate || !body.trim() || pending} onClick={submit}>{pending ? t(mode === "reply" ? "tickets.conversation.sending" : "tickets.conversation.adding") : t(mode === "reply" ? "tickets.conversation.sendReply" : "tickets.conversation.addNote")}</button>
-        </div>
-      </div>
-    </>
-  );
 
   return (
     <ConversationSection
       bounded
       autoScrollItemCount={items.length}
-      autoScrollSendToken={sendToken}
+      autoScrollSendToken={autoScrollSendToken}
       heading={t("tickets.conversation.title")}
       description={t("tickets.conversation.description")}
       timelineLabel={t("tickets.conversation.timelineLabel")}
@@ -173,8 +53,16 @@ export const TicketConversation = forwardRef<TicketConversationHandle, TicketCon
       isEmpty={items.length === 0}
       emptyTitle={t("tickets.conversation.emptyTitle")}
       emptyDescription={t("tickets.conversation.emptyDescription")}
-      belowBody={<ConversationAttachmentBand canUpload={canUpload} upload={upload} />}
-      footer={composer}
+      viewportOverride={
+        attachMode && upload ? (
+          <AttachmentWorkspace
+            upload={upload}
+            initialFile={pendingAttachment}
+            onDone={() => onExitAttachMode?.()}
+            onCancel={() => onExitAttachMode?.()}
+          />
+        ) : undefined
+      }
     >
       {items.map((item) => {
         const internal = item.kind === "INTERNAL_NOTE";
@@ -182,7 +70,8 @@ export const TicketConversation = forwardRef<TicketConversationHandle, TicketCon
         return (
           <ConversationMessage
             key={`${item.kind}-${item.id}`}
-            side={internal || fromCustomer ? "start" : "end"}
+            side={fromCustomer ? "start" : "end"}
+            maxWidthClass="sm:max-w-[62%]"
             tone={internal ? "internal" : "default"}
             title={item.author.name}
             meta={t(`tickets.conversation.roles.${item.author.role}`, { defaultValue: item.author.role })}
@@ -191,12 +80,15 @@ export const TicketConversation = forwardRef<TicketConversationHandle, TicketCon
             timestamp={item.createdAt}
             language={i18n.language}
             body={item.body}
-            bodyTransform={internal ? renderMentions : undefined}
-            attachmentsSlot={internal ? undefined : <MessageAttachmentList attachments={messageAttachments?.get(item.id) ?? []} scope="internal" />}
+            mentionize={internal}
+            attachmentsSlot={
+              internal ? undefined : (
+                <MessageAttachmentList attachments={messageAttachments?.get(item.id) ?? []} scope="internal" />
+              )
+            }
           />
         );
       })}
     </ConversationSection>
   );
-  },
-);
+}

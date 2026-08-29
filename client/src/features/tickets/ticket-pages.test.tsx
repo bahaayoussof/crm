@@ -22,6 +22,32 @@ vi.mock("@/features/collaboration/mention-textarea", () => ({
 }));
 vi.mock("@/features/collaboration/watch-toggle", () => ({ WatchToggle: () => null }));
 vi.mock("@/features/ai-assistant/ai-assistant-panel", () => ({ AiAssistantPanel: () => null }));
+// Page-wiring tests: a plain-textarea stand-in for the Lexical reply editor.
+// The editor's own behaviour is covered in quick-reply-composer.test.tsx.
+vi.mock("./ticket-reply-editor", async () => {
+  const React = await import("react");
+  const TicketReplyEditor = React.forwardRef(function TicketReplyEditor(
+    props: { id: string; ariaLabel: string; ariaDescribedBy?: string; disabled?: boolean; onTextChange?: (v: string) => void },
+    ref: React.ForwardedRef<unknown>,
+  ) {
+    const [value, setValue] = React.useState("");
+    React.useImperativeHandle(ref, () => ({
+      hasText: () => value.trim().length > 0,
+      getPlainText: () => value,
+      getHtml: () => value,
+      insertText: (t: string) => { setValue((v) => v + t); props.onTextChange?.(value + t); return "inserted"; },
+      replaceText: (t: string) => { setValue(t); props.onTextChange?.(t); return "inserted"; },
+      focus: () => {},
+      clear: () => { setValue(""); props.onTextChange?.(""); },
+    }), [value, props]);
+    return React.createElement("textarea", {
+      id: props.id, "aria-label": props.ariaLabel, "aria-describedby": props.ariaDescribedBy,
+      disabled: props.disabled, value,
+      onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => { setValue(e.target.value); props.onTextChange?.(e.target.value); },
+    });
+  });
+  return { TicketReplyEditor };
+});
 
 import { TicketDetailPage } from "./ticket-detail-page";
 import { TicketFormPage } from "./ticket-form-page";
@@ -169,7 +195,13 @@ describe("ticket pages", () => {
 
   it("renders details and localized operational history", () => {
     renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
-    expect(screen.getByRole("heading", { name: ticket.subject })).toBeInTheDocument(); expect(screen.getByText(ticket.description)).toBeInTheDocument(); expect(screen.getByText("Status changed")).toBeInTheDocument(); expect(screen.getByText("Conversation")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: ticket.subject })).toBeInTheDocument();
+    expect(screen.getByText("Conversation")).toBeInTheDocument();
+    // Description and Activity are lower-workspace tabs now.
+    fireEvent.click(screen.getByRole("tab", { name: "Description" }));
+    expect(screen.getByText(ticket.description)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: /^Activity/ }));
+    expect(screen.getByText("Status changed")).toBeInTheDocument();
   });
 
   it.each([
@@ -221,7 +253,7 @@ describe("ticket pages", () => {
   it("switches composer modes and clears only after successful submission", async () => {
     mocks.createMessage.mockResolvedValue({}); mocks.createNote.mockResolvedValue({});
     renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
-    const reply = screen.getByLabelText("Public reply"); fireEvent.change(reply, { target: { value: "Public update" } }); fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
+    const reply = screen.getByLabelText("Reply to customer"); fireEvent.change(reply, { target: { value: "Public update" } }); fireEvent.click(screen.getByRole("button", { name: "Reply" }));
     await waitFor(() => expect(mocks.createMessage).toHaveBeenCalledWith({ body: "Public update" })); expect(reply).toHaveValue("");
     fireEvent.click(screen.getByRole("tab", { name: "Internal note" })); const note = screen.getByLabelText("Internal note"); fireEvent.change(note, { target: { value: "Private context" } }); fireEvent.click(screen.getByRole("button", { name: "Add note" }));
     await waitFor(() => expect(mocks.createNote).toHaveBeenCalledWith({ body: "Private context" })); expect(note).toHaveValue("");
@@ -230,7 +262,7 @@ describe("ticket pages", () => {
   it("preserves composer content on localized failure and prevents pending duplicates", async () => {
     mocks.createMessage.mockRejectedValue(new Error("failure"));
     renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
-    const reply = screen.getByLabelText("Public reply"); fireEvent.change(reply, { target: { value: "Keep this reply" } }); fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
+    const reply = screen.getByLabelText("Reply to customer"); fireEvent.change(reply, { target: { value: "Keep this reply" } }); fireEvent.click(screen.getByRole("button", { name: "Reply" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Unable to send the reply."); expect(reply).toHaveValue("Keep this reply");
     cleanup(); mocks.useCreateTicketMessage.mockReturnValue({ mutateAsync: mocks.createMessage, isPending: true }); renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
     expect(screen.getByRole("button", { name: "Sending…" })).toBeDisabled();
@@ -238,7 +270,8 @@ describe("ticket pages", () => {
 
   it("renders an accessible RTL conversation composer", async () => {
     await changeAppLanguage("ar"); renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
-    expect(screen.getByRole("tablist", { name: "وضع محرر الرسالة" })).toBeInTheDocument(); expect(screen.getByRole("tab", { name: "رد" })).toHaveAttribute("aria-selected", "true");
+    const composerModes = screen.getByRole("tablist", { name: "وضع محرر الرسالة" });
+    expect(within(composerModes).getByRole("tab", { name: "رد" })).toHaveAttribute("aria-selected", "true");
     expect(document.documentElement).toHaveAttribute("dir", "rtl");
   });
 
@@ -289,7 +322,7 @@ describe("ticket pages", () => {
     mocks.useAuth.mockReturnValue({ user: { id: "agent-1", name: "Agent", email: "agent@example.com", role: "AGENT" } });
     mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: { ...ticket, assignedAgent: null } });
     renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
-    expect(screen.getByText("This ticket must be assigned to you before you can change its workflow or conversation.")).toBeInTheDocument(); expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument(); expect(screen.getByRole("button", { name: "Send reply" })).toBeDisabled();
+    expect(screen.getByText("This ticket must be assigned to you before you can change its workflow or conversation.")).toBeInTheDocument(); expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument(); expect(screen.getByRole("button", { name: "Reply" })).toBeDisabled();
   });
 
   it("contains long subject and customer values in separate accessible cells", () => {

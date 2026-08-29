@@ -8,11 +8,24 @@ import { describe, expect, it } from "vitest";
  * `ai-assistant` feature at all.
  */
 describe("AI Assistant is not wired into the Customer Portal", () => {
-  it("no client/src/features/portal source file imports the ai-assistant feature", () => {
+  const portalSources = () => {
     const dir = join(process.cwd(), "src/features/portal");
-    const offenders = readdirSync(dir)
+    return readdirSync(dir)
       .filter((name) => /\.(ts|tsx)$/.test(name) && !/\.test\.tsx?$/.test(name))
-      .filter((name) => /(?:ai-assistant|AiAssistant)/.test(readFileSync(join(dir, name), "utf8")));
+      .map((name) => ({ name, text: readFileSync(join(dir, name), "utf8") }));
+  };
+
+  it("no client/src/features/portal source file imports the ai-assistant feature", () => {
+    const offenders = portalSources()
+      .filter((f) => /(?:ai-assistant|AiAssistant)/.test(f.text))
+      .map((f) => f.name);
+    expect(offenders).toEqual([]);
+  });
+
+  it("no Portal source file imports the internal @mention typeahead / node or quick replies", () => {
+    const offenders = portalSources()
+      .filter((f) => /(?:ticket-mention-plugin|ticket-mention-node|TicketMentionPlugin|MentionNode|quick-repl|QuickReply)/.test(f.text))
+      .map((f) => f.name);
     expect(offenders).toEqual([]);
   });
 });

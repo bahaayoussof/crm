@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
-import { CheckCircle2, Clock, Inbox, Star } from "lucide-react";
-import { useState } from "react";
+import { CheckCircle2, Clock, Inbox, Paperclip, Star } from "lucide-react";
+import { useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -10,7 +10,9 @@ import { useAuth } from "@/features/auth/auth-state";
 import { useDebouncedValue } from "@/features/customers/use-debounced-value";
 import { formatTicketDate } from "@/features/tickets/ticket-format";
 import { ConversationMessage, ConversationSection } from "@/features/tickets/ticket-conversation-ui";
-import { ConversationAttachmentBand, MessageAttachmentList } from "@/features/attachments/attachment-ui";
+import { AttachmentWorkspace, MessageAttachmentList } from "@/features/attachments/attachment-ui";
+import { ACCEPTED_INPUT_ACCEPT, validateAttachmentFile } from "@/features/attachments/attachment.types";
+import { TicketReplyEditor, type TicketReplyEditorHandle } from "@/features/tickets/ticket-reply-editor";
 import { usePortalTicketAttachments, useUploadPortalTicketAttachment } from "@/features/attachments/attachment-hooks";
 import { portalTicketSchema, type PortalTicketForm } from "./portal.schemas";
 import { useCreatePortalTicket, usePortalCategories, usePortalOverview, usePortalTicket, usePortalTickets, useReplyPortalTicket, useSubmitPortalFeedback } from "./portal-hooks";
@@ -390,6 +392,150 @@ function TicketFeedback({ ticket }: { ticket: PortalTicketDetail }) {
   );
 }
 
+/** Customer-safe context strip — the same visual language as the internal
+ * `TicketContextSummary`, but only fields the portal detail contract carries
+ * (no priority / channel / assignee / followers). */
+function PortalContextStrip({ ticket, locale }: { ticket: PortalTicketDetail; locale: string }) {
+  const { t } = useTranslation();
+  const cells: { label: string; value: React.ReactNode }[] = [
+    { label: t("portal.category"), value: ticket.category?.name ?? t("common.notProvided") },
+    { label: t("portal.created"), value: <bdi dir="ltr">{formatTicketDate(ticket.createdAt, locale)}</bdi> },
+    { label: t("portal.updated"), value: <bdi dir="ltr">{formatTicketDate(ticket.updatedAt, locale)}</bdi> },
+  ];
+  return (
+    <div className="flex flex-col divide-y divide-border rounded-lg border border-border bg-card text-card-foreground shadow-subtle sm:flex-row sm:divide-x sm:divide-y-0 rtl:sm:divide-x-reverse">
+      {cells.map((cell) => (
+        <div key={cell.label} className="min-w-0 px-4 py-3 sm:flex-1 sm:px-5">
+          <p className="text-xs font-medium text-muted-foreground">{cell.label}</p>
+          <div className="mt-1 text-sm text-foreground">{cell.value}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Portal reply composer — its own card, using the shared rich Lexical editor
+ * (reply-only: no internal note / quick reply / AI / mentions). "Attach file"
+ * opens the native OS picker directly (§C). */
+function PortalComposer({
+  ticket,
+  reply,
+  onSent,
+  onAttachFile,
+  attachMode,
+}: {
+  ticket: PortalTicketDetail;
+  reply: ReturnType<typeof useReplyPortalTicket>;
+  onSent: () => void;
+  onAttachFile: (file: File) => void;
+  attachMode: boolean;
+}) {
+  const { t } = useTranslation();
+  const editorRef = useRef<TicketReplyEditorHandle>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [text, setText] = useState("");
+  const [attachError, setAttachError] = useState<string | null>(null);
+
+  if (ticket.status === "CLOSED") {
+    return (
+      <section className="rounded-md border border-border bg-card p-4 text-sm text-muted-foreground shadow-subtle sm:p-5">
+        {t("portal.closedNotice")}
+      </section>
+    );
+  }
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (reply.isPending || !editorRef.current?.hasText()) return;
+    try {
+      await reply.mutateAsync(editorRef.current?.getHtml() ?? "");
+      editorRef.current?.clear();
+      setText("");
+      onSent();
+    } catch {
+      /* surfaced via reply.isError below */
+    }
+  };
+
+  const pickFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const chosen = event.target.files?.[0];
+    event.target.value = "";
+    if (!chosen) return;
+    const { file, error } = validateAttachmentFile(chosen, t);
+    if (error || !file) {
+      setAttachError(error ?? t("attachments.errors.UNSUPPORTED_FILE_TYPE"));
+      return;
+    }
+    setAttachError(null);
+    onAttachFile(file);
+  };
+
+  return (
+    <section className="rounded-md border border-border bg-card text-card-foreground shadow-subtle">
+      <form onSubmit={submit} className="space-y-3 p-4 sm:p-5">
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold text-foreground">{t("portal.reply")}</h2>
+          <p className="mt-1 text-xs text-muted-foreground" id="portal-reply-help">
+            {t("portal.replyHelp")}
+          </p>
+        </div>
+        {ticket.status === "RESOLVED" && (
+          <p className="rounded-md border border-primary/30 bg-primary-subtle p-3 text-sm text-primary">
+            {t("portal.reopenNotice")}
+          </p>
+        )}
+        <TicketReplyEditor
+          ref={editorRef}
+          id="portal-reply"
+          ariaLabel={t("portal.replyLabel")}
+          ariaDescribedBy="portal-reply-help"
+          placeholder={t("portal.replyPlaceholder")}
+          disabled={reply.isPending}
+          onTextChange={setText}
+        />
+        {reply.isError && (
+          <p className="text-sm text-danger" role="alert">
+            {t("portal.replyError")}
+          </p>
+        )}
+        <div className="flex flex-col gap-2 border-t border-border pt-3 sm:flex-row sm:items-center">
+          <div className="sm:me-auto">
+            {!attachMode && (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="sr-only"
+                  accept={ACCEPTED_INPUT_ACCEPT}
+                  aria-hidden="true"
+                  tabIndex={-1}
+                  onChange={pickFile}
+                />
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 rounded-sm text-sm font-medium text-primary transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Paperclip className="size-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+                  {t("attachments.attachFile")}
+                </button>
+                {attachError && (
+                  <p className="mt-1 text-xs text-danger" role="alert">
+                    {attachError}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+          <button className="button-primary sm:ms-auto sm:w-auto" disabled={reply.isPending || !text.trim()}>
+            {reply.isPending ? t("portal.sending") : t("portal.sendReply")}
+          </button>
+        </div>
+      </form>
+    </section>
+  );
+}
+
 export function PortalTicketDetailPage() {
   const { id = "" } = useParams();
   const { t, i18n } = useTranslation();
@@ -397,8 +543,9 @@ export function PortalTicketDetailPage() {
   const reply = useReplyPortalTicket(id);
   const attachments = usePortalTicketAttachments(id);
   const uploadAttachment = useUploadPortalTicketAttachment(id);
-  const [body, setBody] = useState("");
   const [sendToken, setSendToken] = useState(0);
+  const [attachMode, setAttachMode] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   if (query.isLoading) return (
     <PortalPage>
       <TicketDetailSkeleton variant="portal" label={t("portal.loadingDetail")} />
@@ -417,87 +564,88 @@ export function PortalTicketDetailPage() {
   const ticketLevelAttachments = attachments.data?.filter((item) => item.messageId === null) ?? [];
   const messageAttachments = new Map<string, NonNullable<typeof attachments.data>>();
   for (const item of attachments.data ?? []) if (item.messageId) messageAttachments.set(item.messageId, [...(messageAttachments.get(item.messageId) ?? []), item]);
-  const closed = ticket.status === "CLOSED";
-  const send = async (event: React.FormEvent) => { event.preventDefault(); if (!body.trim() || reply.isPending) return; await reply.mutateAsync(body); setBody(""); setSendToken((token) => token + 1); };
-  const composer = closed ? (
-    <p className="rounded-md border border-border bg-surface-subtle p-3 text-sm text-muted-foreground">{t("portal.closedNotice")}</p>
-  ) : (
-    <form onSubmit={send}>
-      <h2 className="text-base font-semibold text-foreground">{t("portal.reply")}</h2>
-      {ticket.status === "RESOLVED" && <p className="mt-2 rounded-md border border-primary/30 bg-primary-subtle p-3 text-sm text-primary">{t("portal.reopenNotice")}</p>}
-      <label className="mt-3 block text-sm font-medium text-foreground" htmlFor="portal-reply">{t("portal.replyLabel")}</label>
-      <p className="mt-1 text-xs text-muted-foreground" id="portal-reply-help">{t("portal.replyHelp")}</p>
-      <textarea aria-describedby="portal-reply-help" className="input mt-3 min-h-28 resize-y py-3" id="portal-reply" value={body} onChange={(event) => setBody(event.target.value)} />
-      {reply.isError && <p className="mt-2 text-sm text-danger" role="alert">{t("portal.replyError")}</p>}
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <button className="button-primary sm:ms-auto sm:w-auto" disabled={reply.isPending || !body.trim()}>{reply.isPending ? t("portal.sending") : t("portal.sendReply")}</button>
+  const portalUpload = {
+    mutateAsync: (file: File) => uploadAttachment.mutateAsync(file),
+    isPending: uploadAttachment.isPending,
+  };
+  const exitAttach = () => {
+    setAttachMode(false);
+    setPendingFile(null);
+  };
+
+  return (
+    <PortalPage>
+      <div className="space-y-4">
+        <TicketDetailHeader
+          backTo="/portal/tickets"
+          backLabel={t("portal.back")}
+          reference={ticket.id}
+          subject={ticket.subject}
+          badges={<PortalStatus status={ticket.status} />}
+        />
+        <PortalContextStrip ticket={ticket} locale={i18n.language} />
+        <TicketDetailSection heading={t("portal.descriptionLabel")} headingId="portal-ticket-description">
+          <p className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground [overflow-wrap:anywhere]">{ticket.description}</p>
+        </TicketDetailSection>
+        {/* Only the message region scrolls internally; the page scrolls for the
+            composer / attachments / feedback cards below. */}
+        <div className="lg:h-[calc(100dvh_-_13rem)] lg:min-h-[22rem]">
+          <ConversationSection
+            bounded
+            autoScrollItemCount={ticket.messages.length}
+            autoScrollSendToken={sendToken}
+            heading={t("portal.conversation")}
+            description={t("portal.conversationDescription")}
+            timelineLabel={t("portal.timelineLabel")}
+            isEmpty={ticket.messages.length === 0}
+            emptyTitle={t("portal.noMessages")}
+            viewportOverride={
+              attachMode ? (
+                <AttachmentWorkspace
+                  upload={portalUpload}
+                  initialFile={pendingFile}
+                  onDone={exitAttach}
+                  onCancel={exitAttach}
+                />
+              ) : undefined
+            }
+          >
+            {ticket.messages.map((message) => (
+              <ConversationMessage
+                key={message.id}
+                // Viewer-relative: the customer's own messages sit on the end
+                // (right in LTR), support replies on the start.
+                side={message.author.kind === "CUSTOMER" ? "end" : "start"}
+                maxWidthClass="sm:max-w-[62%]"
+                title={t(`portal.author.${message.author.kind}`)}
+                timestamp={message.createdAt}
+                language={i18n.language}
+                body={message.body}
+                attachmentsSlot={<MessageAttachmentList attachments={messageAttachments.get(message.id) ?? []} scope="portal" />}
+              />
+            ))}
+          </ConversationSection>
+        </div>
+        <PortalComposer
+          ticket={ticket}
+          reply={reply}
+          onSent={() => setSendToken((token) => token + 1)}
+          onAttachFile={(file) => {
+            setPendingFile(file);
+            setAttachMode(true);
+          }}
+          attachMode={attachMode}
+        />
+        <TicketAttachments
+          attachments={ticketLevelAttachments}
+          isLoading={attachments.isLoading}
+          isError={attachments.isError}
+          onRetry={() => attachments.refetch()}
+          locale={i18n.language}
+          scope="portal"
+        />
+        <TicketFeedback ticket={ticket} />
       </div>
-    </form>
+    </PortalPage>
   );
-  return <PortalPage>
-    <TicketDetailHeader
-      backTo="/portal/tickets"
-      backLabel={t("portal.back")}
-      reference={ticket.id}
-      subject={ticket.subject}
-      badges={<PortalStatus status={ticket.status} />}
-    >
-      <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-3 text-sm text-muted-foreground">
-        <div><dt className="text-xs font-medium text-foreground">{t("portal.category")}</dt><dd className="mt-0.5">{ticket.category?.name ?? t("common.notProvided")}</dd></div>
-        <div><dt className="text-xs font-medium text-foreground">{t("portal.created")}</dt><dd className="mt-0.5"><bdi dir="ltr">{formatTicketDate(ticket.createdAt, i18n.language)}</bdi></dd></div>
-        <div><dt className="text-xs font-medium text-foreground">{t("portal.updated")}</dt><dd className="mt-0.5"><bdi dir="ltr">{formatTicketDate(ticket.updatedAt, i18n.language)}</bdi></dd></div>
-      </dl>
-    </TicketDetailHeader>
-    <div className="mt-6 space-y-6">
-      <TicketDetailSection heading={t("portal.descriptionLabel")} headingId="portal-ticket-description">
-        <p className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground [overflow-wrap:anywhere]">{ticket.description}</p>
-      </TicketDetailSection>
-      {/* Bounded height on desktop: the message region owns the only scroll, so
-          the attach band + composer stay pinned (`lg:shrink-0`) and toggling the
-          uploader open resizes the `lg:flex-1` message viewport instead of
-          growing the card — which, in the page-level AppShell scroller, left a
-          blank band after returning from the native file dialog. */}
-      <div className="lg:h-[calc(100dvh_-_13rem)] lg:min-h-[22rem]">
-        <ConversationSection
-          bounded
-          autoScrollItemCount={ticket.messages.length}
-          autoScrollSendToken={sendToken}
-          heading={t("portal.conversation")}
-          description={t("portal.conversationDescription")}
-          timelineLabel={t("portal.timelineLabel")}
-          isEmpty={ticket.messages.length === 0}
-          emptyTitle={t("portal.noMessages")}
-          belowBody={
-            <ConversationAttachmentBand
-              canUpload={!closed}
-              upload={{ mutateAsync: (file) => uploadAttachment.mutateAsync(file), isPending: uploadAttachment.isPending }}
-              disabledReason={closed ? t("attachments.closedTicketUpload") : undefined}
-            />
-          }
-          footer={composer}
-        >
-          {ticket.messages.map((message) => (
-            <ConversationMessage
-              key={message.id}
-              side={message.author.kind === "CUSTOMER" ? "start" : "end"}
-              title={t(`portal.author.${message.author.kind}`)}
-              timestamp={message.createdAt}
-              language={i18n.language}
-              body={message.body}
-              attachmentsSlot={<MessageAttachmentList attachments={messageAttachments.get(message.id) ?? []} scope="portal" />}
-            />
-          ))}
-        </ConversationSection>
-      </div>
-      <TicketAttachments
-        attachments={ticketLevelAttachments}
-        isLoading={attachments.isLoading}
-        isError={attachments.isError}
-        onRetry={() => attachments.refetch()}
-        locale={i18n.language}
-        scope="portal"
-      />
-      <TicketFeedback ticket={ticket} />
-    </div>
-  </PortalPage>;
 }
