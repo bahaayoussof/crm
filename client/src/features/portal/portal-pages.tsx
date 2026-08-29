@@ -10,23 +10,23 @@ import { useAuth } from "@/features/auth/auth-state";
 import { useDebouncedValue } from "@/features/customers/use-debounced-value";
 import { formatTicketDate } from "@/features/tickets/ticket-format";
 import { ConversationMessage, ConversationSection } from "@/features/tickets/ticket-conversation-ui";
-import { AttachmentPanel, MessageAttachmentList } from "@/features/attachments/attachment-ui";
+import { ConversationAttachmentBand, MessageAttachmentList } from "@/features/attachments/attachment-ui";
 import { usePortalTicketAttachments, useUploadPortalTicketAttachment } from "@/features/attachments/attachment-hooks";
 import { portalTicketSchema, type PortalTicketForm } from "./portal.schemas";
 import { useCreatePortalTicket, usePortalCategories, usePortalOverview, usePortalTicket, usePortalTickets, useReplyPortalTicket, useSubmitPortalFeedback } from "./portal-hooks";
-import type { PortalOverview, PortalTicket, PortalTicketDetail, PortalTicketStatus, TicketPriority } from "./portal.types";
-import { PortalPage, PortalStatus, TicketRef } from "./portal-ui";
+import type { PortalOverview, PortalTicketDetail, PortalTicketStatus, TicketPriority } from "./portal.types";
+import { PortalPage, PortalStatus } from "./portal-ui";
 import { PortalTicketsTable } from "./portal-tickets-table";
 import { PageHeader } from "@/components/shared/page-header";
 import { TicketDetailHeader, TicketDetailSection, TicketDetailSkeleton } from "@/features/tickets/ticket-detail-header";
+import { TicketAttachments } from "@/features/tickets/ticket-attachments";
 import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from "@/components/ui/table";
+  TicketFormActions,
+  TicketFormError,
+  TicketFormField,
+  TicketFormSection,
+  TicketFormShell,
+} from "@/features/tickets/ticket-form-shell";
 import {
   DataTableFiltersPopover,
   DataTableSurface,
@@ -40,83 +40,6 @@ import { EmptyState } from "@/components/shared/empty-state";
 const statuses: PortalTicketStatus[] = ["OPEN", "IN_PROGRESS", "WAITING_FOR_YOU", "RESOLVED", "CLOSED"];
 const priorities: TicketPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 const errorCode = (error: unknown) => axios.isAxiosError(error) ? error.response?.data?.error?.code as string | undefined : undefined;
-
-function TicketRows({ tickets }: { tickets: PortalTicket[] }) {
-  const { t, i18n } = useTranslation();
-  return (
-    <>
-      <div className="hidden md:block overflow-x-auto">
-        <Table className="min-w-[48rem]">
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-32">{t("portal.ticketId")}</TableHead>
-              <TableHead className="w-auto">{t("portal.subject")}</TableHead>
-              <TableHead className="w-36">{t("portal.statusLabel")}</TableHead>
-              <TableHead className="w-36">{t("portal.category")}</TableHead>
-              <TableHead className="w-44">{t("portal.created")}</TableHead>
-              <TableHead className="w-44">{t("portal.updated")}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {tickets.map((ticket) => (
-              <TableRow key={ticket.id}>
-                <TableCell>
-                  <TicketRef id={ticket.id} />
-                </TableCell>
-                <TableCell>
-                  <Link
-                    className="block break-words font-medium text-foreground hover:underline transition-colors focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    to={`/portal/tickets/${ticket.id}`}
-                  >
-                    {ticket.subject}
-                  </Link>
-                </TableCell>
-                <TableCell>
-                  <PortalStatus status={ticket.status} />
-                </TableCell>
-                <TableCell
-                  className="truncate text-xs text-muted-foreground"
-                  title={ticket.category?.name}
-                >
-                  {ticket.category?.name ?? t("common.notProvided")}
-                </TableCell>
-                <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                  <bdi dir="ltr">{formatTicketDate(ticket.createdAt, i18n.language)}</bdi>
-                </TableCell>
-                <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                  <bdi dir="ltr">{formatTicketDate(ticket.updatedAt, i18n.language)}</bdi>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-      <div className="divide-y divide-border-subtle bg-table-background md:hidden">
-        {tickets.map((ticket) => (
-          <Link
-            className="block p-4 transition-colors hover:bg-table-row-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            key={ticket.id}
-            to={`/portal/tickets/${ticket.id}`}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <strong className="min-w-0 break-words text-sm font-semibold text-foreground">
-                {ticket.subject}
-              </strong>
-              <PortalStatus status={ticket.status} />
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
-              <TicketRef id={ticket.id} />
-              <span>{ticket.category?.name ?? t("common.notProvided")}</span>
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              {t("portal.updated")}: <bdi dir="ltr">{formatTicketDate(ticket.updatedAt, i18n.language)}</bdi>
-            </p>
-          </Link>
-        ))}
-      </div>
-    </>
-  );
-}
 
 const homeMetrics: { key: keyof PortalOverview["counts"]; icon: React.ReactNode; variant: "primary" | "warning" | "success" }[] = [
   { key: "open", icon: <Inbox className="size-4" aria-hidden="true" />, variant: "primary" },
@@ -136,7 +59,9 @@ export function PortalHomePage() {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {homeMetrics.map((metric) => <div className="h-[4.75rem] animate-pulse rounded-lg bg-muted" key={metric.key} />)}
         </div>
-        <div className="h-52 animate-pulse rounded-lg bg-muted" />
+        <DataTableSurface>
+          <div className="p-4"><DataTableSkeleton columns={5} /></div>
+        </DataTableSurface>
       </div>
     ) : query.isError ? (
       <EmptyState
@@ -163,7 +88,14 @@ export function PortalHomePage() {
         </div>
         {query.data!.recentTickets.length ? (
           <DataTableSurface>
-            <TicketRows tickets={query.data!.recentTickets} />
+            <PortalTicketsTable
+              tickets={query.data!.recentTickets}
+              showPriority={false}
+              page={1}
+              pageSize={query.data!.recentTickets.length || 1}
+              pageCount={0}
+              onPageChange={() => {}}
+            />
           </DataTableSurface>
         ) : (
           <EmptyState
@@ -352,11 +284,12 @@ export function PortalNewTicketPage() {
   });
   return <PortalPage>
     <PageHeader title={t("portal.newRequest")} description={t("portal.newDescription")} />
-    <form className="mt-6 max-w-3xl rounded-lg border border-border bg-card p-5 sm:p-6" noValidate onSubmit={submit}>
-      <div className="space-y-5">
-        <Field id="portal-subject" label={t("portal.subject")} error={form.formState.errors.subject ? t("portal.validation.subject") : undefined}>
+    <TicketFormShell className="mt-6" onSubmit={submit}>
+      {mutation.isError && <TicketFormError>{t("portal.createError")}</TicketFormError>}
+      <TicketFormSection titleId="portal-request-details-heading" title={t("portal.requestDetails")} bordered={false}>
+        <TicketFormField id="portal-subject" label={t("portal.subject")} error={form.formState.errors.subject ? t("portal.validation.subject") : undefined}>
           <input aria-describedby={form.formState.errors.subject ? "portal-subject-error" : undefined} aria-invalid={Boolean(form.formState.errors.subject)} className="input" id="portal-subject" {...form.register("subject")} />
-        </Field>
+        </TicketFormField>
         <Controller
           name="categoryId"
           control={form.control}
@@ -364,7 +297,7 @@ export function PortalNewTicketPage() {
             <AppSelectField
               id="portal-category"
               label={`${t("portal.category")} ${t("portal.optional")}`}
-              labelClassName="mb-1.5 block text-sm font-medium text-foreground"
+              labelClassName="block text-sm font-medium text-foreground"
               disabled={categories.isLoading || mutation.isPending}
               value={field.value}
               onValueChange={field.onChange}
@@ -372,17 +305,17 @@ export function PortalNewTicketPage() {
             />
           )}
         />
-        <Field id="portal-description" label={t("portal.descriptionLabel")} error={form.formState.errors.description ? t("portal.validation.description") : undefined}>
+        <TicketFormField id="portal-description" label={t("portal.descriptionLabel")} error={form.formState.errors.description ? t("portal.validation.description") : undefined}>
           <textarea aria-describedby={form.formState.errors.description ? "portal-description-error" : undefined} aria-invalid={Boolean(form.formState.errors.description)} className="input min-h-44 resize-y" id="portal-description" {...form.register("description")} />
-        </Field>
-      </div>
-      {mutation.isError && <p className="mt-4 text-sm text-danger" role="alert">{t("portal.createError")}</p>}
-      <div className="mt-6 flex justify-end border-t border-border pt-5">
-        <button className="button-primary w-full sm:w-auto" disabled={mutation.isPending} type="submit">
+        </TicketFormField>
+      </TicketFormSection>
+      <TicketFormActions>
+        <Link className="button-secondary" to="/portal/tickets">{t("common.cancel")}</Link>
+        <button className="button-primary w-auto" disabled={mutation.isPending} type="submit">
           {mutation.isPending ? t("portal.creating") : t("portal.createAction")}
         </button>
-      </div>
-    </form>
+      </TicketFormActions>
+    </TicketFormShell>
   </PortalPage>;
 }
 
@@ -457,17 +390,6 @@ function TicketFeedback({ ticket }: { ticket: PortalTicketDetail }) {
   );
 }
 
-function Field({ id, label, error, children }: { id: string; label: string; error?: string; children: React.ReactNode }) {
-  const errorId = `${id}-error`;
-  return (
-    <div>
-      <label className="mb-1.5 block text-sm font-medium text-foreground" htmlFor={id}>{label}</label>
-      {children}
-      {error && <p className="mt-1.5 text-sm text-danger" id={errorId} role="alert">{error}</p>}
-    </div>
-  );
-}
-
 export function PortalTicketDetailPage() {
   const { id = "" } = useParams();
   const { t, i18n } = useTranslation();
@@ -529,29 +451,49 @@ export function PortalTicketDetailPage() {
       <TicketDetailSection heading={t("portal.descriptionLabel")} headingId="portal-ticket-description">
         <p className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground [overflow-wrap:anywhere]">{ticket.description}</p>
       </TicketDetailSection>
-      <ConversationSection
-        heading={t("portal.conversation")}
-        description={t("portal.conversationDescription")}
-        timelineLabel={t("portal.timelineLabel")}
-        isEmpty={ticket.messages.length === 0}
-        emptyTitle={t("portal.noMessages")}
-        footer={composer}
-      >
-        {ticket.messages.map((message) => (
-          <ConversationMessage
-            key={message.id}
-            side={message.author.kind === "CUSTOMER" ? "start" : "end"}
-            title={t(`portal.author.${message.author.kind}`)}
-            timestamp={message.createdAt}
-            language={i18n.language}
-            body={message.body}
-            attachmentsSlot={<MessageAttachmentList attachments={messageAttachments.get(message.id) ?? []} scope="portal" />}
-          />
-        ))}
-      </ConversationSection>
-      <TicketDetailSection>
-        <AttachmentPanel attachments={ticketLevelAttachments} isLoading={attachments.isLoading} isError={attachments.isError} onRetry={() => attachments.refetch()} scope="portal" locale={i18n.language} canUpload={!closed} upload={{ mutateAsync: (file) => uploadAttachment.mutateAsync(file), isPending: uploadAttachment.isPending }} disabledReason={closed ? t("attachments.closedTicketUpload") : undefined} />
-      </TicketDetailSection>
+      {/* Bounded height on desktop: the message region owns the only scroll, so
+          the attach band + composer stay pinned (`lg:shrink-0`) and toggling the
+          uploader open resizes the `lg:flex-1` message viewport instead of
+          growing the card — which, in the page-level AppShell scroller, left a
+          blank band after returning from the native file dialog. */}
+      <div className="lg:h-[calc(100dvh_-_13rem)] lg:min-h-[22rem]">
+        <ConversationSection
+          bounded
+          heading={t("portal.conversation")}
+          description={t("portal.conversationDescription")}
+          timelineLabel={t("portal.timelineLabel")}
+          isEmpty={ticket.messages.length === 0}
+          emptyTitle={t("portal.noMessages")}
+          belowBody={
+            <ConversationAttachmentBand
+              canUpload={!closed}
+              upload={{ mutateAsync: (file) => uploadAttachment.mutateAsync(file), isPending: uploadAttachment.isPending }}
+              disabledReason={closed ? t("attachments.closedTicketUpload") : undefined}
+            />
+          }
+          footer={composer}
+        >
+          {ticket.messages.map((message) => (
+            <ConversationMessage
+              key={message.id}
+              side={message.author.kind === "CUSTOMER" ? "start" : "end"}
+              title={t(`portal.author.${message.author.kind}`)}
+              timestamp={message.createdAt}
+              language={i18n.language}
+              body={message.body}
+              attachmentsSlot={<MessageAttachmentList attachments={messageAttachments.get(message.id) ?? []} scope="portal" />}
+            />
+          ))}
+        </ConversationSection>
+      </div>
+      <TicketAttachments
+        attachments={ticketLevelAttachments}
+        isLoading={attachments.isLoading}
+        isError={attachments.isError}
+        onRetry={() => attachments.refetch()}
+        locale={i18n.language}
+        scope="portal"
+      />
       <TicketFeedback ticket={ticket} />
     </div>
   </PortalPage>;

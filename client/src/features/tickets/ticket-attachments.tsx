@@ -13,6 +13,7 @@ export function TicketAttachments({
   isError,
   onRetry,
   locale,
+  scope = "internal",
   className = "",
 }: {
   attachments: AttachmentItem[];
@@ -20,6 +21,8 @@ export function TicketAttachments({
   isError: boolean;
   onRetry: () => void;
   locale: string;
+  /** Which authenticated download/preview endpoint the rows use. */
+  scope?: "internal" | "portal";
   className?: string;
 }) {
   const { t } = useTranslation();
@@ -46,7 +49,7 @@ export function TicketAttachments({
           </button>
         </div>
       ) : attachments.length > 0 ? (
-        <AttachmentRows attachments={attachments} scope="internal" locale={locale} />
+        <AttachmentRows attachments={attachments} scope={scope} locale={locale} />
       ) : (
         <p className="text-sm text-muted-foreground">{t("attachments.none")}</p>
       )}

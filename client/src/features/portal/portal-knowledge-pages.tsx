@@ -9,6 +9,7 @@ import { PortalPage } from "./portal-ui";
 import { PageHeader } from "@/components/shared/page-header";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { EmptyState } from "@/components/shared/empty-state";
+import { LoadingRows } from "@/features/knowledge-base/knowledge-base-ui";
 
 const errorCode = (error: unknown) => (axios.isAxiosError(error) ? (error.response?.data?.error?.code as string | undefined) : undefined);
 
@@ -61,7 +62,7 @@ export function PortalKnowledgeBasePage() {
 
       <h2 className="mt-8 text-base font-semibold tracking-tight text-foreground">{t("portal.knowledgeBase.latestArticles")}</h2>
       {query.isLoading ? (
-        <p className="mt-6 text-center text-sm text-muted-foreground" role="status">{t("portal.knowledgeBase.loading")}</p>
+        <div className="mt-4"><LoadingRows /></div>
       ) : query.isError ? (
         <EmptyState
           className="mt-4"
@@ -102,7 +103,7 @@ export function PortalKnowledgeArticlePage() {
     </Link>
   );
 
-  if (query.isLoading) return <PortalPage><p className="mt-6 text-center text-sm text-muted-foreground" role="status">{t("portal.knowledgeBase.loadingDetail")}</p></PortalPage>;
+  if (query.isLoading) return <PortalPage><div className="mb-4">{back}</div><LoadingRows /></PortalPage>;
   if (query.isError) {
     const notFound = errorCode(query.error) === "KNOWLEDGE_ARTICLE_NOT_FOUND";
     return (
@@ -120,17 +121,21 @@ export function PortalKnowledgeArticlePage() {
   const article = query.data!;
   return (
     <PortalPage>
-      <div className="mb-4">{back}</div>
-      <header className="border-b border-border pb-5">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground" dir="auto">{article.title}</h1>
-        <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-          <span dir="auto">{article.category ?? t("common.notProvided")}</span>
-          <span>{t("portal.updated")}: <bdi dir="ltr">{formatTicketDate(article.updatedAt, i18n.language)}</bdi></span>
-        </p>
-      </header>
-      <article className="mt-6 max-w-3xl rounded-md border border-border bg-card p-6 sm:p-8 whitespace-pre-wrap break-words text-sm leading-7 text-foreground" dir="auto">
-        {article.content}
-      </article>
+      <div className="space-y-6">
+        <div>{back}</div>
+        <PageHeader
+          title={article.title}
+          description={
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <span dir="auto">{article.category ?? t("common.notProvided")}</span>
+              <span>{t("portal.updated")}: <bdi dir="ltr">{formatTicketDate(article.updatedAt, i18n.language)}</bdi></span>
+            </div>
+          }
+        />
+        <article className="rounded-xl border border-border bg-surface p-6 sm:p-8 max-w-3xl whitespace-pre-wrap break-words text-sm leading-7 text-foreground shadow-subtle" dir="auto">
+          {article.content}
+        </article>
+      </div>
     </PortalPage>
   );
 }

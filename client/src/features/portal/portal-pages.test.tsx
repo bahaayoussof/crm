@@ -3,12 +3,12 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { changeAppLanguage } from "@/lib/i18n";
 
-const mocks = vi.hoisted(() => ({ overview: vi.fn(), tickets: vi.fn(), detail: vi.fn(), categories: vi.fn(), create: vi.fn(), reply: vi.fn(), feedback: vi.fn(), auth: vi.fn(), refetch: vi.fn(), mutate: vi.fn() }));
+const mocks = vi.hoisted(() => ({ overview: vi.fn(), tickets: vi.fn(), detail: vi.fn(), categories: vi.fn(), create: vi.fn(), reply: vi.fn(), feedback: vi.fn(), auth: vi.fn(), refetch: vi.fn(), mutate: vi.fn(), attachList: vi.fn(), attachUpload: vi.fn(), uploadFn: vi.fn() }));
 vi.mock("./portal-hooks", () => ({ usePortalOverview: mocks.overview, usePortalTickets: mocks.tickets, usePortalTicket: mocks.detail, usePortalCategories: mocks.categories, useCreatePortalTicket: mocks.create, useReplyPortalTicket: mocks.reply, useSubmitPortalFeedback: mocks.feedback }));
 vi.mock("@/features/auth/auth-state", () => ({ useAuth: mocks.auth }));
 vi.mock("@/features/attachments/attachment-hooks", () => ({
-  usePortalTicketAttachments: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
-  useUploadPortalTicketAttachment: () => ({ mutateAsync: vi.fn().mockResolvedValue({}), isPending: false }),
+  usePortalTicketAttachments: mocks.attachList,
+  useUploadPortalTicketAttachment: mocks.attachUpload,
 }));
 import { PortalHomePage, PortalNewTicketPage, PortalTicketDetailPage, PortalTicketsPage } from "./portal-pages";
 
@@ -23,6 +23,9 @@ describe("portal pages", () => {
     mocks.create.mockReturnValue({ mutateAsync: mocks.mutate, isPending: false });
     mocks.reply.mockReturnValue({ mutateAsync: mocks.mutate, isPending: false });
     mocks.feedback.mockReturnValue({ mutateAsync: mocks.mutate, isPending: false });
+    mocks.attachList.mockReturnValue({ data: [], isLoading: false, isError: false, refetch: mocks.refetch });
+    mocks.uploadFn.mockResolvedValue({});
+    mocks.attachUpload.mockReturnValue({ mutateAsync: mocks.uploadFn, isPending: false });
   });
   it("shows overview metrics and responsive recent requests", () => { renderPage(<PortalHomePage />); expect(screen.getByRole("heading", { name: "Welcome, Ahmed" })).toBeInTheDocument(); expect(screen.getByText("Waiting for You")).toBeInTheDocument(); expect(screen.getAllByText("Payment help")).toHaveLength(2); expect(screen.getByRole("table")).toBeInTheDocument(); });
   it("renders loading and retry states", () => { mocks.overview.mockReturnValue({ isLoading: true }); const view = renderPage(<PortalHomePage />); expect(screen.getByTestId("portal-overview-skeleton")).toBeInTheDocument(); view.unmount(); mocks.overview.mockReturnValue({ isError: true, refetch: mocks.refetch }); renderPage(<PortalHomePage />); fireEvent.click(screen.getByRole("button", { name: "Retry" })); expect(mocks.refetch).toHaveBeenCalled(); });
@@ -271,6 +274,95 @@ describe("portal ticket details shares the internal ticket design", () => {
     expect(container.textContent).not.toMatch(/BREACHED|URGENT|ESCALATED|FIRST_RESPONSE|Mariam/);
     // no internal two-column workspace grid
     expect(container.querySelector(".grid.gap-6")).toBeNull();
+  });
+
+  it("places the Attach file control inside the Conversation card, next to the composer", () => {
+    mocks.detail.mockReturnValue({ data: detail({ status: "OPEN" }) });
+    renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
+    const attach = screen.getByRole("button", { name: "Attach file" });
+    const send = screen.getByRole("button", { name: "Send Reply" });
+    // same section as the reply composer — the shared Conversation card
+    expect(attach.closest("section")).toBe(send.closest("section"));
+    expect(within(attach.closest("section") as HTMLElement).getByRole("heading", { name: "Conversation" })).toBeInTheDocument();
+  });
+
+  it("keeps the standalone Attachments card to existing files only — no upload controls", () => {
+    mocks.detail.mockReturnValue({ data: detail({ status: "OPEN" }) });
+    renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
+    const card = screen.getByRole("heading", { name: "Attachments" }).closest("section") as HTMLElement;
+    expect(within(card).queryByRole("button", { name: "Attach file" })).not.toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: "Upload" })).not.toBeInTheDocument();
+    expect(within(card).queryByLabelText("Select file")).not.toBeInTheDocument();
+    expect(within(card).getByText("No attachments yet.")).toBeInTheDocument();
+  });
+
+  it("reveals the shared uploader from Attach file and uploads through the portal mutation", async () => {
+    mocks.detail.mockReturnValue({ data: detail({ status: "OPEN" }) });
+    renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
+    fireEvent.click(screen.getByRole("button", { name: "Attach file" }));
+    expect(await screen.findByText("Choose file")).toBeInTheDocument();
+    const file = new File(["hello"], "receipt.png", { type: "image/png" });
+    fireEvent.change(screen.getByLabelText("Select file"), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    await waitFor(() => expect(mocks.uploadFn).toHaveBeenCalledWith(file));
+  });
+
+  it("hides the uploader on a closed request and shows the disabled reason", () => {
+    mocks.detail.mockReturnValue({ data: detail({ status: "CLOSED" }) });
+    renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
+    expect(screen.queryByRole("button", { name: "Attach file" })).not.toBeInTheDocument();
+    expect(screen.getByText("This request is closed and no longer accepts new attachments.")).toBeInTheDocument();
+  });
+
+  it("still renders existing ticket attachments with preview/download actions", () => {
+    mocks.attachList.mockReturnValue({
+      data: [{ id: "att-1", fileName: "invoice.pdf", mimeType: "application/pdf", createdAt: "2026-08-25T10:00:00Z", messageId: null }],
+      isLoading: false,
+      isError: false,
+      refetch: mocks.refetch,
+    });
+    mocks.detail.mockReturnValue({ data: detail({ status: "OPEN" }) });
+    renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
+    const card = screen.getByRole("heading", { name: "Attachments" }).closest("section") as HTMLElement;
+    const row = within(card).getByText("invoice.pdf").closest("li") as HTMLElement;
+    expect(within(row).getByRole("button", { name: "Preview attachment" })).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: "Download attachment" })).toBeInTheDocument();
+  });
+
+  it("gives the customer a public-only composer — no internal note or quick reply tools", () => {
+    mocks.detail.mockReturnValue({ data: detail({ status: "OPEN" }) });
+    renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /quick repl/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/internal note/i)).not.toBeInTheDocument();
+  });
+
+  it("bounds the conversation message viewport and keeps the attach band + composer outside that scroll", () => {
+    mocks.detail.mockReturnValue({ data: detail({ status: "OPEN" }) });
+    renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
+    const list = screen.getByRole("list", { name: "Request conversation" });
+    const scrollRegion = list.closest(".overflow-y-auto") as HTMLElement;
+    expect(scrollRegion).toBeTruthy();
+    expect(scrollRegion.className).toMatch(/lg:flex-1/);
+    // the conversation card is a bounded flex column with a desktop height cap on its wrapper
+    const card = list.closest("section") as HTMLElement;
+    expect(card.className).toMatch(/lg:flex\b/);
+    expect(card.className).toMatch(/lg:h-full/);
+    expect((card.parentElement as HTMLElement).className).toMatch(/lg:h-\[calc\(/);
+    // attach band + Send live AFTER the scroll region, never inside it
+    expect(scrollRegion.contains(screen.getByRole("button", { name: "Attach file" }))).toBe(false);
+    expect(scrollRegion.contains(screen.getByRole("button", { name: "Send Reply" }))).toBe(false);
+  });
+
+  it("does not change the conversation card shell when the attachment uploader is toggled open", async () => {
+    mocks.detail.mockReturnValue({ data: detail({ status: "OPEN" }) });
+    renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
+    const card = screen.getByRole("list", { name: "Request conversation" }).closest("section") as HTMLElement;
+    const shellBefore = card.className;
+    fireEvent.click(screen.getByRole("button", { name: "Attach file" }));
+    expect(await screen.findByText("Choose file")).toBeInTheDocument();
+    // the flex-1 message region absorbs the revealed form; card height classes are untouched
+    expect(card.className).toBe(shellBefore);
   });
 });
 function renderPage(element: React.ReactNode, path = "/portal") { return render(<MemoryRouter initialEntries={[path]}><Routes><Route path="/portal/*" element={element}/></Routes></MemoryRouter>); }

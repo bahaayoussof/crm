@@ -7,12 +7,17 @@ import { DataTableEmptyRow } from "@/components/shared/data-table/data-table-emp
 import { DataTablePagination } from "@/components/shared/data-table/data-table-pagination";
 import { TicketPriorityText } from "@/features/tickets/ticket-badges";
 import { formatTicketDate } from "@/features/tickets/ticket-format";
-import type { PortalTicketListItem } from "./portal.types";
+import type { PortalTicket, TicketPriority } from "./portal.types";
 import { PortalStatus, TicketRef } from "./portal-ui";
 
+type PortalTicketRow = PortalTicket & { priority?: TicketPriority };
+
 interface PortalTicketsTableProps {
-  tickets: PortalTicketListItem[];
+  tickets: PortalTicketRow[];
   emptyMessage?: string;
+  /** "My Requests" exposes the customer-safe priority column; the compact
+   * "Recent requests" list on the Portal home omits it. Never an internal-only field. */
+  showPriority?: boolean;
   page: number;
   pageSize: number;
   pageCount: number;
@@ -29,6 +34,7 @@ interface PortalTicketsTableProps {
 export function PortalTicketsTable({
   tickets,
   emptyMessage,
+  showPriority = true,
   page,
   pageSize,
   pageCount,
@@ -37,7 +43,7 @@ export function PortalTicketsTable({
 }: PortalTicketsTableProps) {
   const { t, i18n } = useTranslation();
 
-  const columns = useMemo<ColumnDef<PortalTicketListItem>[]>(
+  const columns = useMemo<ColumnDef<PortalTicketRow>[]>(
     () => [
       {
         id: "id",
@@ -71,12 +77,15 @@ export function PortalTicketsTable({
         header: t("portal.statusLabel"),
         cell: ({ row }) => <PortalStatus status={row.original.status} />,
       },
-      {
-        id: "priority",
-        accessorKey: "priority",
-        header: t("portal.priority"),
-        cell: ({ row }) => <TicketPriorityText priority={row.original.priority} />,
-      },
+      ...(showPriority
+        ? [{
+            id: "priority",
+            accessorKey: "priority",
+            header: t("portal.priority"),
+            cell: ({ row }) =>
+              row.original.priority ? <TicketPriorityText priority={row.original.priority} /> : null,
+          } as ColumnDef<PortalTicketRow>]
+        : []),
       {
         id: "category",
         header: t("portal.category"),
@@ -97,7 +106,7 @@ export function PortalTicketsTable({
         ),
       },
     ],
-    [i18n.language, t],
+    [i18n.language, t, showPriority],
   );
 
   const pagination = useMemo<PaginationState>(() => ({ pageIndex: page - 1, pageSize }), [page, pageSize]);
@@ -167,7 +176,7 @@ export function PortalTicketsTable({
                 <strong className="min-w-0 break-words text-[12px] font-semibold text-foreground">
                   {ticket.subject}
                 </strong>
-                <TicketPriorityText priority={ticket.priority} />
+                {showPriority && ticket.priority && <TicketPriorityText priority={ticket.priority} />}
               </div>
               <div className="mt-2.5 flex flex-wrap items-center gap-2">
                 <PortalStatus status={ticket.status} />

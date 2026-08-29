@@ -253,6 +253,48 @@ export function AttachmentUploadForm({
   );
 }
 
+/**
+ * The "Attach file" band that sits between the scrollable conversation and the
+ * reply composer. Presentation only — the caller supplies the upload behaviour
+ * (`upload`) and, when uploading is not available, the reason to show in its
+ * place (`disabledReason`). Used by both the internal Ticket Details view and the
+ * Customer Portal ticket view so the attachment input has one placement + look.
+ */
+export function ConversationAttachmentBand({
+  canUpload,
+  upload,
+  disabledReason,
+  uploadLabel,
+}: {
+  canUpload: boolean;
+  upload?: { mutateAsync: (file: File) => Promise<unknown>; isPending: boolean };
+  /** Shown in place of the trigger when `canUpload` is false (default: assignment hint). */
+  disabledReason?: string;
+  /** Overrides the submit button label inside the revealed form (default: `attachments.uploadShort`). */
+  uploadLabel?: string;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="p-3 sm:p-4">
+      {!canUpload || !upload ? (
+        <p className="text-xs text-muted-foreground">{disabledReason ?? t("attachments.uploadRequiresAssignment")}</p>
+      ) : open ? (
+        <AttachmentUploadForm
+          onUpload={(file) => upload.mutateAsync(file)}
+          isPending={upload.isPending}
+          onClose={() => setOpen(false)}
+          uploadLabel={uploadLabel ?? t("attachments.uploadShort")}
+        />
+      ) : (
+        <button type="button" className="button-secondary sm:w-auto" onClick={() => setOpen(true)}>
+          {t("attachments.attachFile")}
+        </button>
+      )}
+    </div>
+  );
+}
+
 /** Full attachments panel: heading, optional upload control or disabled reason, then the list. */
 export function AttachmentPanel({
   attachments,

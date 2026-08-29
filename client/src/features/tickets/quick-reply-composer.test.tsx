@@ -18,7 +18,7 @@ vi.mock("./ticket-hooks", () => ({
   useCreateTicketMessage: () => ({ mutateAsync: mocks.createMessage, isPending: false }),
   useCreateTicketNote: () => ({ mutateAsync: mocks.createNote, isPending: false }),
 }));
-vi.mock("@/features/attachments/attachment-ui", () => ({ MessageAttachmentList: () => null }));
+vi.mock("@/features/attachments/attachment-ui", () => ({ MessageAttachmentList: () => null, ConversationAttachmentBand: () => null }));
 
 import { TicketConversation } from "./ticket-conversation";
 
