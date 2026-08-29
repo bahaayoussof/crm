@@ -7,7 +7,7 @@ import { AppShell } from "@/app/layouts/app-shell";
 export function ProtectedRoute({ audience }: { audience: ProtectedAudience }) {
   const { t } = useTranslation();
   const { user, isLoading } = useAuth();
-  if (isLoading) return <main className="grid min-h-[100dvh] place-items-center bg-background px-4"><div className="w-full max-w-sm" aria-label={t("common.loading")}><div className="h-4 w-28 animate-pulse rounded bg-muted" /><div className="mt-4 h-10 animate-pulse rounded bg-muted" /><div className="mt-3 h-10 animate-pulse rounded bg-muted" /></div></main>;
+  if (isLoading) return <main className="grid h-full place-items-center bg-background px-4"><div className="w-full max-w-sm" aria-label={t("common.loading")}><div className="h-4 w-28 animate-pulse rounded bg-muted" /><div className="mt-4 h-10 animate-pulse rounded bg-muted" /><div className="mt-3 h-10 animate-pulse rounded bg-muted" /></div></main>;
   const redirect = getProtectedRedirect(user, audience);
   if (redirect) return <Navigate to={redirect} replace />;
   return <AppShell audience={audience}><Outlet /></AppShell>;

@@ -403,9 +403,18 @@
 }
 
 * { border-color: var(--border); }
+
+/* Explicit root viewport-height contract.
+   html = viewport height, body = html, #root = body. One viewport-height
+   source; every descendant fills its parent with h-full. The document/body
+   never scrolls — each app layout owns its own internal scroll region. */
+html, body, #root { width: 100%; height: 100%; min-height: 0; }
+html, body { overflow: hidden; }
+#root { overflow: hidden; }
+
 html { background: var(--background); }
 html, body { font-family: var(--font-app); }
-body { margin: 0; min-width: 320px; min-height: 100dvh; background: var(--background); color: var(--foreground); font-size: 0.875rem; line-height: 1.5; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body { margin: 0; min-width: 320px; background: var(--background); color: var(--foreground); font-size: 0.875rem; line-height: 1.5; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 button, input, select, textarea { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 ::selection { background: color-mix(in srgb, var(--foreground) 15%, transparent); }
@@ -420,7 +429,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 ::-webkit-scrollbar-corner { background: transparent; }
 
 @layer components {
-  .page-container { @apply mx-auto min-h-[calc(100dvh-4rem)] w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8; }
+  .page-container { @apply mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8; }
 
   /* Base input style */
   .input { @apply min-h-10 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 hover:border-border-strong focus:border-ring focus:ring-2 focus:ring-ring/15 disabled:cursor-not-allowed disabled:bg-muted disabled:text-disabled-foreground aria-invalid:border-danger aria-invalid:ring-danger/15; }

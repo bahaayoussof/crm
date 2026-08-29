@@ -6,7 +6,7 @@ export function AuthLayout({ title, description, children }: { title: string; de
   const { t } = useTranslation();
 
   return (
-    <main className="min-h-[100dvh] bg-background px-4 py-5 sm:px-6 sm:py-8">
+    <main className="h-full overflow-y-auto bg-background px-4 py-5 sm:px-6 sm:py-8">
       <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4">
         <div className="flex items-center gap-2.5">
           <div className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-xs shadow-xs">

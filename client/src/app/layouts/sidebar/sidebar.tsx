@@ -29,7 +29,7 @@ export function Sidebar({ user, audience, collapsed, onToggleCollapsed, onLogout
   return (
     <aside
       className={cn(
-        "relative hidden lg:flex lg:flex-col lg:justify-between lg:h-[100dvh] select-none bg-sidebar border-e border-sidebar-border transition-all duration-200 ease-out z-40",
+        "relative hidden lg:flex lg:flex-col lg:justify-between lg:h-full lg:min-h-0 select-none bg-sidebar border-e border-sidebar-border transition-all duration-200 ease-out z-40",
         collapsed ? "w-[68px]" : "w-60"
       )}
     >
