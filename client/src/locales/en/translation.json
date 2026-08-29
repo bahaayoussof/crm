@@ -338,6 +338,67 @@
       "noResults": "No matching people"
     }
   },
+  "aiAssistant": {
+    "title": "AI Assistant",
+    "summarize": "Summarize Ticket",
+    "summarizing": "Summarizing ticket…",
+    "summaryHeading": "AI Summary",
+    "suggestReply": "Suggest Reply",
+    "generatingReply": "Generating reply…",
+    "suggestedReplyHeading": "Suggested Reply",
+    "insertIntoReply": "Insert into Reply",
+    "inserted": "Draft inserted into the reply box.",
+    "suggestCategory": "Suggest Category",
+    "analyzingCategory": "Analyzing category…",
+    "suggestedCategoryHeading": "Suggested Category",
+    "confidenceLabel": "AI confidence",
+    "reasonLabel": "Reason",
+    "applyCategory": "Apply Category",
+    "categoryApplied": "Category applied.",
+    "categoryAlreadyCurrent": "This ticket already uses the suggested category.",
+    "noCategoryCandidates": "No active categories are available for AI classification.",
+    "findSolution": "Find Solution",
+    "findingSolutions": "Finding solutions…",
+    "suggestedSolutionsHeading": "Suggested Solutions",
+    "openArticle": "Open Article",
+    "noKbResults": "No relevant Knowledge Base articles were found for this ticket.",
+    "regenerate": "Regenerate",
+    "retry": "Retry",
+    "emptyTimeline": "No timeline events identified.",
+    "unavailable": "AI assistant unavailable",
+    "unavailableHint": "AI features are not configured for this workspace.",
+    "confidence": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "relevance": {
+      "high": "High relevance",
+      "medium": "Medium relevance",
+      "low": "Low relevance"
+    },
+    "insertConfirm": {
+      "title": "Existing reply text detected.",
+      "atCursor": "Insert at cursor",
+      "replace": "Replace reply"
+    },
+    "fields": {
+      "issue": "Issue",
+      "timeline": "Timeline",
+      "currentState": "Current State",
+      "recommendedNextAction": "Recommended Next Action"
+    },
+    "errors": {
+      "AI_TIMEOUT": "The AI request timed out. Try again.",
+      "AI_GENERATION_FAILED": "The AI request could not be completed. Try again.",
+      "AI_PROVIDER_RATE_LIMITED": "The AI provider is temporarily busy. Please try again shortly.",
+      "RATE_LIMITED": "Too many AI requests. Wait a few minutes and try again.",
+      "TICKET_NOT_FOUND": "This ticket is no longer available.",
+      "generic": "Something went wrong. Try again.",
+      "replyTooLong": "The draft would make the reply too long. Nothing was inserted.",
+      "applyCategoryFailed": "Could not apply the category. Try again."
+    }
+  },
   "attachments": {
     "title": "Attachments",
     "upload": "Upload attachment",

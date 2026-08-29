@@ -1,9 +1,10 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { forwardRef, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ConversationAttachmentBand, MessageAttachmentList } from "@/features/attachments/attachment-ui";
 import { MentionTextarea } from "@/features/collaboration/mention-textarea";
 import { renderMentions } from "@/features/collaboration/render-mentions";
 import { QuickReplyPicker } from "@/features/quick-replies/quick-reply-picker";
+import { replaceReplyValue, spliceReply } from "./reply-insertion";
 import { ConversationMessage, ConversationSection } from "./ticket-conversation-ui";
 import { getTicketError } from "./ticket-error";
 import { useCreateTicketMessage, useCreateTicketNote } from "./ticket-hooks";
@@ -12,19 +13,18 @@ import type { TicketChannel, TicketConversationItem, TicketMessageResult } from 
 type Mode = "reply" | "note";
 type MessageAttachment = { id: string; fileName: string; mimeType: string; createdAt: string };
 
-// Matches the server public-reply limit (`ticketConversationBodySchema` / `portalReplySchema`: body max 20_000).
-const MAX_PUBLIC_REPLY_LENGTH = 20_000;
+/** Narrow imperative surface for cross-column actions (AI "Insert into Reply").
+ * Exposes only the public-reply operations — never internal composer state. */
+export type TicketConversationHandle = {
+  /** True when the public reply draft holds non-whitespace text. */
+  hasReplyText: () => boolean;
+  /** Insert an AI-suggested reply into the public reply draft: switches to the
+   * reply tab, reuses the caret-aware splice, and focuses the textarea. Returns
+   * "too-long" — leaving the draft untouched — when the limit would be exceeded. */
+  insertSuggestedReply: (text: string, mode: "cursor" | "replace") => "inserted" | "too-long";
+};
 
-export function TicketConversation({
-  ticketId,
-  items,
-  canMutate,
-  messageAttachments,
-  canUpload = false,
-  upload,
-  channel,
-  customerPhone,
-}: {
+type TicketConversationProps = {
   ticketId: string;
   items: TicketConversationItem[];
   canMutate: boolean;
@@ -33,7 +33,13 @@ export function TicketConversation({
   upload?: { mutateAsync: (file: File) => Promise<unknown>; isPending: boolean };
   channel?: TicketChannel;
   customerPhone?: string | null;
-}) {
+};
+
+export const TicketConversation = forwardRef<TicketConversationHandle, TicketConversationProps>(
+  function TicketConversation(
+    { ticketId, items, canMutate, messageAttachments, canUpload = false, upload, channel, customerPhone },
+    ref,
+  ) {
   const { t, i18n } = useTranslation();
   const isWhatsapp = channel === "WHATSAPP";
   const [mode, setMode] = useState<Mode>("reply");
@@ -65,20 +71,44 @@ export function TicketConversation({
     const element = replyRef.current;
     const start = element?.selectionStart ?? reply.length;
     const end = element?.selectionEnd ?? reply.length;
-    const before = reply.slice(0, start);
-    const after = reply.slice(end);
-    const leading = before !== "" && !/\s$/.test(before) ? "\n\n" : "";
-    const trailing = after !== "" && !/^\s/.test(after) ? "\n\n" : "";
-    const inserted = `${leading}${snippet}${trailing}`;
-    const next = `${before}${inserted}${after}`;
-    if (next.length > MAX_PUBLIC_REPLY_LENGTH) {
+    const outcome = spliceReply(reply, snippet, start, end);
+    if (outcome.status === "too-long") {
       setInsertError(t("quickReplies.picker.lengthExceeded"));
       return;
     }
     setInsertError(null);
-    pendingCaretRef.current = before.length + leading.length + snippet.length;
-    setReply(next);
+    pendingCaretRef.current = outcome.caret;
+    setReply(outcome.nextValue);
   };
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      hasReplyText: () => reply.trim().length > 0,
+      insertSuggestedReply: (text, mode) => {
+        const outcome =
+          mode === "replace"
+            ? replaceReplyValue(text)
+            : spliceReply(
+                reply,
+                text,
+                replyRef.current?.selectionStart ?? reply.length,
+                replyRef.current?.selectionEnd ?? reply.length,
+              );
+        if (outcome.status === "too-long") return "too-long";
+        // Explicit user action → land in the public reply tab and focus the box
+        // (the pendingCaret effect below restores the caret after the value change).
+        setError(null);
+        setSuccess(null);
+        setInsertError(null);
+        setMode("reply");
+        pendingCaretRef.current = outcome.caret;
+        setReply(outcome.nextValue);
+        return "inserted";
+      },
+    }),
+    [reply],
+  );
 
   const submit = async () => {
     if (!canMutate || !body.trim() || pending) return;
@@ -168,4 +198,5 @@ export function TicketConversation({
       })}
     </ConversationSection>
   );
-}
+  },
+);

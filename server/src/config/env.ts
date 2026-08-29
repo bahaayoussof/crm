@@ -32,6 +32,17 @@ const envSchema = z.object({
   WHATSAPP_VERIFY_TOKEN: z.string().min(1).optional(),
   WHATSAPP_APP_SECRET: z.string().min(1).optional(),
   WHATSAPP_API_VERSION: z.string().regex(/^v\d+\.\d+$/, "WHATSAPP_API_VERSION must look like v22.0").default("v22.0"),
+  // AI Assistant (server/src/modules/ai) — internal agent-assistance layer only.
+  // All optional: when AI_PROVIDER / AI_API_KEY / AI_MODEL are not all set (or
+  // AI_PROVIDER names an unsupported vendor), the AI endpoints return a structured
+  // AI_NOT_CONFIGURED error and the rest of the CRM is unaffected. AI_PROVIDER is a
+  // free string here — an unknown value must NOT crash startup; `ai.config.ts`
+  // decides support. Never exposed to the browser. AI_MODEL is the only place the
+  // model is chosen — business logic never hardcodes it.
+  AI_PROVIDER: z.string().min(1).optional(),
+  AI_API_KEY: z.string().min(1).optional(),
+  AI_MODEL: z.string().min(1).optional(),
+  AI_TIMEOUT_MS: z.coerce.number().int().positive().max(120_000).default(20_000),
 });
 
 const result = envSchema.safeParse(process.env);

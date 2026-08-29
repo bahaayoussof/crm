@@ -21,6 +21,7 @@ vi.mock("@/features/collaboration/mention-textarea", () => ({
   ),
 }));
 vi.mock("@/features/collaboration/watch-toggle", () => ({ WatchToggle: () => null }));
+vi.mock("@/features/ai-assistant/ai-assistant-panel", () => ({ AiAssistantPanel: () => null }));
 
 import { TicketDetailPage } from "./ticket-detail-page";
 import { TicketFormPage } from "./ticket-form-page";

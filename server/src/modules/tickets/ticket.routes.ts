@@ -12,6 +12,9 @@ import {
 } from "../attachments/attachment.controller.js";
 import { messageAttachmentParamsSchema, ticketAttachmentParamsSchema } from "../attachments/attachment.schema.js";
 import { unwatch, watch, watchers } from "../collaboration/collaboration.controller.js";
+import { runAction as runAiAction } from "../ai/ai.controller.js";
+import { aiActionSchema } from "../ai/ai.schema.js";
+import { aiRateLimit } from "../ai/ai-rate-limit.js";
 
 export const ticketRouter = Router();
 ticketRouter.use(requireAuth, requireRole(Role.ADMIN, Role.MANAGER, Role.AGENT));
@@ -21,6 +24,12 @@ ticketRouter.get("/:id", validateParams(ticketParamsSchema), detail);
 ticketRouter.patch("/:id", validateParams(ticketParamsSchema), validateBody(updateTicketSchema), update);
 ticketRouter.post("/:id/messages", validateParams(ticketParamsSchema), validateBody(ticketConversationBodySchema), createMessage);
 ticketRouter.post("/:id/notes", validateParams(ticketParamsSchema), validateBody(ticketConversationBodySchema), createNote);
+
+// feature/ai-assistant (ADR-034) — internal agent-assistance. Suggestions only:
+// this endpoint never mutates the ticket, sends a message, or changes state.
+// Inherits requireAuth + ADMIN/MANAGER/AGENT guard; AI context is built server-
+// side after the same ticket-visibility check as GET /:id.
+ticketRouter.post("/:id/ai", aiRateLimit, validateParams(ticketParamsSchema), validateBody(aiActionSchema), runAiAction);
 
 // feature/team-collaboration — ticket watchers (self-watch / self-unwatch / list).
 // Inherits this router's requireAuth + internal-role guard; each handler re-checks

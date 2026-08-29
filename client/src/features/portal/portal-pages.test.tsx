@@ -268,6 +268,9 @@ describe("portal ticket details shares the internal ticket design", () => {
       /internal note/i, /add note/i, /manage ticket/i, /ticket properties/i, /assigned agent/i, /assignee/i,
       /watch|follow ticket|watcher/i, /mention/i, /\bactivity\b/i, /history/i, /\bSLA\b/i, /breached/i, /at risk/i,
       /on track/i, /first response due/i, /resolution due/i, /escalat/i, /save changes/i, /close ticket/i,
+      /ai assistant/i, /summarize ticket/i, /ai summary/i, /suggest reply/i, /suggested reply/i, /insert into reply/i,
+      /suggest category/i, /suggested category/i, /apply category/i, /ai confidence/i,
+      /find solution/i, /suggested solutions/i, /open article/i, /relevance/i,
     ]) {
       expect(screen.queryByText(pattern)).not.toBeInTheDocument();
     }

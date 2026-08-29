@@ -395,6 +395,27 @@ DELETE /api/tickets/:id/watchers/me        unfollow the ticket (self only, safe 
 - **Watcher activity:** watchers receive a `TICKET_WATCH_ACTIVITY` notification when a staff reply or internal note is added, when status changes, when assignment changes, or when the customer replies from the Portal — always excluding the actor and any recipient already notified by the triggering event's own notification (assignment, escalation, customer-reply, or a `TICKET_MENTION` for the same note).
 - No schema column changes to existing tables; new tables `TicketWatcher` and `TicketMention` (migration `20260828163000_add_team_collaboration`). No new `Notification` enum — `type` stays a string with two new values.
 
+## AI Assistant — INTERNAL (on `feature/ai-assistant`, not yet integrated)
+
+`feature/ai-assistant` (ADR-034). Internal agent-assistance layer — suggestions only. `CUSTOMER` and unauthenticated callers are rejected at the router; the Customer Portal exposes nothing.
+
+```text
+POST /api/tickets/:id/ai      body: { "action": "SUMMARY" | "SUGGEST_REPLY" | "CLASSIFY" | "KB_SUGGESTIONS", "locale"?: "en" | "ar" }
+```
+
+- Sub-route of `ticketRouter` (`requireAuth` + `requireRole(ADMIN, MANAGER, AGENT)`). The client sends **only `{ action }`** plus an optional strict `locale` enum — no messages, notes, customer data, or free-form text. `.strict()` body; any extra key, unknown action, or unsupported locale → `400 VALIDATION_ERROR`. `locale` currently affects **SUMMARY** only (output language); other actions ignore it.
+- The server builds the AI context itself after the **same ticket-visibility check as `GET /api/tickets/:id`** (`ticketVisibilityWhere`); a hidden or missing ticket → `404 TICKET_NOT_FOUND` (IDOR-safe). There is no weaker AI-only visibility rule.
+- **Context is minimized per action.** SUMMARY and SUGGEST_REPLY may use internal notes (SUGGEST_REPLY only inside a non-disclosable private block). **CLASSIFY and KB_SUGGESTIONS never receive internal notes** and only get the recent public exchange plus the server-owned candidate list.
+- This endpoint never mutates the ticket, sends a message, or changes status/category/priority/assignment. Using a suggestion (insert reply text, apply category, open article) is a separate explicit user action through the existing ticket-update / composer / KB-route paths and their RBAC.
+- Success → `200 { data: { action, promptVersion, result } }`:
+  - `SUMMARY` → `result: { issue, timeline: string[] (≤8), currentState, recommendedNextAction }`
+  - `SUGGEST_REPLY` → `result: { reply }` (≤5000 chars; internal notes never appear in it)
+  - `CLASSIFY` → `result: { categoryId, categoryName, confidence (0..1), reason }` — `categoryId` is always one of the server's active categories (re-validated after generation; `categoryName` from the server record, not the model)
+  - `KB_SUGGESTIONS` → `result: { articles: [{ id, title, excerpt, relevance (0..1), reason }] }` (≤5) — every `id` is a real **PUBLISHED** article from the server candidate set; `title`/`excerpt` from the server record
+- Provider config is four optional env vars (`AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL`, `AI_TIMEOUT_MS`). Not fully configured, or `AI_PROVIDER` naming an unsupported vendor → `503 AI_NOT_CONFIGURED` (never a startup crash, never a silent fallback to OpenRouter); the rest of the CRM is unaffected. Provider timeout → `504 AI_TIMEOUT`; **provider rate-limited (HTTP 429 from OpenRouter/upstream)** → `503 AI_PROVIDER_RATE_LIMITED` (retryable; `Retry-After` header + `details.retryAfterSeconds` when known; the adapter already made one bounded in-budget retry); other provider/network/output failure → `502 AI_GENERATION_FAILED`; **CLASSIFY** with zero active categories → `422 AI_NO_CANDIDATES` (KB_SUGGESTIONS with no matching articles is a normal `200 { articles: [] }`, not an error, and does not call the provider). Raw provider errors, upstream provider names, and OpenRouter internals are never forwarded.
+- Rate limit: `429 RATE_LIMITED` after 20 actions per user per 10 minutes, with a `Retry-After` header and `{ retryAfterSeconds }` detail.
+- First provider adapter: OpenRouter via native `fetch` (`z-ai/glm-5.2:free` initial dev/demo model), fully isolated behind an `AiProvider` interface; model is chosen only by `AI_MODEL`. No schema or migration change.
+
 ## SLA automation — INTERNAL CRON
 
 ```text

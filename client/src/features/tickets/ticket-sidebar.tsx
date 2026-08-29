@@ -3,6 +3,8 @@ import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { AppSelectField } from "@/components/ui/app-select";
+import { AiAssistantPanel } from "@/features/ai-assistant/ai-assistant-panel";
+import type { CategoryApplyApi, ReplyInsertionApi } from "@/features/ai-assistant/ai-assistant.types";
 import { WatchToggle } from "@/features/collaboration/watch-toggle";
 import { getTicketError } from "./ticket-error";
 import { formatTicketDate } from "./ticket-format";
@@ -25,12 +27,26 @@ interface TicketSidebarProps {
   canWorkflow: boolean;
   canClose: boolean;
   locale: string;
+  /** Bridge to the public reply composer for AI "Insert into Reply". Omitted
+   * when the caller cannot post a reply (read-only / unassigned agent). */
+  replyInsertion?: ReplyInsertionApi;
+  /** Adapter for AI "Apply Category". Omitted when the caller cannot change the
+   * ticket category under normal CRM rules (`canManage`). */
+  categoryApply?: CategoryApplyApi;
 }
 
 /** Contextual ticket information beside the conversation. One subtle container,
  * sections separated by dividers rather than a card per subsection. Attachments
  * live in the main conversation column, not here. */
-export function TicketSidebar({ record, canManage, canWorkflow, canClose, locale }: TicketSidebarProps) {
+export function TicketSidebar({
+  record,
+  canManage,
+  canWorkflow,
+  canClose,
+  locale,
+  replyInsertion,
+  categoryApply,
+}: TicketSidebarProps) {
   const { t } = useTranslation();
   return (
     <aside className="min-w-0">
@@ -43,6 +59,12 @@ export function TicketSidebar({ record, canManage, canWorkflow, canClose, locale
             watcherCount={record.watcherCount ?? 0}
           />
         </Section>
+        <AiAssistantPanel
+          ticketId={record.id}
+          replyInsertion={replyInsertion}
+          currentCategoryId={record.category?.id ?? null}
+          categoryApply={categoryApply}
+        />
         <CustomerSection record={record} />
         <DescriptionSection description={record.description} />
         <SlaSection record={record} language={locale} />

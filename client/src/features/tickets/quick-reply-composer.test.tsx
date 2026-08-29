@@ -1,5 +1,6 @@
+import { createRef } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -20,7 +21,7 @@ vi.mock("./ticket-hooks", () => ({
 }));
 vi.mock("@/features/attachments/attachment-ui", () => ({ MessageAttachmentList: () => null, ConversationAttachmentBand: () => null }));
 
-import { TicketConversation } from "./ticket-conversation";
+import { TicketConversation, type TicketConversationHandle } from "./ticket-conversation";
 
 const qr = (id: string, title: string, body: string) => ({
   id, title, body,
@@ -314,6 +315,82 @@ describe("quick reply composer integration", () => {
     const option = await screen.findByRole("option", { name: /Zebra escalation/ });
     fireEvent.click(option);
     await waitFor(() => expect(replyBox().value).toBe("Escalate to the zebra team immediately."));
+  });
+});
+
+describe("TicketConversation imperative reply insertion (AI 'Insert into Reply')", () => {
+  afterEach(cleanup);
+  beforeEach(async () => {
+    await changeAppLanguage("en");
+    vi.clearAllMocks();
+    mocks.getQuickReplies.mockImplementation(defaultSearch);
+  });
+
+  function renderWithHandle() {
+    const ref = createRef<TicketConversationHandle>();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <TicketConversation ref={ref} ticketId="ticket-1" items={[]} canMutate />
+      </QueryClientProvider>,
+    );
+    return ref;
+  }
+
+  it("reports whether the public reply draft has text", () => {
+    const ref = renderWithHandle();
+    expect(ref.current?.hasReplyText()).toBe(false);
+    setDraft("hello");
+    expect(ref.current?.hasReplyText()).toBe(true);
+    setDraft("   ");
+    expect(ref.current?.hasReplyText()).toBe(false);
+  });
+
+  it("inserts an AI draft into an empty composer and focuses the textarea", () => {
+    const ref = renderWithHandle();
+    let outcome: string | undefined;
+    act(() => {
+      outcome = ref.current?.insertSuggestedReply("Thanks for the update.", "cursor");
+    });
+    expect(outcome).toBe("inserted");
+    expect(replyBox().value).toBe("Thanks for the update.");
+    expect(document.activeElement).toBe(replyBox());
+  });
+
+  it("splices at the caret and separates from existing text", () => {
+    const ref = renderWithHandle();
+    setDraft("Hello.There.", 6, 6); // caret after "Hello."
+    act(() => {
+      ref.current?.insertSuggestedReply("INSERTED", "cursor");
+    });
+    expect(replyBox().value).toBe("Hello.\n\nINSERTED\n\nThere.");
+  });
+
+  it("replace swaps the whole draft only on the replace mode", () => {
+    const ref = renderWithHandle();
+    setDraft("agent typed this");
+    act(() => {
+      ref.current?.insertSuggestedReply("AI DRAFT", "replace");
+    });
+    expect(replyBox().value).toBe("AI DRAFT");
+  });
+
+  it("rejects an over-limit insertion without changing the draft", () => {
+    const ref = renderWithHandle();
+    setDraft("existing draft");
+    let outcome: string | undefined;
+    act(() => {
+      outcome = ref.current?.insertSuggestedReply("x".repeat(20_001), "cursor");
+    });
+    expect(outcome).toBe("too-long");
+    expect(replyBox().value).toBe("existing draft");
+  });
+
+  it("Quick Reply insertion still works after the shared splice refactor", async () => {
+    renderConversation();
+    setDraft("Intro.");
+    await openAndPick(/Greeting/);
+    await waitFor(() => expect(replyBox().value).toBe("Intro.\n\nHello and welcome to our support team."));
   });
 });
 

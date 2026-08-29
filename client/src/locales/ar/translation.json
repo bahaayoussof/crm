@@ -338,6 +338,67 @@
       "noResults": "لا يوجد أشخاص مطابقون"
     }
   },
+  "aiAssistant": {
+    "title": "المساعد الذكي",
+    "summarize": "تلخيص التذكرة",
+    "summarizing": "جارٍ تلخيص التذكرة…",
+    "summaryHeading": "ملخّص الذكاء الاصطناعي",
+    "suggestReply": "اقتراح رد",
+    "generatingReply": "جارٍ إنشاء الرد…",
+    "suggestedReplyHeading": "الرد المقترح",
+    "insertIntoReply": "إدراج في الرد",
+    "inserted": "تم إدراج المسودة في مربع الرد.",
+    "suggestCategory": "اقتراح التصنيف",
+    "analyzingCategory": "جارٍ تحليل التصنيف…",
+    "suggestedCategoryHeading": "التصنيف المقترح",
+    "confidenceLabel": "ثقة الذكاء الاصطناعي",
+    "reasonLabel": "السبب",
+    "applyCategory": "تطبيق التصنيف",
+    "categoryApplied": "تم تطبيق التصنيف.",
+    "categoryAlreadyCurrent": "تستخدم هذه التذكرة التصنيف المقترح بالفعل.",
+    "noCategoryCandidates": "لا توجد تصنيفات نشطة متاحة لتصنيف الذكاء الاصطناعي.",
+    "findSolution": "البحث عن حل",
+    "findingSolutions": "جارٍ البحث عن حلول…",
+    "suggestedSolutionsHeading": "الحلول المقترحة",
+    "openArticle": "فتح المقالة",
+    "noKbResults": "لم يتم العثور على مقالات ذات صلة في قاعدة المعرفة لهذه التذكرة.",
+    "regenerate": "إعادة التوليد",
+    "retry": "إعادة المحاولة",
+    "emptyTimeline": "لا توجد أحداث زمنية محدّدة.",
+    "unavailable": "المساعد الذكي غير متاح",
+    "unavailableHint": "ميزات الذكاء الاصطناعي غير مُهيّأة لمساحة العمل هذه.",
+    "confidence": {
+      "high": "مرتفعة",
+      "medium": "متوسطة",
+      "low": "منخفضة"
+    },
+    "relevance": {
+      "high": "صلة عالية",
+      "medium": "صلة متوسطة",
+      "low": "صلة منخفضة"
+    },
+    "insertConfirm": {
+      "title": "يوجد نص رد مكتوب بالفعل.",
+      "atCursor": "إدراج عند المؤشر",
+      "replace": "استبدال الرد"
+    },
+    "fields": {
+      "issue": "المشكلة",
+      "timeline": "التسلسل الزمني",
+      "currentState": "الحالة الحالية",
+      "recommendedNextAction": "الإجراء التالي المقترح"
+    },
+    "errors": {
+      "AI_TIMEOUT": "انتهت مهلة طلب الذكاء الاصطناعي. حاول مرة أخرى.",
+      "AI_GENERATION_FAILED": "تعذّر إكمال طلب الذكاء الاصطناعي. حاول مرة أخرى.",
+      "AI_PROVIDER_RATE_LIMITED": "مزود الذكاء الاصطناعي مشغول مؤقتًا. حاول مرة أخرى بعد قليل.",
+      "RATE_LIMITED": "طلبات ذكاء اصطناعي كثيرة جدًا. انتظر بضع دقائق ثم حاول مرة أخرى.",
+      "TICKET_NOT_FOUND": "لم تعُد هذه التذكرة متاحة.",
+      "generic": "حدث خطأ ما. حاول مرة أخرى.",
+      "replyTooLong": "ستجعل المسودة الرد طويلًا جدًا. لم يتم إدراج أي شيء.",
+      "applyCategoryFailed": "تعذّر تطبيق التصنيف. حاول مرة أخرى."
+    }
+  },
   "attachments": {
     "title": "المرفقات",
     "upload": "رفع مرفق",

@@ -25,6 +25,15 @@ vi.mock("@/features/collaboration/mention-textarea", () => ({
   ),
 }));
 vi.mock("@/features/collaboration/watch-toggle", () => ({ WatchToggle: () => null }));
+// Real behavior is covered in features/ai-assistant/ai-assistant.test.tsx; here we
+// only need a stand-in that proves the panel is placed in the internal sidebar.
+vi.mock("@/features/ai-assistant/ai-assistant-panel", () => ({
+  AiAssistantPanel: () => (
+    <section>
+      <h2>AI Assistant</h2>
+    </section>
+  ),
+}));
 
 import { TicketDetailPage } from "./ticket-detail-page";
 
@@ -90,6 +99,11 @@ describe("Ticket Details workspace layout & long-content containment", () => {
     const columns = Array.from(grid.children) as HTMLElement[];
     expect(columns).toHaveLength(2);
     for (const column of columns) expect(column.className).toMatch(/min-w-0/);
+  });
+
+  it("shows the internal-only AI Assistant section in the sidebar", () => {
+    renderDetail();
+    expect(screen.getByRole("heading", { name: "AI Assistant" })).toBeInTheDocument();
   });
 
   it("bounds the conversation into an internally scrollable message region (desktop only)", () => {

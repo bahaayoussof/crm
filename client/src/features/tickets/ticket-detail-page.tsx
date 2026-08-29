@@ -1,13 +1,15 @@
+import { useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "@/features/auth/auth-state";
 import { useTicketAttachments, useUploadTicketAttachment } from "@/features/attachments/attachment-hooks";
+import type { CategoryApplyApi, ReplyInsertionApi } from "@/features/ai-assistant/ai-assistant.types";
 import { TicketAttachments } from "./ticket-attachments";
 import { TicketPriorityText, TicketStatusBadge } from "./ticket-badges";
-import { TicketConversation } from "./ticket-conversation";
+import { TicketConversation, type TicketConversationHandle } from "./ticket-conversation";
 import { TicketDetailHeader, TicketDetailSkeleton } from "./ticket-detail-header";
 import { getTicketErrorStatus } from "./ticket-error";
-import { useTicket } from "./ticket-hooks";
+import { useTicket, useUpdateTicket } from "./ticket-hooks";
 import { TicketSidebar } from "./ticket-sidebar";
 import { TicketPage, TicketState } from "./ticket-ui";
 import { canCloseTicket, canManageTicketDefinition, canOperateAssignedTicket } from "./ticket-permissions";
@@ -19,6 +21,26 @@ export function TicketDetailPage() {
   const ticket = useTicket(id);
   const attachments = useTicketAttachments(id);
   const uploadAttachment = useUploadTicketAttachment(id);
+
+  const conversationRef = useRef<TicketConversationHandle>(null);
+  // Stable bridge from the sidebar AI panel to the public reply composer. It only
+  // proxies to the imperative handle — no DOM access, no shared store.
+  const replyInsertion = useMemo<ReplyInsertionApi>(
+    () => ({
+      hasReplyText: () => conversationRef.current?.hasReplyText() ?? false,
+      insertSuggestedReply: (text, mode) =>
+        conversationRef.current?.insertSuggestedReply(text, mode) ?? "unavailable",
+    }),
+    [],
+  );
+
+  // AI "Apply Category" reuses the normal ticket-update mutation (RBAC + cache
+  // refresh handled there); the AI endpoint never mutates the ticket. The
+  // adapter is rebuilt each render (cheap, and never used as an effect dep).
+  const ticketUpdate = useUpdateTicket(id);
+  const categoryApply: CategoryApplyApi = {
+    apply: (categoryId) => ticketUpdate.mutateAsync({ categoryId }),
+  };
 
   if (ticket.isLoading) return <TicketPage><TicketDetailSkeleton label={t("common.loading")} /></TicketPage>;
   if (ticket.isError || !ticket.data) {
@@ -78,6 +100,7 @@ export function TicketDetailPage() {
         <div className="flex min-w-0 flex-col gap-4 lg:h-[calc(100dvh-4rem)] lg:overflow-hidden">
           <div className="min-w-0 lg:min-h-0 lg:flex-1">
             <TicketConversation
+              ref={conversationRef}
               ticketId={record.id}
               items={record.conversation}
               canMutate={canWorkflow}
@@ -107,6 +130,8 @@ export function TicketDetailPage() {
             canWorkflow={canWorkflow}
             canClose={canClose}
             locale={i18n.language}
+            replyInsertion={canWorkflow ? replyInsertion : undefined}
+            categoryApply={canManage ? categoryApply : undefined}
           />
         </div>
       </div>
