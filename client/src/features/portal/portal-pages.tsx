@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
-import { CheckCircle2, Clock, Inbox, Paperclip, Star } from "lucide-react";
+import { CalendarClock, CheckCircle2, Clock, Inbox, Paperclip, Star, Tag } from "lucide-react";
 import { useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
@@ -397,17 +397,33 @@ function TicketFeedback({ ticket }: { ticket: PortalTicketDetail }) {
  * (no priority / channel / assignee / followers). */
 function PortalContextStrip({ ticket, locale }: { ticket: PortalTicketDetail; locale: string }) {
   const { t } = useTranslation();
-  const cells: { label: string; value: React.ReactNode }[] = [
-    { label: t("portal.category"), value: ticket.category?.name ?? t("common.notProvided") },
-    { label: t("portal.created"), value: <bdi dir="ltr">{formatTicketDate(ticket.createdAt, locale)}</bdi> },
-    { label: t("portal.updated"), value: <bdi dir="ltr">{formatTicketDate(ticket.updatedAt, locale)}</bdi> },
+  const iconClass = "size-3.5 shrink-0 text-muted-foreground";
+  const cells: { label: string; icon: React.ReactNode; value: React.ReactNode }[] = [
+    {
+      label: t("portal.category"),
+      icon: <Tag className={iconClass} strokeWidth={1.75} aria-hidden="true" />,
+      value: ticket.category?.name ?? t("common.notProvided"),
+    },
+    {
+      label: t("portal.created"),
+      icon: <CalendarClock className={iconClass} strokeWidth={1.75} aria-hidden="true" />,
+      value: <bdi dir="ltr">{formatTicketDate(ticket.createdAt, locale)}</bdi>,
+    },
+    {
+      label: t("portal.updated"),
+      icon: <CalendarClock className={iconClass} strokeWidth={1.75} aria-hidden="true" />,
+      value: <bdi dir="ltr">{formatTicketDate(ticket.updatedAt, locale)}</bdi>,
+    },
   ];
   return (
     <div className="flex flex-col divide-y divide-border rounded-lg border border-border bg-card text-card-foreground shadow-subtle sm:flex-row sm:divide-x sm:divide-y-0 rtl:sm:divide-x-reverse">
       {cells.map((cell) => (
         <div key={cell.label} className="min-w-0 px-4 py-3 sm:flex-1 sm:px-5">
           <p className="text-xs font-medium text-muted-foreground">{cell.label}</p>
-          <div className="mt-1 text-sm text-foreground">{cell.value}</div>
+          <div className="mt-1 flex items-center gap-1.5 text-sm text-foreground">
+            {cell.icon}
+            <span className="min-w-0 truncate">{cell.value}</span>
+          </div>
         </div>
       ))}
     </div>

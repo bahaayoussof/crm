@@ -7,7 +7,7 @@ import { useTicketAttachments, useUploadTicketAttachment } from "@/features/atta
 import { AiAssistantPanel } from "@/features/ai-assistant/ai-assistant-panel";
 import type { CategoryApplyApi, ReplyInsertionApi } from "@/features/ai-assistant/ai-assistant.types";
 import { TicketContextSummary } from "./ticket-context-summary";
-import { TicketPriorityText, TicketStatusBadge } from "./ticket-badges";
+import { TicketStatusBadge } from "./ticket-badges";
 import { TicketConversation } from "./ticket-conversation";
 import { TicketDetailHeader, TicketDetailSkeleton } from "./ticket-detail-header";
 import { formatTicketDate } from "./ticket-format";
@@ -101,8 +101,6 @@ export function TicketDetailPage() {
             badges={
               <>
                 <TicketStatusBadge status={record.status} />
-                <TicketPriorityText priority={record.priority} />
-                <span className="text-xs text-muted-foreground">{t(`tickets.channel.${record.channel}`)}</span>
                 <span className="text-xs text-muted-foreground">
                   {t("tickets.created")} <bdi dir="ltr">{formatTicketDate(record.createdAt, i18n.language)}</bdi>
                 </span>

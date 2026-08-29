@@ -187,10 +187,6 @@ function PropertiesSection({
                 options={categoryOptions}
               />
             )}
-            <div>
-              <p className={labelClassName}>{t("tickets.channelLabel")}</p>
-              <p className="mt-1 text-sm text-foreground">{t(`tickets.channel.${record.channel}`)}</p>
-            </div>
             {canManage && (
               <AppSelectField
                 id="ticket-detail-agent"
