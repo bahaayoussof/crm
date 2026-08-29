@@ -49,18 +49,8 @@ export function AiSuggestedReply({
     mutation.mutate();
   };
 
-  if (mutation.isPending) {
-    return (
-      <div className="space-y-2" role="status" aria-live="polite">
-        <p className="text-sm text-muted-foreground">{t("aiAssistant.generatingReply")}</p>
-        <div className="space-y-2" aria-hidden="true">
-          <div className="h-3 w-full animate-pulse rounded bg-surface-subtle" />
-          <div className="h-3 w-5/6 animate-pulse rounded bg-surface-subtle" />
-          <div className="h-3 w-3/4 animate-pulse rounded bg-surface-subtle" />
-        </div>
-      </div>
-    );
-  }
+  // Idle and pending are represented by the launcher card in the action grid.
+  if (mutation.isPending) return null;
 
   if (mutation.isError) {
     return (
@@ -136,9 +126,6 @@ export function AiSuggestedReply({
     );
   }
 
-  return (
-    <button type="button" className="button-secondary sm:w-auto" onClick={() => mutation.mutate()}>
-      {t("aiAssistant.suggestReply")}
-    </button>
-  );
+  // Idle: the launcher card in the action grid is the trigger.
+  return null;
 }

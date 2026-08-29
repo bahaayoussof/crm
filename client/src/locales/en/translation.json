@@ -340,6 +340,16 @@
   },
   "aiAssistant": {
     "title": "AI Assistant",
+    "openAssistant": "Open AI Assistant",
+    "closeAssistant": "Close AI Assistant",
+    "launcherDescription": "Use AI to summarize, draft replies, classify and find relevant solutions.",
+    "launcherReady": "{{count}} results ready",
+    "actions": {
+      "summary": { "description": "Get a quick overview of the conversation." },
+      "reply": { "description": "Draft a customer-facing response." },
+      "category": { "description": "Recommend the best ticket category." },
+      "solution": { "description": "Find relevant Knowledge Base articles." }
+    },
     "summarize": "Summarize Ticket",
     "summarizing": "Summarizing ticket…",
     "summaryHeading": "AI Summary",

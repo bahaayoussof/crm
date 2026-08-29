@@ -340,6 +340,16 @@
   },
   "aiAssistant": {
     "title": "المساعد الذكي",
+    "openAssistant": "فتح المساعد الذكي",
+    "closeAssistant": "إغلاق المساعد الذكي",
+    "launcherDescription": "استخدم الذكاء الاصطناعي للتلخيص وصياغة الردود والتصنيف وإيجاد حلول ذات صلة.",
+    "launcherReady": "{{count}} نتائج جاهزة",
+    "actions": {
+      "summary": { "description": "احصل على نظرة سريعة على المحادثة." },
+      "reply": { "description": "صِغ ردًا موجهًا للعميل." },
+      "category": { "description": "اقترح أنسب تصنيف للتذكرة." },
+      "solution": { "description": "ابحث عن مقالات ذات صلة في قاعدة المعرفة." }
+    },
     "summarize": "تلخيص التذكرة",
     "summarizing": "جارٍ تلخيص التذكرة…",
     "summaryHeading": "ملخّص الذكاء الاصطناعي",

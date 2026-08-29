@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { changeAppLanguage } from "@/lib/i18n";
@@ -71,7 +71,12 @@ function makeCategoryApply(): CategoryApplyApi & { apply: ReturnType<typeof vi.f
 
 function renderPanel(
   replyInsertion?: ReplyInsertionApi,
-  extra: { currentCategoryId?: string | null; categoryApply?: CategoryApplyApi } = {},
+  extra: {
+    currentCategoryId?: string | null;
+    categoryApply?: CategoryApplyApi;
+    /** Leave the drawer closed (for launcher-only assertions). Defaults to open. */
+    openDrawer?: boolean;
+  } = {},
 ) {
   const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
   const invalidateSpy = vi.spyOn(client, "invalidateQueries");
@@ -87,6 +92,10 @@ function renderPanel(
       </QueryClientProvider>
     </MemoryRouter>,
   );
+  // The interactive AI workspace lives in a drawer; before it is opened the only
+  // control rendered is the sidebar launcher. Open it so the existing action
+  // assertions below operate on the workspace.
+  if (extra.openDrawer !== false) fireEvent.click(screen.getByRole("button"));
   return { ...utils, invalidateSpy };
 }
 
@@ -101,15 +110,18 @@ beforeEach(async () => {
 afterEach(cleanup);
 
 describe("AiAssistantPanel", () => {
-  it("renders the AI Assistant section with a Summarize action", () => {
+  it("renders the AI Assistant workspace with a Summarize action once opened", () => {
     renderPanel();
-    expect(screen.getByRole("heading", { name: "AI Assistant" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Summarize Ticket" })).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", { name: "AI Assistant" });
+    expect(within(dialog).getByRole("button", { name: "Summarize Ticket" })).toBeInTheDocument();
   });
 
-  it("makes no AI request on mount", () => {
+  it("makes no AI request on mount or when the drawer opens", () => {
     renderPanel();
     expect(mocks.requestTicketSummary).not.toHaveBeenCalled();
+    expect(mocks.requestTicketSuggestedReply).not.toHaveBeenCalled();
+    expect(mocks.requestTicketClassification).not.toHaveBeenCalled();
+    expect(mocks.requestTicketKbSuggestions).not.toHaveBeenCalled();
   });
 
   it("sends exactly one SUMMARY request when Summarize is clicked", async () => {
@@ -213,6 +225,91 @@ describe("AiAssistantPanel", () => {
   it("makes no Suggested Reply request on mount", () => {
     renderPanel(makeReplyInsertion());
     expect(mocks.requestTicketSuggestedReply).not.toHaveBeenCalled();
+  });
+});
+
+describe("AiAssistantPanel — launcher & drawer", () => {
+  it("shows only a compact launcher (no AI results) before the drawer is opened", () => {
+    renderPanel(makeReplyInsertion(), { categoryApply: makeCategoryApply(), openDrawer: false });
+    expect(screen.getByRole("button", { name: "Open AI Assistant" })).toBeInTheDocument();
+    expect(screen.getByText("Use AI to summarize, draft replies, classify and find relevant solutions.")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    for (const name of ["Summarize Ticket", "Suggest Reply", "Suggest Category", "Find Solution"]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
+  });
+
+  it("opens the workspace on launcher click and closes it with the Close control", () => {
+    renderPanel(makeReplyInsertion(), { openDrawer: false });
+    fireEvent.click(screen.getByRole("button", { name: "Open AI Assistant" }));
+    const dialog = screen.getByRole("dialog", { name: "AI Assistant" });
+    expect(within(dialog).getByRole("button", { name: "Summarize Ticket" })).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close AI Assistant" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("closes the workspace on Escape", () => {
+    renderPanel();
+    const dialog = screen.getByRole("dialog", { name: "AI Assistant" });
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("keeps generated results when the drawer is closed and reopened", async () => {
+    renderPanel(makeReplyInsertion());
+    fireEvent.click(screen.getByRole("button", { name: "Summarize Ticket" }));
+    await screen.findByText("AI Summary");
+    expect(screen.getByText(SUMMARY.result.issue)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Close AI Assistant" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open AI Assistant" }));
+    // Result is still there — no re-request needed.
+    expect(screen.getByText("AI Summary")).toBeInTheDocument();
+    expect(screen.getByText(SUMMARY.result.issue)).toBeInTheDocument();
+    expect(mocks.requestTicketSummary).toHaveBeenCalledTimes(1);
+  });
+
+  it("reflects a ready-results count on the launcher", async () => {
+    renderPanel(makeReplyInsertion());
+    fireEvent.click(screen.getByRole("button", { name: "Summarize Ticket" }));
+    await screen.findByText("AI Summary");
+    fireEvent.click(screen.getByRole("button", { name: "Close AI Assistant" }));
+    expect(screen.getByRole("button", { name: "Open AI Assistant" })).toBeInTheDocument();
+    expect(screen.getByText("1 results ready")).toBeInTheDocument();
+  });
+});
+
+describe("AiAssistantPanel — action grid", () => {
+  it("renders the four actions as a 2-column card grid with descriptions", () => {
+    renderPanel(makeReplyInsertion(), { categoryApply: makeCategoryApply() });
+    const dialog = screen.getByRole("dialog", { name: "AI Assistant" });
+    for (const name of ["Summarize Ticket", "Suggest Reply", "Suggest Category", "Find Solution"]) {
+      expect(within(dialog).getByRole("button", { name })).toBeInTheDocument();
+    }
+    for (const text of [
+      "Get a quick overview of the conversation.",
+      "Draft a customer-facing response.",
+      "Recommend the best ticket category.",
+      "Find relevant Knowledge Base articles.",
+    ]) {
+      expect(within(dialog).getByText(text)).toBeInTheDocument();
+    }
+    const grid = within(dialog)
+      .getByText("Get a quick overview of the conversation.")
+      .closest("div.grid");
+    expect(grid).toHaveClass("sm:grid-cols-2");
+  });
+
+  it("keeps the other action cards usable while one action is pending", async () => {
+    mocks.requestTicketSummary.mockReturnValue(new Promise(() => {}));
+    renderPanel(makeReplyInsertion(), { categoryApply: makeCategoryApply() });
+    fireEvent.click(screen.getByRole("button", { name: "Summarize Ticket" }));
+    expect(await screen.findByText("Summarizing ticket…")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Summarizing ticket…" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Suggest Reply" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Find Solution" })).toBeEnabled();
   });
 });
 

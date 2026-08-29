@@ -50,7 +50,7 @@ export function TicketSidebar({
   const { t } = useTranslation();
   return (
     <aside className="min-w-0">
-      <div className="divide-y divide-border-subtle rounded-xl border border-border bg-surface shadow-subtle">
+      <div className="divide-y divide-border-subtle rounded-md border border-border bg-surface shadow-subtle">
         <PropertiesSection record={record} canManage={canManage} canWorkflow={canWorkflow} canClose={canClose} />
         <Section title={t("collaboration.followTicket")}>
           <WatchToggle

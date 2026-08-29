@@ -37,17 +37,8 @@ export function AiCategorySuggestion({
 
   if (isAiNotConfigured(mutation.error)) return null; // panel renders the unavailable state
 
-  if (mutation.isPending) {
-    return (
-      <div className="space-y-2" role="status" aria-live="polite">
-        <p className="text-sm text-muted-foreground">{t("aiAssistant.analyzingCategory")}</p>
-        <div className="space-y-2" aria-hidden="true">
-          <div className="h-3 w-1/2 animate-pulse rounded bg-surface-subtle" />
-          <div className="h-3 w-3/4 animate-pulse rounded bg-surface-subtle" />
-        </div>
-      </div>
-    );
-  }
+  // Idle and pending are represented by the launcher card in the action grid.
+  if (mutation.isPending) return null;
 
   if (mutation.isError) {
     if (isAiNoCandidates(mutation.error)) {
@@ -74,13 +65,7 @@ export function AiCategorySuggestion({
   }
 
   const data = mutation.data?.result;
-  if (!data) {
-    return (
-      <button type="button" className="button-secondary sm:w-auto" onClick={() => mutation.mutate()}>
-        {t("aiAssistant.suggestCategory")}
-      </button>
-    );
-  }
+  if (!data) return null; // idle: the launcher card in the action grid is the trigger
 
   const level = scoreLevel(data.confidence);
   const isCurrent = Boolean(currentCategoryId) && data.categoryId === currentCategoryId;
