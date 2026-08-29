@@ -124,6 +124,24 @@ describe("Ticket Details workspace layout & long-content containment", () => {
     expect(screen.getByRole("button", { name: "Send reply" })).toBeInTheDocument();
   });
 
+  it("gives the desktop conversation column most of the viewport height", () => {
+    const { container } = renderDetail();
+    const leftColumn = (container.querySelector("div.grid") as HTMLElement).firstElementChild as HTMLElement;
+    expect(leftColumn.className).toMatch(/lg:h-\[calc\(100dvh-2rem\)\]/);
+    expect(leftColumn.className).toMatch(/lg:overflow-hidden/);
+  });
+
+  it("bounds the public reply textarea so a long draft cannot swallow the message area", () => {
+    const { container } = renderDetail();
+    const reply = container.querySelector("#conversation-reply") as HTMLTextAreaElement;
+    expect(reply).toBeTruthy();
+    // comfortable floor, hard ceiling, then the textarea scrolls its own content
+    expect(reply.className).toMatch(/min-h-28/);
+    expect(reply.className).toMatch(/max-h-56/);
+    expect(reply.className).toMatch(/overflow-y-auto/);
+    expect(reply.className).toMatch(/\[field-sizing:content\]/);
+  });
+
   it("gives consecutive messages breathing room", () => {
     renderDetail();
     const list = screen.getByRole("list", { name: "Ticket conversation timeline" });

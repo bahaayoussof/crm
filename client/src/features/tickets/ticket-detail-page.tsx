@@ -97,7 +97,7 @@ export function TicketDetailPage() {
         }
       />
       <div className="mt-6 grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start xl:grid-cols-[minmax(0,1fr)_24rem]">
-        <div className="flex min-w-0 flex-col gap-4 lg:h-[calc(100dvh-4rem)] lg:overflow-hidden">
+        <div className="flex min-w-0 flex-col gap-4 lg:h-[calc(100dvh-2rem)] lg:overflow-hidden">
           <div className="min-w-0 lg:min-h-0 lg:flex-1">
             <TicketConversation
               ref={conversationRef}

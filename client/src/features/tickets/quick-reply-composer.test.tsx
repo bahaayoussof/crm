@@ -265,6 +265,19 @@ describe("quick reply composer integration", () => {
     expect(screen.queryByRole("button", { name: "Insert quick reply" })).not.toBeInTheDocument();
   });
 
+  it("bounds both the public reply and internal note textareas (min/max height + internal scroll)", () => {
+    renderConversation();
+    const reply = replyBox();
+    for (const token of ["min-h-28", "max-h-56", "overflow-y-auto", "[field-sizing:content]"]) {
+      expect(reply.className).toContain(token);
+    }
+    fireEvent.click(screen.getByRole("tab", { name: "Internal note" }));
+    const note = screen.getByLabelText("Internal note") as HTMLTextAreaElement;
+    for (const token of ["min-h-28", "max-h-56", "overflow-y-auto", "[field-sizing:content]"]) {
+      expect(note.className).toContain(token);
+    }
+  });
+
   it("hides the trigger when the agent cannot mutate the ticket", () => {
     renderConversation({ canMutate: false });
     expect(screen.queryByRole("button", { name: "Insert quick reply" })).not.toBeInTheDocument();

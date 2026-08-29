@@ -145,9 +145,9 @@ export const TicketConversation = forwardRef<TicketConversationHandle, TicketCon
           </p>
         )}
         {mode === "reply" ? (
-          <textarea ref={replyRef} id="conversation-reply" className="input mt-3 min-h-28 resize-y py-3" value={reply} disabled={!canMutate || pending} aria-describedby="conversation-reply-help" onChange={(event) => { setReply(event.target.value); setInsertError(null); }} />
+          <textarea ref={replyRef} id="conversation-reply" className="input mt-3 min-h-28 max-h-56 resize-y overflow-y-auto py-3 [field-sizing:content]" value={reply} disabled={!canMutate || pending} aria-describedby="conversation-reply-help" onChange={(event) => { setReply(event.target.value); setInsertError(null); }} />
         ) : (
-          <MentionTextarea id="conversation-note" className="input mt-3 min-h-28 resize-y py-3" value={note} disabled={!canMutate || pending} ariaDescribedBy="conversation-note-help" onChange={setNote} />
+          <MentionTextarea id="conversation-note" className="input mt-3 min-h-28 max-h-56 resize-y overflow-y-auto py-3 [field-sizing:content]" value={note} disabled={!canMutate || pending} ariaDescribedBy="conversation-note-help" onChange={setNote} />
         )}
         {!canMutate && <p className="mt-2 text-sm text-warning-foreground" role="status">{t("tickets.conversation.readOnly")}</p>}
         {insertError && <p className="mt-2 text-sm text-danger-foreground" role="alert">{insertError}</p>}
