@@ -5,7 +5,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { formatTicketDate } from "@/features/tickets/ticket-format";
 import { usePortalKnowledgeArticle, usePortalKnowledgeArticles } from "./portal-hooks";
 import type { PortalKnowledgeArticle } from "./portal.types";
-import { PortalPage, PortalState } from "./portal-ui";
+import { PortalPage } from "./portal-ui";
 import { PageHeader } from "@/components/shared/page-header";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -61,9 +61,13 @@ export function PortalKnowledgeBasePage() {
 
       <h2 className="mt-8 text-base font-semibold tracking-tight text-foreground">{t("portal.knowledgeBase.latestArticles")}</h2>
       {query.isLoading ? (
-        <PortalState>{t("portal.knowledgeBase.loading")}</PortalState>
+        <p className="mt-6 text-center text-sm text-muted-foreground" role="status">{t("portal.knowledgeBase.loading")}</p>
       ) : query.isError ? (
-        <PortalState retry={() => query.refetch()}>{t("portal.knowledgeBase.loadError")}</PortalState>
+        <EmptyState
+          className="mt-4"
+          title={t("portal.knowledgeBase.loadError")}
+          action={<button type="button" className="button-secondary" onClick={() => query.refetch()}>{t("common.retry")}</button>}
+        />
       ) : query.data && query.data.data.length ? (
         <>
           <div className="mt-4 grid gap-3">{query.data.data.map((article) => <ArticleCard article={article} key={article.id} />)}</div>
@@ -98,15 +102,20 @@ export function PortalKnowledgeArticlePage() {
     </Link>
   );
 
-  if (query.isLoading) return <PortalPage><PortalState>{t("portal.knowledgeBase.loadingDetail")}</PortalState></PortalPage>;
-  if (query.isError) return (
-    <PortalPage>
-      <div className="mb-4">{back}</div>
-      <PortalState retry={errorCode(query.error) === "KNOWLEDGE_ARTICLE_NOT_FOUND" ? undefined : () => query.refetch()}>
-        {errorCode(query.error) === "KNOWLEDGE_ARTICLE_NOT_FOUND" ? t("portal.knowledgeBase.notFound") : t("portal.knowledgeBase.detailError")}
-      </PortalState>
-    </PortalPage>
-  );
+  if (query.isLoading) return <PortalPage><p className="mt-6 text-center text-sm text-muted-foreground" role="status">{t("portal.knowledgeBase.loadingDetail")}</p></PortalPage>;
+  if (query.isError) {
+    const notFound = errorCode(query.error) === "KNOWLEDGE_ARTICLE_NOT_FOUND";
+    return (
+      <PortalPage>
+        <div className="mb-4">{back}</div>
+        <EmptyState
+          className="mt-2"
+          title={notFound ? t("portal.knowledgeBase.notFound") : t("portal.knowledgeBase.detailError")}
+          action={notFound ? undefined : <button type="button" className="button-secondary" onClick={() => query.refetch()}>{t("common.retry")}</button>}
+        />
+      </PortalPage>
+    );
+  }
 
   const article = query.data!;
   return (

@@ -103,3 +103,38 @@ export function TicketDetailSection({
     </section>
   );
 }
+
+/**
+ * Loading placeholder for a ticket detail page. `variant="workspace"` matches the
+ * internal two-column agent layout; `variant="portal"` matches the single-column
+ * customer view. Both open with the same header-shaped block so the skeleton
+ * tracks the real `TicketDetailHeader`.
+ */
+export function TicketDetailSkeleton({
+  label,
+  variant = "workspace",
+}: {
+  label: string;
+  variant?: "workspace" | "portal";
+}) {
+  return (
+    <div className="space-y-6" role="status" aria-label={label}>
+      <div className="space-y-3 border-b border-border pb-4">
+        <div className="h-3.5 w-24 animate-pulse rounded bg-muted" />
+        <div className="h-7 w-2/3 animate-pulse rounded bg-muted" />
+        <div className="h-5 w-40 animate-pulse rounded bg-muted" />
+      </div>
+      {variant === "workspace" ? (
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_24rem]">
+          <div className="h-96 animate-pulse rounded-xl bg-muted/40" />
+          <div className="h-96 animate-pulse rounded-xl bg-muted/40" />
+        </div>
+      ) : (
+        <>
+          <div className="h-28 animate-pulse rounded-md bg-muted/50" />
+          <div className="h-64 animate-pulse rounded-md bg-muted/50" />
+        </>
+      )}
+    </div>
+  );
+}

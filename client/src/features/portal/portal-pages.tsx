@@ -15,10 +15,10 @@ import { usePortalTicketAttachments, useUploadPortalTicketAttachment } from "@/f
 import { portalTicketSchema, type PortalTicketForm } from "./portal.schemas";
 import { useCreatePortalTicket, usePortalCategories, usePortalOverview, usePortalTicket, usePortalTickets, useReplyPortalTicket, useSubmitPortalFeedback } from "./portal-hooks";
 import type { PortalOverview, PortalTicket, PortalTicketDetail, PortalTicketStatus, TicketPriority } from "./portal.types";
-import { PortalPage, PortalState, PortalStatus, TicketRef } from "./portal-ui";
+import { PortalPage, PortalStatus, TicketRef } from "./portal-ui";
 import { PortalTicketsTable } from "./portal-tickets-table";
 import { PageHeader } from "@/components/shared/page-header";
-import { TicketDetailHeader, TicketDetailSection } from "@/features/tickets/ticket-detail-header";
+import { TicketDetailHeader, TicketDetailSection, TicketDetailSkeleton } from "@/features/tickets/ticket-detail-header";
 import {
   Table,
   TableHeader,
@@ -139,7 +139,11 @@ export function PortalHomePage() {
         <div className="h-52 animate-pulse rounded-lg bg-muted" />
       </div>
     ) : query.isError ? (
-      <PortalState retry={() => query.refetch()}>{t("portal.overviewError")}</PortalState>
+      <EmptyState
+        className="mt-6"
+        title={t("portal.overviewError")}
+        action={<button type="button" className="button-secondary" onClick={() => query.refetch()}>{t("common.retry")}</button>}
+      />
     ) : <>
       <section aria-label={t("portal.summary")} className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
         {homeMetrics.map((metric) => (
@@ -297,7 +301,11 @@ export function PortalTicketsPage() {
             </div>
           ) : query.isError ? (
             <div className="p-6">
-              <PortalState retry={() => query.refetch()}>{t("portal.requestsError")}</PortalState>
+              <EmptyState
+                className="border-0 bg-transparent p-2"
+                title={t("portal.requestsError")}
+                action={<button type="button" className="button-secondary" onClick={() => query.refetch()}>{t("common.retry")}</button>}
+              />
             </div>
           ) : query.data!.data.length ? (
             <PortalTicketsTable
@@ -470,18 +478,18 @@ export function PortalTicketDetailPage() {
   const [body, setBody] = useState("");
   if (query.isLoading) return (
     <PortalPage>
-      <div className="space-y-6" aria-label={t("portal.loadingDetail")}>
-        <div className="space-y-3 border-b border-border pb-5">
-          <div className="h-3.5 w-24 animate-pulse rounded bg-muted" />
-          <div className="h-7 w-2/3 animate-pulse rounded bg-muted" />
-          <div className="h-5 w-40 animate-pulse rounded bg-muted" />
-        </div>
-        <div className="h-28 animate-pulse rounded-md bg-muted" />
-        <div className="h-64 animate-pulse rounded-md bg-muted" />
-      </div>
+      <TicketDetailSkeleton variant="portal" label={t("portal.loadingDetail")} />
     </PortalPage>
   );
-  if (query.isError) return <PortalPage><PortalState retry={() => query.refetch()}>{errorCode(query.error) === "TICKET_NOT_FOUND" ? t("portal.notFound") : t("portal.detailError")}</PortalState></PortalPage>;
+  if (query.isError) return (
+    <PortalPage>
+      <EmptyState
+        className="mt-6"
+        title={errorCode(query.error) === "TICKET_NOT_FOUND" ? t("portal.notFound") : t("portal.detailError")}
+        action={<button type="button" className="button-secondary" onClick={() => query.refetch()}>{t("common.retry")}</button>}
+      />
+    </PortalPage>
+  );
   const ticket = query.data!;
   const ticketLevelAttachments = attachments.data?.filter((item) => item.messageId === null) ?? [];
   const messageAttachments = new Map<string, NonNullable<typeof attachments.data>>();

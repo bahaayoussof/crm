@@ -5,7 +5,7 @@ import { useTicketAttachments, useUploadTicketAttachment } from "@/features/atta
 import { TicketAttachments } from "./ticket-attachments";
 import { TicketPriorityText, TicketStatusBadge } from "./ticket-badges";
 import { TicketConversation } from "./ticket-conversation";
-import { TicketDetailHeader } from "./ticket-detail-header";
+import { TicketDetailHeader, TicketDetailSkeleton } from "./ticket-detail-header";
 import { getTicketErrorStatus } from "./ticket-error";
 import { useTicket } from "./ticket-hooks";
 import { TicketSidebar } from "./ticket-sidebar";
@@ -20,7 +20,7 @@ export function TicketDetailPage() {
   const attachments = useTicketAttachments(id);
   const uploadAttachment = useUploadTicketAttachment(id);
 
-  if (ticket.isLoading) return <TicketPage><TicketDetailSkeleton /></TicketPage>;
+  if (ticket.isLoading) return <TicketPage><TicketDetailSkeleton label={t("common.loading")} /></TicketPage>;
   if (ticket.isError || !ticket.data) {
     const statusCode = getTicketErrorStatus(ticket.error);
     return (
@@ -111,17 +111,5 @@ export function TicketDetailPage() {
         </div>
       </div>
     </TicketPage>
-  );
-}
-
-function TicketDetailSkeleton() {
-  return (
-    <div className="space-y-6" aria-label="loading">
-      <div className="h-16 animate-pulse rounded-lg bg-muted/50" />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_24rem]">
-        <div className="h-96 animate-pulse rounded-xl bg-muted/40" />
-        <div className="h-96 animate-pulse rounded-xl bg-muted/40" />
-      </div>
-    </div>
   );
 }

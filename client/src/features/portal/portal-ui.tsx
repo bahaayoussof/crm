@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "react-i18next";
+import { ticketReference } from "@/features/tickets/ticket-format";
 import type { PortalTicketStatus } from "./portal.types";
 
 /**
@@ -28,18 +29,10 @@ export function PortalStatus({ status }: { status: PortalTicketStatus }) {
   );
 }
 
-export function PortalState({ children, retry }: { children: React.ReactNode; retry?: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <section className="mt-6 flex flex-col items-center justify-center rounded-lg border border-border bg-card p-8 text-center" role={retry ? "alert" : undefined}>
-      <p className="text-sm text-muted-foreground">{children}</p>
-      {retry && <button className="button-secondary mt-4" onClick={retry}>{t("common.retry")}</button>}
-    </section>
-  );
-}
-
+/** Portal ticket reference chip. Formatting comes from the shared
+ * `ticketReference()` helper — only the portal-specific styling lives here. */
 export const TicketRef = ({ id }: { id: string }) => (
   <bdi dir="ltr" className="font-mono text-xs font-medium text-muted-foreground">
-    #{id.slice(-8).toUpperCase()}
+    {ticketReference(id)}
   </bdi>
 );
