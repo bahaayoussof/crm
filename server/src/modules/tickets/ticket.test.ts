@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   ticketUpdateMany: vi.fn(), messageCreate: vi.fn(), noteCreate: vi.fn(),
   historyCreate: vi.fn(), historyCreateMany: vi.fn(), customerFind: vi.fn(), userFindFirst: vi.fn(), userFindMany: vi.fn(),
   categoryFindFirst: vi.fn(), categoryFindMany: vi.fn(), departmentFind: vi.fn(), branchFind: vi.fn(), slaFind: vi.fn(), transaction: vi.fn(),
+  watcherCreateMany: vi.fn(), watcherFindMany: vi.fn(), watcherDeleteMany: vi.fn(), watcherCount: vi.fn(), watcherFindFirst: vi.fn(),
+  mentionCreateMany: vi.fn(), notificationCreateMany: vi.fn(),
 }));
 
 vi.mock("../../config/prisma.js", () => {
@@ -14,9 +16,12 @@ vi.mock("../../config/prisma.js", () => {
     ticket: { findMany: mocks.ticketFindMany, count: mocks.ticketCount, findFirst: mocks.ticketFindFirst, create: mocks.ticketCreate, update: mocks.ticketUpdate, updateMany: mocks.ticketUpdateMany },
     ticketMessage: { create: mocks.messageCreate }, ticketNote: { create: mocks.noteCreate },
     ticketHistory: { create: mocks.historyCreate, createMany: mocks.historyCreateMany },
+    ticketWatcher: { createMany: mocks.watcherCreateMany, findMany: mocks.watcherFindMany, deleteMany: mocks.watcherDeleteMany, count: mocks.watcherCount, findFirst: mocks.watcherFindFirst },
+    ticketMention: { createMany: mocks.mentionCreateMany },
     customer: { findUnique: mocks.customerFind }, user: { findFirst: mocks.userFindFirst, findMany: mocks.userFindMany },
     category: { findFirst: mocks.categoryFindFirst, findMany: mocks.categoryFindMany }, department: { findUnique: mocks.departmentFind },
     branch: { findUnique: mocks.branchFind }, slaRule: { findFirst: mocks.slaFind },
+    notification: { createMany: mocks.notificationCreateMany },
     $transaction: mocks.transaction,
   };
   return { prisma };
@@ -52,10 +57,12 @@ describe("ticket API", () => {
       ticket: { findFirst: mocks.ticketFindFirst, create: mocks.ticketCreate, update: mocks.ticketUpdate, updateMany: mocks.ticketUpdateMany },
       ticketMessage: { create: mocks.messageCreate }, ticketNote: { create: mocks.noteCreate },
       ticketHistory: { create: mocks.historyCreate, createMany: mocks.historyCreateMany }, customer: { findUnique: mocks.customerFind },
+      ticketWatcher: { createMany: mocks.watcherCreateMany, findMany: mocks.watcherFindMany, deleteMany: mocks.watcherDeleteMany, count: mocks.watcherCount, findFirst: mocks.watcherFindFirst },
+      ticketMention: { createMany: mocks.mentionCreateMany },
       user: { findFirst: mocks.userFindFirst, findMany: mocks.userFindMany },
       category: { findFirst: mocks.categoryFindFirst }, department: { findUnique: mocks.departmentFind },
       branch: { findUnique: mocks.branchFind }, slaRule: { findFirst: mocks.slaFind },
-      notification: { createMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      notification: { createMany: mocks.notificationCreateMany },
     }) : Promise.all(value as Promise<unknown>[]));
     mocks.customerFind.mockResolvedValue({ id: "customer-1" }); mocks.userFindFirst.mockResolvedValue({ id: "agent-1", name: "Assigned Agent" });
     mocks.categoryFindFirst.mockResolvedValue({ id: "category-1", name: "Billing" }); mocks.departmentFind.mockResolvedValue(null);
@@ -65,6 +72,10 @@ describe("ticket API", () => {
     mocks.messageCreate.mockResolvedValue({ id: "message-1", body: "We are checking this.", createdAt: now, author: { id: admin.id, name: "Admin", role: Role.ADMIN } });
     mocks.noteCreate.mockResolvedValue({ id: "note-1", body: "Check the payment provider.", createdAt: now, author: { id: admin.id, name: "Admin", role: Role.ADMIN } });
     mocks.userFindMany.mockResolvedValue([]); mocks.categoryFindMany.mockResolvedValue([]);
+    mocks.watcherCreateMany.mockResolvedValue({ count: 0 }); mocks.watcherFindMany.mockResolvedValue([]);
+    mocks.watcherDeleteMany.mockResolvedValue({ count: 0 }); mocks.watcherCount.mockResolvedValue(0);
+    mocks.watcherFindFirst.mockResolvedValue(null); mocks.mentionCreateMany.mockResolvedValue({ count: 0 });
+    mocks.notificationCreateMany.mockResolvedValue({ count: 0 });
   });
 
   it("rejects unauthenticated and CUSTOMER access", async () => {
@@ -230,11 +241,37 @@ describe("ticket API", () => {
   });
 
   it("stores internal notes separately without recording first response", async () => {
-    mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: agent.id });
+    mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, subject: "Payment failed", assignedAgentId: agent.id });
     const response = await request(app).post("/api/tickets/ticket-1/notes").set(auth(agent)).send({ body: "  Check provider logs. " });
     expect(response.status).toBe(201); expect(response.body.data.kind).toBe("INTERNAL_NOTE");
     expect(mocks.noteCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ authorUserId: agent.id, body: "Check provider logs." }) }));
     expect(mocks.messageCreate).not.toHaveBeenCalled(); expect(mocks.ticketUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("records @mentions on a new note: mention rows, auto-watch, and one mention notification", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, subject: "Payment failed", assignedAgentId: agent.id });
+    mocks.noteCreate.mockResolvedValue({ id: "note-9", body: "please review", createdAt: now, author: { id: agent.id, name: "Assigned Agent", role: Role.AGENT } });
+    mocks.userFindMany.mockResolvedValue([{ id: "manager-1" }]); // active internal user resolution
+    const response = await request(app).post("/api/tickets/ticket-1/notes").set(auth(agent)).send({ body: "please review @[Manager](manager-1) and @[Me](agent-1)" });
+    expect(response.status).toBe(201);
+    // self-mention (agent-1 = author) is dropped before the lookup
+    expect(mocks.userFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: { in: ["manager-1"] } }) }));
+    expect(mocks.mentionCreateMany).toHaveBeenCalledWith({ data: [{ noteId: "note-9", mentionedUserId: "manager-1", ticketId: "ticket-1" }], skipDuplicates: true });
+    expect(mocks.watcherCreateMany).toHaveBeenCalledWith({ data: [{ ticketId: "ticket-1", userId: "agent-1" }, { ticketId: "ticket-1", userId: "manager-1" }], skipDuplicates: true });
+    const mentionNotify = mocks.notificationCreateMany.mock.calls.find(([arg]) => arg.data?.[0]?.type === "TICKET_MENTION");
+    expect(mentionNotify?.[0].data).toHaveLength(1);
+    expect(mentionNotify?.[0].data[0]).toMatchObject({ userId: "manager-1", ticketId: "ticket-1" });
+  });
+
+  it("does not send a watcher activity notification to a mentioned user for the same note", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, subject: "Payment failed", assignedAgentId: agent.id });
+    mocks.noteCreate.mockResolvedValue({ id: "note-9", body: "x", createdAt: now, author: { id: agent.id, name: "Assigned Agent", role: Role.AGENT } });
+    mocks.userFindMany.mockResolvedValue([{ id: "manager-1" }]);
+    // pre-existing watchers: the mentioned manager plus an unrelated follower
+    mocks.watcherFindMany.mockResolvedValue([{ userId: "manager-1" }, { userId: "admin-9" }, { userId: "agent-1" }]);
+    await request(app).post("/api/tickets/ticket-1/notes").set(auth(agent)).send({ body: "@[Manager](manager-1)" });
+    const watchNotify = mocks.notificationCreateMany.mock.calls.find(([arg]) => arg.data?.[0]?.type === "TICKET_WATCH_ACTIVITY");
+    expect(watchNotify?.[0].data.map((d: { userId: string }) => d.userId)).toEqual(["admin-9"]); // not manager-1 (mentioned), not agent-1 (actor)
   });
 
   it("enforces manager, assigned-agent, unassigned, other-agent, and customer conversation access", async () => {

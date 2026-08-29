@@ -15,6 +15,12 @@ vi.mock("@/features/attachments/attachment-hooks", () => ({
   useUploadTicketAttachment: () => ({ mutateAsync: vi.fn().mockResolvedValue({}), isPending: false }),
 }));
 vi.mock("@/features/quick-replies/quick-reply-picker", () => ({ QuickReplyPicker: () => null }));
+vi.mock("@/features/collaboration/mention-textarea", () => ({
+  MentionTextarea: (props: { id: string; value: string; disabled?: boolean; ariaDescribedBy?: string; onChange: (v: string) => void }) => (
+    <textarea id={props.id} value={props.value} disabled={props.disabled} aria-describedby={props.ariaDescribedBy} onChange={(event) => props.onChange(event.target.value)} />
+  ),
+}));
+vi.mock("@/features/collaboration/watch-toggle", () => ({ WatchToggle: () => null }));
 
 import { TicketDetailPage } from "./ticket-detail-page";
 import { TicketFormPage } from "./ticket-form-page";

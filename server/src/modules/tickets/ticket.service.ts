@@ -3,6 +3,11 @@ import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import { deriveSla } from "../../shared/sla/derive-sla.js";
 import { createNotifications } from "../notifications/notification.service.js";
+import {
+  applyNoteMentions,
+  notifyWatchers,
+  NOTIFICATION_WATCH_ACTIVITY,
+} from "../collaboration/collaboration.service.js";
 import { deliverOutboundReply } from "../integrations/whatsapp/whatsapp.service.js";
 import type { CreateTicketInput, TicketConversationInput, TicketListQuery, UpdateTicketInput } from "./ticket.schema.js";
 import { ticketVisibilityWhere, type TicketActor as Actor } from "./ticket-visibility.js";
@@ -63,13 +68,17 @@ export async function getTicket(ticketId: string, actor: Actor, now = new Date()
       } },
       messages: { orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: conversationSelect },
       notes: { orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: conversationSelect },
+      _count: { select: { watchers: true } },
+      watchers: { where: { userId: actor.userId }, select: { id: true }, take: 1 },
     },
   });
   if (!ticket) throw new AppError(404, "TICKET_NOT_FOUND", "Ticket not found");
-  const { messages, notes, ...detail } = ticket;
+  const { messages, notes, _count, watchers, ...detail } = ticket;
   return {
     ...detail,
     ...deriveSla(detail, now),
+    watcherCount: _count?.watchers ?? 0,
+    viewerIsWatching: (watchers?.length ?? 0) > 0,
     conversation: [
       ...messages.map((item) => ({ ...item, kind: "PUBLIC_MESSAGE" as const })),
       ...notes.map((item) => ({ ...item, kind: "INTERNAL_NOTE" as const })),
@@ -86,6 +95,14 @@ export async function addTicketMessage(ticketId: string, input: TicketConversati
       select: conversationSelect,
     });
     await tx.ticket.updateMany({ where: { id: ticketId, firstRespondedAt: null }, data: { firstRespondedAt: createdAt } });
+    // Watcher fan-out: a staff reply is activity on a followed ticket.
+    await notifyWatchers(tx, {
+      ticketId,
+      actorUserId: actor.userId,
+      type: NOTIFICATION_WATCH_ACTIVITY,
+      title: "New reply on a ticket you follow",
+      message: `${created.author.name} replied on ticket #${ticketId}: ${ticket.subject}`,
+    });
     return {
       message: { ...created, kind: "PUBLIC_MESSAGE" as const },
       channel: ticket.channel,
@@ -105,10 +122,28 @@ export async function addTicketMessage(ticketId: string, input: TicketConversati
 
 export async function addTicketNote(ticketId: string, input: TicketConversationInput, actor: Actor) {
   return prisma.$transaction(async (tx) => {
-    await requireConversationMutationAccess(tx, ticketId, actor);
+    const ticket = await requireConversationMutationAccess(tx, ticketId, actor);
     const note = await tx.ticketNote.create({
       data: { ticketId, authorUserId: actor.userId, body: input.body },
       select: conversationSelect,
+    });
+    // @mentions: records + auto-watch + mention notifications. Returns the
+    // mentioned ids so they are excluded from the generic watcher fan-out below.
+    const mentionedIds = await applyNoteMentions(tx, {
+      ticketId,
+      noteId: note.id,
+      body: input.body,
+      authorUserId: actor.userId,
+      authorName: note.author.name,
+      ticketSubject: ticket.subject,
+    });
+    await notifyWatchers(tx, {
+      ticketId,
+      actorUserId: actor.userId,
+      type: NOTIFICATION_WATCH_ACTIVITY,
+      title: "New note on a ticket you follow",
+      message: `${note.author.name} added an internal note on ticket #${ticketId}: ${ticket.subject}`,
+      excludeUserIds: mentionedIds,
     });
     return { ...note, kind: "INTERNAL_NOTE" as const };
   });
@@ -193,15 +228,41 @@ export async function updateTicket(ticketId: string, input: UpdateTicketInput, a
 
     // Escalation notification: status transitions INTO ESCALATED
     const escalated = input.status === TicketStatus.ESCALATED && current.status !== TicketStatus.ESCALATED;
+    let escalationRecipientIds: string[] = [];
     if (escalated) {
       const adminsManagers = await tx.user.findMany({
         where: { role: { in: [Role.ADMIN, Role.MANAGER] }, isActive: true, id: { not: actor.userId } },
         select: { id: true },
       });
-      const recipientIds = adminsManagers.map((u) => u.id);
-      if (recipientIds.length > 0) {
-        await createNotifications(tx, recipientIds, "TICKET_ESCALATED", "Ticket escalated", `Ticket #${ticketId}: ${current.subject} has been escalated`, ticketId);
+      escalationRecipientIds = adminsManagers.map((u) => u.id);
+      if (escalationRecipientIds.length > 0) {
+        await createNotifications(tx, escalationRecipientIds, "TICKET_ESCALATED", "Ticket escalated", `Ticket #${ticketId}: ${current.subject} has been escalated`, ticketId);
       }
+    }
+
+    // Watcher fan-out — status and assignment changes. Actor is always excluded
+    // by notifyWatchers; recipients already notified by the TICKET_ESCALATED /
+    // TICKET_ASSIGNED notifications above are excluded explicitly so a watcher is
+    // never notified twice for the same event.
+    if (input.status && input.status !== current.status) {
+      await notifyWatchers(tx, {
+        ticketId,
+        actorUserId: actor.userId,
+        type: NOTIFICATION_WATCH_ACTIVITY,
+        title: "Status changed on a ticket you follow",
+        message: `Ticket #${ticketId}: ${current.subject} — status ${current.status} → ${input.status}`,
+        excludeUserIds: escalationRecipientIds,
+      });
+    }
+    if (assigneeChanged) {
+      await notifyWatchers(tx, {
+        ticketId,
+        actorUserId: actor.userId,
+        type: NOTIFICATION_WATCH_ACTIVITY,
+        title: "Assignment changed on a ticket you follow",
+        message: `Ticket #${ticketId}: ${current.subject} — assignment updated`,
+        excludeUserIds: input.assignedAgentId ? [input.assignedAgentId] : [],
+      });
     }
 
     return updated;
@@ -216,7 +277,7 @@ const conversationSelect = {
 async function requireConversationMutationAccess(tx: Prisma.TransactionClient, ticketId: string, actor: Actor) {
   const ticket = await tx.ticket.findFirst({
     where: { id: ticketId, ...ticketVisibilityWhere(actor) },
-    select: { id: true, assignedAgentId: true, channel: true, customer: { select: { phone: true } } },
+    select: { id: true, subject: true, assignedAgentId: true, channel: true, customer: { select: { phone: true } } },
   });
   if (!ticket) throw new AppError(404, "TICKET_NOT_FOUND", "Ticket not found");
   if (actor.role === Role.AGENT && ticket.assignedAgentId !== actor.userId) throw forbidden("Ticket must be assigned to the agent before adding conversation content");

@@ -74,6 +74,8 @@ model User {
   quickReplies      QuickReply[]
   createdTasks      Task[]             @relation("TaskCreator")
   assignedTasks     Task[]             @relation("TaskAssignee")
+  ticketWatchers    TicketWatcher[]
+  ticketMentions    TicketMention[]
 
   @@index([role])
   @@index([departmentId])
@@ -128,6 +130,8 @@ model Ticket {
   feedback      Feedback?
   notifications Notification[]
   tasks         Task[]
+  watchers      TicketWatcher[]
+  mentions      TicketMention[]
 
   @@index([customerId])
   @@index([assignedAgentId])
@@ -164,11 +168,53 @@ model TicketNote {
   body         String
   createdAt    DateTime @default(now())
 
-  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Restrict)
-  author User   @relation(fields: [authorUserId], references: [id], onDelete: Restrict)
+  ticket   Ticket          @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  author   User            @relation(fields: [authorUserId], references: [id], onDelete: Restrict)
+  mentions TicketMention[]
 
   @@index([ticketId, createdAt])
   @@index([authorUserId])
+}
+
+// feature/team-collaboration (ADR-032) — internal-only collaboration primitives.
+//
+// TicketWatcher: a live subscription list, NOT a historical record, so the ticket
+// and user relations use Cascade (a watcher row has no meaning without either
+// side). Neither Ticket nor User is ever hard-deleted in this app (tickets are
+// retained as history; users are retired via isActive), so the cascade is a
+// defensive default that does not fire in practice.
+model TicketWatcher {
+  id        String   @id @default(cuid())
+  ticketId  String
+  userId    String
+  createdAt DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([ticketId, userId])
+  @@index([ticketId])
+  @@index([userId])
+}
+
+// TicketMention: one row per (note, mentioned user). `ticketId` is denormalized
+// for ticket-level queries/audit. A note delete cascades its mentions; the
+// mentioned user relation stays Restrict to match the project policy for
+// user-referencing rows (docs/04). Notes are never deleted in this app either.
+model TicketMention {
+  id              String   @id @default(cuid())
+  noteId          String
+  mentionedUserId String
+  ticketId        String
+  createdAt       DateTime @default(now())
+
+  note          TicketNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  mentionedUser User       @relation(fields: [mentionedUserId], references: [id], onDelete: Restrict)
+  ticket        Ticket     @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@unique([noteId, mentionedUserId])
+  @@index([ticketId])
+  @@index([mentionedUserId])
 }
 
 model CustomerNote {

@@ -1,6 +1,8 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ConversationAttachmentBand, MessageAttachmentList } from "@/features/attachments/attachment-ui";
+import { MentionTextarea } from "@/features/collaboration/mention-textarea";
+import { renderMentions } from "@/features/collaboration/render-mentions";
 import { QuickReplyPicker } from "@/features/quick-replies/quick-reply-picker";
 import { ConversationMessage, ConversationSection } from "./ticket-conversation-ui";
 import { getTicketError } from "./ticket-error";
@@ -112,7 +114,11 @@ export function TicketConversation({
             {customerPhone ? <> <span dir="ltr">{customerPhone}</span></> : <> — {t("tickets.conversation.whatsappNoPhone")}</>}
           </p>
         )}
-        <textarea ref={mode === "reply" ? replyRef : undefined} id={`conversation-${mode}`} className="input mt-3 min-h-28 resize-y py-3" value={body} disabled={!canMutate || pending} aria-describedby={`conversation-${mode}-help`} onChange={(event) => { if (mode === "reply") { setReply(event.target.value); setInsertError(null); } else setNote(event.target.value); }} />
+        {mode === "reply" ? (
+          <textarea ref={replyRef} id="conversation-reply" className="input mt-3 min-h-28 resize-y py-3" value={reply} disabled={!canMutate || pending} aria-describedby="conversation-reply-help" onChange={(event) => { setReply(event.target.value); setInsertError(null); }} />
+        ) : (
+          <MentionTextarea id="conversation-note" className="input mt-3 min-h-28 resize-y py-3" value={note} disabled={!canMutate || pending} ariaDescribedBy="conversation-note-help" onChange={setNote} />
+        )}
         {!canMutate && <p className="mt-2 text-sm text-warning-foreground" role="status">{t("tickets.conversation.readOnly")}</p>}
         {insertError && <p className="mt-2 text-sm text-danger-foreground" role="alert">{insertError}</p>}
         {error && <p className="mt-2 text-sm text-danger-foreground" role="alert">{error}</p>}
@@ -155,6 +161,7 @@ export function TicketConversation({
             timestamp={item.createdAt}
             language={i18n.language}
             body={item.body}
+            bodyTransform={internal ? renderMentions : undefined}
             attachmentsSlot={internal ? undefined : <MessageAttachmentList attachments={messageAttachments?.get(item.id) ?? []} scope="internal" />}
           />
         );

@@ -2,6 +2,7 @@ import { Channel, Prisma, Role, TicketPriority, TicketStatus } from "@prisma/cli
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import { createNotifications } from "../notifications/notification.service.js";
+import { notifyWatchers, NOTIFICATION_WATCH_ACTIVITY } from "../collaboration/collaboration.service.js";
 import type { PortalCreateTicketInput, PortalReplyInput, PortalStatus, PortalTicketListQuery } from "./portal.schema.js";
 
 const listSelect = { id: true, subject: true, status: true, category: { select: { id: true, name: true } }, createdAt: true, updatedAt: true } satisfies Prisma.TicketSelect;
@@ -117,6 +118,18 @@ export async function reply(id: string, input: PortalReplyInput, userId: string)
     // Exclude the customer (userId) from the recipient list — they are the author
     const filtered = recipientIds.filter((rid) => rid !== userId);
     await createNotifications(tx, filtered, "CUSTOMER_REPLY", "Customer replied", `Customer replied to ticket #${id}: ${ticket.subject}`, id);
+
+    // feature/team-collaboration — also notify internal watchers who are not
+    // already covered by the assignee / admin / manager fan-out above. The
+    // customer (author) is excluded via actorUserId.
+    await notifyWatchers(tx, {
+      ticketId: id,
+      actorUserId: userId,
+      type: NOTIFICATION_WATCH_ACTIVITY,
+      title: "Customer replied on a ticket you follow",
+      message: `Customer replied to ticket #${id}: ${ticket.subject}`,
+      excludeUserIds: filtered,
+    });
 
     return { id: message.id, body: message.body, createdAt: message.createdAt, author: { id: message.author.id, name: message.author.name, kind: "CUSTOMER" as const } };
   });

@@ -11,6 +11,7 @@ import {
   uploadTicketAttachment,
 } from "../attachments/attachment.controller.js";
 import { messageAttachmentParamsSchema, ticketAttachmentParamsSchema } from "../attachments/attachment.schema.js";
+import { unwatch, watch, watchers } from "../collaboration/collaboration.controller.js";
 
 export const ticketRouter = Router();
 ticketRouter.use(requireAuth, requireRole(Role.ADMIN, Role.MANAGER, Role.AGENT));
@@ -20,6 +21,13 @@ ticketRouter.get("/:id", validateParams(ticketParamsSchema), detail);
 ticketRouter.patch("/:id", validateParams(ticketParamsSchema), validateBody(updateTicketSchema), update);
 ticketRouter.post("/:id/messages", validateParams(ticketParamsSchema), validateBody(ticketConversationBodySchema), createMessage);
 ticketRouter.post("/:id/notes", validateParams(ticketParamsSchema), validateBody(ticketConversationBodySchema), createNote);
+
+// feature/team-collaboration — ticket watchers (self-watch / self-unwatch / list).
+// Inherits this router's requireAuth + internal-role guard; each handler re-checks
+// ticket visibility (hidden ticket → 404 TICKET_NOT_FOUND).
+ticketRouter.get("/:id/watchers", validateParams(ticketParamsSchema), watchers);
+ticketRouter.post("/:id/watchers", validateParams(ticketParamsSchema), watch);
+ticketRouter.delete("/:id/watchers/me", validateParams(ticketParamsSchema), unwatch);
 
 // feature/attachments — secure per-context attachment upload/listing
 ticketRouter.get("/:ticketId/attachments", validateParams(ticketAttachmentParamsSchema), listTicketAttachments);

@@ -325,6 +325,19 @@
       "FORBIDDEN": "You do not have permission to perform this action."
     }
   },
+  "collaboration": {
+    "followTicket": "Follow ticket",
+    "watch": "Follow",
+    "watching": "Following",
+    "watchError": "Could not update your follow status. Try again.",
+    "watchers": "{{count}} following",
+    "mention": {
+      "listLabel": "People you can mention",
+      "loading": "Searching people…",
+      "error": "Could not load people.",
+      "noResults": "No matching people"
+    }
+  },
   "attachments": {
     "title": "Attachments",
     "upload": "Upload attachment",

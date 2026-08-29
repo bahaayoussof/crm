@@ -11,6 +11,8 @@ import {
   userListQuerySchema,
   userParamsSchema,
 } from "./user.schema.js";
+import { mentionable } from "../collaboration/collaboration.controller.js";
+import { mentionableQuerySchema } from "../collaboration/collaboration.schema.js";
 
 export const userRouter = Router();
 userRouter.use(requireAuth);
@@ -25,6 +27,16 @@ userRouter.get("/agents", requireRole(Role.ADMIN, Role.MANAGER, Role.AGENT), asy
   });
   response.status(200).json({ data });
 });
+
+// feature/team-collaboration — internal @mention autocomplete lookup. Open to
+// every internal role (like `/agents`); returns active internal users only,
+// never CUSTOMER. Registered before the dynamic `/:id` route below.
+userRouter.get(
+  "/mentionable",
+  requireRole(Role.ADMIN, Role.MANAGER, Role.AGENT),
+  validateQuery(mentionableQuerySchema),
+  mentionable,
+);
 
 // User administration — ADMIN only (docs/18 §15; MANAGER access not granted).
 // `requireActiveUser` resolves the caller's current DB role/active state first so

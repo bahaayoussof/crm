@@ -3,6 +3,7 @@ import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { AppSelectField } from "@/components/ui/app-select";
+import { WatchToggle } from "@/features/collaboration/watch-toggle";
 import { getTicketError } from "./ticket-error";
 import { formatTicketDate } from "./ticket-format";
 import { useAgents, useCategories, useUpdateTicket } from "./ticket-hooks";
@@ -30,10 +31,18 @@ interface TicketSidebarProps {
  * sections separated by dividers rather than a card per subsection. Attachments
  * live in the main conversation column, not here. */
 export function TicketSidebar({ record, canManage, canWorkflow, canClose, locale }: TicketSidebarProps) {
+  const { t } = useTranslation();
   return (
     <aside className="min-w-0">
       <div className="divide-y divide-border-subtle rounded-xl border border-border bg-surface shadow-subtle">
         <PropertiesSection record={record} canManage={canManage} canWorkflow={canWorkflow} canClose={canClose} />
+        <Section title={t("collaboration.followTicket")}>
+          <WatchToggle
+            ticketId={record.id}
+            watching={record.viewerIsWatching ?? false}
+            watcherCount={record.watcherCount ?? 0}
+          />
+        </Section>
         <CustomerSection record={record} />
         <DescriptionSection description={record.description} />
         <SlaSection record={record} language={locale} />

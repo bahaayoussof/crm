@@ -14,14 +14,21 @@ import { useConversationAutoScroll } from "./use-conversation-auto-scroll";
 const LONG_MESSAGE_LINES = 10;
 const LONG_MESSAGE_CHARS = 800;
 
-export function MessageBody({ body }: { body: string }) {
+export function MessageBody({
+  body,
+  transform,
+}: {
+  body: string;
+  /** Optional rich renderer for the raw text (e.g. internal-note @mentions). */
+  transform?: (raw: string) => React.ReactNode;
+}) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const isLong = body.length > LONG_MESSAGE_CHARS || body.split("\n").length > LONG_MESSAGE_LINES;
   return (
     <div className="mt-2">
       <p className={`whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-6 ${isLong && !expanded ? "line-clamp-[10]" : ""}`}>
-        {body}
+        {transform ? transform(body) : body}
       </p>
       {isLong && (
         <button
@@ -48,6 +55,7 @@ export function ConversationMessage({
   timestamp,
   language,
   body,
+  bodyTransform,
   footnote,
   attachmentsSlot,
 }: {
@@ -59,6 +67,7 @@ export function ConversationMessage({
   timestamp: string;
   language: string;
   body: string;
+  bodyTransform?: (raw: string) => React.ReactNode;
   footnote?: string;
   attachmentsSlot?: React.ReactNode;
 }) {
@@ -84,7 +93,7 @@ export function ConversationMessage({
             {formatTicketDate(timestamp, language)}
           </time>
         </header>
-        <MessageBody body={body} />
+        <MessageBody body={body} transform={bodyTransform} />
         {attachmentsSlot}
         {footnote && <p className="mt-2 text-xs text-muted-foreground">{footnote}</p>}
       </article>
