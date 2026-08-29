@@ -29,7 +29,11 @@ export function Sidebar({ user, audience, collapsed, onToggleCollapsed, onLogout
   return (
     <aside
       className={cn(
-        "relative hidden lg:flex lg:flex-col lg:justify-between lg:h-full lg:min-h-0 select-none bg-sidebar border-e border-sidebar-border transition-all duration-200 ease-out z-40",
+        // No `overflow-hidden` here: the floating collapse toggle intentionally
+        // sticks out past the edge. Height containment comes from the fixed-height
+        // AppShell row + the nav below being the only growable child (min-h-0 +
+        // overflow-y-auto), so the aside itself never needs to clip or scroll.
+        "relative hidden lg:flex lg:flex-col lg:h-full lg:min-h-0 select-none bg-sidebar border-e border-sidebar-border transition-all duration-200 ease-out z-40",
         collapsed ? "w-[68px]" : "w-60"
       )}
     >
@@ -51,32 +55,33 @@ export function Sidebar({ user, audience, collapsed, onToggleCollapsed, onLogout
         )}
       </button>
 
-      {/* Top Half: Brand Logo, Minimal Search, Navigation List */}
-      <div className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto">
-        {/* Brand Header */}
-        <div
-          className={cn(
-            "flex h-14 items-center transition-all duration-200",
-            collapsed ? "w-full justify-center px-0" : "px-4"
-          )}
-        >
-          <div className={cn("flex items-center overflow-hidden", collapsed ? "justify-center" : "gap-2.5")}>
-            <div
-              className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-foreground text-background font-bold text-xs shadow-2xs"
-              title={collapsed ? t("app.title") : undefined}
-            >
-              CS
-            </div>
-            {!collapsed && (
-              <span className="truncate text-sm font-semibold tracking-tight text-foreground">
-                {t("app.title")}
-              </span>
-            )}
+      {/* Brand Header — pinned; stays visible while the nav scrolls under it */}
+      <div
+        className={cn(
+          "flex h-14 shrink-0 items-center transition-all duration-200",
+          collapsed ? "w-full justify-center px-0" : "px-4"
+        )}
+      >
+        <div className={cn("flex items-center overflow-hidden", collapsed ? "justify-center" : "gap-2.5")}>
+          <div
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-foreground text-background font-bold text-xs shadow-2xs"
+            title={collapsed ? t("app.title") : undefined}
+          >
+            CS
           </div>
+          {!collapsed && (
+            <span className="truncate text-sm font-semibold tracking-tight text-foreground">
+              {t("app.title")}
+            </span>
+          )}
         </div>
+      </div>
 
-        {/* Navigation Sections */}
-        <nav className="w-full pt-2 pb-4 space-y-3" aria-label={t("navigation.primary")}>
+      {/* Navigation Sections — the ONLY scroll region, and only when it overflows */}
+      <nav
+        className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto pt-2 pb-4 space-y-3"
+        aria-label={t("navigation.primary")}
+      >
           {sections.map((section, sectionIdx) => (
             <div key={section.id} className="w-full">
               {/* Section Header */}
@@ -188,11 +193,11 @@ export function Sidebar({ user, audience, collapsed, onToggleCollapsed, onLogout
               </div>
             </div>
           ))}
-        </nav>
-      </div>
+      </nav>
 
-      {/* Bottom Half: Pinned User Profile Menu */}
+      {/* Bottom Half: Pinned User Profile Menu — anchored at the viewport bottom */}
       <div
+        data-sidebar-profile
         className={cn(
           "w-full shrink-0 border-t border-sidebar-border bg-sidebar",
           collapsed ? "py-2 px-0 flex items-center justify-center" : "p-3"

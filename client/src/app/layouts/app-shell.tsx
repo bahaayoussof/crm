@@ -75,7 +75,7 @@ export function AppShell({ audience, children }: PropsWithChildren<{ audience: P
   return (
     <div
       className={cn(
-        "flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground lg:grid transition-[grid-template-columns] duration-200 ease-out",
+        "flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground lg:grid lg:grid-rows-1 transition-[grid-template-columns] duration-200 ease-out",
         collapsed ? "lg:grid-cols-[68px_minmax(0,1fr)]" : "lg:grid-cols-[240px_minmax(0,1fr)]"
       )}
     >
@@ -145,8 +145,12 @@ export function AppShell({ audience, children }: PropsWithChildren<{ audience: P
           </div>
         </header>
 
-        {/* Page Content — the primary vertical scroll container on desktop */}
-        <div className="min-w-0 min-h-0 flex-1 overflow-y-auto">{children}</div>
+        {/* Page Content — the primary vertical scroll container on desktop.
+            `data-app-content-scroll` is the stable QA/test hook for the app's
+            single page-scroll owner. */}
+        <div data-app-content-scroll className="min-w-0 min-h-0 flex-1 overflow-y-auto">
+          {children}
+        </div>
       </div>
 
       {/* Mobile Slide-Over Navigation Drawer */}

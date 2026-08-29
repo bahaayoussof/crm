@@ -90,6 +90,41 @@ describe("Sidebar component", () => {
     expect(screen.getByRole("button", { name: "Collapse sidebar" })).toBeInTheDocument();
   });
 
+  it("is a full-height flex column so page content cannot stretch it", () => {
+    const { container } = renderSidebar({ collapsed: false });
+    const aside = container.querySelector("aside")!;
+    expect(aside.className).toMatch(/lg:h-full/);
+    expect(aside.className).toMatch(/lg:min-h-0/);
+    expect(aside.className).toMatch(/lg:flex-col/);
+  });
+
+  it("keeps the nav as the only scroll region, with brand and profile pinned outside it", () => {
+    const { container } = renderSidebar({ collapsed: false });
+    const aside = container.querySelector("aside")!;
+    const nav = aside.querySelector("nav")!;
+    // nav absorbs overflow internally
+    expect(nav.className).toMatch(/overflow-y-auto/);
+    expect(nav.className).toMatch(/min-h-0/);
+    expect(nav.className).toMatch(/flex-1/);
+    // brand is a pinned sibling, not inside the scroll region
+    const brand = screen.getByText("Customer Support CRM");
+    expect(nav.contains(brand)).toBe(false);
+    // profile/account footer is a pinned sibling, not inside the scroll region
+    const profile = container.querySelector("[data-sidebar-profile]")!;
+    expect(profile).toBeTruthy();
+    expect(profile.className).toMatch(/shrink-0/);
+    expect(nav.contains(profile)).toBe(false);
+    expect(nav.compareDocumentPosition(profile) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("keeps the profile/account footer pinned outside the scroll region when collapsed", () => {
+    const { container } = renderSidebar({ collapsed: true });
+    const nav = container.querySelector("aside nav")!;
+    const profile = container.querySelector("[data-sidebar-profile]")!;
+    expect(profile.className).toMatch(/shrink-0/);
+    expect(nav.contains(profile)).toBe(false);
+  });
+
   it("renders compact navigation rail when collapsed", () => {
     renderSidebar({ collapsed: true });
 

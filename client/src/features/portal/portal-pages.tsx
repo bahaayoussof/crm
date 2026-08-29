@@ -398,6 +398,7 @@ export function PortalTicketDetailPage() {
   const attachments = usePortalTicketAttachments(id);
   const uploadAttachment = useUploadPortalTicketAttachment(id);
   const [body, setBody] = useState("");
+  const [sendToken, setSendToken] = useState(0);
   if (query.isLoading) return (
     <PortalPage>
       <TicketDetailSkeleton variant="portal" label={t("portal.loadingDetail")} />
@@ -417,7 +418,7 @@ export function PortalTicketDetailPage() {
   const messageAttachments = new Map<string, NonNullable<typeof attachments.data>>();
   for (const item of attachments.data ?? []) if (item.messageId) messageAttachments.set(item.messageId, [...(messageAttachments.get(item.messageId) ?? []), item]);
   const closed = ticket.status === "CLOSED";
-  const send = async (event: React.FormEvent) => { event.preventDefault(); if (!body.trim() || reply.isPending) return; await reply.mutateAsync(body); setBody(""); };
+  const send = async (event: React.FormEvent) => { event.preventDefault(); if (!body.trim() || reply.isPending) return; await reply.mutateAsync(body); setBody(""); setSendToken((token) => token + 1); };
   const composer = closed ? (
     <p className="rounded-md border border-border bg-surface-subtle p-3 text-sm text-muted-foreground">{t("portal.closedNotice")}</p>
   ) : (
@@ -459,6 +460,8 @@ export function PortalTicketDetailPage() {
       <div className="lg:h-[calc(100dvh_-_13rem)] lg:min-h-[22rem]">
         <ConversationSection
           bounded
+          autoScrollItemCount={ticket.messages.length}
+          autoScrollSendToken={sendToken}
           heading={t("portal.conversation")}
           description={t("portal.conversationDescription")}
           timelineLabel={t("portal.timelineLabel")}

@@ -40,6 +40,7 @@ export function TicketConversation({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [insertError, setInsertError] = useState<string | null>(null);
+  const [sendToken, setSendToken] = useState(0);
   const replyRef = useRef<HTMLTextAreaElement>(null);
   const pendingCaretRef = useRef<number | null>(null);
   const messageMutation = useCreateTicketMessage(ticketId);
@@ -83,6 +84,8 @@ export function TicketConversation({
     try {
       const result = (await mutation.mutateAsync({ body })) as TicketMessageResult;
       if (mode === "reply") setReply(""); else setNote("");
+      // The local user sent this — reveal it once the list updates.
+      setSendToken((token) => token + 1);
       // The message is persisted even when WhatsApp delivery fails — surface the
       // failure as a warning rather than a success, and keep the sent text out of the box.
       if (mode === "reply" && result?.delivery?.status === "FAILED") {
@@ -125,6 +128,8 @@ export function TicketConversation({
   return (
     <ConversationSection
       bounded
+      autoScrollItemCount={items.length}
+      autoScrollSendToken={sendToken}
       heading={t("tickets.conversation.title")}
       description={t("tickets.conversation.description")}
       timelineLabel={t("tickets.conversation.timelineLabel")}

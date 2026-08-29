@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { formatTicketDate } from "./ticket-format";
+import { useConversationAutoScroll } from "./use-conversation-auto-scroll";
 
 // Role-neutral presentational primitives for a ticket conversation. Both the
 // internal Ticket Details view and the Customer Portal ticket view compose these
@@ -106,6 +107,8 @@ export function ConversationSection({
   belowBody,
   footer,
   bounded = false,
+  autoScrollItemCount,
+  autoScrollSendToken,
 }: {
   headingId?: string;
   heading: string;
@@ -121,7 +124,15 @@ export function ConversationSection({
   footer?: React.ReactNode;
   /** Desktop only: turn the section into a bounded flex column whose message region scrolls internally. */
   bounded?: boolean;
+  /** Message count — drives initial "scroll to latest" and near-bottom follow. */
+  autoScrollItemCount?: number;
+  /** Bump on every successful send by the local user to force a scroll to latest. */
+  autoScrollSendToken?: number;
 }) {
+  const scrollRef = useConversationAutoScroll<HTMLDivElement>({
+    itemCount: autoScrollItemCount ?? 0,
+    sendToken: autoScrollSendToken,
+  });
   return (
     <section
       className={`overflow-hidden rounded-md border border-border bg-card text-card-foreground shadow-subtle ${
@@ -139,6 +150,8 @@ export function ConversationSection({
         {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
       </div>
       <div
+        ref={scrollRef}
+        data-conversation-scroll
         className={`min-h-48 px-4 sm:px-5 ${
           bounded ? "py-4 overflow-y-auto lg:min-h-0 lg:flex-1" : "py-2"
         }`}
