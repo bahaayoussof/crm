@@ -1106,3 +1106,32 @@ Previously, clicking the Link button in the Lexical reply toolbar triggered brow
 - Browser-native link prompts are eliminated from all support replies and customer portal rich-text composition.
 - Safe, validated link insertion with full keyboard and screen-reader accessibility.
 - Server-side sanitizer allowlists in `reply-html.ts` continue to enforce `target="_blank"` and `rel="noopener noreferrer nofollow"`.
+
+# ADR-042: Account Management — password reset for all roles + customer self-service profile
+
+**Status:** Implemented on `feature/account-management` (not yet integrated). Additive migration `20260830190000_add_password_reset`.
+
+## Context
+
+Login/register existed but there was no way to recover a forgotten password (any role) and no customer-facing profile/settings page. The CRM had no email transport and no server-side session registry.
+
+## Decisions
+
+1. **Reset tokens.** New `PasswordResetToken` model. The raw token (`randomBytes(32)`, base64url) is emailed only inside `${APP_URL}/reset-password?token=…`; the DB stores only `sha256(raw)`. 30-minute TTL, single-use (`usedAt`). A new forgot-password request deletes the user's prior unused rows, and a successful reset marks its row used and deletes the rest → at most one live link per account.
+2. **Enumeration safety.** `POST /auth/forgot-password` always returns the same generic `200` body whether or not the email matches an account. Rate-limited by IP+email.
+3. **Atomic consumption.** `POST /auth/reset-password` claims the token inside the transaction with `updateMany({ where: { tokenHash, usedAt: null, expiresAt: { gt: now } } })` and requires `count === 1` before writing the new password — two concurrent requests cannot both succeed. It returns `{ ok: true }` with **no token and no auto-login**; the user signs in afterward (matches the success screen).
+4. **Change password** (`PATCH /auth/change-password`, authenticated, any role) verifies the current password, rejects new === current, and returns a **fresh JWT** so the acting session survives while `passwordChangedAt` is bumped.
+5. **Email abstraction.** `server/src/modules/email/` — an `EmailProvider` interface with a Resend adapter (used when `RESEND_API_KEY` + `EMAIL_FROM` are set) and a log-transport fallback that prints the message (incl. the reset URL) to the server console in development. `sendEmail` swallows provider errors so a mail outage never 500s a security flow. New env: `APP_URL` (falls back to `CLIENT_URL`), `RESEND_API_KEY`, `EMAIL_FROM`. Added the `resend` dependency (server).
+6. **Scoped session invalidation.** The JWT now carries `iat` (`request.auth.issuedAt`). `middleware/require-fresh-token.ts` rejects a token issued before `passwordChangedAt` (`401 SESSION_EXPIRED`). It is mounted ONLY on `portalRouter`; `/auth/me` performs the same check inside `getCurrentUser` (which already reads the user row). Global `requireAuth` is **not** modified — a DB-backed `requireAuth` breaks ~10 module test suites (see `.wolf/cerebrum.md`). All other internal routes stay bounded by the 8-hour JWT expiry. Documented limitation.
+7. **Customer profile.** `GET/PATCH /api/portal/profile` derives the customer from `req.auth.userId`. `PATCH` accepts a strict `{ name, email, phone }` whitelist only; a changed email is checked for uniqueness across `User` + `Customer` (pre-check and `P2002` both → `409 EMAIL_IN_USE`); `Customer` and `User` are updated in one transaction so the login identity stays synced; `PROFILE_UPDATED` is audited. Phone gets **no** uniqueness constraint (WhatsApp customer matching keys on phone). The page is read-only by default with two cards (Personal Information / Security); Edit Profile and Change Password use shared portalled modals matching `FileUploadModal`.
+8. **Audit actions added:** `PASSWORD_RESET_REQUESTED`, `PASSWORD_RESET_COMPLETED`, `PASSWORD_CHANGED`, `PROFILE_UPDATED`. Tokens, hashes and raw URLs are never logged.
+
+## Alternatives rejected
+
+- A dedicated `PasswordResetToken`-free flow reusing JWTs as reset tokens (rejected — not single-use, not revocable, leaks in URLs/logs). Storing the raw token (rejected — a DB read then reveals working reset links). A full refresh-token / session-registry system just for this feature (rejected per the brief — documented the stateless-JWT limitation instead and enforced freshness only where it matters). Adding `nodemailer` (rejected — the user chose Resend). A global DB-backed `requireAuth` for freshness (rejected — breaks the per-file prisma mocks across ~10 suites).
+
+## Consequences
+
+- Every role can self-serve a password reset; links expire and are one-time; a reset/change immediately invalidates other sessions on `/auth/me` + portal routes (other internal routes on token expiry).
+- Customers can fix their own name/email/phone and rotate their password without contacting support; the header/avatar refresh without re-login.
+- Development needs no mail account — the reset URL is printed to the server console.

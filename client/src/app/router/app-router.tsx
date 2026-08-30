@@ -1,6 +1,8 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { LoginPage } from "@/features/auth/login-page";
 import { RegisterPage } from "@/features/auth/register-page";
+import { ForgotPasswordPage } from "@/features/auth/forgot-password-page";
+import { ResetPasswordPage } from "@/features/auth/reset-password-page";
 import { CustomerDetailPage } from "@/features/customers/customer-detail-page";
 import { CustomerFormPage } from "@/features/customers/customer-form-page";
 import { CustomerListPage } from "@/features/customers/customer-list-page";
@@ -11,6 +13,7 @@ import { ProtectedRoute } from "./protected-route";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { CustomerManageRoute } from "./customer-manage-route";
 import { PortalHomePage, PortalNewTicketPage, PortalTicketDetailPage, PortalTicketsPage } from "@/features/portal/portal-pages";
+import { PortalProfilePage } from "@/features/portal/profile/profile-page";
 import { PortalKnowledgeArticlePage, PortalKnowledgeBasePage } from "@/features/portal/portal-knowledge-pages";
 import { KnowledgeArticleFormPage } from "@/features/knowledge-base/knowledge-article-form-page";
 import { KnowledgeBaseDetailPage } from "@/features/knowledge-base/knowledge-base-detail-page";
@@ -37,6 +40,8 @@ export function AppRouter() {
   return <BrowserRouter><Routes>
     <Route path="/login" element={<LoginPage />} />
     <Route path="/register" element={<RegisterPage />} />
+    <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+    <Route path="/reset-password" element={<ResetPasswordPage />} />
     <Route element={<ProtectedRoute audience="internal" />}>
       <Route path="/dashboard" element={<DashboardPage />} />
       <Route path="/tickets" element={<TicketListPage />} />
@@ -80,6 +85,7 @@ export function AppRouter() {
       <Route path="/portal/tickets" element={<PortalTicketsPage />} />
       <Route path="/portal/tickets/new" element={<PortalNewTicketPage />} />
       <Route path="/portal/tickets/:id" element={<PortalTicketDetailPage />} />
+      <Route path="/portal/profile" element={<PortalProfilePage />} />
       <Route path="/portal/knowledge-base" element={<PortalKnowledgeBasePage />} />
       <Route path="/portal/knowledge-base/:id" element={<PortalKnowledgeArticlePage />} />
     </Route>

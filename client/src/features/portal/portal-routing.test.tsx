@@ -19,6 +19,7 @@ const CUSTOMER_NAV = [
   ["My Requests", "/portal/tickets"],
   ["New Request", "/portal/tickets/new"],
   ["Help Center", "/portal/knowledge-base"],
+  ["Profile", "/portal/profile"],
 ] as const;
 
 const INTERNAL_ONLY_NAV = ["Dashboard", "Tickets", "Customers", "Knowledge Base", "Reports", "Users", "Settings"];

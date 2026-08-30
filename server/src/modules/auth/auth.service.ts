@@ -2,8 +2,11 @@ import bcrypt from "bcrypt";
 import { Prisma, Role } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
+import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../audit-logs/audit-log.constants.js";
+import type { AuditRequestContext } from "../audit-logs/audit-request-context.js";
+import { createAuditLog } from "../audit-logs/audit-log.service.js";
 import { createAccessToken } from "./auth-token.js";
-import type { LoginInput, RegisterInput } from "./auth.schema.js";
+import type { ChangePasswordInput, LoginInput, RegisterInput } from "./auth.schema.js";
 import type { AuthResponse, AuthUser } from "./auth.types.js";
 
 const authUserSelect = {
@@ -12,6 +15,7 @@ const authUserSelect = {
   email: true,
   role: true,
   isActive: true,
+  passwordChangedAt: true,
   customerProfile: {
     select: { id: true, name: true, email: true, phone: true },
   },
@@ -103,7 +107,7 @@ export async function login(input: LoginInput): Promise<AuthResponse> {
   return createAuthResponse(safeUser);
 }
 
-export async function getCurrentUser(userId: string): Promise<AuthUser> {
+export async function getCurrentUser(userId: string, issuedAt?: number): Promise<AuthUser> {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: authUserSelect });
 
   if (!user) {
@@ -114,5 +118,54 @@ export async function getCurrentUser(userId: string): Promise<AuthUser> {
     throw new AppError(401, "ACCOUNT_DEACTIVATED", "This account has been deactivated");
   }
 
+  // Stale-token check: a token minted before the last password change is dead.
+  if (
+    user.passwordChangedAt &&
+    typeof issuedAt === "number" &&
+    issuedAt * 1000 < user.passwordChangedAt.getTime() - 1000
+  ) {
+    throw new AppError(401, "SESSION_EXPIRED", "Your session has expired. Please sign in again.");
+  }
+
   return toAuthUser(user);
+}
+
+export async function changePassword(
+  userId: string,
+  input: ChangePasswordInput,
+  requestContext?: AuditRequestContext,
+): Promise<{ token: string }> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, role: true, isActive: true, passwordHash: true },
+  });
+
+  if (!user || !user.isActive) {
+    throw new AppError(401, "ACCOUNT_DEACTIVATED", "This account has been deactivated");
+  }
+
+  if (!(await bcrypt.compare(input.currentPassword, user.passwordHash))) {
+    throw new AppError(401, "INVALID_PASSWORD", "The current password is incorrect");
+  }
+
+  if (await bcrypt.compare(input.newPassword, user.passwordHash)) {
+    throw new AppError(422, "SAME_PASSWORD", "New password must be different from the current password");
+  }
+
+  const passwordHash = await bcrypt.hash(input.newPassword, 12);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash, passwordChangedAt: new Date() },
+  });
+
+  await createAuditLog({
+    actorId: user.id,
+    action: AUDIT_ACTIONS.PASSWORD_CHANGED,
+    entityType: AUDIT_ENTITY_TYPES.USER,
+    entityId: user.id,
+    requestContext,
+  });
+
+  // Fresh token so the caller's own session survives the passwordChangedAt bump.
+  return { token: createAccessToken(user) };
 }

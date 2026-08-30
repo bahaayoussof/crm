@@ -13,6 +13,7 @@ import {
   Ticket,
   UserCog,
   Users,
+  UserRound,
   Settings,
   ScrollText,
 } from "lucide-react";
@@ -53,6 +54,7 @@ export function UsersNavIcon(props: LucideProps) {
   return <UserCog size={18} strokeWidth={1.75} aria-hidden="true" {...props} />;
 }
 export function SettingsNavIcon(props: LucideProps) { return <Settings size={18} strokeWidth={1.75} aria-hidden="true" {...props} />; }
+export function ProfileNavIcon(props: LucideProps) { return <UserRound size={18} strokeWidth={1.75} aria-hidden="true" {...props} />; }
 export function AuditLogsNavIcon(props: LucideProps) { return <ScrollText size={18} strokeWidth={1.75} aria-hidden="true" {...props} />; }
 
 export function LogoutIcon(props: LucideProps) {

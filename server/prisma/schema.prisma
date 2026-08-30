@@ -50,16 +50,17 @@ enum TaskStatus {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  name         String
-  email        String   @unique
-  passwordHash String
-  role         Role
-  isActive     Boolean  @default(true)
-  departmentId String?
-  branchId     String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                String    @id @default(cuid())
+  name              String
+  email             String    @unique
+  passwordHash      String
+  role              Role
+  isActive          Boolean   @default(true)
+  passwordChangedAt DateTime?
+  departmentId      String?
+  branchId          String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   department        Department?        @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   branch            Branch?            @relation(fields: [branchId], references: [id], onDelete: SetNull)
@@ -77,6 +78,7 @@ model User {
   ticketWatchers    TicketWatcher[]
   ticketMentions    TicketMention[]
   auditLogs         AuditLog[]
+  passwordResetTokens PasswordResetToken[]
 
   @@index([role])
   @@index([departmentId])
@@ -297,6 +299,24 @@ model AuditLog {
   @@index([actorId, createdAt])
   @@index([entityType, entityId])
   @@index([action])
+}
+
+// feature/account-management — password reset tokens. The raw token is never
+// stored; only its SHA-256 hash. Single-use (usedAt) + short-lived (expiresAt).
+// A new request for the same user deletes prior unused rows, so at most one live
+// reset link exists per account.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model SlaRule {

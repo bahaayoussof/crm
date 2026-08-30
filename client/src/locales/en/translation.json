@@ -6,7 +6,7 @@
     "languageSwitcher": "Choose language", "primary": "Primary navigation", "dashboard": "Dashboard", "tickets": "Tickets", "customers": "Customers", "knowledgeBase": "Knowledge Base", "tasks": "Tasks", "reports": "Reports", "quickReplies": "Quick Replies", "users": "Users", "settings": "Settings", "auditLogs": "Audit Logs",
     "collapseSidebar": "Collapse sidebar", "expandSidebar": "Expand sidebar",
     "portalHome": "Portal home", "portalContext": "Support portal", "workspaceContext": "Support workspace", "openCustomers": "Open customer records",
-    "portalOverview": "Overview", "portalRequests": "My Requests", "portalNewRequest": "New Request", "portalKnowledgeBase": "Help Center",
+    "portalOverview": "Overview", "portalRequests": "My Requests", "portalNewRequest": "New Request", "portalKnowledgeBase": "Help Center", "portalProfile": "Profile",
     "sections": { "main": "Main", "support": "Support", "management": "Management" }
   },
   "auditLogs": {
@@ -75,7 +75,7 @@
   "common": {
     "retry": "Retry", "previous": "Previous", "next": "Next", "cancel": "Cancel", "save": "Save", "saving": "Saving…", "clearSearch": "Clear search",
     "edit": "Edit", "delete": "Delete", "notProvided": "Not provided", "loading": "Loading…", "search": "Search", "noResults": "No results found",
-    "filters": "Filters", "apply": "Apply", "done": "Done", "reset": "Reset"
+    "filters": "Filters", "apply": "Apply", "done": "Done", "reset": "Reset", "close": "Close"
   },
   "datePicker": {
     "placeholder": "Select date",
@@ -101,11 +101,12 @@
   },
   "validation": {
     "email": "Enter a valid email address", "passwordRequired": "Password is required", "nameMin": "Name must be at least 2 characters",
-    "phoneMax": "Phone must be 30 characters or fewer", "passwordMin": "Password must be at least 8 characters", "passwordMatch": "Passwords do not match"
+    "phoneMax": "Phone must be 30 characters or fewer", "passwordMin": "Password must be at least 8 characters", "passwordMatch": "Passwords do not match",
+    "passwordSame": "New password must be different from the current password"
   },
   "errors": {
     "generic": "Unable to complete the request. Please try again.",
-    "auth": { "INVALID_CREDENTIALS": "Invalid email or password.", "EMAIL_ALREADY_REGISTERED": "An account with this email already exists.", "VALIDATION_ERROR": "Check the form and try again." }
+    "auth": { "INVALID_CREDENTIALS": "Invalid email or password.", "EMAIL_ALREADY_REGISTERED": "An account with this email already exists.", "VALIDATION_ERROR": "Check the form and try again.", "TOKEN_INVALID": "This password reset link is invalid or has expired.", "TOKEN_EXPIRED": "This password reset link has expired.", "INVALID_PASSWORD": "The current password is incorrect.", "SAME_PASSWORD": "New password must be different from the current password.", "EMAIL_IN_USE": "This email is already in use.", "SESSION_EXPIRED": "Your session has expired. Please sign in again.", "RATE_LIMITED": "Too many attempts. Please try again later." }
   },
   "dashboard": {
     "title": "Support dashboard", "description": "Current workload, SLA pressure, and tickets that need attention.", "metricsLabel": "Dashboard metrics", "loadError": "Unable to load the dashboard.",
@@ -585,6 +586,27 @@
       "error": "Unable to submit your feedback. Please try again.",
       "ratingRequired": "Select a rating before submitting.",
       "submittedOn": "Submitted {{date}}"
+    },
+    "profile": {
+      "title": "Profile",
+      "description": "Manage your personal information and account security.",
+      "loading": "Loading your profile…",
+      "loadError": "Unable to load your profile.",
+      "personalInformation": "Personal Information",
+      "security": "Security",
+      "name": "Full name",
+      "email": "Email",
+      "phone": "Phone",
+      "password": "Password",
+      "editProfile": "Edit Profile",
+      "editTitle": "Edit profile",
+      "changePassword": "Change Password",
+      "saveChanges": "Save changes",
+      "saving": "Saving…",
+      "errors": {
+        "EMAIL_IN_USE": "This email is already in use.",
+        "updateFailed": "Unable to save your changes. Please try again."
+      }
     }
   },
   "auth": {
@@ -594,6 +616,38 @@
     "show": "Show", "hide": "Hide", "signIn": "Sign in", "signingIn": "Signing in…", "register": "Register",
     "createAccount": "Create account", "creatingAccount": "Creating account…", "needAccount": "Need a customer account?", "haveAccount": "Already have an account?",
     "dashboardPlaceholder": "Internal workspace", "portalPlaceholder": "Customer portal",
-    "signedInAs": "Signed in as {{name}}. This area will be implemented in a later feature.", "logout": "Log out"
+    "signedInAs": "Signed in as {{name}}. This area will be implemented in a later feature.", "logout": "Log out",
+    "forgotPassword": {
+      "link": "Forgot password?",
+      "title": "Forgot your password?",
+      "description": "Enter the email associated with your account. We'll send you instructions to reset your password.",
+      "emailLabel": "Email address",
+      "submit": "Send reset link",
+      "sending": "Sending…",
+      "genericSuccess": "If an account exists for this email, a password reset link has been sent.",
+      "backToLogin": "Back to login"
+    },
+    "resetPassword": {
+      "title": "Reset password",
+      "description": "Choose a new password for your account.",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm password",
+      "submit": "Reset password",
+      "submitting": "Updating…",
+      "success": "Password updated successfully. You can now sign in using your new password.",
+      "goToLogin": "Go to login",
+      "backToLogin": "Back to login",
+      "invalidLink": "This password reset link is invalid or has expired.",
+      "requestNewLink": "Request a new reset link"
+    },
+    "changePassword": {
+      "title": "Change password",
+      "currentPassword": "Current password",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm new password",
+      "submit": "Change password",
+      "submitting": "Updating…",
+      "success": "Password changed successfully."
+    }
   }
 }

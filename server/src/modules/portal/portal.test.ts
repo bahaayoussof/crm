@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   customer: { findUnique: vi.fn() }, ticket: { count: vi.fn(), findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
   category: { findMany: vi.fn(), findFirst: vi.fn() }, slaRule: { findFirst: vi.fn() }, ticketMessage: { create: vi.fn() }, ticketHistory: { create: vi.fn() },
-  user: { findFirst: vi.fn().mockResolvedValue(null), findMany: vi.fn().mockResolvedValue([]) },
+  user: { findFirst: vi.fn().mockResolvedValue(null), findMany: vi.fn().mockResolvedValue([]), findUnique: vi.fn().mockResolvedValue({ passwordChangedAt: null }) },
   notification: { createMany: vi.fn().mockResolvedValue({ count: 0 }) },
   ticketWatcher: { findMany: vi.fn().mockResolvedValue([]) },
 }));

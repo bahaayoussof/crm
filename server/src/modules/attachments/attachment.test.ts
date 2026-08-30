@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   ticketMessageFindFirst: vi.fn(),
   ticketMessageCreate: vi.fn(),
   customerFindUnique: vi.fn(),
+  userFindUnique: vi.fn(),
   attachmentFindMany: vi.fn(),
   attachmentFindUnique: vi.fn(),
   attachmentCreate: vi.fn(),
@@ -18,6 +19,7 @@ vi.mock("../../config/prisma.js", () => ({
     ticket: { findFirst: mocks.ticketFindFirst, update: mocks.ticketUpdate },
     ticketMessage: { findFirst: mocks.ticketMessageFindFirst, create: mocks.ticketMessageCreate },
     customer: { findUnique: mocks.customerFindUnique },
+    user: { findUnique: mocks.userFindUnique },
     attachment: {
       findMany: mocks.attachmentFindMany,
       findUnique: mocks.attachmentFindUnique,
@@ -70,6 +72,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   storage = createMemoryStorage();
   __setAttachmentStorageForTests(storage);
+  mocks.userFindUnique.mockResolvedValue({ passwordChangedAt: null });
   mocks.attachmentFindMany.mockResolvedValue([]);
   mocks.attachmentCreate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
     ...createdRow(),

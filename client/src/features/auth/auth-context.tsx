@@ -3,9 +3,7 @@ import { type PropsWithChildren, useEffect, useState } from "react";
 import { getCurrentUserRequest, loginRequest, registerRequest } from "./auth-api";
 import { clearAuthToken, getAuthToken, setAuthToken } from "./auth-token";
 import type { AuthResponse } from "./auth.types";
-import { AuthContext } from "./auth-state";
-
-const AUTH_QUERY_KEY = ["auth", "me"] as const;
+import { AUTH_QUERY_KEY, AuthContext } from "./auth-state";
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const queryClient = useQueryClient();

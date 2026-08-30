@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   ticket: { findFirst: vi.fn() },
   feedback: { findUnique: vi.fn(), create: vi.fn() },
   ticketHistory: { create: vi.fn() },
+  user: { findUnique: vi.fn() },
 }));
 vi.mock("../../config/prisma.js", () => ({
   prisma: {
@@ -24,6 +25,7 @@ const post = (body: unknown) => request(app).post("/api/portal/tickets/ticket-a/
 describe("customer feedback", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.user.findUnique.mockResolvedValue({ passwordChangedAt: null });
     mocks.customer.findUnique.mockResolvedValue({ id: "customer-a" });
     mocks.ticket.findFirst.mockResolvedValue({ id: "ticket-a", status: TicketStatus.RESOLVED });
     mocks.feedback.findUnique.mockResolvedValue(null);

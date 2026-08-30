@@ -7,6 +7,7 @@ import { AppError } from "../../shared/errors/app-error.js";
 const tokenPayloadSchema = z.object({
   sub: z.string().min(1),
   role: z.nativeEnum(Role),
+  iat: z.number(),
 });
 
 export function createAccessToken(user: { id: string; role: Role }) {
@@ -19,7 +20,7 @@ export function createAccessToken(user: { id: string; role: Role }) {
 export function verifyAccessToken(token: string) {
   try {
     const payload = tokenPayloadSchema.parse(jwt.verify(token, env.JWT_SECRET));
-    return { userId: payload.sub, role: payload.role };
+    return { userId: payload.sub, role: payload.role, issuedAt: payload.iat };
   } catch {
     throw new AppError(401, "INVALID_TOKEN", "Authentication token is invalid or expired");
   }

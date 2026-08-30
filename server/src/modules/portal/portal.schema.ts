@@ -1,5 +1,6 @@
 import { TicketPriority } from "@prisma/client";
 import { z } from "zod";
+import { normalizedEmail } from "../auth/auth.schema.js";
 
 export const portalStatuses = ["OPEN", "IN_PROGRESS", "WAITING_FOR_YOU", "RESOLVED", "CLOSED"] as const;
 export const portalTicketParamsSchema = z.object({ id: z.string().trim().min(1) }).strict();
@@ -18,8 +19,22 @@ export const portalCreateTicketSchema = z.object({
 }).strict();
 export const portalReplySchema = z.object({ body: z.string().trim().min(1).max(20_000) }).strict();
 
+// Customer self-service profile edit. Explicit whitelist — name / email / phone only.
+export const portalProfileUpdateSchema = z.object({
+  name: z.string().trim().min(2).max(100),
+  email: normalizedEmail,
+  phone: z
+    .string()
+    .trim()
+    .max(30)
+    .transform((value) => (value.length ? value : null))
+    .nullable()
+    .optional(),
+}).strict();
+
 export type PortalStatus = typeof portalStatuses[number];
 export type PortalTicketParams = z.infer<typeof portalTicketParamsSchema>;
 export type PortalTicketListQuery = z.infer<typeof portalTicketListSchema>;
 export type PortalCreateTicketInput = z.infer<typeof portalCreateTicketSchema>;
 export type PortalReplyInput = z.infer<typeof portalReplySchema>;
+export type PortalProfileUpdateInput = z.infer<typeof portalProfileUpdateSchema>;

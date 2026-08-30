@@ -19,9 +19,12 @@ Registered routers as of `master` `12a0c12` (feature/customer-feedback integrate
 ## Authentication
 
 ```text
-POST /auth/register
-POST /auth/login
-GET  /auth/me
+POST  /auth/register
+POST  /auth/login
+GET   /auth/me
+POST  /auth/forgot-password
+POST  /auth/reset-password
+PATCH /auth/change-password
 ```
 
 `POST /auth/register` accepts `{ name, email, password, phone? }`, rejects unknown fields, and always creates a customer identity. `POST /auth/login` accepts `{ email, password }`. Both successful endpoints return:
@@ -42,6 +45,16 @@ GET  /auth/me
 ```
 
 `GET /auth/me` requires `Authorization: Bearer <token>` and returns `{ "data": { "user": ... } }`. Internal users have `customer: null`. Password hashes are never returned. Authentication errors use `{ "error": { "code": "...", "message": "..." } }`.
+
+### Password reset & change — LIVE (on `feature/account-management`, not yet integrated)
+
+Works for every role (ADMIN / MANAGER / AGENT / CUSTOMER).
+
+- `POST /auth/forgot-password` — `{ email }`. Always `200 { "data": { "message": "If an account exists…" } }` regardless of whether the email exists (no account enumeration). If it exists: prior unused reset tokens for that user are deleted, a new cryptographically-random token is generated, only its **SHA-256 hash** is stored (`PasswordResetToken`, `expiresAt = now + 30 min`, single-use), and the raw token is emailed inside `${APP_URL}/reset-password?token=<raw>`. Rate-limited per IP+email (5 / 15 min). Audit: `PASSWORD_RESET_REQUESTED` (never stores the token/URL).
+- `POST /auth/reset-password` — `{ token, password, confirmPassword }`. Hashes the token, requires it to exist / be unused / be unexpired, then **atomically claims** it (`updateMany` guarded on `usedAt: null, expiresAt > now`, must affect exactly one row — blocks concurrent consumers) before writing `passwordHash` + `passwordChangedAt` and deleting the user's other unused tokens. Errors: `400 TOKEN_INVALID`, `400 TOKEN_EXPIRED`, `400 VALIDATION_ERROR` (mismatch / weak). Success: `200 { "data": { "ok": true } }` — **no auto-login, no token returned**. Rate-limited per IP (10 / 15 min).
+- `PATCH /auth/change-password` — authenticated; `{ currentPassword, newPassword, confirmPassword }`. Verifies the current password (`401 INVALID_PASSWORD`), rejects a new password equal to the current one (`422 SAME_PASSWORD` / `400 VALIDATION_ERROR`), writes `passwordHash` + `passwordChangedAt`, audits `PASSWORD_CHANGED`, and returns `200 { "data": { "token": "<fresh-jwt>" } }` so the caller's own session survives.
+
+**Session invalidation (bounded):** the JWT now carries `iat`; `require-fresh-token` middleware rejects a token issued before `passwordChangedAt` with `401 SESSION_EXPIRED`. It is enforced ONLY on `/auth/me` and every `/portal/*` route. All other internal routes remain bounded by the 8-hour JWT expiry (no server-side session registry, no refresh tokens).
 
 ## Users — LIVE
 
@@ -537,6 +550,8 @@ All `/api/portal/*` endpoints require an authenticated `CUSTOMER` and derive own
 - `GET /portal/tickets/:id`: safe details and public `TicketMessage` records only.
 - `POST /portal/tickets`: strict subject, description, and optional category creation.
 - `POST /portal/tickets/:id/messages`: strict customer reply. The body is now **rich text (HTML) from the shared Lexical composer** and is **sanitized server-side on write** to the same support allowlist as staff replies; a markup-only body is rejected with `422 EMPTY_MESSAGE`. Maximum 20,000 characters. No mention tokens are produced on the Portal.
+- `GET /portal/profile` (on `feature/account-management`, not yet integrated): the authenticated customer's own `{ name, email, phone }` — derived from `req.auth.userId`, never a client-supplied id.
+- `PATCH /portal/profile`: strict `{ name, email, phone? }` whitelist (email normalized lower-case; `phone` empty → `null`). A customer can edit ONLY these three fields — role, permissions, account type, ids, SLA, ticket ownership are unreachable. A changed email is checked for uniqueness across `User` and `Customer`; a clash (pre-check or DB `P2002`) → `409 EMAIL_IN_USE`. On success `Customer` and `User` are updated in one transaction (login identity stays synced) and `PROFILE_UPDATED` is audited. Phone has no uniqueness constraint (WhatsApp customer matching keys on phone).
 
 Portal **ticket detail** and every other Portal serializer exclude priority, assignee, organization, SLA state, SLA targets, SLA deadlines, notes, history, staff roles/emails, audit data, and escalation semantics; they never expose `slaState`, `effectiveSlaDueAt`, `effectiveSlaTarget`, `firstResponseDueAt`, `firstRespondedAt`, or `resolutionDueAt`. The single exception is the **`GET /portal/tickets` list row**, which carries a customer-safe `priority` (`LOW|MEDIUM|HIGH|URGENT` — the ticket's own priority, not any internal SLA/escalation state) to back the "My Requests" priority column and filter (ADR-033).
 

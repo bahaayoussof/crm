@@ -1,5 +1,11 @@
 import { apiClient } from "@/services/api-client";
-import type { LoginValues, RegistrationValues } from "./auth.schemas";
+import type {
+  ChangePasswordValues,
+  ForgotPasswordValues,
+  LoginValues,
+  RegistrationValues,
+  ResetPasswordValues,
+} from "./auth.schemas";
 import type { ApiEnvelope, AuthResponse, AuthUser } from "./auth.types";
 
 export async function loginRequest(values: LoginValues) {
@@ -18,4 +24,19 @@ export async function registerRequest(values: RegistrationValues) {
 export async function getCurrentUserRequest() {
   const response = await apiClient.get<ApiEnvelope<{ user: AuthUser }>>("/auth/me");
   return response.data.data.user;
+}
+
+export async function forgotPasswordRequest(values: ForgotPasswordValues) {
+  const response = await apiClient.post<ApiEnvelope<{ message: string }>>("/auth/forgot-password", values);
+  return response.data.data;
+}
+
+export async function resetPasswordRequest(values: ResetPasswordValues & { token: string }) {
+  const response = await apiClient.post<ApiEnvelope<{ ok: true }>>("/auth/reset-password", values);
+  return response.data.data;
+}
+
+export async function changePasswordRequest(values: ChangePasswordValues) {
+  const response = await apiClient.patch<ApiEnvelope<{ token: string }>>("/auth/change-password", values);
+  return response.data.data;
 }

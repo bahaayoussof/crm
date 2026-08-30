@@ -1,9 +1,10 @@
 import { Role } from "@prisma/client";
 import { Router } from "express";
 import { requireAuth, requireRole } from "../../middleware/auth.js";
+import { requireFreshToken } from "../../middleware/require-fresh-token.js";
 import { validateBody, validateParams, validateQuery } from "../../middleware/validate.js";
 import * as controller from "./portal.controller.js";
-import { portalCreateTicketSchema, portalReplySchema, portalTicketListSchema, portalTicketParamsSchema } from "./portal.schema.js";
+import { portalCreateTicketSchema, portalProfileUpdateSchema, portalReplySchema, portalTicketListSchema, portalTicketParamsSchema } from "./portal.schema.js";
 import {
   listPortalTicketAttachments,
   uploadPortalTicketAttachment,
@@ -12,8 +13,10 @@ import * as feedbackController from "../feedback/feedback.controller.js";
 import { feedbackParamsSchema, submitFeedbackSchema } from "../feedback/feedback.schema.js";
 
 export const portalRouter = Router();
-portalRouter.use(requireAuth, requireRole(Role.CUSTOMER));
+portalRouter.use(requireAuth, requireRole(Role.CUSTOMER), requireFreshToken);
 portalRouter.get("/overview", controller.overview);
+portalRouter.get("/profile", controller.profile);
+portalRouter.patch("/profile", validateBody(portalProfileUpdateSchema), controller.updateProfile);
 portalRouter.get("/categories", controller.categories);
 portalRouter.get("/tickets", validateQuery(portalTicketListSchema), controller.tickets);
 portalRouter.get("/tickets/:id", validateParams(portalTicketParamsSchema), controller.detail);

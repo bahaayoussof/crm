@@ -10,6 +10,15 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   CLIENT_URL: z.string().url().default("http://localhost:5173"),
   CLIENT_URLS: clientUrlsSchema.optional(),
+  // Public base URL of the web client, used to build absolute links in emails
+  // (e.g. the password-reset URL). Defaults to CLIENT_URL when unset.
+  APP_URL: z.string().url().optional(),
+  // Transactional email (server/src/modules/email). Optional: when RESEND_API_KEY
+  // or EMAIL_FROM is unset the email service falls back to a log transport that
+  // prints the message (incl. the reset URL in development) to the server console.
+  // Never exposed to the browser.
+  RESEND_API_KEY: z.string().min(1).optional(),
+  EMAIL_FROM: z.string().min(1).optional(),
   DATABASE_URL: z
     .string()
     .min(1, "DATABASE_URL is required")

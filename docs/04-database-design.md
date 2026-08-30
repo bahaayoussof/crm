@@ -10,6 +10,8 @@ This is the planned logical model. Exact Prisma syntax may be implemented during
 - email
 - passwordHash
 - role
+- isActive (default true)
+- passwordChangedAt optional — set on every password reset / change; `require-fresh-token` rejects tokens issued before it (`feature/account-management`)
 - departmentId optional
 - branchId optional
 - createdAt
@@ -162,6 +164,16 @@ Department names are unique within a branch through the compound `(branchId, nam
 
 ### AuditLog
 P2 unless time allows.
+
+### PasswordResetToken (`feature/account-management`, migration `20260830190000_add_password_reset`)
+- id
+- userId — FK to `User`, `onDelete: Cascade`
+- tokenHash — `@unique`; SHA-256 of the raw token. The raw token is NEVER stored; it exists only in the emailed reset URL
+- expiresAt — 30 minutes after creation
+- usedAt optional — set the moment the token is consumed (single-use)
+- createdAt
+- Indexes: `tokenHash` (unique), `userId`, `expiresAt`
+- Invariant: at most one live (`usedAt: null`) row per user — a new forgot-password request deletes prior unused rows, and a successful reset marks its row used and deletes the user's remaining unused rows.
 
 ## Enums
 

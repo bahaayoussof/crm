@@ -10,6 +10,10 @@ export interface AuthContextValue {
   logout: () => void;
 }
 
+/** TanStack Query key for the authenticated user (`GET /auth/me`). Shared so
+ *  password / profile mutations can refresh the current-user cache. */
+export const AUTH_QUERY_KEY = ["auth", "me"] as const;
+
 export const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function useAuth() {

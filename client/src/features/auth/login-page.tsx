@@ -47,6 +47,11 @@ export function LoginPage() {
               {showPassword ? t("auth.hide") : t("auth.show")}
             </button>
           </div>
+          <div className="mt-1.5 text-end">
+            <Link className="text-xs font-medium text-primary hover:underline" to="/forgot-password">
+              {t("auth.forgotPassword.link")}
+            </Link>
+          </div>
         </AuthField>
         <button className="button-primary" type="submit" disabled={isSubmitting}>
           {isSubmitting ? t("auth.signingIn") : t("auth.signIn")}

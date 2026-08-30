@@ -590,3 +590,30 @@ Summary: Completed **Tasks & Reminders** end to end on uncommitted `feature/task
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
 | 15:58 | Implemented deterministic & idempotent comprehensive development/test seed generator across all CRM entities (`server/scripts/seed-test-data.ts`), added `npm run seed:test` and `npm run db:seed:test`, created `docs/dev-test-data.md` QA documentation, added `server/src/modules/pagination.test.ts` (11/11 tests passing) verifying pagination calculation, non-divisible totalPages, empty-state total=0, search/filter propagation, and RBAC visibility-scoped counting. Seeded 53 users, 189 customers, 399 tickets, 1,354 messages, 130 notes, 109 tasks, 64 KB articles, 50 quick replies, 416 audit logs, 87 notifications. | server/scripts/seed-test-data.ts, server/src/modules/pagination.test.ts, docs/dev-test-data.md, package.json, server/package.json, client/src/features/tickets/ticket-details-layout.test.tsx, docs/19-progress-tracking.md, .wolf/STATUS.md | All checks pass: server vitest 511/511, client vitest 584/584, client `tsc -b` clean, server `tsc` clean, repo `eslint .` 0 errors, client build green, git diff --check clean. Changes unstaged on feature/initial-test. | ~25k |
+
+## Session: 2026-08-30 17:22
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-08-30 17:22
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-08-30 — feature/account-management (Password Reset + Customer Profile)
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| — | Prisma: add User.passwordChangedAt + PasswordResetToken model | server/prisma/schema.prisma, migrations/20260830190000_add_password_reset | migrate deploy OK on Neon; generate --no-engine OK | 3k |
+| — | Email module (Resend + log fallback) | server/src/modules/email/* (types, config, service, providers/, password-reset.email) | new; log transport prints reset URL in dev | 4k |
+| — | Forgot/Reset password backend | auth.schema.ts, password-reset.service.ts, auth.service.ts (changePassword), auth.controller.ts, auth.routes.ts | POST /auth/forgot-password, POST /auth/reset-password, PATCH /auth/change-password; rate-limited | 6k |
+| — | Stale-token enforcement | auth-token.ts (iat), types/express.d.ts (issuedAt), middleware/require-fresh-token.ts, auth.service.getCurrentUser | scoped to portalRouter + /auth/me only | 3k |
+| — | Portal profile backend | portal.schema.ts, portal-profile.service.ts, portal.controller.ts, portal.routes.ts | GET/PATCH /portal/profile; field whitelist; P2002→409 | 3k |
+| — | Fix portal-scoped test mocks for requireFreshToken | portal.test.ts, feedback.test.ts, attachment.test.ts | added user.findUnique mock → 538/538 server tests pass | 1k |
+| — | Server tests | auth/password-reset.test.ts, auth/change-password.test.ts, portal/portal-profile.test.ts, email/log-provider.test.ts | +25 tests incl. concurrent-consume + P2002 race | 5k |
+| — | Client auth pages/dialogs | features/auth/{forgot-password-page,reset-password-page,change-password-dialog}.tsx, auth.schemas.ts, auth-api.ts, auth-state.ts (AUTH_QUERY_KEY), login-page.tsx | Forgot password link on login; public routes | 6k |
+| — | Portal profile UI | features/portal/profile/{profile.api,profile.queries,profile-page,edit-profile-dialog}.tsx, app-router.tsx, nav-config.ts, nav-icons.tsx | /portal/profile route + Profile nav item | 5k |
+| — | i18n EN/AR | locales/{en,ar}/translation.json | +auth.forgotPassword/resetPassword/changePassword, portal.profile, errors.auth codes; parity 1081/1081 | 3k |
+| — | Client tests | features/auth/*.test.tsx (3), features/portal/profile/profile-page.test.tsx, portal-routing.test.tsx | +14 tests → 603/603 client pass | 4k |
+| — | Verify | — | server 538/538, client 603/603, lint clean, tsc clean, vite build green | 1k |
