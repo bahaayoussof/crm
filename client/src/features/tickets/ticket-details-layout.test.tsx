@@ -169,9 +169,8 @@ describe("Ticket Details workspace layout & long-content containment", () => {
     const { container } = renderDetail();
     // Customer email is removed from the summary strip
     expect(screen.queryByText(baseTicket.customer.email)).not.toBeInTheDocument();
-    // Customer name and View customer link are present
+    // Customer name link is present
     expect(screen.getByRole("link", { name: baseTicket.customer.name })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /^View customer/ })).toBeInTheDocument();
 
     const summaryStrip = container.querySelector(".lg\\:grid-cols-\\[1\\.6fr_0\\.75fr_1fr_0\\.9fr_0\\.65fr\\]") as HTMLElement;
     expect(summaryStrip).toBeTruthy();

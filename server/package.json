@@ -10,7 +10,9 @@
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit --pretty false",
     "test": "vitest run",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "seed:test": "tsx scripts/seed-test-data.ts",
+    "db:seed:test": "tsx scripts/seed-test-data.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.15.0",
