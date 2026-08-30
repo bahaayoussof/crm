@@ -19,6 +19,8 @@
 
 ## Key Learnings
 
+- [2026-08-30] **Customer Portal Ticket Details 2-Column Workspace Redesign (ADR-039).** On desktop (`lg+`), uses a 2-column grid (`minmax(0, 1fr)` main conversation + `300px` sticky right rail, `xl:320px`). The Description and Category/Created/Updated metadata live together in a single `Ticket details` card in the right sidebar, eliminating the standalone Description card and horizontal context strip. Conversation messages shrink-wrap naturally (`w-fit max-w-[85%] sm:max-w-[min(70%,560px)]`) with tighter padding (`px-3.5 py-2.5`). Lower workspace tabs (`PortalWorkspaceTabs`) house Reply (rich Lexical editor kept mounted across tab switches) and Attachments (compact grid with preview/download and empty states). Feedback renders in the right rail sidebar when eligible or present.
+
 - [2026-08-30] Audit logs use one central transaction-aware service, TypeScript string action/entity constants, null actor + `actorType: SYSTEM` for automation, and explicit per-domain safe-field allowlists. Never pass DTOs/records into audit metadata. The ADMIN API returns safe actor projection and extracts `changes` from stored metadata.
 
 - **Roadmap completeness (ADR-038, 2026-08-30).** Required future phases after Ticket Details/internal AI are: Audit Logs, Departments, Branches, Email, SMS, production Live Chat, customer-facing AI Chatbot, generic External Integrations, ERP, Custom Branding, final realistic seed/demo, final integrated QA, then final deployment verification. Department/Branch relations and EMAIL/SMS/LIVE_CHAT enums are foundations only. External Integrations precedes ERP. The customer chatbot has a separate customer-safe context boundary from the internal AI Assistant.

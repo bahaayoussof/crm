@@ -4,6 +4,22 @@ Use this file for decisions not already fixed by the project documentation.
 
 Do not record trivial implementation details.
 
+### ADR-039: Customer Portal Ticket Details — 2-Column Workspace Redesign & Workspace Tabs
+
+**Date:** 2026-08-30
+
+`feature/customer-ticket-details-redesign`. Redesign of the Customer Portal Ticket Details page (`/portal/tickets/:id`) from an oversized vertically stacked layout into a compact, modern two-column ticket workspace matching the CRM design system and information density standards.
+
+- **Two-Column Desktop Workspace Grid:** On desktop (`lg+`), uses `lg:grid lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_320px]` with `items-start` and `gap-4`. The left main column hosts the compact header (`TicketDetailHeader`), bounded conversation container, and unified workspace tabs; the right rail hosts the `Ticket details` metadata card and `TicketFeedback` card. On mobile/tablet, single-column responsive flow with the sidebar placed naturally beneath the main workspace.
+- **Description & Metadata in Right Rail:** Description is moved out of the main vertical flow into the right sidebar `Ticket details` card alongside Category, Created timestamp, and Last Updated timestamp (`<bdi dir="ltr">`), removing the standalone Description card and horizontal context strip.
+- **Unified Lower Workspace Tabs:** Replaces the separate standalone full-width Reply and Attachments cards with a unified lower workspace card `PortalWorkspaceTabs` beneath the conversation (`role="tablist"`):
+  - **Reply tab (`role="tabpanel"`):** rich Lexical editor (`TicketReplyEditor`) with compact height, toolbar, reopen notice when `RESOLVED`, closed notice when `CLOSED`, and footer with paperclip `Attach file` button and primary `Reply` button. The editor is kept mounted (`hidden` when inactive) so draft text survives tab switching.
+  - **Attachments tab (`role="tabpanel"`):** ticket-level attachments grid (`AttachmentCompactGrid`, `scope="portal"`) with file icons, filenames, Preview and Download actions, View all / Show less toggle when > 3 attachments, and empty state.
+- **Natural Bubble Sizing & Viewer-Relative Alignment:** Message bubbles use `w-fit max-w-[85%] sm:max-w-[min(70%,560px)]` and tighter padding (`px-3.5 py-2.5`), preventing short messages from stretching across wide cards while containing long text without horizontal overflow. Alignment is viewer-relative (Customer → end, Support Team → start).
+- **Customer Isolation & Safety:** Preserves strict customer safety (no internal notes, quick replies, staff assignees, internal SLA metrics, watchers, or mentions in the portal bundle).
+
+---
+
 ### ADR-037: Ticket Details PASS 4b — shared rich composer everywhere + Customer view parity
 
 **Date:** 2026-08-29

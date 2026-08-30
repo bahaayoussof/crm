@@ -150,7 +150,8 @@ describe("portal ticket details shares the internal ticket design", () => {
     const customer = bubble("Hi, my card was charged twice.");
     const support = longBody().closest("article") as HTMLElement;
     for (const b of [customer, support]) {
-      expect(b.className).toMatch(/sm:max-w-\[62%\]/);
+      expect(b.className).toMatch(/w-fit/);
+      expect(b.className).toMatch(/max-w-\[85%\]/);
       expect(b.className).toMatch(/min-w-0/);
     }
     // Portal alignment is viewer-relative — opposite of the internal staff view.
@@ -228,11 +229,11 @@ describe("portal ticket details shares the internal ticket design", () => {
     expect(badge.className).not.toMatch(/bg-muted/);
   });
 
-  it("wraps the attachments panel in the shared card treatment", () => {
+  it("wraps the workspace tabs in the shared card treatment", () => {
     mocks.detail.mockReturnValue({ data: detail() });
     renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
-    const heading = screen.getByRole("heading", { name: "Attachments" });
-    const card = heading.closest("section.rounded-md.border.bg-card") as HTMLElement;
+    const attachTab = screen.getByRole("tab", { name: /^Attachments/ });
+    const card = attachTab.closest("section.rounded-md.border.bg-card") as HTMLElement;
     expect(card).toBeTruthy();
   });
 
@@ -250,14 +251,15 @@ describe("portal ticket details shares the internal ticket design", () => {
     renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
     const header = screen.getByRole("heading", { level: 1, name: "Payment help" }).closest("header") as HTMLElement;
     expect(header).toBeTruthy();
-    // shared header shell: back link + reference + status chip + customer-safe meta
+    // shared header shell: back link + reference + status chip
     expect(within(header).getByRole("link", { name: "Back to My Requests" })).toHaveAttribute("href", "/portal/tickets");
     expect(within(header).getByText("#12345678")).toBeInTheDocument();
     expect(within(header).getByText("In progress")).toBeInTheDocument();
-    // Category / Created / Updated moved to the customer-safe context strip (a sibling, not the header).
-    expect(screen.getByText("Category")).toBeInTheDocument();
-    expect(screen.getByText("Created")).toBeInTheDocument();
-    expect(screen.getByText("Updated")).toBeInTheDocument();
+    // Category / Created / Updated / Description rendered in the customer-safe sidebar.
+    expect(screen.getAllByText("Category").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Created").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Updated").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Description").length).toBeGreaterThan(0);
     // internal-only header affordances never appear
     expect(within(header).queryByRole("link", { name: "Edit" })).not.toBeInTheDocument();
     expect(screen.queryByText(/priority|channel|web|email|whatsapp|assignee|followers/i)).not.toBeInTheDocument();
@@ -269,9 +271,9 @@ describe("portal ticket details shares the internal ticket design", () => {
     });
     const { container } = renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
     // customer-safe sections ARE present
-    expect(screen.getByRole("heading", { name: "Description" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Conversation" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Attachments" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Reply" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /^Attachments/ })).toBeInTheDocument();
     // internal-only sections / controls / data are NOT
     for (const pattern of [
       /internal note/i, /add note/i, /manage ticket/i, /ticket properties/i, /assigned agent/i, /assignee/i,
@@ -284,30 +286,36 @@ describe("portal ticket details shares the internal ticket design", () => {
       expect(screen.queryByText(pattern)).not.toBeInTheDocument();
     }
     expect(container.textContent).not.toMatch(/BREACHED|URGENT|ESCALATED|FIRST_RESPONSE|Mariam/);
-    // no internal two-column workspace grid
-    expect(container.querySelector(".grid.gap-6")).toBeNull();
+    // uses customer portal 2-column grid layout
+    expect(container.querySelector(".grid")).toBeTruthy();
   });
 
-  it("places the Attach file control in the composer card, next to the Reply button", () => {
+  it("places the Attach file control in the lower workspace tabs card next to Reply", () => {
     mocks.detail.mockReturnValue({ data: detail({ status: "OPEN" }) });
     renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
     const attach = screen.getByRole("button", { name: "Attach file" });
     const send = screen.getByRole("button", { name: "Reply" });
-    // both live in the standalone composer card (not the Conversation card)
+    // both live in the lower workspace tabs card (not the Conversation card)
     const section = attach.closest("section") as HTMLElement;
     expect(section).toBe(send.closest("section"));
     expect(within(section).getByRole("heading", { name: "Reply" })).toBeInTheDocument();
     expect(within(section).queryByRole("heading", { name: "Conversation" })).not.toBeInTheDocument();
   });
 
-  it("keeps the standalone Attachments card to existing files only — no upload controls", () => {
+  it("switches between Reply and Attachments tabs in the lower workspace card", () => {
     mocks.detail.mockReturnValue({ data: detail({ status: "OPEN" }) });
     renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
-    const card = screen.getByRole("heading", { name: "Attachments" }).closest("section") as HTMLElement;
-    expect(within(card).queryByRole("button", { name: "Attach file" })).not.toBeInTheDocument();
-    expect(within(card).queryByRole("button", { name: "Upload" })).not.toBeInTheDocument();
-    expect(within(card).queryByLabelText("Select file")).not.toBeInTheDocument();
-    expect(within(card).getByText("No attachments yet.")).toBeInTheDocument();
+    const replyTab = screen.getByRole("tab", { name: "Reply" });
+    const attachTab = screen.getByRole("tab", { name: /^Attachments/ });
+    expect(replyTab).toHaveAttribute("aria-selected", "true");
+    expect(attachTab).toHaveAttribute("aria-selected", "false");
+
+    // Click Attachments tab
+    fireEvent.click(attachTab);
+    expect(attachTab).toHaveAttribute("aria-selected", "true");
+    expect(replyTab).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByText("No attachments yet.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Upload" })).not.toBeInTheDocument();
   });
 
   it("opens the native picker on Attach file, then reveals the pre-filled uploader and uploads through the portal mutation", async () => {
@@ -330,7 +338,7 @@ describe("portal ticket details shares the internal ticket design", () => {
     expect(screen.getByText("This request is closed and no longer accepts replies.")).toBeInTheDocument();
   });
 
-  it("still renders existing ticket attachments with preview/download actions", () => {
+  it("still renders existing ticket attachments with preview/download actions in the Attachments tab", () => {
     mocks.attachList.mockReturnValue({
       data: [{ id: "att-1", fileName: "invoice.pdf", mimeType: "application/pdf", createdAt: "2026-08-25T10:00:00Z", messageId: null }],
       isLoading: false,
@@ -339,21 +347,23 @@ describe("portal ticket details shares the internal ticket design", () => {
     });
     mocks.detail.mockReturnValue({ data: detail({ status: "OPEN" }) });
     renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
-    const card = screen.getByRole("heading", { name: "Attachments" }).closest("section") as HTMLElement;
-    const row = within(card).getByText("invoice.pdf").closest("li") as HTMLElement;
-    expect(within(row).getByRole("button", { name: "Preview attachment" })).toBeInTheDocument();
-    expect(within(row).getByRole("button", { name: "Download attachment" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: /^Attachments/ }));
+    const name = screen.getByTitle("invoice.pdf");
+    const card = name.closest("div") as HTMLElement;
+    expect(card).toBeTruthy();
+    expect(within(card.parentElement!).getByRole("button", { name: "Preview attachment" })).toBeInTheDocument();
+    expect(within(card.parentElement!).getByRole("button", { name: "Download attachment" })).toBeInTheDocument();
   });
 
   it("gives the customer a public-only composer — no internal note or quick reply tools", () => {
     mocks.detail.mockReturnValue({ data: detail({ status: "OPEN" }) });
     renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
-    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /internal note/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /quick repl/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/internal note/i)).not.toBeInTheDocument();
   });
 
-  it("bounds only the conversation message viewport; the composer card scrolls with the page", () => {
+  it("bounds only the conversation message viewport; the workspace tabs stay accessible", () => {
     mocks.detail.mockReturnValue({ data: detail({ status: "OPEN" }) });
     renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
     const list = screen.getByRole("list", { name: "Request conversation" });
@@ -363,8 +373,7 @@ describe("portal ticket details shares the internal ticket design", () => {
     const card = list.closest("section") as HTMLElement;
     expect(card.className).toMatch(/lg:flex\b/);
     expect(card.className).toMatch(/lg:h-full/);
-    expect((card.parentElement as HTMLElement).className).toMatch(/lg:h-\[calc\(/);
-    // the composer (a separate card) is entirely outside the bounded conversation card
+    // the composer tabs card is entirely outside the bounded conversation card
     const send = screen.getByRole("button", { name: "Reply" });
     expect(card.contains(send)).toBe(false);
     expect(card.contains(screen.getByRole("button", { name: "Attach file" }))).toBe(false);
@@ -380,5 +389,18 @@ describe("portal ticket details shares the internal ticket design", () => {
     expect(screen.getByTitle("r.png")).toBeInTheDocument();
     expect(card.className).toBe(shellBefore);
   });
+
+  it("sizes message bubbles naturally and aligns customer messages to end and support to start", () => {
+    mocks.detail.mockReturnValue({ data: detail({ status: "OPEN" }) });
+    renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
+    const customerBubble = screen.getByText("Hi, my card was charged twice.", { selector: "p" }).closest("li") as HTMLElement;
+    const supportBubble = longBody().closest("li") as HTMLElement;
+    expect(customerBubble.className).toMatch(/justify-end/);
+    expect(supportBubble.className).toMatch(/justify-start/);
+    const article = customerBubble.querySelector("article") as HTMLElement;
+    expect(article.className).toMatch(/w-fit/);
+    expect(article.className).toMatch(/max-w-\[85%\]/);
+  });
 });
 function renderPage(element: React.ReactNode, path = "/portal") { return render(<MemoryRouter initialEntries={[path]}><Routes><Route path="/portal/*" element={element}/></Routes></MemoryRouter>); }
+
