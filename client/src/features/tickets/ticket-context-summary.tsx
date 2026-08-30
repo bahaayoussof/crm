@@ -32,7 +32,7 @@ export function TicketContextSummary({ record }: { record: TicketDetail }) {
   const channelName = t(`tickets.channel.${record.channel}`);
 
   return (
-    <div className="mt-3.5 grid grid-cols-2 rounded-lg border border-border bg-card text-start text-card-foreground sm:grid-cols-4 lg:grid-cols-[1.6fr_0.75fr_1fr_0.9fr_0.65fr]">
+    <div className="grid grid-cols-2 rounded-lg border border-border bg-card text-start text-card-foreground sm:grid-cols-4 lg:grid-cols-[1.6fr_0.75fr_1fr_0.9fr_0.65fr]">
       {/* 1. Customer segment */}
       <div className="col-span-2 flex min-w-0 items-center gap-2.5 border-b border-border p-3 sm:col-span-4 sm:px-4 sm:py-2.5 lg:col-span-1 lg:border-b-0">
         <span
