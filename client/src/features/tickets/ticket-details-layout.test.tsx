@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   useTicket: vi.fn(), useCategories: vi.fn(), useAgents: vi.fn(), useUpdateTicket: vi.fn(),
   useCreateTicketMessage: vi.fn(), useCreateTicketNote: vi.fn(), useAuth: vi.fn(),
   useTicketAttachments: vi.fn(),
+  useUploadTicketAttachment: vi.fn(),
 }));
 
 vi.mock("./ticket-hooks", () => ({
@@ -16,7 +17,7 @@ vi.mock("./ticket-hooks", () => ({
 vi.mock("@/features/auth/auth-state", () => ({ useAuth: mocks.useAuth }));
 vi.mock("@/features/attachments/attachment-hooks", () => ({
   useTicketAttachments: mocks.useTicketAttachments,
-  useUploadTicketAttachment: () => ({ mutateAsync: vi.fn().mockResolvedValue({}), isPending: false }),
+  useUploadTicketAttachment: mocks.useUploadTicketAttachment,
 }));
 vi.mock("@/features/quick-replies/quick-reply-picker", () => ({ QuickReplyPicker: () => null }));
 // The @mention typeahead needs a QueryClient; its behaviour is covered elsewhere.
@@ -82,6 +83,10 @@ function baseMocks() {
   mocks.useTicketAttachments.mockReturnValue({
     data: [{ id: "att-1", fileName: LONG_FILENAME, mimeType: "application/pdf", createdAt: "2026-08-25T09:00:00.000Z", messageId: null }],
     isLoading: false, isError: false, refetch: vi.fn(),
+  });
+  mocks.useUploadTicketAttachment.mockReturnValue({
+    mutateAsync: vi.fn().mockResolvedValue({}),
+    isPending: false,
   });
 }
 
@@ -338,34 +343,46 @@ describe("Ticket Details sidebar controls & responsive sizing", () => {
     expect(within(filename.closest("li") as HTMLElement).getByRole("button", { name: "Preview attachment" })).toBeInTheDocument();
   });
 
-  it("opens the native file picker on the first Attach file click, then reveals the pre-filled uploader; Cancel restores messages", async () => {
+  it("opens the shared FileUploadModal on Attach file click; Cancel closes modal and restores conversation", async () => {
     renderDetail();
-    expect(screen.queryByRole("button", { name: "Upload" })).not.toBeInTheDocument();
-    // The trigger owns a hidden <input type=file>; clicking it opens the OS
-    // dialog directly. In jsdom we drive the resulting change event.
-    const native = document.querySelector('input[type="file"]') as HTMLInputElement;
-    expect(native).toBeTruthy();
-    fireEvent.change(native, {
+    expect(screen.queryByRole("dialog", { name: /upload file|select file/i })).not.toBeInTheDocument();
+
+    const attachButton = screen.getByRole("button", { name: "Attach file" });
+    fireEvent.click(attachButton);
+
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText("Drag and drop your file here")).toBeInTheDocument();
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(input).toBeTruthy();
+
+    fireEvent.change(input, {
       target: { files: [new File(["x".repeat(2048)], "evidence.pdf", { type: "application/pdf" })] },
     });
-    // Workspace opens straight to the preview/upload state — the file is already chosen.
+
     expect(await screen.findByTitle("evidence.pdf")).toBeInTheDocument();
     const upload = screen.getByRole("button", { name: "Upload" });
     const cancel = screen.getByRole("button", { name: "Cancel" });
     expect(upload.parentElement).toBe(cancel.parentElement);
+
     fireEvent.click(cancel);
-    expect(screen.queryByRole("button", { name: "Upload" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("list", { name: "Ticket conversation timeline" })).toBeInTheDocument();
   });
 
-  it("shows a themed selected-file card with a contained filename, metadata, and a Remove action", async () => {
+  it("shows a themed selected-file card in FileUploadModal with a contained filename, metadata, and a Remove action", async () => {
     renderDetail();
-    const native = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.click(screen.getByRole("button", { name: "Attach file" }));
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
     const longName = `azm_squad_customer_support_crm_super_long_filename_v12_final.pdf`;
-    fireEvent.change(native, { target: { files: [new File(["x".repeat(40 * 1024)], longName, { type: "application/pdf" })] } });
+    fireEvent.change(input, { target: { files: [new File(["x".repeat(40 * 1024)], longName, { type: "application/pdf" })] } });
+
     const name = await screen.findByTitle(longName);
     expect(name.className).toMatch(/truncate/);
-    expect(screen.getByText(/PDF ·/)).toBeInTheDocument();
+    expect(screen.getByText((content) => content.includes("40 KB"))).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove file" })).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole("button", { name: "Remove file" }));
     expect(screen.queryByTitle(longName)).not.toBeInTheDocument();
   });
@@ -477,38 +494,37 @@ describe("Ticket Details right rail & lower workspace", () => {
     expect(footer).toContainElement(screen.getByRole("button", { name: "Attach file" }));
   });
 
-  it("swaps the message viewport for the upload workspace once a file is chosen, and back on Cancel", async () => {
+  it("keeps the conversation viewport mounted when opening FileUploadModal, and closes on Cancel", async () => {
     renderDetail();
-    const viewport = screen.getByRole("list", { name: "Ticket conversation timeline" })
-      .closest("[data-conversation-scroll]") as HTMLElement;
-    expect(viewport).toBeTruthy();
-
-    const native = document.querySelector('input[type="file"]') as HTMLInputElement;
-    fireEvent.change(native, {
-      target: { files: [new File(["x".repeat(2048)], "note.pdf", { type: "application/pdf" })] },
-    });
-    // messages are gone from the viewport, the uploader took their place
-    expect(screen.queryByRole("list", { name: "Ticket conversation timeline" })).not.toBeInTheDocument();
-    expect(within(viewport).getByText("Upload files")).toBeInTheDocument();
-    expect(within(viewport).getByTitle("note.pdf")).toBeInTheDocument();
-    // the composer + tabs stay mounted; the Attach trigger hides while in attach mode
-    expect(screen.getByRole("button", { name: "Reply" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /^Attachments/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Attach file" })).not.toBeInTheDocument();
-
-    fireEvent.click(within(viewport).getByRole("button", { name: "Cancel" }));
     expect(screen.getByRole("list", { name: "Ticket conversation timeline" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Attach file" }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+
+    // Conversation remains in place
+    expect(screen.getByRole("list", { name: "Ticket conversation timeline" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Attach file" })).toBeInTheDocument();
   });
 
-  it("returns to the message viewport after a successful upload", async () => {
+  it("closes the upload modal and preserves conversation after a successful upload", async () => {
+    mocks.useUploadTicketAttachment.mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({ success: true }),
+      isPending: false,
+    });
     renderDetail();
-    const native = document.querySelector('input[type="file"]') as HTMLInputElement;
-    fireEvent.change(native, { target: { files: [new File(["x".repeat(2048)], "note.pdf", { type: "application/pdf" })] } });
+    fireEvent.click(screen.getByRole("button", { name: "Attach file" }));
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(["x".repeat(2048)], "note.pdf", { type: "application/pdf" })] } });
+
     fireEvent.click(await screen.findByRole("button", { name: "Upload" }));
     await waitFor(() =>
-      expect(screen.getByRole("list", { name: "Ticket conversation timeline" })).toBeInTheDocument(),
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
+    expect(screen.getByRole("list", { name: "Ticket conversation timeline" })).toBeInTheDocument();
   });
 
   it("keeps the context rail as a page-grid sibling of the conversation workspace, not inside it", () => {

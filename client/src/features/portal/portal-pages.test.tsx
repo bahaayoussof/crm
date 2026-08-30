@@ -318,13 +318,17 @@ describe("portal ticket details shares the internal ticket design", () => {
     expect(screen.queryByRole("button", { name: "Upload" })).not.toBeInTheDocument();
   });
 
-  it("opens the native picker on Attach file, then reveals the pre-filled uploader and uploads through the portal mutation", async () => {
+  it("opens the modal on Attach file, allows file selection, and uploads through the portal mutation", async () => {
     mocks.detail.mockReturnValue({ data: detail({ status: "OPEN" }) });
     renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
-    const native = document.querySelector('input[type="file"]') as HTMLInputElement;
-    expect(native).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Attach file" }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(input).toBeTruthy();
     const file = new File(["hello"], "receipt.png", { type: "image/png" });
-    fireEvent.change(native, { target: { files: [file] } });
+    fireEvent.change(input, { target: { files: [file] } });
     expect(await screen.findByTitle("receipt.png")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Upload" }));
     await waitFor(() => expect(mocks.uploadFn).toHaveBeenCalledWith(file));
@@ -379,14 +383,13 @@ describe("portal ticket details shares the internal ticket design", () => {
     expect(card.contains(screen.getByRole("button", { name: "Attach file" }))).toBe(false);
   });
 
-  it("does not change the conversation card shell when the attachment uploader is toggled open", () => {
+  it("opens dedicated FileUploadModal outside the conversation area on Attach file click", async () => {
     mocks.detail.mockReturnValue({ data: detail({ status: "OPEN" }) });
     renderPage(<PortalTicketDetailPage />, "/portal/tickets/ticket-12345678");
     const card = screen.getByRole("list", { name: "Request conversation" }).closest("section") as HTMLElement;
     const shellBefore = card.className;
-    const native = document.querySelector('input[type="file"]') as HTMLInputElement;
-    fireEvent.change(native, { target: { files: [new File(["x"], "r.png", { type: "image/png" })] } });
-    expect(screen.getByTitle("r.png")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Attach file" }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
     expect(card.className).toBe(shellBefore);
   });
 

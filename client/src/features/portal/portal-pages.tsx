@@ -10,8 +10,8 @@ import { useAuth } from "@/features/auth/auth-state";
 import { useDebouncedValue } from "@/features/customers/use-debounced-value";
 import { formatTicketDate } from "@/features/tickets/ticket-format";
 import { ConversationMessage, ConversationSection } from "@/features/tickets/ticket-conversation-ui";
-import { AttachmentCompactGrid, AttachmentWorkspace, MessageAttachmentList } from "@/features/attachments/attachment-ui";
-import { ACCEPTED_INPUT_ACCEPT, validateAttachmentFile } from "@/features/attachments/attachment.types";
+import { AttachmentCompactGrid, MessageAttachmentList } from "@/features/attachments/attachment-ui";
+import { FileUploadModal } from "@/components/shared/file-upload";
 import { TicketReplyEditor, type TicketReplyEditorHandle } from "@/features/tickets/ticket-reply-editor";
 import { usePortalTicketAttachments, useUploadPortalTicketAttachment } from "@/features/attachments/attachment-hooks";
 import { portalTicketSchema, type PortalTicketForm } from "./portal.schemas";
@@ -487,12 +487,16 @@ function PortalAttachmentsTabContent({
   isError,
   onRetry,
   locale,
+  canUpload = false,
+  onUpload,
 }: {
   attachments: { id: string; fileName: string; mimeType: string; createdAt: string }[];
   isLoading: boolean;
   isError: boolean;
   onRetry: () => void;
   locale: string;
+  canUpload?: boolean;
+  onUpload?: () => void;
 }) {
   const { t } = useTranslation();
   const [showAll, setShowAll] = useState(false);
@@ -520,11 +524,37 @@ function PortalAttachmentsTabContent({
     );
   }
   if (attachments.length === 0) {
-    return <p className="text-sm text-muted-foreground">{t("attachments.none")}</p>;
+    return (
+      <div className="space-y-3">
+        <p className="text-sm text-muted-foreground">{t("attachments.none")}</p>
+        {canUpload && onUpload && (
+          <button
+            type="button"
+            className="button-secondary inline-flex items-center gap-1.5 min-h-9 px-3 text-xs w-full sm:w-auto"
+            onClick={onUpload}
+          >
+            <Paperclip className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.75} aria-hidden="true" />
+            <span>{t("attachments.attachFile")}</span>
+          </button>
+        )}
+      </div>
+    );
   }
 
   return (
     <div className={`space-y-3 ${showAll ? "lg:max-h-[20rem] lg:overflow-y-auto" : ""}`}>
+      {canUpload && onUpload && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            className="button-secondary inline-flex items-center gap-1.5 min-h-8 px-2.5 py-1 text-xs"
+            onClick={onUpload}
+          >
+            <Paperclip className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.75} aria-hidden="true" />
+            <span>{t("attachments.attachFile")}</span>
+          </button>
+        </div>
+      )}
       <AttachmentCompactGrid attachments={visible} scope="portal" locale={locale} />
       {hasMore && (
         <button
@@ -551,7 +581,6 @@ function PortalWorkspaceTabs({
   locale,
   onSent,
   onAttachFile,
-  attachMode,
 }: {
   ticket: PortalTicketDetail;
   reply: ReturnType<typeof useReplyPortalTicket>;
@@ -561,15 +590,13 @@ function PortalWorkspaceTabs({
   onRetryAttachments: () => void;
   locale: string;
   onSent: () => void;
-  onAttachFile: (file: File) => void;
-  attachMode: boolean;
+  onAttachFile?: () => void;
+  attachMode?: boolean;
 }) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<"reply" | "attachments">("reply");
   const editorRef = useRef<TicketReplyEditorHandle>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState("");
-  const [attachError, setAttachError] = useState<string | null>(null);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -582,19 +609,6 @@ function PortalWorkspaceTabs({
     } catch {
       /* surfaced via reply.isError below */
     }
-  };
-
-  const pickFile = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const chosen = event.target.files?.[0];
-    event.target.value = "";
-    if (!chosen) return;
-    const { file, error } = validateAttachmentFile(chosen, t);
-    if (error || !file) {
-      setAttachError(error ?? t("attachments.errors.UNSUPPORTED_FILE_TYPE"));
-      return;
-    }
-    setAttachError(null);
-    onAttachFile(file);
   };
 
   const tabs: { value: "reply" | "attachments"; label: string; count?: number }[] = [
@@ -671,32 +685,14 @@ function PortalWorkspaceTabs({
               )}
               <div className="flex flex-col gap-2 border-t border-border pt-3 sm:flex-row sm:items-center">
                 <div className="sm:me-auto">
-                  {!attachMode && (
-                    <>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        className="sr-only"
-                        accept={ACCEPTED_INPUT_ACCEPT}
-                        aria-hidden="true"
-                        tabIndex={-1}
-                        onChange={pickFile}
-                      />
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1.5 rounded-sm text-sm font-medium text-primary transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        <Paperclip className="size-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-                        {t("attachments.attachFile")}
-                      </button>
-                      {attachError && (
-                        <p className="mt-1 text-xs text-danger" role="alert">
-                          {attachError}
-                        </p>
-                      )}
-                    </>
-                  )}
+                  <button
+                    type="button"
+                    className="button-secondary inline-flex items-center gap-1.5 w-full sm:w-auto"
+                    onClick={() => onAttachFile?.()}
+                  >
+                    <Paperclip className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.75} aria-hidden="true" />
+                    <span>{t("attachments.attachFile")}</span>
+                  </button>
                 </div>
                 <button
                   type="submit"
@@ -718,6 +714,8 @@ function PortalWorkspaceTabs({
             isError={attachmentsError}
             onRetry={onRetryAttachments}
             locale={locale}
+            canUpload={ticket.status !== "CLOSED"}
+            onUpload={onAttachFile}
           />
         </div>
       </div>
@@ -733,8 +731,7 @@ export function PortalTicketDetailPage() {
   const attachments = usePortalTicketAttachments(id);
   const uploadAttachment = useUploadPortalTicketAttachment(id);
   const [sendToken, setSendToken] = useState(0);
-  const [attachMode, setAttachMode] = useState(false);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
 
   if (query.isLoading) return (
     <PortalPage>
@@ -754,14 +751,6 @@ export function PortalTicketDetailPage() {
   const ticketLevelAttachments = attachments.data?.filter((item) => item.messageId === null) ?? [];
   const messageAttachments = new Map<string, NonNullable<typeof attachments.data>>();
   for (const item of attachments.data ?? []) if (item.messageId) messageAttachments.set(item.messageId, [...(messageAttachments.get(item.messageId) ?? []), item]);
-  const portalUpload = {
-    mutateAsync: (file: File) => uploadAttachment.mutateAsync(file),
-    isPending: uploadAttachment.isPending,
-  };
-  const exitAttach = () => {
-    setAttachMode(false);
-    setPendingFile(null);
-  };
 
   return (
     <PortalPage>
@@ -787,16 +776,6 @@ export function PortalTicketDetailPage() {
               timelineLabel={t("portal.timelineLabel")}
               isEmpty={ticket.messages.length === 0}
               emptyTitle={t("portal.noMessages")}
-              viewportOverride={
-                attachMode ? (
-                  <AttachmentWorkspace
-                    upload={portalUpload}
-                    initialFile={pendingFile}
-                    onDone={exitAttach}
-                    onCancel={exitAttach}
-                  />
-                ) : undefined
-              }
             >
               {ticket.messages.map((message) => (
                 <ConversationMessage
@@ -823,11 +802,7 @@ export function PortalTicketDetailPage() {
             onRetryAttachments={() => attachments.refetch()}
             locale={i18n.language}
             onSent={() => setSendToken((token) => token + 1)}
-            onAttachFile={(file) => {
-              setPendingFile(file);
-              setAttachMode(true);
-            }}
-            attachMode={attachMode}
+            onAttachFile={() => setUploadModalOpen(true)}
           />
         </div>
 
@@ -837,6 +812,13 @@ export function PortalTicketDetailPage() {
           <TicketFeedback ticket={ticket} />
         </div>
       </div>
+
+      <FileUploadModal
+        open={uploadModalOpen}
+        onOpenChange={setUploadModalOpen}
+        onUpload={(file) => uploadAttachment.mutateAsync(file)}
+        isUploading={uploadAttachment.isPending}
+      />
     </PortalPage>
   );
 }

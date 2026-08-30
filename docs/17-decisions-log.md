@@ -1026,3 +1026,44 @@ Introduce a first-class `AuditLog` administrative/security trail separate from `
 Audited mutations use one central service and explicit per-domain safe-field allowlists. No arbitrary DTO or Prisma record serialization is allowed. Passwords/hashes, tokens, API keys, provider credentials, authorization/cookie headers, message/note bodies, and whole request bodies are never stored. Security-sensitive existing mutations write the domain change and audit row in the same Prisma transaction; missing IP/User-Agent never blocks a mutation.
 
 The list API and `/audit-logs` workspace are `ADMIN` only. Navigation visibility is presentation-only and an independent route guard plus backend RBAC remains authoritative. The Customer Portal has no route, navigation, API authorization, or audit data access. Export, retention, signing, SIEM/webhooks, alerting, and external append-only storage remain deferred.
+
+---
+
+# ADR-040: Shared Reusable File Upload Modal for CRM and Customer Portal
+
+## Date: 2026-08-30
+
+## Context
+
+Previously, clicking "Attach file" in the ticket reply footer or portal workspace swapped out the entire conversation messages timeline inside the conversation viewport (`viewportOverride` with `AttachmentWorkspace`). This displaced conversation messages, causing visual disruption and maintaining separate attachment trigger mechanics across CRM and Customer Portal.
+
+A unified, modern file upload modal was required to serve both:
+- Internal CRM / Admin / Agent ticket workflow
+- Customer Portal ticket workflow
+
+The upload experience needed to be context-agnostic, outside the conversation message viewport (preventing inline displacement), and visually aligned with the dark/light design system while retaining 4 MiB size constraints, 5 MIME types, RTL/LTR isolation, keyboard accessibility, and focus trapping.
+
+## Decision
+
+1. **Context-agnostic Shared Component:**
+   Created `@/components/shared/file-upload/` (`FileUploadModal`, `FileDropzone`, `SelectedFileRow`, `file-upload.types.ts`, `file-upload.utils.ts`, `index.ts`).
+   The component accepts `open`, `onOpenChange`, `onUpload(file)`, `isUploading`, `title`, `acceptedMimeTypes`, `maxSizeBytes`, `allowedExtensions`, and optional `returnFocusRef`.
+
+2. **Dedicated Modal Surface Outside Conversation Timeline:**
+   The modal renders via React Portal (`createPortal(..., document.body)`), maintaining full conversation timeline visibility behind the modal backdrop. Conversation messages are never swapped out or unmounted.
+
+3. **Explicit User Confirmation Flow:**
+   Selecting or dropping a file stages it in the modal's internal state and displays a themed `SelectedFileRow` with type badge (PDF, Image, Text, Generic), truncated filename (`<bdi dir="auto">`), file metadata (e.g. `PDF · 40 KB`), and a `Remove file` action.
+   Upload execution only happens when the user clicks the primary "Upload" button (or hits Enter). The modal manages upload errors with inline alerts and retry capability without discarding the selected file, and automatically clears/resets on successful upload or dismissal.
+
+4. **Shared Integration across CRM and Portal:**
+   Integrated into both `TicketDetailPage` (internal CRM) and `PortalTicketDetailPage` (Customer Portal). The reply footer "Attach file" button and attachments panel triggers open the shared modal directly. `attachMode` and `pendingAttachment` viewport overrides were eliminated from `TicketDetailPage`, `TicketConversation`, and `PortalTicketDetailPage`.
+
+5. **Accessibility & Localization:**
+   Full keyboard accessibility: Tab focus trap (`Tab` / `Shift+Tab`), `Escape` key dismissal, `aria-modal="true"`, `role="dialog"`, `aria-labelledby`, `bdi dir="auto"` for bilingual file names, and 100% EN/AR parity in translations.
+
+## Consequences
+
+- Inline viewport replacement is replaced with a clean, focused, consistent upload dialog across CRM and Customer Portal.
+- Reduced duplicate attachment UI logic and decoupled conversation viewport from attachment staging.
+- Backend API contracts and 4 MiB MIME-validated private Vercel Blob storage pipeline remain unchanged.

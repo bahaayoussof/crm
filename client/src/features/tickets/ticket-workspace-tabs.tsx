@@ -38,10 +38,9 @@ type TicketWorkspaceTabsProps = {
   locale: string;
   /** Fired after a successful reply or note so the page can scroll the conversation to latest. */
   onSent?: () => void;
-  /** A file was picked via the native OS dialog — the page enters attach mode and
-   * swaps the conversation message viewport for the upload workspace (not this panel). */
-  onAttachFile?: (file: File) => void;
-  /** True while the conversation viewport shows the upload workspace. */
+  /** Triggered to open the shared file upload modal. */
+  onAttachFile?: () => void;
+  /** True while the conversation viewport shows the upload workspace (legacy/optional). */
   attachMode?: boolean;
   className?: string;
 };
@@ -88,27 +87,11 @@ export const TicketWorkspaceTabs = forwardRef<TicketWorkspaceHandle, TicketWorks
     const [attachError, setAttachError] = useState<string | null>(null);
     const editorRef = useRef<TicketReplyEditorHandle>(null);
     const noteEditorRef = useRef<TicketReplyEditorHandle>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
     const messageMutation = useCreateTicketMessage(ticketId);
     const noteMutation = useCreateTicketNote(ticketId);
     const mutation = mode === "reply" ? messageMutation : noteMutation;
     const pending = messageMutation.isPending || noteMutation.isPending;
     const canSubmit = mode === "reply" ? replyText.trim().length > 0 : noteText.trim().length > 0;
-
-    // The composer "Attach file" control opens the native OS dialog directly; only
-    // after a valid file is chosen does the page enter attach mode.
-    const pickFile = (event: React.ChangeEvent<HTMLInputElement>) => {
-      const chosen = event.target.files?.[0];
-      event.target.value = "";
-      if (!chosen) return;
-      const { file, error: fileError } = validateAttachmentFile(chosen, t);
-      if (fileError || !file) {
-        setAttachError(fileError ?? t("attachments.errors.UNSUPPORTED_FILE_TYPE"));
-        return;
-      }
-      setAttachError(null);
-      onAttachFile?.(file);
-    };
 
     const insertQuickReply = (snippet: string) => {
       const outcome = editorRef.current?.insertText(snippet) ?? "too-long";
@@ -334,31 +317,15 @@ export const TicketWorkspaceTabs = forwardRef<TicketWorkspaceHandle, TicketWorks
 
             <div className="flex flex-col gap-2 border-t border-border pt-3 sm:flex-row sm:items-center">
               <div className="sm:me-auto">
-                {canMutate && !attachMode && (
-                  <>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      className="sr-only"
-                      accept={ACCEPTED_INPUT_ACCEPT}
-                      aria-hidden="true"
-                      tabIndex={-1}
-                      onChange={pickFile}
-                    />
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1.5 rounded-sm text-sm font-medium text-primary transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <Paperclip className="size-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-                      {t("attachments.attachFile")}
-                    </button>
-                    {attachError && (
-                      <p className="mt-1 text-xs text-danger-foreground" role="alert">
-                        {attachError}
-                      </p>
-                    )}
-                  </>
+                {canMutate && (
+                  <button
+                    type="button"
+                    className="button-secondary inline-flex items-center gap-1.5 w-full sm:w-auto"
+                    onClick={() => onAttachFile?.()}
+                  >
+                    <Paperclip className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.75} aria-hidden="true" />
+                    <span>{t("attachments.attachFile")}</span>
+                  </button>
                 )}
               </div>
               <button
@@ -374,14 +341,16 @@ export const TicketWorkspaceTabs = forwardRef<TicketWorkspaceHandle, TicketWorks
             </div>
           </div>
 
-          {/* Attachments */}
-          <div role="tabpanel" hidden={tab !== "attachments"}>
+          {/* Attachments tab panel */}
+          <div role="tabpanel" hidden={tab !== "attachments"} className={tab === "attachments" ? "space-y-3" : "hidden"}>
             <AttachmentsPanel
               attachments={attachments}
               isLoading={attachmentsLoading}
               isError={attachmentsError}
               onRetry={onRetryAttachments}
               locale={locale}
+              canUpload={canMutate}
+              onUpload={onAttachFile}
             />
           </div>
 
@@ -408,12 +377,16 @@ function AttachmentsPanel({
   isError,
   onRetry,
   locale,
+  canUpload = false,
+  onUpload,
 }: {
   attachments: AttachmentItem[];
   isLoading: boolean;
   isError: boolean;
   onRetry: () => void;
   locale: string;
+  canUpload?: boolean;
+  onUpload?: () => void;
 }) {
   const { t } = useTranslation();
   const [showAll, setShowAll] = useState(false);
@@ -438,10 +411,37 @@ function AttachmentsPanel({
         </button>
       </div>
     );
-  if (attachments.length === 0) return <p className="text-sm text-muted-foreground">{t("attachments.none")}</p>;
+  if (attachments.length === 0)
+    return (
+      <div className="space-y-3">
+        <p className="text-sm text-muted-foreground">{t("attachments.none")}</p>
+        {canUpload && onUpload && (
+          <button
+            type="button"
+            className="button-secondary inline-flex items-center gap-1.5 min-h-9 px-3 text-xs w-full sm:w-auto"
+            onClick={onUpload}
+          >
+            <Paperclip className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.75} aria-hidden="true" />
+            <span>{t("attachments.attachFile")}</span>
+          </button>
+        )}
+      </div>
+    );
 
   return (
     <div className={`space-y-3 ${showAll ? "lg:max-h-[20rem] lg:overflow-y-auto" : ""}`}>
+      {canUpload && onUpload && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            className="button-secondary inline-flex items-center gap-1.5 min-h-8 px-2.5 py-1 text-xs"
+            onClick={onUpload}
+          >
+            <Paperclip className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.75} aria-hidden="true" />
+            <span>{t("attachments.attachFile")}</span>
+          </button>
+        </div>
+      )}
       <AttachmentCompactGrid attachments={visible} scope="internal" locale={locale} />
       {hasMore && (
         <button

@@ -6,6 +6,7 @@ import { useAuth } from "@/features/auth/auth-state";
 import { useTicketAttachments, useUploadTicketAttachment } from "@/features/attachments/attachment-hooks";
 import { AiAssistantPanel } from "@/features/ai-assistant/ai-assistant-panel";
 import type { CategoryApplyApi, ReplyInsertionApi } from "@/features/ai-assistant/ai-assistant.types";
+import { FileUploadModal } from "@/components/shared/file-upload";
 import { TicketContextSummary } from "./ticket-context-summary";
 import { TicketStatusBadge } from "./ticket-badges";
 import { TicketConversation } from "./ticket-conversation";
@@ -27,8 +28,7 @@ export function TicketDetailPage() {
   const uploadAttachment = useUploadTicketAttachment(id);
 
   const [aiOpen, setAiOpen] = useState(false);
-  const [attachMode, setAttachMode] = useState(false);
-  const [pendingAttachment, setPendingAttachment] = useState<File | null>(null);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [sendToken, setSendToken] = useState(0);
   const aiButtonRef = useRef<HTMLButtonElement>(null);
   const workspaceRef = useRef<TicketWorkspaceHandle>(null);
@@ -131,13 +131,6 @@ export function TicketDetailPage() {
               items={record.conversation}
               messageAttachments={messageAttachments}
               autoScrollSendToken={sendToken}
-              attachMode={attachMode}
-              upload={upload}
-              pendingAttachment={pendingAttachment}
-              onExitAttachMode={() => {
-                setAttachMode(false);
-                setPendingAttachment(null);
-              }}
             />
           </div>
           <TicketWorkspaceTabs
@@ -155,11 +148,7 @@ export function TicketDetailPage() {
             description={record.description}
             locale={i18n.language}
             onSent={() => setSendToken((token) => token + 1)}
-            onAttachFile={(file) => {
-              setPendingAttachment(file);
-              setAttachMode(true);
-            }}
-            attachMode={attachMode}
+            onAttachFile={() => setUploadModalOpen(true)}
           />
         </div>
         <div className="min-w-0 lg:sticky lg:top-4 lg:max-h-[calc(100dvh-2rem)] lg:self-start lg:overflow-y-auto">
@@ -172,6 +161,13 @@ export function TicketDetailPage() {
           />
         </div>
       </div>
+
+      <FileUploadModal
+        open={uploadModalOpen}
+        onOpenChange={setUploadModalOpen}
+        onUpload={(file) => uploadAttachment.mutateAsync(file)}
+        isUploading={uploadAttachment.isPending}
+      />
 
       <AiAssistantPanel
         open={aiOpen}
