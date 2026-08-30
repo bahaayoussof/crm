@@ -152,6 +152,24 @@
   --shadow-subtle: 0 1px 2px 0 rgb(0 0 0 / 0.02);
   --shadow-elevated: 0 4px 12px -2px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.02);
   --shadow-flyout: 0 8px 20px -4px rgb(0 0 0 / 0.08), 0 3px 6px -3px rgb(0 0 0 / 0.03);
+
+  /* react-international-phone tokens (Light) */
+  --react-international-phone-height: 2.5rem;
+  --react-international-phone-border-radius: 0.375rem;
+  --react-international-phone-border-color: var(--border);
+  --react-international-phone-background-color: var(--surface);
+  --react-international-phone-text-color: var(--foreground);
+  --react-international-phone-font-size: 0.875rem;
+  --react-international-phone-country-selector-background-color: var(--surface);
+  --react-international-phone-country-selector-background-color-hover: var(--surface-hover);
+  --react-international-phone-country-selector-border-color: var(--border);
+  --react-international-phone-dropdown-item-background-color: var(--card);
+  --react-international-phone-dropdown-item-text-color: var(--card-foreground);
+  --react-international-phone-selected-dropdown-item-background-color: var(--surface-hover);
+  --react-international-phone-selected-dropdown-item-text-color: var(--foreground);
+  --react-international-phone-disabled-background-color: var(--muted);
+  --react-international-phone-disabled-text-color: var(--disabled-foreground);
+  --react-international-phone-dropdown-shadow: var(--shadow-elevated);
 }
 
 .dark {
@@ -280,6 +298,24 @@
   --shadow-subtle: 0 1px 2px 0 rgb(0 0 0 / 0.3);
   --shadow-elevated: 0 4px 14px -2px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.3);
   --shadow-flyout: 0 8px 24px -4px rgb(0 0 0 / 0.6), 0 4px 8px -3px rgb(0 0 0 / 0.4);
+
+  /* react-international-phone tokens (Dark) */
+  --react-international-phone-height: 2.5rem;
+  --react-international-phone-border-radius: 0.375rem;
+  --react-international-phone-border-color: var(--border);
+  --react-international-phone-background-color: var(--surface);
+  --react-international-phone-text-color: var(--foreground);
+  --react-international-phone-font-size: 0.875rem;
+  --react-international-phone-country-selector-background-color: var(--surface);
+  --react-international-phone-country-selector-background-color-hover: var(--surface-hover);
+  --react-international-phone-country-selector-border-color: var(--border);
+  --react-international-phone-dropdown-item-background-color: var(--card);
+  --react-international-phone-dropdown-item-text-color: var(--card-foreground);
+  --react-international-phone-selected-dropdown-item-background-color: var(--surface-hover);
+  --react-international-phone-selected-dropdown-item-text-color: var(--foreground);
+  --react-international-phone-disabled-background-color: var(--muted);
+  --react-international-phone-disabled-text-color: var(--disabled-foreground);
+  --react-international-phone-dropdown-shadow: var(--shadow-elevated);
 }
 
 @theme inline {

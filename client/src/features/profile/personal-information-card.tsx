@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import type { SelfProfile } from "./profile.types";
 import { currentLanguageLabel, runtimeTimeZone } from "./profile-format";
 import { formatPhoneForDisplay } from "@/lib/phone";
-import { getProfileEditPermissions } from "./profile-permissions";
 
 function InfoRow({
   icon: Icon,
@@ -39,7 +38,6 @@ interface PersonalInformationCardProps {
 
 export function PersonalInformationCard({ profile, onEdit, editButtonRef }: PersonalInformationCardProps) {
   const { t, i18n } = useTranslation();
-  const editLabel = t("profile.edit");
 
   return (
     <section className="rounded-lg border border-border bg-card p-5 sm:p-6">
@@ -52,7 +50,7 @@ export function PersonalInformationCard({ profile, onEdit, editButtonRef }: Pers
           className="button-secondary inline-flex h-8 items-center gap-1.5 px-2.5 text-xs sm:w-auto"
         >
           <Pencil className="size-3.5" aria-hidden="true" />
-          {editLabel}
+          {t("profile.edit")}
         </button>
       </div>
 

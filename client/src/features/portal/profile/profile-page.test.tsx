@@ -22,7 +22,7 @@ import { PortalProfilePage } from "./profile-page";
 const profile = {
   name: "Bahaa Youssof",
   email: "bahaa@example.com",
-  phone: "+20100000000",
+  phone: "+201000000000",
   role: "CUSTOMER" as const,
   createdAt: "2025-02-01T00:00:00.000Z",
   passwordChangedAt: "2025-07-01T00:00:00.000Z",
@@ -52,7 +52,7 @@ describe("PortalProfilePage", () => {
     renderPage();
     expect((await screen.findAllByText("Bahaa Youssof")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("bahaa@example.com")).toHaveLength(2);
-    expect(screen.getByText("+20 100000000")).toBeInTheDocument();
+    expect(screen.getByText("+20 1000000000")).toBeInTheDocument();
     expect(screen.getByText("Customer")).toBeInTheDocument();
     expect(screen.getByText("Personal Information")).toBeInTheDocument();
     expect(screen.getByText("Last password change")).toBeInTheDocument();
@@ -60,32 +60,30 @@ describe("PortalProfilePage", () => {
     expect(cards?.className).toContain("lg:grid-cols-2");
   });
 
-  it("opens the Edit Profile dialog and refreshes the displayed value after saving", async () => {
-    mocks.updatePortalProfile.mockResolvedValue({ ...profile, name: "Bahaa Y" });
+  it("opens the Edit Profile dialog and refreshes the displayed value after saving phone", async () => {
+    mocks.updatePortalProfile.mockResolvedValue({ ...profile, phone: "+201011111111" });
     renderPage();
     await screen.findAllByText("Bahaa Youssof");
-    // Server state after the update (the post-save refetch reads this).
-    mocks.getPortalProfile.mockResolvedValue({ ...profile, name: "Bahaa Y" });
+    mocks.getPortalProfile.mockResolvedValue({ ...profile, phone: "+201011111111" });
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     const dialog = screen.getByRole("dialog");
-    fireEvent.change(within(dialog).getByLabelText("Full name"), { target: { value: "Bahaa Y" } });
+    expect(within(dialog).getByLabelText("Full name")).toHaveAttribute("readonly");
+    expect(within(dialog).getByLabelText("Email address")).toHaveAttribute("readonly");
+    fireEvent.change(within(dialog).getByLabelText("Phone number"), { target: { value: "+20 101 111 1111" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Save changes" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(await screen.findAllByText("Bahaa Y")).toHaveLength(2);
+    expect(await screen.findByText("+20 1011111111")).toBeInTheDocument();
   });
 
-  it("shows a duplicate-email error on the email field", async () => {
-    mocks.updatePortalProfile.mockRejectedValue({
-      isAxiosError: true,
-      response: { data: { error: { code: "EMAIL_IN_USE" } } },
-    });
+  it("shows validation error on invalid phone in edit profile dialog", async () => {
     renderPage();
     await screen.findAllByText("Bahaa Youssof");
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     const dialog = screen.getByRole("dialog");
-    fireEvent.change(within(dialog).getByLabelText("Email address"), { target: { value: "taken@example.com" } });
+    fireEvent.change(within(dialog).getByLabelText("Phone number"), { target: { value: "+20 12" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Save changes" }));
-    expect(await within(dialog).findByText("This email is already in use.")).toBeInTheDocument();
+    expect(await within(dialog).findByText("Enter a valid phone number")).toBeInTheDocument();
+    expect(mocks.updatePortalProfile).not.toHaveBeenCalled();
   });
 
   it("opens the Change Password dialog", async () => {

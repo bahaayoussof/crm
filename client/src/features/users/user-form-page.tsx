@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { PhoneInput } from "@/components/shared/phone-input";
 import { AppSelectField } from "@/components/ui/app-select";
 import { useAuth } from "@/features/auth/auth-state";
 import { getLocalizedUserError, getUserError } from "./user-error";
@@ -99,10 +100,8 @@ function EditUserForm({ id }: { id: string }) {
 
   const isSelf = Boolean(user.data && currentUser && user.data.id === currentUser.id);
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<{
-    phone?: string;
-    isActive: boolean;
-  }>({
+  const { register, control, handleSubmit, formState: { errors, isSubmitting } } = useForm<UserEditFormValues>({
+    resolver: zodResolver(userEditFormSchema),
     values: user.data
       ? { phone: user.data.phone ?? "", isActive: user.data.isActive }
       : undefined,
@@ -178,13 +177,19 @@ function EditUserForm({ id }: { id: string }) {
             </Field>
 
             <Field id="user-phone" label={t("users.fieldPhone")} error={errors.phone?.message ? t(errors.phone.message) : undefined}>
-              <input
-                id="user-phone"
-                type="tel"
-                className="input text-start"
-                dir="ltr"
-                autoComplete="tel"
-                {...register("phone")}
+              <Controller
+                name="phone"
+                control={control}
+                render={({ field, fieldState }) => (
+                  <PhoneInput
+                    id="user-phone"
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    error={fieldState.error?.message}
+                    aria-describedby={errors.phone ? "user-phone-error" : undefined}
+                  />
+                )}
               />
             </Field>
 

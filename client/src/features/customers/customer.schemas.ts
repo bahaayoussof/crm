@@ -1,9 +1,10 @@
 import { z } from "zod";
+import { optionalPhoneInputSchema } from "@/lib/phone";
 
 export const customerFormSchema = z.object({
   name: z.string().trim().min(2, "customers.validation.name").max(100),
   email: z.string().trim().email("customers.validation.email").transform((value) => value.toLowerCase()),
-  phone: z.string().trim().max(30, "customers.validation.phone").optional(),
+  phone: optionalPhoneInputSchema,
 }).strict();
 
 export const customerNoteSchema = z.object({

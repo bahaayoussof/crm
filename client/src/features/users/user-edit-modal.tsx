@@ -1,8 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
+import { PhoneInput } from "@/components/shared/phone-input";
 import { Modal } from "@/components/ui/modal";
 import { optionalPhoneInputSchema } from "@/lib/phone";
 import { getLocalizedUserError } from "./user-error";
@@ -35,6 +36,7 @@ export function UserEditModal({
 
   const {
     register,
+    control,
     reset,
     handleSubmit,
     formState: { errors, isSubmitting },
@@ -138,16 +140,22 @@ export function UserEditModal({
           <label htmlFor="modal-edit-user-phone" className="block text-xs font-medium text-foreground">
             {t("users.fieldPhone")}
           </label>
-          <input
-            id="modal-edit-user-phone"
-            className="input mt-1 text-start"
-            dir="ltr"
-            type="tel"
-            autoComplete="tel"
-            aria-invalid={Boolean(errors.phone)}
-            aria-describedby={errors.phone ? "modal-edit-user-phone-error" : undefined}
-            {...register("phone")}
-          />
+          <div className="mt-1">
+            <Controller
+              name="phone"
+              control={control}
+              render={({ field, fieldState }) => (
+                <PhoneInput
+                  id="modal-edit-user-phone"
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  error={fieldState.error?.message}
+                  aria-describedby={errors.phone ? "modal-edit-user-phone-error" : undefined}
+                />
+              )}
+            />
+          </div>
           {errors.phone?.message && (
             <p id="modal-edit-user-phone-error" role="alert" className="mt-1 text-xs text-danger">
               {t(errors.phone.message)}

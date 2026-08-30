@@ -1,8 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { PhoneInput } from "@/components/shared/phone-input";
 import { getCustomerError, getLocalizedCustomerError } from "./customer-error";
 import { useCreateCustomer, useCustomer, useUpdateCustomer } from "./customer-hooks";
 import { customerFormSchema, type CustomerFormValues } from "./customer.schemas";
@@ -17,7 +18,7 @@ export function CustomerFormPage() {
   const update = useUpdateCustomer(id);
   const navigate = useNavigate();
   const [apiError, setApiError] = useState<string | null>(null);
-  const { register, reset, handleSubmit, formState: { errors, isSubmitting } } = useForm<CustomerFormValues>({ resolver: zodResolver(customerFormSchema), defaultValues: { name: "", email: "", phone: "" } });
+  const { register, control, reset, handleSubmit, formState: { errors, isSubmitting } } = useForm<CustomerFormValues>({ resolver: zodResolver(customerFormSchema), defaultValues: { name: "", email: "", phone: "" } });
 
   useEffect(() => { if (customer.data) reset({ name: customer.data.name, email: customer.data.email, phone: customer.data.phone ?? "" }); }, [customer.data, reset]);
 
@@ -49,7 +50,20 @@ export function CustomerFormPage() {
               <input id="customer-email" className="input text-start" dir="ltr" type="email" autoComplete="email" aria-invalid={Boolean(errors.email)} aria-describedby={errors.email ? "customer-email-error" : undefined} {...register("email")} />
             </FormField>
             <FormField id="customer-phone" label={t("customers.phoneOptional")} error={errors.phone?.message ? t(errors.phone.message) : undefined}>
-              <input id="customer-phone" className="input text-start" dir="ltr" type="tel" autoComplete="tel" aria-invalid={Boolean(errors.phone)} aria-describedby={errors.phone ? "customer-phone-error" : undefined} {...register("phone")} />
+              <Controller
+                name="phone"
+                control={control}
+                render={({ field, fieldState }) => (
+                  <PhoneInput
+                    id="customer-phone"
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    error={fieldState.error?.message}
+                    aria-describedby={errors.phone ? "customer-phone-error" : undefined}
+                  />
+                )}
+              />
             </FormField>
           </div>
           <div className="flex flex-col-reverse gap-3 border-t border-border bg-surface-subtle/40 px-5 py-4 sm:flex-row sm:justify-end sm:px-6 rounded-b-xl">

@@ -1,7 +1,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { PhoneInput } from "@/components/shared/phone-input";
 import { Modal } from "@/components/ui/modal";
 import { getLocalizedCustomerError } from "./customer-error";
 import { useCreateCustomer } from "./customer-hooks";
@@ -24,6 +25,7 @@ export function CustomerCreateModal({
 
   const {
     register,
+    control,
     reset,
     handleSubmit,
     formState: { errors, isSubmitting },
@@ -113,16 +115,22 @@ export function CustomerCreateModal({
           <label htmlFor="modal-customer-phone" className="block text-xs font-medium text-foreground">
             {t("customers.phoneOptional")}
           </label>
-          <input
-            id="modal-customer-phone"
-            className="input mt-1 text-start"
-            dir="ltr"
-            type="tel"
-            autoComplete="tel"
-            aria-invalid={Boolean(errors.phone)}
-            aria-describedby={errors.phone ? "modal-customer-phone-error" : undefined}
-            {...register("phone")}
-          />
+          <div className="mt-1">
+            <Controller
+              name="phone"
+              control={control}
+              render={({ field, fieldState }) => (
+                <PhoneInput
+                  id="modal-customer-phone"
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  error={fieldState.error?.message}
+                  aria-describedby={errors.phone ? "modal-customer-phone-error" : undefined}
+                />
+              )}
+            />
+          </div>
           {errors.phone?.message && (
             <p id="modal-customer-phone-error" role="alert" className="mt-1 text-xs text-danger">
               {t(errors.phone.message)}

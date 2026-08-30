@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { changeAppLanguage } from "@/lib/i18n";
@@ -81,7 +81,7 @@ describe("InternalProfilePage", () => {
       mocks.updateSelfProfile.mockResolvedValue(makeProfile("MANAGER"));
     });
 
-    it("presents personal information and opens Edit dialog with read-only name, email, role and editable phone", async () => {
+    it("presents personal information and opens Edit Profile dialog with read-only name and email and editable phone", async () => {
       renderPage();
       expect((await screen.findAllByText("Mona Hassan")).length).toBeGreaterThan(0);
       expect(screen.getByText("Manager")).toBeInTheDocument();
@@ -92,10 +92,24 @@ describe("InternalProfilePage", () => {
 
       const dialog = screen.getByRole("dialog");
       expect(within(dialog).getByRole("heading", { name: "Edit profile" })).toBeInTheDocument();
-      expect(within(dialog).getByLabelText("Full name")).toBeDisabled();
-      expect(within(dialog).getByLabelText("Email address")).toBeDisabled();
-      expect(within(dialog).getByLabelText("Role")).toBeDisabled();
-      expect(within(dialog).getByLabelText("Phone number")).toBeEnabled();
+
+      const nameInput = within(dialog).getByLabelText("Full name");
+      expect(nameInput).toBeInTheDocument();
+      expect(nameInput).toHaveValue("Mona Hassan");
+      expect(nameInput).toHaveAttribute("readonly");
+
+      const emailInput = within(dialog).getByLabelText("Email address");
+      expect(emailInput).toBeInTheDocument();
+      expect(emailInput).toHaveValue("mona@example.com");
+      expect(emailInput).toHaveAttribute("readonly");
+
+      const phoneInput = within(dialog).getByLabelText("Phone number");
+      expect(phoneInput).toBeEnabled();
+
+      fireEvent.click(within(dialog).getByRole("button", { name: "Save changes" }));
+      await waitFor(() => {
+        expect(mocks.updateSelfProfile).toHaveBeenCalledWith({ phone: "+201234567890" }, expect.anything());
+      });
     });
 
     it("opens the Change Password dialog for MANAGER", async () => {
@@ -115,7 +129,7 @@ describe("InternalProfilePage", () => {
       mocks.updateSelfProfile.mockResolvedValue(makeProfile("AGENT"));
     });
 
-    it("presents personal information and opens Edit dialog with read-only name, email, role and editable phone", async () => {
+    it("presents personal information and opens Edit Profile dialog with read-only name and email and editable phone", async () => {
       renderPage();
       expect((await screen.findAllByText("Mona Hassan")).length).toBeGreaterThan(0);
       expect(screen.getByText("Agent")).toBeInTheDocument();
@@ -126,10 +140,42 @@ describe("InternalProfilePage", () => {
 
       const dialog = screen.getByRole("dialog");
       expect(within(dialog).getByRole("heading", { name: "Edit profile" })).toBeInTheDocument();
-      expect(within(dialog).getByLabelText("Full name")).toBeDisabled();
-      expect(within(dialog).getByLabelText("Email address")).toBeDisabled();
-      expect(within(dialog).getByLabelText("Role")).toBeDisabled();
-      expect(within(dialog).getByLabelText("Phone number")).toBeEnabled();
+
+      const nameInput = within(dialog).getByLabelText("Full name");
+      expect(nameInput).toBeInTheDocument();
+      expect(nameInput).toHaveValue("Mona Hassan");
+      expect(nameInput).toHaveAttribute("readonly");
+
+      const emailInput = within(dialog).getByLabelText("Email address");
+      expect(emailInput).toBeInTheDocument();
+      expect(emailInput).toHaveValue("mona@example.com");
+      expect(emailInput).toHaveAttribute("readonly");
+
+      const phoneInput = within(dialog).getByLabelText("Phone number");
+      expect(phoneInput).toBeEnabled();
+      expect(within(dialog).queryByLabelText("Role")).not.toBeInTheDocument();
+
+      fireEvent.click(within(dialog).getByRole("button", { name: "Save changes" }));
+      await waitFor(() => {
+        expect(mocks.updateSelfProfile).toHaveBeenCalledWith({ phone: "+201234567890" }, expect.anything());
+      });
+    });
+
+    it("shows validation error on invalid phone and blocks submission", async () => {
+      renderPage();
+      await screen.findAllByText("Mona Hassan");
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+      const dialog = screen.getByRole("dialog");
+      const phoneInput = within(dialog).getByLabelText("Phone number");
+
+      fireEvent.change(phoneInput, { target: { value: "+20 12" } });
+      fireEvent.click(within(dialog).getByRole("button", { name: "Save changes" }));
+
+      expect(
+        await within(dialog).findByText("Enter a valid phone number"),
+      ).toBeInTheDocument();
+      expect(mocks.updateSelfProfile).not.toHaveBeenCalled();
     });
 
     it("opens the Change Password dialog for AGENT", async () => {
