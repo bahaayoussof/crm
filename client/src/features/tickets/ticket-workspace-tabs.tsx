@@ -3,7 +3,6 @@ import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Paperclip } from "lucide-react";
 import { AttachmentCompactGrid } from "@/features/attachments/attachment-ui";
-import { ACCEPTED_INPUT_ACCEPT, validateAttachmentFile } from "@/features/attachments/attachment.types";
 import { QuickReplyPicker } from "@/features/quick-replies/quick-reply-picker";
 import { getTicketError } from "./ticket-error";
 import { formatTicketDate } from "./ticket-format";
@@ -70,7 +69,6 @@ export const TicketWorkspaceTabs = forwardRef<TicketWorkspaceHandle, TicketWorks
       locale,
       onSent,
       onAttachFile,
-      attachMode = false,
       className = "",
     },
     ref,
@@ -84,7 +82,6 @@ export const TicketWorkspaceTabs = forwardRef<TicketWorkspaceHandle, TicketWorks
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     const [insertError, setInsertError] = useState<string | null>(null);
-    const [attachError, setAttachError] = useState<string | null>(null);
     const editorRef = useRef<TicketReplyEditorHandle>(null);
     const noteEditorRef = useRef<TicketReplyEditorHandle>(null);
     const messageMutation = useCreateTicketMessage(ticketId);

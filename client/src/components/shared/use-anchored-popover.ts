@@ -91,9 +91,10 @@ function isTriggerOffscreen(rect: DOMRect, viewport: AnchoredViewport) {
 
 export type AnchoredDismissReason = "outside" | "escape" | "offscreen";
 
-export interface UseAnchoredPopoverOptions {
+export interface UseAnchoredPopoverOptions<T extends HTMLElement = HTMLElement> {
   open: boolean;
   onDismiss: (reason: AnchoredDismissReason) => void;
+  triggerRef?: RefObject<T | null>;
   align?: AnchoredAlign;
   width?: number;
   minWidth?: number;
@@ -112,10 +113,11 @@ export interface UseAnchoredPopoverResult<T extends HTMLElement, P extends HTMLE
 }
 
 export function useAnchoredPopover<T extends HTMLElement = HTMLElement, P extends HTMLElement = HTMLElement>(
-  options: UseAnchoredPopoverOptions,
+  options: UseAnchoredPopoverOptions<T>,
 ): UseAnchoredPopoverResult<T, P> {
   const { open, onDismiss } = options;
-  const triggerRef = useRef<T | null>(null);
+  const internalTriggerRef = useRef<T | null>(null);
+  const triggerRef = options.triggerRef ?? internalTriggerRef;
   const panelRef = useRef<P | null>(null);
   const [position, setPosition] = useState<AnchoredPosition | null>(null);
 
@@ -137,15 +139,16 @@ export function useAnchoredPopover<T extends HTMLElement = HTMLElement, P extend
 
   const reposition = useCallback(() => {
     const trigger = triggerRef.current;
-    if (!trigger) return;
-    const rect = trigger.getBoundingClientRect();
-    const viewport = { width: window.innerWidth, height: window.innerHeight };
+    const viewport = { width: window.innerWidth || 1024, height: window.innerHeight || 768 };
+    const rect = trigger
+      ? trigger.getBoundingClientRect()
+      : ({ top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0 } as DOMRect);
     if (isTriggerOffscreen(rect, viewport)) {
       onDismissRef.current("offscreen");
       return;
     }
     setPosition(computeAnchoredPosition(rect, viewport, JSON.parse(geometryKey) as AnchoredGeometryOptions));
-  }, [geometryKey]);
+  }, [geometryKey, triggerRef]);
 
   useLayoutEffect(() => {
     if (!open) {
@@ -209,7 +212,7 @@ export function useAnchoredPopover<T extends HTMLElement = HTMLElement, P extend
       document.removeEventListener("pointerdown", onPointerDown, true);
       document.removeEventListener("keydown", onKeyDown, true);
     };
-  }, [open]);
+  }, [open, triggerRef]);
 
   const style: CSSProperties = position
     ? { left: position.left, width: position.width, top: position.top, bottom: position.bottom, maxHeight: position.maxHeight }

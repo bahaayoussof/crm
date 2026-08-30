@@ -160,7 +160,21 @@
       "editor": {
         "toolbarLabel": "Reply formatting", "bold": "Bold", "italic": "Italic", "underline": "Underline",
         "bulletList": "Bulleted list", "numberList": "Numbered list", "link": "Link", "undo": "Undo", "redo": "Redo",
-        "linkPrompt": "Enter a URL"
+        "linkPopover": {
+          "title": "Insert link",
+          "editTitle": "Edit link",
+          "urlLabel": "URL",
+          "urlPlaceholder": "https://example.com",
+          "textLabel": "Text",
+          "textPlaceholder": "Link text",
+          "openInNewTab": "Open link in new tab",
+          "insert": "Insert",
+          "save": "Save",
+          "cancel": "Cancel",
+          "remove": "Remove link",
+          "urlRequired": "URL is required.",
+          "invalidUrl": "Please enter a valid URL (e.g. https://example.com or mailto:user@example.com)."
+        }
       },
       "sendReply": "Reply", "addNote": "Add note", "sending": "Sending…", "adding": "Adding…", "replySuccess": "Reply sent.", "noteSuccess": "Internal note added.",
       "replyError": "Unable to send the reply.", "noteError": "Unable to add the internal note.", "internalLabel": "Internal note", "publicLabel": "Visible to customer",

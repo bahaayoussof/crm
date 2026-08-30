@@ -1067,3 +1067,42 @@ The upload experience needed to be context-agnostic, outside the conversation me
 - Inline viewport replacement is replaced with a clean, focused, consistent upload dialog across CRM and Customer Portal.
 - Reduced duplicate attachment UI logic and decoupled conversation viewport from attachment staging.
 - Backend API contracts and 4 MiB MIME-validated private Vercel Blob storage pipeline remain unchanged.
+
+---
+
+# ADR-041: CRM-Styled Anchored Link Popover for Lexical Rich Text Editor
+
+## Date: 2026-08-30
+
+## Context
+
+Previously, clicking the Link button in the Lexical reply toolbar triggered browser-native `window.prompt("Enter a URL")`. This created a jarring browser context switch, lacked support for link text customization, open-in-new-tab toggling, dangerous protocol validation (`javascript:`, `data:`, `vbscript:`, `file:`), existing link editing, and RTL/bilingual presentation.
+
+## Decision
+
+1. **Elimination of Browser Prompts:**
+   Completely removed `window.prompt`, `prompt`, and `window.alert` from the editor link workflow.
+
+2. **Anchored Popover Primitive (`TicketReplyLinkPopover`):**
+   Implemented `client/src/features/tickets/ticket-reply-link-popover.tsx` powered by `useAnchoredPopover` portalled to `document.body`. The popover positions dynamically relative to the Link toolbar button, clamps to the viewport, and flips above when vertical space is constrained.
+
+3. **Form Fields & Capabilities:**
+   - **URL Input:** Required, rendered with `dir="ltr"` and `placeholder="https://example.com"`. Validated to allow `http://`, `https://`, `mailto:`, and `tel:`. Schemeless domains (e.g. `example.com`) are automatically prefixed with `https://`. Dangerous schemes (`javascript:`, `data:`, `vbscript:`, `file:`) are strictly rejected with inline localized error alerts (`role="alert"`).
+   - **Text Input:** Pre-populated with the user's selected editor text if text is selected. If text is left empty, the URL is used as the link text.
+   - **Open in new tab Checkbox:** Controls `target="_blank"` and `rel="noopener noreferrer"`.
+   - **Existing Link Editing & Unlink:** When selection or caret is inside an existing `LinkNode`, the popover pre-fills with current URL, link text, and target state, switching the primary action to "Save" and revealing a "Remove link" action.
+
+4. **Lexical State & Focus Preservation:**
+   - `editor.update(..., { discrete: true })` ensures immediate state application.
+   - Selection is safely restored and inserted inside `ParagraphNode` blocks.
+   - Keyboard navigation supports `Tab`, `Shift+Tab`, `Enter` to submit, and `Escape` to cancel without modifying editor content. Focus returns to the editor upon dismissal.
+
+5. **Localization & RTL:**
+   - Fully localized in English and Arabic under `tickets.conversation.editor.linkPopover` with 100% key parity.
+   - URL field remains LTR while Arabic labels, buttons, and checkbox adapt seamlessly to RTL layout.
+
+## Consequences
+
+- Browser-native link prompts are eliminated from all support replies and customer portal rich-text composition.
+- Safe, validated link insertion with full keyboard and screen-reader accessibility.
+- Server-side sanitizer allowlists in `reply-html.ts` continue to enforce `target="_blank"` and `rel="noopener noreferrer nofollow"`.

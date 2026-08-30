@@ -1,6 +1,6 @@
 import { createRef } from "react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { changeAppLanguage } from "@/lib/i18n";
 import { TicketReplyEditor, type TicketReplyEditorHandle } from "./ticket-reply-editor";
 
@@ -98,5 +98,84 @@ describe("TicketReplyEditor", () => {
     await changeAppLanguage("ar");
     setup({ ariaLabel: "الرد على العميل" });
     expect(screen.getByRole("button", { name: "غامق" })).toBeInTheDocument();
+  });
+
+  describe("Link popover", () => {
+    it("opens a custom popover instead of calling window.prompt", () => {
+      const promptSpy = vi.spyOn(window, "prompt");
+      setup();
+      const linkBtn = screen.getByRole("button", { name: "Link" });
+      fireEvent.click(linkBtn);
+
+      expect(promptSpy).not.toHaveBeenCalled();
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+      expect(screen.getByLabelText("URL")).toBeInTheDocument();
+      expect(screen.getByLabelText("Text")).toBeInTheDocument();
+      expect(screen.getByLabelText("Open link in new tab")).toBeInTheDocument();
+      promptSpy.mockRestore();
+    });
+
+    it("shows inline error when URL is empty", () => {
+      setup();
+      fireEvent.click(screen.getByRole("button", { name: "Link" }));
+      fireEvent.click(screen.getByRole("button", { name: "Insert" }));
+
+      expect(screen.getByRole("alert")).toHaveTextContent("URL is required.");
+    });
+
+    it("rejects dangerous URL schemes with an inline validation alert", () => {
+      setup();
+      fireEvent.click(screen.getByRole("button", { name: "Link" }));
+      const urlInput = screen.getByLabelText("URL");
+      fireEvent.change(urlInput, { target: { value: "javascript:alert(1)" } });
+      fireEvent.click(screen.getByRole("button", { name: "Insert" }));
+
+      expect(screen.getByRole("alert")).toHaveTextContent("Please enter a valid URL");
+    });
+
+    it("inserts a link into the editor when valid URL is submitted", () => {
+      const ref = setup();
+      act(() => ref.current!.focus());
+      fireEvent.click(screen.getByRole("button", { name: "Link" }));
+
+      fireEvent.change(screen.getByLabelText("URL"), { target: { value: "https://example.com" } });
+      fireEvent.change(screen.getByLabelText("Text"), { target: { value: "Example Site" } });
+      fireEvent.click(screen.getByRole("button", { name: "Insert" }));
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      const html = ref.current!.getHtml();
+      expect(html).toContain('href="https://example.com"');
+      expect(html).toContain("Example Site");
+    });
+
+    it("closes popover without modifying content on Cancel click or Escape key", () => {
+      const ref = setup();
+      act(() => ref.current!.insertText("Initial text"));
+      fireEvent.click(screen.getByRole("button", { name: "Link" }));
+
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(ref.current!.getPlainText()).toBe("Initial text");
+
+      // Test Escape key
+      fireEvent.click(screen.getByRole("button", { name: "Link" }));
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+      fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    it("localizes the Link popover into Arabic", async () => {
+      await changeAppLanguage("ar");
+      setup({ ariaLabel: "الرد على العميل" });
+      fireEvent.click(screen.getByRole("button", { name: "رابط" }));
+
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+      expect(screen.getByLabelText("الرابط (URL)")).toBeInTheDocument();
+      expect(screen.getByLabelText("النص")).toBeInTheDocument();
+      expect(screen.getByLabelText("فتح الرابط في علامة تبويب جديدة")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "إدراج" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "إلغاء" })).toBeInTheDocument();
+    });
   });
 });

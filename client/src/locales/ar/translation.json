@@ -160,7 +160,21 @@
       "editor": {
         "toolbarLabel": "تنسيق الرد", "bold": "غامق", "italic": "مائل", "underline": "تسطير",
         "bulletList": "قائمة نقطية", "numberList": "قائمة رقمية", "link": "رابط", "undo": "تراجع", "redo": "إعادة",
-        "linkPrompt": "أدخل رابطًا"
+        "linkPopover": {
+          "title": "إدراج رابط",
+          "editTitle": "تعديل الرابط",
+          "urlLabel": "الرابط (URL)",
+          "urlPlaceholder": "https://example.com",
+          "textLabel": "النص",
+          "textPlaceholder": "نص الرابط",
+          "openInNewTab": "فتح الرابط في علامة تبويب جديدة",
+          "insert": "إدراج",
+          "save": "حفظ",
+          "cancel": "إلغاء",
+          "remove": "إزالة الرابط",
+          "urlRequired": "الرابط مطلوب.",
+          "invalidUrl": "يرجى إدخال رابط صالح (مثل https://example.com أو mailto:user@example.com)."
+        }
       },
       "sendReply": "رد", "addNote": "إضافة الملاحظة", "sending": "جارٍ الإرسال…", "adding": "جارٍ الإضافة…", "replySuccess": "تم إرسال الرد.", "noteSuccess": "تمت إضافة الملاحظة الداخلية.",
       "replyError": "تعذر إرسال الرد.", "noteError": "تعذرت إضافة الملاحظة الداخلية.", "internalLabel": "ملاحظة داخلية", "publicLabel": "ظاهر للعميل",
