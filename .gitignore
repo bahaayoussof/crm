@@ -189,7 +189,10 @@ Desktop.ini
 .codex/
 .cursor/
 .opencode/
-.wolf/
+.wolf/*
+!.wolf/STATUS.md
+!.wolf/memory.md
+!.wolf/cerebrum.md
 
 CLAUDE.md
 GEMINI.md

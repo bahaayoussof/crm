@@ -10,7 +10,7 @@ This three-day assessment window is a historical constraint. The P0/P1/P2/P3 lis
 
 ## Current target (post-P0)
 
-The P0 support loop is implemented and integrated into `master`. The delivery target is now **broader original-assignment coverage before the final demo** (ADR-019). Work continues one isolated feature branch at a time in the order recorded in `docs/19-progress-tracking.md`, starting with `feature/knowledge-base`.
+The P0 support loop is implemented and integrated into `master`. The delivery target is now **complete original-assignment coverage before final acceptance and deployment verification** (ADR-038). Work continues one isolated feature branch at a time in the active order recorded in `docs/14-implementation-plan.md` and `docs/19-progress-tracking.md`.
 
 Scope is now grouped as:
 
@@ -41,9 +41,9 @@ Feedback and Reports are **not optional**: the documented primary demo journey (
 - AI assistant: ticket summary, suggested reply, categorization suggestion, suggested KB solution
 - Custom Branding (bounded, persisted)
 
-### D. Architecture / demo-only
+### D. Historically architecture / demo-only; now promoted to planned work
 
-Represented in the model or UI but not production-connected, unless explicitly promoted:
+The following were originally deprioritized by the three-day assessment. ADR-038 promotes them to explicit future implementation phases; their current enum/model/UI representation must still not be mistaken for implementation:
 
 - inbound email ingestion, WhatsApp provider, SMS provider, production live chat transport
 - ERP integration, arbitrary external systems
@@ -51,7 +51,7 @@ Represented in the model or UI but not production-connected, unless explicitly p
 - multi-department and multi-branch behavior
 - general audit logs
 
-Do not claim any item in D works because its enum, model, or nav label exists.
+Do not claim any item in D works because its enum, model, or nav label exists. Their branch order and scope are defined in `docs/14-implementation-plan.md`.
 
 ## P0: Must Have
 
