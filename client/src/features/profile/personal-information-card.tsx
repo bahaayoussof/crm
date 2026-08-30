@@ -3,6 +3,7 @@ import type { LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { SelfProfile } from "./profile.types";
 import { currentLanguageLabel, runtimeTimeZone } from "./profile-format";
+import { formatPhoneForDisplay } from "@/lib/phone";
 
 function InfoRow({
   icon: Icon,
@@ -59,7 +60,7 @@ export function PersonalInformationCard({ profile, onEdit, editButtonRef }: Pers
         <InfoRow
           icon={Phone}
           label={t("profile.phoneNumber")}
-          value={profile.phone ?? t("profile.notProvided")}
+          value={formatPhoneForDisplay(profile.phone) ?? t("profile.notProvided")}
           ltr={Boolean(profile.phone)}
         />
         <InfoRow

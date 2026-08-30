@@ -11,6 +11,7 @@ import type {
   OutboundDeliveryResult,
   OutboundFailureReason,
 } from "./whatsapp.types.js";
+import { normalizePhoneNumber } from "../../../shared/utils/phone.js";
 
 /**
  * Adapter between the WhatsApp Cloud API and the existing CRM
@@ -45,7 +46,7 @@ function isUniqueConstraintError(error: unknown): boolean {
 
 /** Digits-only, "+"-prefixed E.164-ish form used for storage and matching. */
 function toE164(raw: string): string {
-  return `+${raw.replace(/\D/g, "")}`;
+  return normalizePhoneNumber(raw.startsWith("+") ? raw : `+${raw.replace(/\D/g, "")}`) ?? `+${raw.replace(/\D/g, "")}`;
 }
 
 /** Deterministic, user-friendly ticket subject derived from the first message. */
@@ -93,7 +94,7 @@ async function matchOrCreateCustomer(
   profileName: string | null,
 ) {
   const digits = from.replace(/\D/g, "");
-  const e164 = `+${digits}`;
+  const e164 = toE164(from);
   const matches = await tx.customer.findMany({
     where: { OR: [{ phone: e164 }, { phone: digits }, { phone: from }] },
     orderBy: [{ updatedAt: "desc" }, { id: "asc" }],

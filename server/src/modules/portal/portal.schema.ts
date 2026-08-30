@@ -1,6 +1,7 @@
 import { TicketPriority } from "@prisma/client";
 import { z } from "zod";
 import { normalizedEmail } from "../auth/auth.schema.js";
+import { optionalPhoneSchema } from "../../shared/utils/phone.js";
 
 export const portalStatuses = ["OPEN", "IN_PROGRESS", "WAITING_FOR_YOU", "RESOLVED", "CLOSED"] as const;
 export const portalTicketParamsSchema = z.object({ id: z.string().trim().min(1) }).strict();
@@ -23,13 +24,7 @@ export const portalReplySchema = z.object({ body: z.string().trim().min(1).max(2
 export const portalProfileUpdateSchema = z.object({
   name: z.string().trim().min(2).max(100),
   email: normalizedEmail,
-  phone: z
-    .string()
-    .trim()
-    .max(30)
-    .transform((value) => (value.length ? value : null))
-    .nullable()
-    .optional(),
+  phone: optionalPhoneSchema,
 }).strict();
 
 export type PortalStatus = typeof portalStatuses[number];

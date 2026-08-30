@@ -8,12 +8,13 @@ import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { AuthField } from "@/features/auth/auth-field";
+import { optionalPhoneInputSchema } from "@/lib/phone";
 import type { SelfProfile, SelfProfileUpdate } from "./profile.types";
 
 const editProfileSchema = z.strictObject({
-  name: z.string().trim().min(2, "validation.nameMin").max(100),
-  email: z.string().trim().email("validation.email"),
-  phone: z.string().trim().max(30, "validation.phoneMax"),
+  name: z.string().trim().min(2, "validation.nameMin").max(100, "validation.nameMax"),
+  email: z.string().trim().max(254, "validation.email").email("validation.email").transform((value) => value.toLowerCase()),
+  phone: optionalPhoneInputSchema,
 });
 type EditProfileValues = z.input<typeof editProfileSchema>;
 
@@ -82,9 +83,9 @@ export function EditProfileDialog({
   const onSubmit = handleSubmit(async (values) => {
     try {
       await updateMutation.mutateAsync({
-        name: values.name.trim(),
-        email: values.email.trim().toLowerCase(),
-        phone: values.phone.trim() ? values.phone.trim() : null,
+        name: values.name,
+        email: values.email,
+        phone: values.phone || null,
       });
       onOpenChange(false);
     } catch (error) {

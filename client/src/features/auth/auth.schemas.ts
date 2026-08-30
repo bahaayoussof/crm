@@ -1,9 +1,10 @@
 import { z } from "zod";
+import { optionalPhoneInputSchema } from "@/lib/phone";
 
-const emailSchema = z.string().trim().email("validation.email").transform((value) => value.toLowerCase());
+const emailSchema = z.string().trim().max(254, "validation.email").email("validation.email").transform((value) => value.toLowerCase());
 
 /** Shared new-password rule, mirrors the server `passwordSchema`. */
-export const passwordSchema = z.string().min(8, "validation.passwordMin").max(128);
+export const passwordSchema = z.string().min(8, "validation.passwordMin").max(128, "validation.passwordMax");
 
 export const loginSchema = z.strictObject({
   email: emailSchema,
@@ -17,7 +18,7 @@ export const forgotPasswordSchema = z.strictObject({
 export const resetPasswordSchema = z
   .strictObject({
     password: passwordSchema,
-    confirmPassword: z.string(),
+    confirmPassword: passwordSchema,
   })
   .refine((values) => values.password === values.confirmPassword, {
     message: "validation.passwordMatch",
@@ -28,7 +29,7 @@ export const changePasswordSchema = z
   .strictObject({
     currentPassword: z.string().min(1, "validation.passwordRequired"),
     newPassword: passwordSchema,
-    confirmPassword: z.string(),
+    confirmPassword: passwordSchema,
   })
   .refine((values) => values.newPassword === values.confirmPassword, {
     message: "validation.passwordMatch",
@@ -41,11 +42,11 @@ export const changePasswordSchema = z
 
 export const registrationSchema = z
   .strictObject({
-    name: z.string().trim().min(2, "validation.nameMin").max(100),
+    name: z.string().trim().min(2, "validation.nameMin").max(100, "validation.nameMax"),
     email: emailSchema,
-    phone: z.string().trim().max(30, "validation.phoneMax").optional(),
-    password: z.string().min(8, "validation.passwordMin").max(128),
-    confirmPassword: z.string(),
+    phone: optionalPhoneInputSchema,
+    password: passwordSchema,
+    confirmPassword: passwordSchema,
   })
   .refine((values) => values.password === values.confirmPassword, {
     message: "validation.passwordMatch",

@@ -97,6 +97,16 @@ describe("portal profile", () => {
     expect(response.body.data.phone).toBeNull();
   });
 
+  it("normalizes formatted international phone input", async () => {
+    const response = await request(app).patch("/api/portal/profile").set(customerAuth).send({
+      name: "Bahaa Youssof", email: " BAhaa@Example.com ", phone: "+1 (415) 555-2671",
+    });
+    expect(response.status).toBe(200);
+    expect(mocks.customerUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      data: { name: "Bahaa Youssof", email: "bahaa@example.com", phone: "+14155552671" },
+    }));
+  });
+
   it("rejects a duplicate email with 409 EMAIL_IN_USE", async () => {
     mocks.userFindFirst.mockResolvedValue({ id: "other-user" });
     const response = await request(app)

@@ -52,7 +52,7 @@ describe("PortalProfilePage", () => {
     renderPage();
     expect((await screen.findAllByText("Bahaa Youssof")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("bahaa@example.com")).toHaveLength(2);
-    expect(screen.getByText("+20100000000")).toBeInTheDocument();
+    expect(screen.getByText("+20 100000000")).toBeInTheDocument();
     expect(screen.getByText("Customer")).toBeInTheDocument();
     expect(screen.getByText("Personal Information")).toBeInTheDocument();
     expect(screen.getByText("Last password change")).toBeInTheDocument();

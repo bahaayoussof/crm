@@ -91,6 +91,26 @@ describe("self profile API", () => {
     expect(response.body.data).not.toHaveProperty("passwordHash");
   });
 
+  it("normalizes a formatted international phone and rejects malformed values", async () => {
+    const user = internalUser(Role.ADMIN);
+    mocks.userFindUnique.mockResolvedValue(user);
+    const valid = await request(app).patch("/api/auth/profile").set(authFor(user)).send({
+      name: "  أحمد محمد  ", email: " ADMIN@Example.com ", phone: "+44 20 7946 0958",
+    });
+    expect(valid.status).toBe(200);
+    expect(mocks.userUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      data: { name: "أحمد محمد", email: "admin@example.com", phone: "+442079460958" },
+    }));
+
+    for (const phone of ["abc123", "++++123", "12", "01001234567"]) {
+      const invalid = await request(app).patch("/api/auth/profile").set(authFor(user)).send({
+        name: user.name, email: user.email, phone,
+      });
+      expect(invalid.status).toBe(400);
+      expect(invalid.body.error.code).toBe("VALIDATION_ERROR");
+    }
+  });
+
   it("synchronizes a CUSTOMER User and Customer row", async () => {
     const user = {
       ...internalUser(Role.CUSTOMER),

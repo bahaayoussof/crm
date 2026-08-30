@@ -101,7 +101,7 @@
   },
   "validation": {
     "email": "Enter a valid email address", "passwordRequired": "Password is required", "nameMin": "Name must be at least 2 characters",
-    "phoneMax": "Phone must be 30 characters or fewer", "passwordMin": "Password must be at least 8 characters", "passwordMatch": "Passwords do not match",
+    "phoneMax": "Phone must be 30 characters or fewer", "phoneInvalid": "Enter a possible international phone number beginning with + and a country code", "phoneTooLong": "Phone must be 50 characters or fewer", "nameMax": "Name must be 100 characters or fewer", "passwordMin": "Password must be at least 8 characters", "passwordMax": "Password must be 128 characters or fewer", "passwordMatch": "Passwords do not match",
     "passwordSame": "New password must be different from the current password"
   },
   "errors": {
