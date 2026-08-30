@@ -627,3 +627,4 @@ Summary: Completed **Tasks & Reminders** end to end on uncommitted `feature/task
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
 | 19:35 | Account/profile validation audit | auth/profile schemas, shared phone utilities, WhatsApp matching, tests/docs | libphonenumber-js E.164/isPossible alignment; server 562, client 620; typecheck/lint/client build green; server Prisma build lock remains | ~18k |
+| 19:55 | Role-based profile edit permissions (client + server) | auth controller/service/schema/tests, client profile permissions/dialog/card/tests, locales/docs | Matrix enforced; 403 FORBIDDEN without field leak; atomic mixed rejection; server 573/573, client 628/628; lint/typecheck/client build green; ADR-042 updated | ~18k |

@@ -99,22 +99,22 @@ function EditUserForm({ id }: { id: string }) {
 
   const isSelf = Boolean(user.data && currentUser && user.data.id === currentUser.id);
 
-  const { register, control, handleSubmit, formState: { errors, isSubmitting } } = useForm<UserEditFormValues>({
-    resolver: zodResolver(userEditFormSchema),
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<{
+    phone?: string;
+    isActive: boolean;
+  }>({
     values: user.data
-      ? { name: user.data.name, email: user.data.email, role: user.data.role, isActive: user.data.isActive }
+      ? { phone: user.data.phone ?? "", isActive: user.data.isActive }
       : undefined,
   });
-
-  const roleOptions = MANAGEABLE_ROLES.map((option) => ({
-    value: option,
-    label: t(`users.roles.${option}`),
-  }));
 
   const submit = handleSubmit(async (values) => {
     setApiError(null);
     try {
-      await update.mutateAsync(values);
+      await update.mutateAsync({
+        phone: values.phone || null,
+        isActive: values.isActive,
+      });
       navigate("/users", { replace: true });
     } catch (error) {
       setApiError(getLocalizedUserError(error, t("users.saveError"), t));
@@ -144,31 +144,49 @@ function EditUserForm({ id }: { id: string }) {
           <div className="space-y-5 p-5 sm:p-6">
             {apiError && <p className="rounded-md border border-danger-subtle bg-danger-subtle/50 p-3 text-sm text-danger-foreground" role="alert">{apiError}</p>}
 
-            <Field id="user-name" label={t("users.fieldName")} required error={errors.name?.message ? t(errors.name.message) : undefined}>
-              <input id="user-name" className="input" dir="auto" aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? "user-name-error" : undefined} {...register("name")} />
+            <Field id="user-name" label={t("users.fieldName")}>
+              <input
+                id="user-name"
+                className="input bg-surface-muted/50 text-muted-foreground cursor-not-allowed"
+                dir="auto"
+                readOnly
+                disabled
+                value={user.data?.name ?? ""}
+              />
             </Field>
 
-            <Field id="user-email" label={t("users.fieldEmail")} required error={errors.email?.message ? t(errors.email.message) : undefined}>
-              <input id="user-email" type="email" className="input" dir="ltr" autoComplete="off" aria-invalid={Boolean(errors.email)} aria-describedby={errors.email ? "user-email-error" : undefined} {...register("email")} />
+            <Field id="user-email" label={t("users.fieldEmail")}>
+              <input
+                id="user-email"
+                type="email"
+                className="input bg-surface-muted/50 text-muted-foreground cursor-not-allowed text-start"
+                dir="ltr"
+                readOnly
+                disabled
+                value={user.data?.email ?? ""}
+              />
             </Field>
 
-            <Controller
-              name="role"
-              control={control}
-              render={({ field, fieldState }) => (
-                <AppSelectField
-                  id="user-role"
-                  label={t("users.fieldRole")}
-                  required
-                  disabled={isSelf}
-                  value={field.value}
-                  onValueChange={field.onChange}
-                  error={fieldState.error?.message ? t(fieldState.error.message) : undefined}
-                  helperText={isSelf ? t("users.selfRoleReadonly") : undefined}
-                  options={roleOptions}
-                />
-              )}
-            />
+            <Field id="user-role" label={t("users.fieldRole")}>
+              <input
+                id="user-role"
+                className="input bg-surface-muted/50 text-muted-foreground cursor-not-allowed"
+                readOnly
+                disabled
+                value={user.data?.role ? t(`users.roles.${user.data.role}`) : ""}
+              />
+            </Field>
+
+            <Field id="user-phone" label={t("users.fieldPhone")} error={errors.phone?.message ? t(errors.phone.message) : undefined}>
+              <input
+                id="user-phone"
+                type="tel"
+                className="input text-start"
+                dir="ltr"
+                autoComplete="tel"
+                {...register("phone")}
+              />
+            </Field>
 
             <div className="rounded-lg border border-border bg-surface-subtle/50 p-4">
               <label className="flex items-start gap-3 cursor-pointer">

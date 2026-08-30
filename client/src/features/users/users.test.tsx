@@ -339,50 +339,47 @@ describe("users management — forms", () => {
     expect(mocks.create).not.toHaveBeenCalled();
   });
 
-  it("edits another user: preloads role, submits it in the update payload", async () => {
+  it("edits another user: displays name, email, role as read-only and submits phone and active state", async () => {
     mocks.update.mockResolvedValue(admin2);
     renderAt("/users/u-admin2/edit", <><Route path="/users/:id/edit" element={<UserFormPage />} /><Route path="/users" element={<LocationProbe />} /></>);
-    await waitFor(() => expect(screen.getByRole("combobox", { name: /^Role/ })).toHaveTextContent("Admin"));
+    expect(screen.getByLabelText(/Name/)).toBeDisabled();
+    expect(screen.getByLabelText(/Email/)).toBeDisabled();
+    expect(screen.getByLabelText(/Role/)).toBeDisabled();
+    expect(screen.getByLabelText(/Phone number/)).toBeEnabled();
 
-    const roleTrigger = screen.getByRole("combobox", { name: /^Role/ });
-    fireEvent.keyDown(roleTrigger, { key: "ArrowDown" });
-    await waitFor(() => expect(screen.getByRole("option", { name: "Manager" })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("option", { name: "Manager" }));
-
-    fireEvent.change(screen.getByLabelText(/Name/), { target: { value: "Bilal A." } });
+    fireEvent.change(screen.getByLabelText(/Phone number/), { target: { value: "+201234567890" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({ name: "Bilal A.", email: "bilal@example.com", role: "MANAGER", isActive: true }));
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({ phone: "+201234567890", isActive: true }));
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/users"));
   });
 
-  it("makes Role read-only and Active disabled when editing your own account", async () => {
+  it("makes Active disabled when editing your own account", async () => {
     mocks.useUser.mockReturnValue({ isLoading: false, isError: false, data: admin });
     renderAt("/users/u-admin/edit", <Route path="/users/:id/edit" element={<UserFormPage />} />);
-    await waitFor(() => expect(screen.getByRole("combobox", { name: /^Role/ })).toBeDisabled());
-    expect(screen.getByText("An administrator cannot change their own role.")).toBeInTheDocument();
+    expect(screen.getByLabelText(/Name/)).toBeDisabled();
+    expect(screen.getByLabelText(/Email/)).toBeDisabled();
+    expect(screen.getByLabelText(/Role/)).toBeDisabled();
     expect(screen.getByLabelText(/Active account/)).toBeDisabled();
     expect(screen.getByText("An administrator cannot deactivate their own account.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /Edit user/ })).toHaveTextContent("You");
   });
 
-  it("surfaces a last-active-admin conflict from the server and preserves entered values", async () => {
-    mocks.update.mockRejectedValueOnce({
-      isAxiosError: true,
-      response: { status: 409, data: { error: { code: "LAST_ACTIVE_ADMIN_REQUIRED" } } },
-    });
-    renderAt("/users/u-admin2/edit", <Route path="/users/:id/edit" element={<UserFormPage />} />);
-    await waitFor(() => expect(screen.getByRole("combobox", { name: /^Role/ })).toHaveTextContent("Admin"));
+  it("UserListPage opens UserEditModal when clicking edit user row action", async () => {
+    mocks.useUsers.mockReturnValue(listResult([admin2]));
+    renderAt("/users", <Route path="/users" element={<UserListPage />} />);
+    const table = screen.getByRole("table");
+    const row = within(table).getAllByRole("row").find((r) => within(r).queryByText("Bilal Admin"))!;
+    const actionsTrigger = within(row).getByRole("button", { name: "Actions" });
+    fireEvent.click(actionsTrigger);
+    const editItem = screen.getByRole("menuitem", { name: "Edit user" });
+    fireEvent.click(editItem);
 
-    const roleTrigger = screen.getByRole("combobox", { name: /^Role/ });
-    fireEvent.keyDown(roleTrigger, { key: "ArrowDown" });
-    await waitFor(() => expect(screen.getByRole("option", { name: "Agent" })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("option", { name: "Agent" }));
-
-    fireEvent.change(screen.getByLabelText(/Name/), { target: { value: "Kept Name" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("At least one active administrator must remain.");
-    expect((screen.getByLabelText(/Name/) as HTMLInputElement).value).toBe("Kept Name");
-    expect(screen.getByRole("combobox", { name: /^Role/ })).toHaveTextContent("Agent");
+    const dialog = screen.getByRole("dialog", { name: /Edit user/ });
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByLabelText(/Name/)).toBeDisabled();
+    expect(within(dialog).getByLabelText(/Email/)).toBeDisabled();
+    expect(within(dialog).getByLabelText(/Role/)).toBeDisabled();
+    expect(within(dialog).getByLabelText(/Phone number/)).toBeEnabled();
   });
 
   it("prevents duplicate submission while the edit is pending", async () => {

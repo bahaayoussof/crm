@@ -55,7 +55,12 @@ export const updateProfileHandler: RequestHandler<unknown, unknown, SelfProfileU
     throw new AppError(401, "AUTHENTICATION_REQUIRED", "Authentication is required");
   }
 
-  const profile = await updateSelfProfile(request.auth.userId, request.body, getAuditRequestContext(request));
+  const profile = await updateSelfProfile(
+    request.auth.userId,
+    request.auth.role,
+    request.body,
+    getAuditRequestContext(request),
+  );
   response.status(200).json({ data: profile });
 };
 

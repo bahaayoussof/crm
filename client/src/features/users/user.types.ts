@@ -6,6 +6,7 @@ export interface User {
   email: string;
   role: ManageableRole;
   isActive: boolean;
+  phone?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -29,6 +30,7 @@ export type UserUpdatePayload = Partial<{
   email: string;
   role: ManageableRole;
   isActive: boolean;
+  phone?: string | null;
 }>;
 
 export const MANAGEABLE_ROLES: ManageableRole[] = ["ADMIN", "MANAGER", "AGENT"];

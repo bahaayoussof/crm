@@ -11,12 +11,25 @@ import { AuthField } from "@/features/auth/auth-field";
 import { optionalPhoneInputSchema } from "@/lib/phone";
 import type { SelfProfile, SelfProfileUpdate } from "./profile.types";
 
-const editProfileSchema = z.strictObject({
+import { getProfileEditPermissions } from "./profile-permissions";
+
+const fullEditProfileSchema = z.strictObject({
   name: z.string().trim().min(2, "validation.nameMin").max(100, "validation.nameMax"),
   email: z.string().trim().max(254, "validation.email").email("validation.email").transform((value) => value.toLowerCase()),
   phone: optionalPhoneInputSchema,
 });
-type EditProfileValues = z.input<typeof editProfileSchema>;
+
+const phoneOnlyProfileSchema = z.strictObject({
+  name: z.string().optional(),
+  email: z.string().optional(),
+  phone: optionalPhoneInputSchema,
+});
+
+type EditProfileValues = {
+  name?: string;
+  email?: string;
+  phone: string;
+};
 
 function focusables(root: HTMLElement): HTMLElement[] {
   return Array.from(
@@ -49,6 +62,7 @@ export function EditProfileDialog({
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const hasOpenedRef = useRef(false);
+  const permissions = getProfileEditPermissions(profile.role);
 
   const {
     register,
@@ -57,7 +71,7 @@ export function EditProfileDialog({
     setError,
     formState: { errors, isSubmitting },
   } = useForm<EditProfileValues>({
-    resolver: zodResolver(editProfileSchema),
+    resolver: zodResolver(permissions.isRestricted ? phoneOnlyProfileSchema : fullEditProfileSchema),
     defaultValues: { name: profile.name, email: profile.email, phone: profile.phone ?? "" },
   });
 
@@ -82,11 +96,17 @@ export function EditProfileDialog({
 
   const onSubmit = handleSubmit(async (values) => {
     try {
-      await updateMutation.mutateAsync({
-        name: values.name,
-        email: values.email,
-        phone: values.phone || null,
-      });
+      if (permissions.isRestricted) {
+        await updateMutation.mutateAsync({
+          phone: values.phone || null,
+        });
+      } else {
+        await updateMutation.mutateAsync({
+          name: values.name,
+          email: values.email,
+          phone: values.phone || null,
+        });
+      }
       onOpenChange(false);
     } catch (error) {
       if (errorCode(error) === "EMAIL_IN_USE") {
@@ -166,49 +186,107 @@ export function EditProfileDialog({
                 {rootError}
               </div>
             )}
-            <AuthField
-              id="ep-name"
-              label={t("profile.fullName")}
-              error={errors.name?.message ? t(errors.name.message) : undefined}
-            >
-              <input
-                id="ep-name"
-                className="input"
-                autoComplete="name"
-                aria-invalid={Boolean(errors.name)}
-                {...register("name")}
-              />
-            </AuthField>
-            <AuthField
-              id="ep-email"
-              label={t("profile.emailAddress")}
-              error={errors.email?.message ? t(errors.email.message) : undefined}
-            >
-              <input
-                id="ep-email"
-                className="input text-start"
-                dir="ltr"
-                type="email"
-                autoComplete="email"
-                aria-invalid={Boolean(errors.email)}
-                {...register("email")}
-              />
-            </AuthField>
-            <AuthField
-              id="ep-phone"
-              label={t("profile.phoneNumber")}
-              error={errors.phone?.message ? t(errors.phone.message) : undefined}
-            >
-              <input
-                id="ep-phone"
-                className="input text-start"
-                dir="ltr"
-                type="tel"
-                autoComplete="tel"
-                aria-invalid={Boolean(errors.phone)}
-                {...register("phone")}
-              />
-            </AuthField>
+            {permissions.isRestricted ? (
+              <>
+                <AuthField id="ep-name" label={t("profile.fullName")}>
+                  <input
+                    id="ep-name"
+                    className="input bg-surface-muted/50 text-muted-foreground cursor-not-allowed"
+                    readOnly
+                    disabled
+                    value={profile.name}
+                  />
+                </AuthField>
+
+                <AuthField id="ep-email" label={t("profile.emailAddress")}>
+                  <input
+                    id="ep-email"
+                    className="input bg-surface-muted/50 text-muted-foreground cursor-not-allowed text-start"
+                    dir="ltr"
+                    type="email"
+                    readOnly
+                    disabled
+                    value={profile.email}
+                  />
+                </AuthField>
+
+                <AuthField
+                  id="ep-phone"
+                  label={t("profile.phoneNumber")}
+                  error={errors.phone?.message ? t(errors.phone.message) : undefined}
+                >
+                  <input
+                    id="ep-phone"
+                    className="input text-start"
+                    dir="ltr"
+                    type="tel"
+                    autoComplete="tel"
+                    aria-invalid={Boolean(errors.phone)}
+                    {...register("phone")}
+                  />
+                </AuthField>
+              </>
+            ) : (
+              <>
+                <AuthField
+                  id="ep-name"
+                  label={t("profile.fullName")}
+                  error={errors.name?.message ? t(errors.name.message) : undefined}
+                >
+                  <input
+                    id="ep-name"
+                    className="input"
+                    autoComplete="name"
+                    aria-invalid={Boolean(errors.name)}
+                    {...register("name")}
+                  />
+                </AuthField>
+
+                <AuthField
+                  id="ep-email"
+                  label={t("profile.emailAddress")}
+                  error={errors.email?.message ? t(errors.email.message) : undefined}
+                >
+                  <input
+                    id="ep-email"
+                    className="input text-start"
+                    dir="ltr"
+                    type="email"
+                    autoComplete="email"
+                    aria-invalid={Boolean(errors.email)}
+                    {...register("email")}
+                  />
+                </AuthField>
+
+                {profile.role && profile.role !== "CUSTOMER" && (
+                  <AuthField id="ep-role" label={t("profile.role")}>
+                    <input
+                      id="ep-role"
+                      className="input bg-surface-muted/50 text-muted-foreground cursor-not-allowed"
+                      readOnly
+                      disabled
+                      value={profile.role}
+                    />
+                  </AuthField>
+                )}
+
+                <AuthField
+                  id="ep-phone"
+                  label={t("profile.phoneNumber")}
+                  error={errors.phone?.message ? t(errors.phone.message) : undefined}
+                >
+                  <input
+                    id="ep-phone"
+                    className="input text-start"
+                    dir="ltr"
+                    type="tel"
+                    autoComplete="tel"
+                    aria-invalid={Boolean(errors.phone)}
+                    {...register("phone")}
+                  />
+                </AuthField>
+              </>
+            )}
           </div>
           <footer className="flex items-center justify-end gap-3 border-t border-border/80 bg-surface/40 px-6 py-4">
             <button type="button" disabled={isSubmitting} onClick={close} className="button-secondary sm:w-auto">

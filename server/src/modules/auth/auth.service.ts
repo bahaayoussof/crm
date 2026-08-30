@@ -223,22 +223,39 @@ export async function getSelfProfile(userId: string): Promise<SelfProfile> {
   return toSelfProfile(user);
 }
 
+export const ALLOWED_PROFILE_UPDATE_FIELDS: Record<Role, readonly (keyof SelfProfileUpdateInput)[]> = {
+  ADMIN: ["name", "email", "phone"],
+  CUSTOMER: ["name", "email", "phone"],
+  MANAGER: ["phone"],
+  AGENT: ["phone"],
+} as const;
+
 export async function updateSelfProfile(
   userId: string,
+  role: Role,
   input: SelfProfileUpdateInput,
   requestContext?: AuditRequestContext,
 ): Promise<SelfProfile> {
+  const allowed = ALLOWED_PROFILE_UPDATE_FIELDS[role] ?? ["phone"];
+  const submittedFields = (Object.keys(input) as (keyof SelfProfileUpdateInput)[]).filter(
+    (key) => input[key] !== undefined,
+  );
+  const hasForbiddenField = submittedFields.some((key) => !allowed.includes(key));
+  if (hasForbiddenField) {
+    throw new AppError(403, "FORBIDDEN", "You are not allowed to update one or more profile fields.");
+  }
+
   const current = await prisma.user.findUnique({ where: { id: userId }, select: selfProfileSelect });
   if (!current || !current.isActive) {
     throw new AppError(401, "INVALID_TOKEN", "Authentication token is invalid or expired");
   }
 
   const before = toSelfProfile(current);
-  const nextName = input.name;
-  const nextEmail = input.email;
+  const nextName = input.name !== undefined ? input.name : before.name;
+  const nextEmail = input.email !== undefined ? input.email : before.email;
   const nextPhone = input.phone === undefined ? before.phone : input.phone;
 
-  if (nextEmail !== before.email) {
+  if (input.email !== undefined && nextEmail !== before.email) {
     const [userClash, customerClash] = await Promise.all([
       prisma.user.findFirst({ where: { email: nextEmail, NOT: { id: userId } }, select: { id: true } }),
       prisma.customer.findFirst({ where: { email: nextEmail, NOT: { userId } }, select: { id: true } }),
@@ -248,17 +265,24 @@ export async function updateSelfProfile(
     }
   }
 
+  const dataToUpdate: Prisma.UserUpdateInput = {};
+  if (input.name !== undefined) dataToUpdate.name = nextName;
+  if (input.email !== undefined) dataToUpdate.email = nextEmail;
+  if (input.phone !== undefined) dataToUpdate.phone = nextPhone;
+
   try {
     await prisma.$transaction(async (tx) => {
-      await tx.user.update({
-        where: { id: userId },
-        data: { name: nextName, email: nextEmail, phone: nextPhone },
-      });
-      if (current.customerProfile) {
-        await tx.customer.update({
-          where: { id: current.customerProfile.id },
-          data: { name: nextName, email: nextEmail, phone: nextPhone },
+      if (Object.keys(dataToUpdate).length > 0) {
+        await tx.user.update({
+          where: { id: userId },
+          data: dataToUpdate,
         });
+        if (current.customerProfile) {
+          await tx.customer.update({
+            where: { id: current.customerProfile.id },
+            data: dataToUpdate,
+          });
+        }
       }
     });
   } catch (error) {
@@ -270,16 +294,19 @@ export async function updateSelfProfile(
 
   const after: SelfProfile = { ...before, name: nextName, email: nextEmail, phone: nextPhone };
 
+  const allowedAuditFields = (ALLOWED_PROFILE_UPDATE_FIELDS[role] ?? ["phone"]) as readonly (keyof SelfProfileUpdateInput)[];
+  const auditChanges = changedFields(
+    { name: before.name, email: before.email, phone: before.phone },
+    { name: after.name, email: after.email, phone: after.phone },
+    allowedAuditFields,
+  );
+
   await createAuditLog({
     actorId: userId,
     action: AUDIT_ACTIONS.PROFILE_UPDATED,
     entityType: AUDIT_ENTITY_TYPES.USER,
     entityId: userId,
-    changes: changedFields(
-      { name: before.name, email: before.email, phone: before.phone },
-      { name: after.name, email: after.email, phone: after.phone },
-      ["name", "email", "phone"],
-    ),
+    changes: auditChanges,
     requestContext,
   });
 

@@ -13,8 +13,9 @@ import { useDebouncedValue } from "@/features/customers/use-debounced-value";
 import { useUsers } from "./user-hooks";
 import { UserTable } from "./user-table";
 import { UserCreateModal } from "./user-create-modal";
+import { UserEditModal } from "./user-edit-modal";
 import { PageHeader, StatePanel, UsersPage } from "./users-ui";
-import { MANAGEABLE_ROLES, type ManageableRole } from "./user.types";
+import { MANAGEABLE_ROLES, type ManageableRole, type User } from "./user.types";
 
 const STATUSES = ["active", "inactive"] as const;
 
@@ -23,6 +24,7 @@ export function UserListPage() {
   const { user: currentUser } = useAuth();
   const [params, setParams] = useSearchParams();
   const [createOpen, setCreateOpen] = useState(false);
+  const [editUser, setEditUser] = useState<User | null>(null);
 
   const search = params.get("search") ?? "";
   const debouncedSearch = useDebouncedValue(search);
@@ -138,6 +140,7 @@ export function UserListPage() {
               pageCount={users.data?.meta.totalPages ?? 0}
               totalCount={users.data?.meta.total}
               onPageChange={(nextPage) => setFilter("page", nextPage > 1 ? String(nextPage) : "")}
+              onEditUser={setEditUser}
             />
           )}
         </DataTableSurface>
@@ -145,6 +148,14 @@ export function UserListPage() {
         <UserCreateModal
           open={createOpen}
           onOpenChange={setCreateOpen}
+          onSuccess={() => users.refetch()}
+        />
+        <UserEditModal
+          user={editUser}
+          open={Boolean(editUser)}
+          onOpenChange={(open) => {
+            if (!open) setEditUser(null);
+          }}
           onSuccess={() => users.refetch()}
         />
       </div>

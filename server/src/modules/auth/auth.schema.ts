@@ -58,16 +58,19 @@ export const changePasswordSchema = z
 
 /**
  * Self-service profile edit for any authenticated role. Explicit whitelist —
- * name / email / phone only. `.strict()` rejects role / language / timeZone / etc.
- * with a 400 rather than silently dropping them.
+ * name / email / phone only. Role-aware field permissions are enforced on the server.
+ * `.strict()` rejects role / language / timeZone / etc. with a 400 rather than silently dropping them.
  */
 export const selfProfileUpdateSchema = z
   .object({
-    name: z.string().trim().min(2).max(100),
-    email: normalizedEmail,
+    name: z.string().trim().min(2).max(100).optional(),
+    email: normalizedEmail.optional(),
     phone: optionalPhoneSchema,
   })
-  .strict();
+  .strict()
+  .refine((data) => Object.keys(data).length > 0, {
+    message: "At least one field must be provided",
+  });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type SelfProfileUpdateInput = z.infer<typeof selfProfileUpdateSchema>;

@@ -12,7 +12,7 @@ export interface SelfProfile {
 
 /** The only fields the Edit Profile modal may change. */
 export interface SelfProfileUpdate {
-  name: string;
-  email: string;
-  phone: string | null;
+  name?: string;
+  email?: string;
+  phone?: string | null;
 }

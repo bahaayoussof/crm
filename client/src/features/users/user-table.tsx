@@ -18,7 +18,7 @@ import { UserStatusConfirm } from "./user-status-confirm";
 import { RoleBadge, StatusBadge, YouBadge } from "./users-ui";
 import type { User } from "./user.types";
 
-interface UserTableProps {
+export interface UserTableProps {
   users: User[];
   currentUserId: string;
   page: number;
@@ -26,6 +26,7 @@ interface UserTableProps {
   pageCount: number;
   totalCount?: number;
   onPageChange: (page: number) => void;
+  onEditUser?: (user: User) => void;
 }
 
 type ConfirmVariant = "desktop" | "mobile";
@@ -36,6 +37,7 @@ interface UserTableMeta {
   openConfirm: { id: string; variant: ConfirmVariant } | null;
   requestOpenConfirm: (id: string, variant: ConfirmVariant) => void;
   closeConfirm: () => void;
+  onEditUser?: (user: User) => void;
 }
 
 const columnClasses: Record<string, string> = {
@@ -55,6 +57,7 @@ export function UserTable({
   pageCount,
   totalCount,
   onPageChange,
+  onEditUser,
 }: UserTableProps) {
   const { t, i18n } = useTranslation();
 
@@ -98,13 +101,13 @@ export function UserTable({
         accessorKey: "email",
         header: () => t("users.columns.email"),
         cell: ({ getValue }) => (
-          <span
-            className="block min-w-0 max-w-full truncate text-muted-foreground"
+          <div
+            className="min-w-0 max-w-xs truncate text-xs text-muted-foreground text-start"
             dir="ltr"
             title={getValue<string>()}
           >
             {getValue<string>()}
-          </span>
+          </div>
         ),
       },
       {
@@ -150,6 +153,7 @@ export function UserTable({
     openConfirm,
     requestOpenConfirm,
     closeConfirm,
+    onEditUser,
   };
 
   const pagination = useMemo<PaginationState>(
@@ -288,7 +292,13 @@ function RowActions({
       key: "edit",
       label: t("users.editAction"),
       icon: <PencilIcon />,
-      onClick: () => navigate(`/users/${user.id}/edit`),
+      onClick: () => {
+        if (meta.onEditUser) {
+          meta.onEditUser(user);
+        } else {
+          navigate(`/users/${user.id}/edit`);
+        }
+      },
     },
     {
       key: "status",
