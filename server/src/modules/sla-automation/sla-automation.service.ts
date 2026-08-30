@@ -1,6 +1,8 @@
 import { Role, TicketStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { createNotifications } from "../notifications/notification.service.js";
+import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../audit-logs/audit-log.constants.js";
+import { createAuditLog } from "../audit-logs/audit-log.service.js";
 
 const ACTIVE_STATUSES = [
   TicketStatus.NEW,
@@ -88,6 +90,7 @@ async function assignUnassignedTickets() {
           newValue: agent.name,
         },
       });
+      await createAuditLog({ actorId: null, action: AUDIT_ACTIONS.TICKET_ASSIGNED, entityType: AUDIT_ENTITY_TYPES.TICKET, entityId: ticket.id, changes: { assignedAgentId: { from: null, to: agent.id } }, metadata: { reason: "automatic_assignment" } }, tx);
       await createNotifications(
         tx,
         [agent.id],
@@ -144,6 +147,7 @@ async function escalateBreachedTickets(now: Date) {
           newValue: TicketStatus.ESCALATED,
         },
       });
+      await createAuditLog({ actorId: null, action: AUDIT_ACTIONS.TICKET_ESCALATED, entityType: AUDIT_ENTITY_TYPES.TICKET, entityId: ticket.id, changes: { status: { from: ticket.status, to: TicketStatus.ESCALATED } }, metadata: { reason: "sla_breach" } }, tx);
       const recipients = await tx.user.findMany({
         where: { role: { in: [Role.ADMIN, Role.MANAGER] }, isActive: true },
         select: { id: true },

@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   historyCreate: vi.fn(), historyCreateMany: vi.fn(), customerFind: vi.fn(), userFindFirst: vi.fn(), userFindMany: vi.fn(),
   categoryFindFirst: vi.fn(), categoryFindMany: vi.fn(), departmentFind: vi.fn(), branchFind: vi.fn(), slaFind: vi.fn(), transaction: vi.fn(),
   watcherCreateMany: vi.fn(), watcherFindMany: vi.fn(), watcherDeleteMany: vi.fn(), watcherCount: vi.fn(), watcherFindFirst: vi.fn(),
-  mentionCreateMany: vi.fn(), notificationCreateMany: vi.fn(),
+  mentionCreateMany: vi.fn(), notificationCreateMany: vi.fn(), auditCreate: vi.fn(),
 }));
 
 vi.mock("../../config/prisma.js", () => {
@@ -22,6 +22,7 @@ vi.mock("../../config/prisma.js", () => {
     category: { findFirst: mocks.categoryFindFirst, findMany: mocks.categoryFindMany }, department: { findUnique: mocks.departmentFind },
     branch: { findUnique: mocks.branchFind }, slaRule: { findFirst: mocks.slaFind },
     notification: { createMany: mocks.notificationCreateMany },
+    auditLog: { create: mocks.auditCreate },
     $transaction: mocks.transaction,
   };
   return { prisma };
@@ -63,6 +64,7 @@ describe("ticket API", () => {
       category: { findFirst: mocks.categoryFindFirst }, department: { findUnique: mocks.departmentFind },
       branch: { findUnique: mocks.branchFind }, slaRule: { findFirst: mocks.slaFind },
       notification: { createMany: mocks.notificationCreateMany },
+      auditLog: { create: mocks.auditCreate },
     }) : Promise.all(value as Promise<unknown>[]));
     mocks.customerFind.mockResolvedValue({ id: "customer-1" }); mocks.userFindFirst.mockResolvedValue({ id: "agent-1", name: "Assigned Agent" });
     mocks.categoryFindFirst.mockResolvedValue({ id: "category-1", name: "Billing" }); mocks.departmentFind.mockResolvedValue(null);

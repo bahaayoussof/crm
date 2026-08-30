@@ -23,7 +23,11 @@ export function DataTableEmptyRow({
         colSpan={colSpan}
       >
         <div className="flex flex-col items-center justify-center gap-2">
-          <p className="text-xs text-muted-foreground">{message ?? t("common.noData", "No data found")}</p>
+          {typeof message === "string" ? (
+            <p className="text-xs text-muted-foreground">{message}</p>
+          ) : (
+            message ?? <p className="text-xs text-muted-foreground">{t("common.noData", "No data found")}</p>
+          )}
           {action && <div className="mt-1">{action}</div>}
         </div>
       </td>

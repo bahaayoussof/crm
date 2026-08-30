@@ -14,10 +14,10 @@ export interface DataTableSearchProps extends Omit<React.InputHTMLAttributes<HTM
 export const DataTableSearch = React.forwardRef<HTMLInputElement, DataTableSearchProps>(
   ({ value, onChange, placeholder, id = "table-search", ariaLabel, className, containerClassName, ...props }, ref) => {
     return (
-      <div className={cn("relative w-72 sm:w-80 shrink-0", containerClassName)}>
-        <label htmlFor={id}>
+      <div className={cn("relative w-72 sm:w-80 max-w-full shrink-0", containerClassName)}>
+        <label htmlFor={id} className="block w-full">
           <span className="sr-only">{ariaLabel ?? placeholder ?? "Search"}</span>
-          <div className="relative">
+          <div className="relative w-full">
             <Search
               className="pointer-events-none absolute start-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/70"
               strokeWidth={2}
@@ -27,7 +27,7 @@ export const DataTableSearch = React.forwardRef<HTMLInputElement, DataTableSearc
               ref={ref}
               id={id}
               className={cn(
-                "input h-8.5 ps-8 text-xs rounded-lg bg-surface/50 border-input-border placeholder:text-muted-foreground/70",
+                "input h-8.5 w-full ps-8 text-xs rounded-lg bg-surface/50 border-input-border placeholder:text-muted-foreground/70",
                 className
               )}
               type="search"

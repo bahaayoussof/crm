@@ -3,15 +3,79 @@
   "notifications": { "title": "الإشعارات", "bellLabel": "الإشعارات، {{count}} غير مقروءة", "markAllRead": "تحديد الكل كمقروء", "empty": "لا توجد إشعارات جديدة.", "error": "تعذر تحميل الإشعارات.", "unread": "غير مقروء" },
   "theme": { "title": "المظهر", "light": "فاتح", "dark": "داكن", "system": "تلقائي", "mode": "المظهر" },
   "navigation": {
-    "languageSwitcher": "اختيار اللغة", "primary": "التنقل الرئيسي", "dashboard": "لوحة التحكم", "tickets": "التذاكر", "customers": "العملاء", "knowledgeBase": "قاعدة المعرفة", "tasks": "المهام", "reports": "التقارير", "quickReplies": "الردود السريعة", "users": "المستخدمون", "settings": "الإعدادات",
+    "languageSwitcher": "اختيار اللغة", "primary": "التنقل الرئيسي", "dashboard": "لوحة التحكم", "tickets": "التذاكر", "customers": "العملاء", "knowledgeBase": "قاعدة المعرفة", "tasks": "المهام", "reports": "التقارير", "quickReplies": "الردود السريعة", "users": "المستخدمون", "settings": "الإعدادات", "auditLogs": "سجلات التدقيق",
     "collapseSidebar": "طي الشريط الجانبي", "expandSidebar": "توسيع الشريط الجانبي",
     "portalHome": "الصفحة الرئيسية للبوابة", "portalContext": "بوابة الدعم", "workspaceContext": "مساحة عمل الدعم", "openCustomers": "فتح سجلات العملاء",
     "portalOverview": "نظرة عامة", "portalRequests": "طلباتي", "portalNewRequest": "طلب جديد", "portalKnowledgeBase": "مركز المساعدة",
     "sections": { "main": "الرئيسية", "support": "الدعم", "management": "الإدارة" }
   },
+  "auditLogs": {
+    "title": "سجلات التدقيق",
+    "description": "راجع التغييرات الإدارية والأمنية المهمة في نظام إدارة العملاء.",
+    "searchPlaceholder": "ابحث بالإجراء أو الكيان أو المنفذ أو المعرّف…",
+    "time": "الوقت",
+    "actor": "المنفذ",
+    "action": "الإجراء",
+    "entity": "الكيان",
+    "changes": "التغييرات",
+    "context": "السياق",
+    "systemActor": "النظام",
+    "view": "عرض",
+    "viewDetails": "عرض التفاصيل",
+    "detailsTitle": "تفاصيل نشاط التدقيق",
+    "ipAddress": "عنوان IP",
+    "userAgent": "وكيل المستخدم",
+    "from": "من",
+    "to": "إلى",
+    "noLogs": "لا يوجد نشاط تدقيق بعد",
+    "noLogsDescription": "ستظهر التغييرات الإدارية والأمنية هنا.",
+    "noResults": "لا يوجد نشاط تدقيق يطابق عوامل التصفية",
+    "noResultsDescription": "جرّب تغيير البحث أو عوامل التصفية.",
+    "clearFilters": "مسح عوامل التصفية",
+    "clearAll": "مسح الكل",
+    "resetFilters": "إعادة تعيين",
+    "activeFilters": "عوامل التصفية النشطة",
+    "loadError": "تعذر تحميل سجلات التدقيق",
+    "loadErrorDescription": "حدث خطأ أثناء تحميل نشاط سجلات التدقيق.",
+    "resultsCount": "{{count}} نتيجة",
+    "fieldsChanged": "{{count}} حقول تم تغييرها",
+    "moreChanges": "+{{count}} إضافية",
+    "filterChips": {
+      "search": "البحث: «{{value}}»",
+      "action": "الإجراء: {{value}}",
+      "entity": "الكيان: {{value}}",
+      "actor": "المنفذ: {{value}}",
+      "date": "التاريخ: {{value}}"
+    },
+    "filters": {
+      "action": "الإجراء",
+      "entityType": "نوع الكيان",
+      "actor": "المنفذ",
+      "dateRange": "النطاق الزمني",
+      "allActions": "كل الإجراءات",
+      "allEntities": "كل أنواع الكيانات",
+      "allActors": "كل المنفذين"
+    },
+    "sections": {
+      "overview": "نظرة عامة",
+      "actor": "المنفذ",
+      "entity": "الكيان المستهدف",
+      "changes": "تغييرات الخصائص",
+      "metadata": "البيانات الوصفية",
+      "context": "سياق الطلب"
+    },
+    "diff": {
+      "before": "القيمة السابقة",
+      "after": "القيمة الجديدة",
+      "noChanges": "لا توجد تغييرات مسجلة للخصائص"
+    },
+    "actions": { "USER_CREATED": "إنشاء مستخدم", "USER_UPDATED": "تحديث مستخدم", "USER_ROLE_CHANGED": "تغيير دور المستخدم", "USER_ACTIVATED": "تفعيل مستخدم", "USER_DEACTIVATED": "تعطيل مستخدم", "CUSTOMER_CREATED": "إنشاء عميل", "CUSTOMER_UPDATED": "تحديث عميل", "CUSTOMER_DELETED": "حذف عميل", "CUSTOMER_NOTE_ADDED": "إضافة ملاحظة عميل", "TICKET_CREATED": "إنشاء تذكرة", "TICKET_STATUS_CHANGED": "تغيير حالة التذكرة", "TICKET_PRIORITY_CHANGED": "تغيير أولوية التذكرة", "TICKET_CATEGORY_CHANGED": "تغيير فئة التذكرة", "TICKET_ASSIGNED": "إسناد التذكرة", "TICKET_ESCALATED": "تصعيد التذكرة", "TICKET_CLOSED": "إغلاق التذكرة", "CATEGORY_CREATED": "إنشاء فئة", "CATEGORY_UPDATED": "تحديث فئة", "SLA_RULE_CREATED": "إنشاء قاعدة مستوى خدمة", "SLA_RULE_UPDATED": "تحديث قاعدة مستوى خدمة" },
+    "entityTypes": { "USER": "مستخدم", "CUSTOMER": "عميل", "TICKET": "تذكرة", "CATEGORY": "فئة", "SLA_RULE": "قاعدة مستوى خدمة" }
+  },
   "common": {
     "retry": "إعادة المحاولة", "previous": "السابق", "next": "التالي", "cancel": "إلغاء", "save": "حفظ", "saving": "جارٍ الحفظ…", "clearSearch": "مسح البحث",
-    "edit": "تعديل", "delete": "حذف", "notProvided": "غير متوفر", "loading": "جارٍ التحميل…", "search": "بحث", "noResults": "لا توجد نتائج"
+    "edit": "تعديل", "delete": "حذف", "notProvided": "غير متوفر", "loading": "جارٍ التحميل…", "search": "بحث", "noResults": "لا توجد نتائج",
+    "filters": "عوامل التصفية", "apply": "تطبيق", "done": "تم", "reset": "إعادة تعيين"
   },
   "datePicker": {
     "placeholder": "اختر التاريخ",

@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   ticketUpdateMany: vi.fn(),
   historyCreate: vi.fn(),
   notificationCreateMany: vi.fn(),
+  auditCreate: vi.fn(),
   transaction: vi.fn(),
 }));
 
@@ -17,6 +18,7 @@ vi.mock("../../config/prisma.js", () => {
     ticketHistory: { create: mocks.historyCreate },
     user: { findMany: mocks.userFindMany },
     notification: { createMany: mocks.notificationCreateMany },
+    auditLog: { create: mocks.auditCreate },
   };
   return {
     prisma: {
@@ -53,6 +55,7 @@ describe("SLA automation", () => {
       ticketHistory: { create: mocks.historyCreate },
       user: { findMany: mocks.userFindMany },
       notification: { createMany: mocks.notificationCreateMany },
+      auditLog: { create: mocks.auditCreate },
     }));
     mocks.ticketFindMany.mockResolvedValue([]);
     mocks.userFindMany.mockResolvedValue([]);

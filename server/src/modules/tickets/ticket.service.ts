@@ -12,6 +12,9 @@ import { deliverOutboundReply } from "../integrations/whatsapp/whatsapp.service.
 import { replyHtmlToPlainText, sanitizeReplyHtml } from "../../shared/rich-text/reply-html.js";
 import type { CreateTicketInput, TicketConversationInput, TicketListQuery, UpdateTicketInput } from "./ticket.schema.js";
 import { ticketVisibilityWhere, type TicketActor as Actor } from "./ticket-visibility.js";
+import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../audit-logs/audit-log.constants.js";
+import { createAuditLog } from "../audit-logs/audit-log.service.js";
+import type { AuditRequestContext } from "../audit-logs/audit-request-context.js";
 
 const ticketSummarySelect = {
   id: true, subject: true, status: true, priority: true, channel: true,
@@ -165,7 +168,7 @@ export async function addTicketNote(ticketId: string, input: TicketConversationI
   });
 }
 
-export async function createTicket(input: CreateTicketInput, actor: Actor) {
+export async function createTicket(input: CreateTicketInput, actor: Actor, requestContext?: AuditRequestContext) {
   if (actor.role === Role.AGENT && input.assignedAgentId !== undefined) throw forbidden("Agents cannot choose a ticket assignee");
   const creationInput: CreateTicketInput = actor.role === Role.AGENT ? { ...input, assignedAgentId: actor.userId } : input;
   const now = new Date();
@@ -181,6 +184,7 @@ export async function createTicket(input: CreateTicketInput, actor: Actor) {
       select: ticketSummarySelect,
     });
     await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorUserId: actor.userId, action: "TICKET_CREATED", newValue: TicketStatus.NEW } });
+    await createAuditLog({ actorId: actor.userId, action: AUDIT_ACTIONS.TICKET_CREATED, entityType: AUDIT_ENTITY_TYPES.TICKET, entityId: ticket.id, changes: { status: { to: ticket.status }, priority: { to: ticket.priority }, categoryId: { to: creationInput.categoryId ?? null }, assignedAgentId: { to: creationInput.assignedAgentId ?? null } }, requestContext }, tx);
     if (creationInput.assignedAgentId) await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorUserId: actor.userId, action: "ASSIGNMENT_CHANGED", newValue: relations.agent?.name ?? creationInput.assignedAgentId } });
     if (creationInput.categoryId) await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorUserId: actor.userId, action: "CATEGORY_CHANGED", newValue: relations.category?.name ?? creationInput.categoryId } });
     // Notify newly assigned agent (only when the assignee is different from the actor)
@@ -194,7 +198,7 @@ export async function createTicket(input: CreateTicketInput, actor: Actor) {
   });
 }
 
-export async function updateTicket(ticketId: string, input: UpdateTicketInput, actor: Actor) {
+export async function updateTicket(ticketId: string, input: UpdateTicketInput, actor: Actor, requestContext?: AuditRequestContext) {
   const now = new Date();
   return prisma.$transaction(async (tx) => {
     const current = await tx.ticket.findFirst({
@@ -232,6 +236,13 @@ export async function updateTicket(ticketId: string, input: UpdateTicketInput, a
     if (input.assignedAgentId !== undefined && input.assignedAgentId !== current.assignedAgentId) events.push(history(ticketId, actor.userId, "ASSIGNMENT_CHANGED", current.assignedAgent?.name ?? null, relations.agent?.name ?? null));
     if (input.categoryId !== undefined && input.categoryId !== current.categoryId) events.push(history(ticketId, actor.userId, "CATEGORY_CHANGED", current.category?.name ?? null, relations.category?.name ?? null));
     if (events.length) await tx.ticketHistory.createMany({ data: events });
+    const auditEvents = [
+      input.status && input.status !== current.status && { action: input.status === TicketStatus.ESCALATED ? AUDIT_ACTIONS.TICKET_ESCALATED : input.status === TicketStatus.CLOSED ? AUDIT_ACTIONS.TICKET_CLOSED : AUDIT_ACTIONS.TICKET_STATUS_CHANGED, changes: { status: { from: current.status, to: input.status } } },
+      input.priority && input.priority !== current.priority && { action: AUDIT_ACTIONS.TICKET_PRIORITY_CHANGED, changes: { priority: { from: current.priority, to: input.priority } } },
+      input.assignedAgentId !== undefined && input.assignedAgentId !== current.assignedAgentId && { action: AUDIT_ACTIONS.TICKET_ASSIGNED, changes: { assignedAgentId: { from: current.assignedAgentId, to: input.assignedAgentId } } },
+      input.categoryId !== undefined && input.categoryId !== current.categoryId && { action: AUDIT_ACTIONS.TICKET_CATEGORY_CHANGED, changes: { categoryId: { from: current.categoryId, to: input.categoryId } } },
+    ].filter(Boolean) as unknown as { action: string; changes: Record<string, { from: string | null; to: string | null }> }[];
+    for (const event of auditEvents) await createAuditLog({ actorId: actor.userId, action: event.action, entityType: AUDIT_ENTITY_TYPES.TICKET, entityId: ticketId, changes: event.changes, requestContext }, tx);
 
     // Assignment notification: new assignee changed, non-null, not the actor
     const assigneeChanged = input.assignedAgentId !== undefined && input.assignedAgentId !== current.assignedAgentId;

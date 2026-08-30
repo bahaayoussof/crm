@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   findMany: vi.fn(), countCustomers: vi.fn(), findCustomer: vi.fn(), createCustomer: vi.fn(),
   updateCustomer: vi.fn(), deleteCustomer: vi.fn(), transaction: vi.fn(),
-  groupTickets: vi.fn(), countTickets: vi.fn(), findTickets: vi.fn(), findNotes: vi.fn(), createNote: vi.fn(),
+  groupTickets: vi.fn(), countTickets: vi.fn(), findTickets: vi.fn(), findNotes: vi.fn(), createNote: vi.fn(), auditCreate: vi.fn(),
 }));
 
 vi.mock("../../config/prisma.js", () => ({
@@ -16,6 +16,7 @@ vi.mock("../../config/prisma.js", () => ({
     },
     ticket: { groupBy: mocks.groupTickets, count: mocks.countTickets, findMany: mocks.findTickets },
     customerNote: { findMany: mocks.findNotes, create: mocks.createNote },
+    auditLog: { create: mocks.auditCreate },
     $transaction: mocks.transaction,
   },
 }));
@@ -36,7 +37,7 @@ describe("customer API", () => {
     vi.clearAllMocks();
     mocks.findMany.mockResolvedValue([]);
     mocks.countCustomers.mockResolvedValue(0);
-    mocks.transaction.mockImplementation(async (values: unknown[]) => Promise.all(values));
+    mocks.transaction.mockImplementation(async (value: unknown) => typeof value === "function" ? (value as (tx: unknown) => unknown)({ customer: { findUnique: mocks.findCustomer, create: mocks.createCustomer, update: mocks.updateCustomer, delete: mocks.deleteCustomer }, customerNote: { create: mocks.createNote }, auditLog: { create: mocks.auditCreate } }) : Promise.all(value as Promise<unknown>[]));
     mocks.groupTickets.mockResolvedValue([]);
     mocks.countTickets.mockResolvedValue(0);
     mocks.findNotes.mockResolvedValue([]);
@@ -177,6 +178,7 @@ describe("customer API", () => {
   });
 
   it("updates only normalized profile fields", async () => {
+    mocks.findCustomer.mockResolvedValue(customer);
     mocks.updateCustomer.mockResolvedValue({ ...customer, email: "new@example.com" });
     const response = await request(app).patch(`/api/customers/${customer.id}`).set(auth()).send({ email: " NEW@Example.com " });
     expect(response.status).toBe(200);

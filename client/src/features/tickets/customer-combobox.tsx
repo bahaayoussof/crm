@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useCustomers } from "@/features/customers/customer-hooks";
 import { useDebouncedValue } from "@/features/customers/use-debounced-value";
+import { cn } from "@/lib/utils";
 
 interface CustomerSummary {
   id: string;
@@ -103,31 +104,44 @@ export function CustomerCombobox({ id, value, onChange, selectedCustomer, invali
       />
 
       {open && (
-        <div className="absolute inset-x-0 top-full z-20 mt-1 overflow-hidden rounded-md border bg-white shadow-lg">
-          <div id={listboxId} className="max-h-64 overflow-y-auto p-1" role="listbox" aria-label={t("tickets.customerResults")}>
+        <div className="absolute inset-x-0 top-full z-20 mt-1.5 overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-flyout">
+          <div id={listboxId} className="max-h-60 overflow-y-auto p-1.5 space-y-0.5" role="listbox" aria-label={t("tickets.customerResults")}>
             {customers.isLoading ? (
-              <p className="px-3 py-3 text-sm text-muted-foreground" role="status">{t("tickets.customerSearching")}</p>
+              <p className="px-3 py-2.5 text-xs text-muted-foreground" role="status">
+                {t("tickets.customerSearching")}
+              </p>
             ) : customers.isError ? (
-              <p className="px-3 py-3 text-sm text-red-700" role="status">{t("tickets.customerSearchError")}</p>
+              <p className="px-3 py-2.5 text-xs text-destructive" role="status">
+                {t("tickets.customerSearchError")}
+              </p>
             ) : results.length === 0 ? (
-              <p className="px-3 py-3 text-sm text-muted-foreground" role="status">{t("tickets.noCustomerResults")}</p>
-            ) : results.map((customer, index) => (
-              <button
-                id={`${listboxId}-${customer.id}`}
-                key={customer.id}
-                className={`block w-full rounded px-3 py-2 text-start outline-none hover:bg-muted focus-visible:bg-muted ${index === activeIndex ? "bg-muted" : ""}`}
-                type="button"
-                role="option"
-                aria-selected={customer.id === value}
-                tabIndex={-1}
-                onMouseDown={(event) => event.preventDefault()}
-                onMouseEnter={() => setActiveIndex(index)}
-                onClick={() => chooseCustomer(customer)}
-              >
-                <span className="block truncate text-sm font-medium text-foreground">{customer.name}</span>
-                <bdi className="mt-0.5 block truncate text-xs text-muted-foreground" dir="ltr">{customer.email}</bdi>
-              </button>
-            ))}
+              <p className="px-3 py-2.5 text-xs text-muted-foreground" role="status">
+                {t("tickets.noCustomerResults")}
+              </p>
+            ) : (
+              results.map((customer, index) => (
+                <button
+                  id={`${listboxId}-${customer.id}`}
+                  key={customer.id}
+                  className={cn(
+                    "block w-full rounded-md px-2.5 py-2 text-start text-xs transition-colors outline-none",
+                    index === activeIndex || customer.id === value
+                      ? "bg-muted text-foreground font-medium"
+                      : "text-foreground hover:bg-muted/70 focus-visible:bg-muted/70"
+                  )}
+                  type="button"
+                  role="option"
+                  aria-selected={customer.id === value}
+                  tabIndex={-1}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onMouseEnter={() => setActiveIndex(index)}
+                  onClick={() => chooseCustomer(customer)}
+                >
+                  <span className="block truncate text-xs font-medium text-foreground">{customer.name}</span>
+                  <bdi className="mt-0.5 block truncate text-[11px] text-muted-foreground" dir="ltr">{customer.email}</bdi>
+                </button>
+              ))
+            )}
           </div>
         </div>
       )}

@@ -15,7 +15,7 @@ interface SidebarFlyoutProps {
 export function SidebarFlyout({ open, onDismiss, parentLabel, childrenItems }: SidebarFlyoutProps) {
   const { t } = useTranslation();
 
-  const { triggerRef, panelRef, style } = useAnchoredPopover<HTMLButtonElement, HTMLDivElement>({
+  const { panelRef, style } = useAnchoredPopover<HTMLButtonElement, HTMLDivElement>({
     open,
     onDismiss,
     align: "start",

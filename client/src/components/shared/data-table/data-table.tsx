@@ -33,7 +33,7 @@ export interface DataTablePaginationConfig {
 
 export interface DataTableProps<TData> {
   data: TData[];
-  columns: ColumnDef<TData, any>[];
+  columns: ColumnDef<TData>[];
   getRowId?: (item: TData) => string;
   toolbar?: ReactNode;
   pagination?: DataTablePaginationConfig;
@@ -175,9 +175,13 @@ export function DataTable<TData>({
           {renderMobileCard && (
             <div className="divide-y divide-border-subtle bg-table-background md:hidden">
               {data.length === 0 ? (
-                <p className="px-4 py-8 text-center text-xs text-muted-foreground">
-                  {emptyMessage}
-                </p>
+                typeof emptyMessage === "string" ? (
+                  <p className="px-4 py-8 text-center text-xs text-muted-foreground">
+                    {emptyMessage}
+                  </p>
+                ) : (
+                  <div className="p-4">{emptyMessage}</div>
+                )
               ) : (
                 data.map((item, index) => (
                   <div key={getRowId ? getRowId(item) : index}>

@@ -1001,3 +1001,12 @@ New files: `server/src/middleware/rate-limit.ts`; `server/src/modules/ai/*` (12 
 **Status semantics.** Existing schema models, nullable foreign keys, channel enum values, UI labels, and adapter fragments are foundations only. They do not make a feature complete. Newly promoted work is `PLANNED` (or `FOUNDATION EXISTS / PLANNED` where evidence exists) and must not increase completion totals until implemented and verified.
 
 **Consequences.** Older statements that these areas remain permanently out of scope or architecture/demo-only are superseded for forward planning, while their historical priority context remains preserved. The project must not be declared complete before final integrated QA and final deployment verification pass.
+# ADR-039: System-wide audit logging
+
+## Decision
+
+Introduce a first-class `AuditLog` administrative/security trail separate from `TicketHistory`. Canonical actions and entity types are extensible TypeScript string constants rather than database enums. A human event stores the authenticated internal `actorId`; a system/cron event stores `actorId = null` plus safe `actorType: SYSTEM` metadata, never a fake user.
+
+Audited mutations use one central service and explicit per-domain safe-field allowlists. No arbitrary DTO or Prisma record serialization is allowed. Passwords/hashes, tokens, API keys, provider credentials, authorization/cookie headers, message/note bodies, and whole request bodies are never stored. Security-sensitive existing mutations write the domain change and audit row in the same Prisma transaction; missing IP/User-Agent never blocks a mutation.
+
+The list API and `/audit-logs` workspace are `ADMIN` only. Navigation visibility is presentation-only and an independent route guard plus backend RBAC remains authoritative. The Customer Portal has no route, navigation, API authorization, or audit data access. Export, retention, signing, SIEM/webhooks, alerting, and external append-only storage remain deferred.

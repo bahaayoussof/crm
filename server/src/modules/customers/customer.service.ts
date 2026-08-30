@@ -2,6 +2,9 @@ import { Prisma, Role, TicketStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import type { CreateCustomerInput, CustomerListQuery, CustomerTicketListQuery, UpdateCustomerInput } from "./customer.schema.js";
+import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../audit-logs/audit-log.constants.js";
+import { changedFields, createAuditLog } from "../audit-logs/audit-log.service.js";
+import type { AuditRequestContext } from "../audit-logs/audit-request-context.js";
 
 const closedStatuses = [TicketStatus.RESOLVED, TicketStatus.CLOSED];
 
@@ -109,27 +112,21 @@ export async function listCustomerTickets(customerId: string, query: CustomerTic
   };
 }
 
-export async function createCustomer(input: CreateCustomerInput) {
+export async function createCustomer(input: CreateCustomerInput, actorId: string, requestContext?: AuditRequestContext) {
   const existing = await prisma.customer.findUnique({ where: { email: input.email }, select: { id: true } });
   if (existing) throw duplicateEmailError();
 
   try {
-    return await prisma.customer.create({
-      data: { ...input, userId: null },
-      select: { id: true, name: true, email: true, phone: true, createdAt: true, updatedAt: true },
-    });
+    return await prisma.$transaction(async (tx) => { const customer = await tx.customer.create({ data: { ...input, userId: null }, select: { id: true, name: true, email: true, phone: true, createdAt: true, updatedAt: true } }); await createAuditLog({ actorId, action: AUDIT_ACTIONS.CUSTOMER_CREATED, entityType: AUDIT_ENTITY_TYPES.CUSTOMER, entityId: customer.id, changes: { name: { to: customer.name }, email: { to: customer.email }, phone: { to: customer.phone } }, requestContext }, tx); return customer; });
   } catch (error) {
     if (isPrismaError(error, "P2002")) throw duplicateEmailError();
     throw error;
   }
 }
 
-export async function updateCustomer(customerId: string, input: UpdateCustomerInput) {
+export async function updateCustomer(customerId: string, input: UpdateCustomerInput, actorId: string, requestContext?: AuditRequestContext) {
   try {
-    return await prisma.customer.update({
-      where: { id: customerId }, data: input,
-      select: { id: true, name: true, email: true, phone: true, createdAt: true, updatedAt: true },
-    });
+    return await prisma.$transaction(async (tx) => { const before = await tx.customer.findUnique({ where: { id: customerId }, select: { name: true, email: true, phone: true } }); if (!before) throw new AppError(404, "CUSTOMER_NOT_FOUND", "Customer not found"); const customer = await tx.customer.update({ where: { id: customerId }, data: input, select: { id: true, name: true, email: true, phone: true, createdAt: true, updatedAt: true } }); const changes = changedFields(before, customer, ["name", "email", "phone"]); if (Object.keys(changes).length) await createAuditLog({ actorId, action: AUDIT_ACTIONS.CUSTOMER_UPDATED, entityType: AUDIT_ENTITY_TYPES.CUSTOMER, entityId: customerId, changes, requestContext }, tx); return customer; });
   } catch (error) {
     if (isPrismaError(error, "P2025")) throw new AppError(404, "CUSTOMER_NOT_FOUND", "Customer not found");
     if (isPrismaError(error, "P2002")) throw duplicateEmailError();
@@ -137,7 +134,7 @@ export async function updateCustomer(customerId: string, input: UpdateCustomerIn
   }
 }
 
-export async function deleteCustomer(customerId: string) {
+export async function deleteCustomer(customerId: string, actorId: string, requestContext?: AuditRequestContext) {
   const customer = await prisma.customer.findUnique({
     where: { id: customerId },
     select: { userId: true, _count: { select: { tickets: true, feedback: true, notes: true, attachments: true } } },
@@ -150,7 +147,7 @@ export async function deleteCustomer(customerId: string) {
   }
 
   try {
-    await prisma.customer.delete({ where: { id: customerId } });
+    await prisma.$transaction(async (tx) => { await tx.customer.delete({ where: { id: customerId } }); await createAuditLog({ actorId, action: AUDIT_ACTIONS.CUSTOMER_DELETED, entityType: AUDIT_ENTITY_TYPES.CUSTOMER, entityId: customerId, requestContext }, tx); });
   } catch (error) {
     if (isPrismaError(error, "P2003")) {
       throw new AppError(409, "CUSTOMER_HAS_SUPPORT_HISTORY", "Customer cannot be deleted because support history or a login identity exists");
@@ -168,12 +165,9 @@ export async function listCustomerNotes(customerId: string) {
   });
 }
 
-export async function addCustomerNote(customerId: string, authorUserId: string, body: string) {
+export async function addCustomerNote(customerId: string, authorUserId: string, body: string, requestContext?: AuditRequestContext) {
   await ensureCustomerExists(customerId);
-  return prisma.customerNote.create({
-    data: { customerId, authorUserId, body },
-    select: { id: true, body: true, createdAt: true, author: { select: { id: true, name: true, role: true } } },
-  });
+  return prisma.$transaction(async (tx) => { const note = await tx.customerNote.create({ data: { customerId, authorUserId, body }, select: { id: true, body: true, createdAt: true, author: { select: { id: true, name: true, role: true } } } }); await createAuditLog({ actorId: authorUserId, action: AUDIT_ACTIONS.CUSTOMER_NOTE_ADDED, entityType: AUDIT_ENTITY_TYPES.CUSTOMER, entityId: customerId, metadata: { noteId: note.id }, requestContext }, tx); return note; });
 }
 
 async function ensureCustomerExists(customerId: string) {

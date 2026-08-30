@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   findMany: vi.fn(), count: vi.fn(), findUnique: vi.fn(), findFirst: vi.fn(),
-  create: vi.fn(), update: vi.fn(),
+  create: vi.fn(), update: vi.fn(), auditCreate: vi.fn(),
 }));
 
 vi.mock("../../config/prisma.js", () => ({
@@ -15,7 +15,7 @@ vi.mock("../../config/prisma.js", () => ({
     },
     $transaction: vi.fn(async (value: unknown) =>
       typeof value === "function"
-        ? (value as (tx: { user: typeof mocks }) => unknown)({ user: mocks })
+        ? (value as (tx: { user: typeof mocks; auditLog: { create: typeof mocks.auditCreate } }) => unknown)({ user: mocks, auditLog: { create: mocks.auditCreate } })
         : Promise.all(value as Promise<unknown>[])),
   },
 }));

@@ -151,7 +151,7 @@ Completed and current work retains its historical evidence in `docs/19-progress-
 | ----: | --------- | -------------- | ----------------- |
 | 1 | Finish current Ticket Details work | IN PROGRESS | complete review and outstanding visual verification |
 | 2 | Finish / merge `feature/ai-assistant` | PARTIAL / FOUNDATION EXISTS | internal staff assistant only; distinct from the customer chatbot |
-| 3 | `feature/audit-logs` | PLANNED | platform completeness |
+| 3 | `feature/audit-logs` | IMPLEMENTED ON BRANCH; VERIFICATION IN PROGRESS | platform completeness |
 | 4 | `feature/departments` | FOUNDATION EXISTS | schema fields exist; end-to-end behavior is PLANNED |
 | 5 | `feature/branches` | FOUNDATION EXISTS | schema fields exist; end-to-end behavior is PLANNED |
 | 6 | `feature/email-channel` | FOUNDATION EXISTS | `EMAIL` enum only; provider implementation is PLANNED |

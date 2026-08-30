@@ -76,6 +76,7 @@ model User {
   assignedTasks     Task[]             @relation("TaskAssignee")
   ticketWatchers    TicketWatcher[]
   ticketMentions    TicketMention[]
+  auditLogs         AuditLog[]
 
   @@index([role])
   @@index([departmentId])
@@ -277,6 +278,25 @@ model TicketHistory {
 
   @@index([ticketId, createdAt])
   @@index([actorUserId])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([entityType, entityId])
+  @@index([action])
 }
 
 model SlaRule {

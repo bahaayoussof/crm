@@ -3,15 +3,79 @@
   "notifications": { "title": "Notifications", "bellLabel": "Notifications, {{count}} unread", "markAllRead": "Mark all as read", "empty": "You're all caught up.", "error": "Notifications could not be loaded.", "unread": "Unread" },
   "theme": { "title": "Theme", "light": "Light", "dark": "Dark", "system": "System", "mode": "Appearance" },
   "navigation": {
-    "languageSwitcher": "Choose language", "primary": "Primary navigation", "dashboard": "Dashboard", "tickets": "Tickets", "customers": "Customers", "knowledgeBase": "Knowledge Base", "tasks": "Tasks", "reports": "Reports", "quickReplies": "Quick Replies", "users": "Users", "settings": "Settings",
+    "languageSwitcher": "Choose language", "primary": "Primary navigation", "dashboard": "Dashboard", "tickets": "Tickets", "customers": "Customers", "knowledgeBase": "Knowledge Base", "tasks": "Tasks", "reports": "Reports", "quickReplies": "Quick Replies", "users": "Users", "settings": "Settings", "auditLogs": "Audit Logs",
     "collapseSidebar": "Collapse sidebar", "expandSidebar": "Expand sidebar",
     "portalHome": "Portal home", "portalContext": "Support portal", "workspaceContext": "Support workspace", "openCustomers": "Open customer records",
     "portalOverview": "Overview", "portalRequests": "My Requests", "portalNewRequest": "New Request", "portalKnowledgeBase": "Help Center",
     "sections": { "main": "Main", "support": "Support", "management": "Management" }
   },
+  "auditLogs": {
+    "title": "Audit Logs",
+    "description": "Review important administrative and security changes across the CRM.",
+    "searchPlaceholder": "Search by action, entity, actor, or ID…",
+    "time": "Time",
+    "actor": "Actor",
+    "action": "Action",
+    "entity": "Entity",
+    "changes": "Changes",
+    "context": "Context",
+    "systemActor": "System",
+    "view": "View",
+    "viewDetails": "View details",
+    "detailsTitle": "Audit activity details",
+    "ipAddress": "IP address",
+    "userAgent": "User-Agent",
+    "from": "From",
+    "to": "To",
+    "noLogs": "No audit activity yet",
+    "noLogsDescription": "Administrative and security changes will appear here.",
+    "noResults": "No audit activity matches your filters",
+    "noResultsDescription": "Try changing your search or filters.",
+    "clearFilters": "Clear filters",
+    "clearAll": "Clear all",
+    "resetFilters": "Reset",
+    "activeFilters": "Active filters",
+    "loadError": "Couldn’t load audit logs",
+    "loadErrorDescription": "Something went wrong while loading audit activity.",
+    "resultsCount": "{{count}} results",
+    "fieldsChanged": "{{count}} fields changed",
+    "moreChanges": "+{{count}} more",
+    "filterChips": {
+      "search": "Search: “{{value}}”",
+      "action": "Action: {{value}}",
+      "entity": "Entity: {{value}}",
+      "actor": "Actor: {{value}}",
+      "date": "Date: {{value}}"
+    },
+    "filters": {
+      "action": "Action",
+      "entityType": "Entity type",
+      "actor": "Actor",
+      "dateRange": "Date range",
+      "allActions": "All actions",
+      "allEntities": "All entity types",
+      "allActors": "All actors"
+    },
+    "sections": {
+      "overview": "Overview",
+      "actor": "Actor",
+      "entity": "Target Entity",
+      "changes": "Property Changes",
+      "metadata": "Metadata",
+      "context": "Request Context"
+    },
+    "diff": {
+      "before": "Before",
+      "after": "After",
+      "noChanges": "No property changes recorded"
+    },
+    "actions": { "USER_CREATED": "User created", "USER_UPDATED": "User updated", "USER_ROLE_CHANGED": "User role changed", "USER_ACTIVATED": "User activated", "USER_DEACTIVATED": "User deactivated", "CUSTOMER_CREATED": "Customer created", "CUSTOMER_UPDATED": "Customer updated", "CUSTOMER_DELETED": "Customer deleted", "CUSTOMER_NOTE_ADDED": "Customer note added", "TICKET_CREATED": "Ticket created", "TICKET_STATUS_CHANGED": "Ticket status changed", "TICKET_PRIORITY_CHANGED": "Ticket priority changed", "TICKET_CATEGORY_CHANGED": "Ticket category changed", "TICKET_ASSIGNED": "Ticket assigned", "TICKET_ESCALATED": "Ticket escalated", "TICKET_CLOSED": "Ticket closed", "CATEGORY_CREATED": "Category created", "CATEGORY_UPDATED": "Category updated", "SLA_RULE_CREATED": "SLA rule created", "SLA_RULE_UPDATED": "SLA rule updated" },
+    "entityTypes": { "USER": "User", "CUSTOMER": "Customer", "TICKET": "Ticket", "CATEGORY": "Category", "SLA_RULE": "SLA rule" }
+  },
   "common": {
     "retry": "Retry", "previous": "Previous", "next": "Next", "cancel": "Cancel", "save": "Save", "saving": "Saving…", "clearSearch": "Clear search",
-    "edit": "Edit", "delete": "Delete", "notProvided": "Not provided", "loading": "Loading…", "search": "Search", "noResults": "No results found"
+    "edit": "Edit", "delete": "Delete", "notProvided": "Not provided", "loading": "Loading…", "search": "Search", "noResults": "No results found",
+    "filters": "Filters", "apply": "Apply", "done": "Done", "reset": "Reset"
   },
   "datePicker": {
     "placeholder": "Select date",

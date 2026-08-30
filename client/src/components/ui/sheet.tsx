@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
+import { cn } from "@/lib/utils";
 
 function focusables(root: HTMLElement): HTMLElement[] {
   return Array.from(
@@ -18,6 +19,7 @@ interface SheetProps {
   closeLabel: string;
   /** Focus is returned here after the sheet closes (usually the launcher). */
   returnFocusRef?: RefObject<HTMLElement | null>;
+  className?: string;
   children: ReactNode;
 }
 
@@ -35,7 +37,7 @@ interface SheetProps {
  * return focus to `returnFocusRef` on close. It does NOT auto-scroll or move
  * focus on any content change.
  */
-export function Sheet({ open, onClose, title, closeLabel, returnFocusRef, children }: SheetProps) {
+export function Sheet({ open, onClose, title, closeLabel, returnFocusRef, className, children }: SheetProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const hasOpenedRef = useRef(false);
@@ -95,11 +97,12 @@ export function Sheet({ open, onClose, title, closeLabel, returnFocusRef, childr
         aria-labelledby={titleId}
         tabIndex={-1}
         onKeyDown={onKeyDown}
-        className={
+        className={cn(
           "absolute inset-x-0 bottom-0 flex max-h-[85dvh] flex-col overflow-hidden rounded-t-xl border border-border bg-card text-card-foreground shadow-2xl outline-none " +
           "animate-in slide-in-from-bottom-4 duration-200 " +
-          "lg:inset-x-auto lg:inset-y-0 lg:right-0 lg:left-auto lg:max-h-none lg:w-[440px] lg:max-w-[92vw] lg:rounded-none lg:border-y-0 lg:border-r-0 lg:border-l lg:slide-in-from-right-4"
-        }
+          "lg:inset-x-auto lg:inset-y-0 lg:right-0 lg:left-auto lg:max-h-none lg:w-[440px] lg:max-w-[92vw] lg:rounded-none lg:border-y-0 lg:border-r-0 lg:border-l lg:slide-in-from-right-4",
+          className
+        )}
       >
         <header className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3">
           <h2 id={titleId} className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">

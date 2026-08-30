@@ -14,6 +14,7 @@ import {
   TasksNavIcon,
   TicketsNavIcon,
   UsersNavIcon,
+  AuditLogsNavIcon,
 } from "./nav-icons";
 import type { NavItemConfig, NavSectionConfig } from "./sidebar/sidebar-types";
 
@@ -77,7 +78,7 @@ export function getNavigationSections(
       ? [{ to: "/users", key: "users", icon: UsersNavIcon }]
       : []),
     ...(user?.role === "ADMIN"
-      ? [{ to: "/settings", key: "settings", icon: SettingsNavIcon }]
+      ? [{ to: "/audit-logs", key: "auditLogs", icon: AuditLogsNavIcon }, { to: "/settings", key: "settings", icon: SettingsNavIcon }]
       : []),
   ];
 

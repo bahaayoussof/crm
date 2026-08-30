@@ -30,6 +30,8 @@ import { SettingsRoute } from "./settings-route";
 import { TaskDetailPage } from "@/features/tasks/task-detail-page";
 import { TaskFormPage } from "@/features/tasks/task-form-page";
 import { TaskListPage } from "@/features/tasks/task-list-page";
+import { AuditLogPage } from "@/features/audit-logs/audit-log-page";
+import { AuditLogRoute } from "./audit-log-route";
 
 export function AppRouter() {
   return <BrowserRouter><Routes>
@@ -71,6 +73,7 @@ export function AppRouter() {
         <Route path="/users/:id/edit" element={<UserFormPage />} />
       </Route>
       <Route element={<SettingsRoute />}><Route path="/settings" element={<SettingsPage />} /></Route>
+      <Route element={<AuditLogRoute />}><Route path="/audit-logs" element={<AuditLogPage />} /></Route>
     </Route>
     <Route element={<ProtectedRoute audience="customer" />}>
       <Route path="/portal" element={<PortalHomePage />} />

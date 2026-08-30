@@ -82,7 +82,7 @@ export function TicketContextSummary({ record }: { record: TicketDetail }) {
               to={`/customers/${record.customer.id}`}
             >
               {t("tickets.viewCustomer")}
-              <span aria-hidden="true" className="rtl:rotate-180">
+              <span aria-hidden="true" className="inline-block rtl:rotate-180">
                 →
               </span>
             </Link>

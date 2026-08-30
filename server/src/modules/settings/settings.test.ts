@@ -2,10 +2,11 @@ import { Role, TicketPriority } from "@prisma/client";
 import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ user: vi.fn(), categoryFindMany: vi.fn(), categoryFindUnique: vi.fn(), categoryCreate: vi.fn(), categoryUpdate: vi.fn(), slaFindMany: vi.fn(), slaUpsert: vi.fn() }));
+const mocks = vi.hoisted(() => ({ user: vi.fn(), categoryFindMany: vi.fn(), categoryFindUnique: vi.fn(), categoryCreate: vi.fn(), categoryUpdate: vi.fn(), slaFindMany: vi.fn(), slaFindUnique: vi.fn(), slaUpsert: vi.fn(), auditCreate: vi.fn() }));
 vi.mock("../../config/prisma.js", () => ({ prisma: {
   user: { findUnique: mocks.user }, category: { findMany: mocks.categoryFindMany, findUnique: mocks.categoryFindUnique, create: mocks.categoryCreate, update: mocks.categoryUpdate },
-  slaRule: { findMany: mocks.slaFindMany, upsert: mocks.slaUpsert },
+  slaRule: { findMany: mocks.slaFindMany, findUnique: mocks.slaFindUnique, upsert: mocks.slaUpsert }, auditLog: { create: mocks.auditCreate },
+  $transaction: vi.fn(async (value: unknown) => typeof value === "function" ? (value as (tx: unknown) => unknown)({ category: { create: mocks.categoryCreate, update: mocks.categoryUpdate }, slaRule: { findUnique: mocks.slaFindUnique, upsert: mocks.slaUpsert }, auditLog: { create: mocks.auditCreate } }) : Promise.all(value as Promise<unknown>[])),
 } }));
 import { app } from "../../app.js";
 import { createAccessToken } from "../auth/auth-token.js";

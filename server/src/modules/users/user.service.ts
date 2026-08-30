@@ -3,6 +3,9 @@ import { Prisma, Role } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import type { CreateUserInput, UpdateUserInput, UserListQuery } from "./user.schema.js";
+import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../audit-logs/audit-log.constants.js";
+import { changedFields, createAuditLog } from "../audit-logs/audit-log.service.js";
+import type { AuditRequestContext } from "../audit-logs/audit-request-context.js";
 
 // Administrative surface for internal identities only.
 const internalRoles: Role[] = [Role.ADMIN, Role.MANAGER, Role.AGENT];
@@ -51,16 +54,17 @@ export async function getUser(id: string) {
   return record;
 }
 
-export async function createUser(input: CreateUserInput) {
+export async function createUser(input: CreateUserInput, actorId: string, requestContext?: AuditRequestContext) {
   const existing = await prisma.user.findFirst({ where: { email: input.email }, select: { id: true } });
   if (existing) throw emailTaken();
 
   const passwordHash = await bcrypt.hash(input.password, 12);
 
   try {
-    return await prisma.user.create({
-      data: { name: input.name, email: input.email, passwordHash, role: input.role },
-      select: userSelect,
+    return await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({ data: { name: input.name, email: input.email, passwordHash, role: input.role }, select: userSelect });
+      await createAuditLog({ actorId, action: AUDIT_ACTIONS.USER_CREATED, entityType: AUDIT_ENTITY_TYPES.USER, entityId: user.id, changes: { name: { to: user.name }, email: { to: user.email }, role: { to: user.role }, isActive: { to: user.isActive } }, requestContext }, tx);
+      return user;
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") throw emailTaken();
@@ -73,11 +77,11 @@ export async function createUser(input: CreateUserInput) {
  * inside one transaction so the self-management and last-active-ADMIN invariants
  * cannot be raced. Only submitted fields are written.
  */
-export async function updateUser(id: string, input: UpdateUserInput, actor: { userId: string }) {
+export async function updateUser(id: string, input: UpdateUserInput, actor: { userId: string }, requestContext?: AuditRequestContext) {
   return prisma.$transaction(async (tx) => {
     const target = await tx.user.findFirst({
       where: { id, role: { in: internalRoles } },
-      select: { id: true, role: true, isActive: true },
+      select: { id: true, name: true, email: true, role: true, isActive: true },
     });
     if (!target) throw notFound();
 
@@ -120,7 +124,11 @@ export async function updateUser(id: string, input: UpdateUserInput, actor: { us
     if (input.isActive !== undefined) data.isActive = input.isActive;
 
     try {
-      return await tx.user.update({ where: { id }, data, select: userSelect });
+      const updated = await tx.user.update({ where: { id }, data, select: userSelect });
+      const changes = changedFields(target, updated, ["name", "email", "role", "isActive"]);
+      const action = changes.role ? AUDIT_ACTIONS.USER_ROLE_CHANGED : changes.isActive ? (updated.isActive ? AUDIT_ACTIONS.USER_ACTIVATED : AUDIT_ACTIONS.USER_DEACTIVATED) : AUDIT_ACTIONS.USER_UPDATED;
+      if (Object.keys(changes).length) await createAuditLog({ actorId: actor.userId, action, entityType: AUDIT_ENTITY_TYPES.USER, entityId: id, changes, requestContext }, tx);
+      return updated;
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") throw emailTaken();
       throw error;

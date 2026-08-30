@@ -49,6 +49,8 @@
 
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
+| 11:52 | Implemented system-wide Audit Logs model/service/API, mutation coverage, ADMIN DataTable UI, EN/AR/RTL, tests, migration and ADR-039 | server, client, docs | Server 500/500; client 542/542; client build green; server scripted build DLL-lock blocked | ~18k |
+| 12:00 | Fixed runtime P2021 by deploying the pending additive AuditLog migration to configured Neon | server/prisma/migrations, docs/19, STATUS | Migration current; AuditLog count query succeeded with 0 rows | ~1k |
 | 14:16 | Implemented and automatically verified Ticket authorization, agent ownership, closing UX, edit guard, and table containment fix | server/src/modules/tickets, client/src/features/tickets, client/src/app/router, docs | 191 tests passed; lint/typecheck/build passed; changes unstaged on fix/ticket-agent-permissions | ~18000 |
 
 ## Session: 2026-08-26 14:20
@@ -572,3 +574,13 @@ Summary: Completed **Tasks & Reminders** end to end on uncommitted `feature/task
 |------|--------|---------|---------|--------|
 | 22:54 | PASS-5 context-strip refinement: header meta dropped Priority+Channel (keep Status+Created); `TicketContextSummary` — Customer cell label removed, Priority→coloured dot, Category→Tag icon, Channel→Globe icon, Followers→`<WatchToggle compact>` icon-only; `watch-toggle.tsx` +`compact` variant (icon btn + bare count); `ticket-sidebar.tsx` readonly Channel row removed; portal `PortalContextStrip` +Tag/CalendarClock icons for parity | ticket-detail-page.tsx, ticket-context-summary.tsx, watch-toggle.tsx, ticket-sidebar.tsx, portal-pages.tsx | client tsc clean, vitest 538/538, eslint clean (touched), vite build green, no new i18n keys (parity untouched); NOT committed | ~40k |
 | 11:11 | Promoted every remaining original CRM requirement into explicit docs-only roadmap phases; added ADR-038, status/foundation labels, final seed/QA/deployment gates, and OpenWolf handoff context. | docs/01, docs/14, docs/17, docs/19, .wolf/STATUS, .wolf/cerebrum, .wolf/anatomy | Planned only; no runtime implementation or Git history mutation | ~9000 |
+
+## Session: 2026-08-30 11:26
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-08-30 11:27
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
