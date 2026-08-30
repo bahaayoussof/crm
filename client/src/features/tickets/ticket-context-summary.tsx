@@ -1,7 +1,5 @@
-import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { Globe, Tag } from "lucide-react";
 import { WatchToggle } from "@/features/collaboration/watch-toggle";
 import type { TicketDetail, TicketPriority } from "./ticket.types";
 
@@ -19,114 +17,89 @@ const priorityDotClass: Record<TicketPriority, string> = {
   URGENT: "bg-danger",
 };
 
-/** One compact strip segment. The Customer segment omits `label` (avatar + name
- * carry it); the field segments keep a muted label above a stronger value. */
-function Cell({
-  label,
-  className = "",
-  children,
-}: {
-  label?: string;
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className={`min-w-0 px-4 py-3 sm:px-5 ${className}`}>
-      {label && <p className="text-xs font-medium text-muted-foreground">{label}</p>}
-      <div className={`${label ? "mt-1 " : ""}text-sm text-foreground`}>{children}</div>
-    </div>
-  );
-}
-
-/** Icon + value, used by the Priority / Category / Channel segments so they scan
- * uniformly. `icon` is either a small lucide glyph or a coloured status dot. */
-function FieldValue({ icon, children }: { icon: ReactNode; children: ReactNode }) {
-  return (
-    <span className="flex items-center gap-1.5">
-      {icon}
-      <span className="min-w-0 truncate">{children}</span>
-    </span>
-  );
-}
-
 /**
- * Compact context bar under the ticket header: Customer | Priority | Category |
- * Channel | Followers, split by thin separators. It is the page's contextual
- * summary — Status lives in the header, editable properties + SLA in the rail,
- * so nothing here is repeated elsewhere.
+ * Simplified, lightweight context bar under the ticket header:
+ * Customer | Priority | Category | Channel | Followers
+ *
+ * Responsive layout:
+ * - Desktop (lg+): 1 row with weighted columns (1.6fr / 0.75fr / 1fr / 0.9fr / 0.65fr)
+ * - Tablet (sm to lg): Customer on top row, 4 metadata columns on second row
+ * - Mobile (<sm): Customer on top row, 2x2 metadata grid below
  */
 export function TicketContextSummary({ record }: { record: TicketDetail }) {
   const { t } = useTranslation();
+  const categoryName = record.category?.name ?? t("common.notProvided");
+  const channelName = t(`tickets.channel.${record.channel}`);
+
   return (
-    <div className="mt-4 flex flex-col divide-y divide-border rounded-lg border border-border bg-card text-card-foreground shadow-subtle sm:flex-row sm:divide-x sm:divide-y-0 rtl:sm:divide-x-reverse">
-      <Cell className="sm:flex-[1.6]">
-        <div className="flex items-start gap-2.5">
-          <span
-            className="inline-flex size-8 shrink-0 select-none items-center justify-center rounded-full bg-surface-secondary text-xs font-semibold text-muted-foreground"
-            aria-hidden="true"
+    <div className="mt-3.5 grid grid-cols-2 rounded-lg border border-border bg-card text-start text-card-foreground sm:grid-cols-4 lg:grid-cols-[1.6fr_0.75fr_1fr_0.9fr_0.65fr]">
+      {/* 1. Customer segment */}
+      <div className="col-span-2 flex min-w-0 items-center gap-2.5 border-b border-border p-3 sm:col-span-4 sm:px-4 sm:py-2.5 lg:col-span-1 lg:border-b-0">
+        <span
+          className="inline-flex size-7.5 shrink-0 select-none items-center justify-center rounded-full bg-surface-secondary text-xs font-semibold text-muted-foreground"
+          aria-hidden="true"
+        >
+          {initialsOf(record.customer.name)}
+        </span>
+        <div className="min-w-0 flex-1">
+          <Link
+            to={`/customers/${record.customer.id}`}
+            className="block break-words text-sm font-semibold text-foreground hover:underline line-clamp-2 [overflow-wrap:anywhere]"
+            title={record.customer.name}
           >
-            {initialsOf(record.customer.name)}
-          </span>
-          <div className="min-w-0">
-            <Link
-              className="block break-words font-semibold text-foreground hover:underline [overflow-wrap:anywhere]"
-              to={`/customers/${record.customer.id}`}
-            >
-              {record.customer.name}
-            </Link>
-            <p className="break-words text-xs text-muted-foreground [overflow-wrap:anywhere]">
-              <bdi dir="ltr">{record.customer.email}</bdi>
-            </p>
-            <Link
-              className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-              to={`/customers/${record.customer.id}`}
-            >
-              {t("tickets.viewCustomer")}
-              <span aria-hidden="true" className="inline-block rtl:rotate-180">
-                →
-              </span>
-            </Link>
-          </div>
+            {record.customer.name}
+          </Link>
         </div>
-      </Cell>
+      </div>
 
-      <Cell label={t("tickets.priorityLabel")} className="sm:flex-1">
-        <FieldValue
-          icon={
-            <span
-              className={`size-2 shrink-0 rounded-full ${priorityDotClass[record.priority]}`}
-              aria-hidden="true"
-            />
-          }
+      {/* 2. Priority segment */}
+      <div className="col-span-1 flex min-w-0 flex-col justify-center p-3 sm:border-t-0 sm:px-4 sm:py-2.5 lg:border-s lg:border-border">
+        <p className="text-xs font-medium text-muted-foreground">{t("tickets.priorityLabel")}</p>
+        <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
+          <span
+            className={`size-2 shrink-0 rounded-full ${priorityDotClass[record.priority]}`}
+            aria-hidden="true"
+          />
+          <span className="truncate text-sm font-medium text-foreground">
+            {t(`tickets.priority.${record.priority}`)}
+          </span>
+        </div>
+      </div>
+
+      {/* 3. Category segment */}
+      <div className="col-span-1 flex min-w-0 flex-col justify-center border-s border-border p-3 sm:border-t-0 sm:px-4 sm:py-2.5">
+        <p className="text-xs font-medium text-muted-foreground">{t("tickets.category")}</p>
+        <p
+          className="mt-0.5 truncate text-sm font-medium text-foreground"
+          title={categoryName}
         >
-          {t(`tickets.priority.${record.priority}`)}
-        </FieldValue>
-      </Cell>
+          {categoryName}
+        </p>
+      </div>
 
-      <Cell label={t("tickets.category")} className="sm:flex-1">
-        <FieldValue
-          icon={<Tag className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.75} aria-hidden="true" />}
+      {/* 4. Channel segment */}
+      <div className="col-span-1 flex min-w-0 flex-col justify-center border-t border-border p-3 sm:border-s sm:border-t-0 sm:px-4 sm:py-2.5 lg:border-t-0">
+        <p className="text-xs font-medium text-muted-foreground">{t("tickets.channelLabel")}</p>
+        <p
+          className="mt-0.5 truncate text-sm font-medium text-foreground"
+          title={channelName}
         >
-          {record.category?.name ?? t("common.notProvided")}
-        </FieldValue>
-      </Cell>
+          {channelName}
+        </p>
+      </div>
 
-      <Cell label={t("tickets.channelLabel")} className="sm:flex-1">
-        <FieldValue
-          icon={<Globe className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.75} aria-hidden="true" />}
-        >
-          {t(`tickets.channel.${record.channel}`)}
-        </FieldValue>
-      </Cell>
-
-      <Cell label={t("collaboration.followers")} className="sm:flex-1">
-        <WatchToggle
-          compact
-          ticketId={record.id}
-          watching={record.viewerIsWatching ?? false}
-          watcherCount={record.watcherCount ?? 0}
-        />
-      </Cell>
+      {/* 5. Followers segment */}
+      <div className="col-span-1 flex min-w-0 flex-col justify-center border-s border-t border-border p-3 sm:border-t-0 sm:px-4 sm:py-2.5 lg:border-t-0">
+        <p className="text-xs font-medium text-muted-foreground">{t("collaboration.followers")}</p>
+        <div className="mt-0.5">
+          <WatchToggle
+            compact
+            ticketId={record.id}
+            watching={record.viewerIsWatching ?? false}
+            watcherCount={record.watcherCount ?? 0}
+          />
+        </div>
+      </div>
     </div>
   );
 }

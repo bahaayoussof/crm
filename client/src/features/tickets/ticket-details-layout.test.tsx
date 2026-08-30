@@ -150,7 +150,7 @@ describe("Ticket Details workspace layout & long-content containment", () => {
     expect(list.className).toMatch(/space-y-4/);
   });
 
-  it("wraps long unbroken content in the message body, subject, description, activity, and customer email", () => {
+  it("wraps long unbroken content in the message body, subject, description, activity, and customer name", () => {
     renderDetail();
     expect(longBody().className).toMatch(/\[overflow-wrap:anywhere\]/);
     expect(longBody().className).toMatch(/whitespace-pre-wrap/);
@@ -161,8 +161,27 @@ describe("Ticket Details workspace layout & long-content containment", () => {
     expect(screen.getByText(baseTicket.description, { selector: "p" }).className).toMatch(/\[overflow-wrap:anywhere\]/);
     fireEvent.click(screen.getByRole("tab", { name: /^Activity/ }));
     expect(screen.getByText(/NEW-/, { selector: "p" }).className).toMatch(/\[overflow-wrap:anywhere\]/);
-    const email = screen.getByText(baseTicket.customer.email, { selector: "bdi" });
-    expect(email.closest("p")?.className).toMatch(/\[overflow-wrap:anywhere\]/);
+    const customerLink = screen.getByRole("link", { name: baseTicket.customer.name });
+    expect(customerLink.className).toMatch(/\[overflow-wrap:anywhere\]/);
+  });
+
+  it("renders a lightweight context summary strip without customer email and with clean metadata", () => {
+    const { container } = renderDetail();
+    // Customer email is removed from the summary strip
+    expect(screen.queryByText(baseTicket.customer.email)).not.toBeInTheDocument();
+    // Customer name and View customer link are present
+    expect(screen.getByRole("link", { name: baseTicket.customer.name })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /^View customer/ })).toBeInTheDocument();
+
+    const summaryStrip = container.querySelector(".lg\\:grid-cols-\\[1\\.6fr_0\\.75fr_1fr_0\\.9fr_0\\.65fr\\]") as HTMLElement;
+    expect(summaryStrip).toBeTruthy();
+    expect(within(summaryStrip).getByText("Priority")).toBeInTheDocument();
+    expect(within(summaryStrip).getByText("High")).toBeInTheDocument();
+    expect(within(summaryStrip).getByText("Category")).toBeInTheDocument();
+    expect(within(summaryStrip).getByText("Billing")).toBeInTheDocument();
+    expect(within(summaryStrip).getByText("Channel")).toBeInTheDocument();
+    expect(within(summaryStrip).getByText("Web")).toBeInTheDocument();
+    expect(within(summaryStrip).getByText("Followers")).toBeInTheDocument();
   });
 
   it("keeps a long filename inside its row: truncated with the full value in title, actions still reachable", () => {
