@@ -19,6 +19,12 @@ describe("audit log API", () => {
     await request(app).get("/api/audit-logs?page=2&limit=10&search=agent&actorId=u1&action=USER_UPDATED&entityType=USER&entityId=u2&from=2026-01-01T00:00:00.000Z&to=2026-02-01T00:00:00.000Z").set(auth(Role.ADMIN));
     expect(mocks.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 10, take: 10, orderBy: [{ createdAt: "desc" }, { id: "desc" }], where: expect.objectContaining({ actorId: "u1", action: "USER_UPDATED", entityType: "USER", entityId: "u2" }) }));
   });
+  it("defaults pagination to page 1 and limit 15", async () => {
+    const response = await request(app).get("/api/audit-logs").set(auth(Role.ADMIN));
+    expect(response.status).toBe(200);
+    expect(response.body.meta).toMatchObject({ page: 1, limit: 15 });
+    expect(mocks.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 0, take: 15 }));
+  });
   it("rejects invalid ranges and unknown query fields", async () => {
     expect((await request(app).get("/api/audit-logs?from=2026-02-01T00:00:00.000Z&to=2026-01-01T00:00:00.000Z").set(auth(Role.ADMIN))).status).toBe(400);
     expect((await request(app).get("/api/audit-logs?password=secret").set(auth(Role.ADMIN))).status).toBe(400);

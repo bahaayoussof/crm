@@ -60,31 +60,33 @@ export function TicketBreakdown({
             {data.byCategory.length === 0 ? (
               <p className="mt-3 text-sm text-muted-foreground">{t("reports.emptyStatus")}</p>
             ) : (
-              <table className="mt-3 w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-xs text-muted-foreground">
-                    <th className="py-1.5 pe-3 text-start font-medium">{t("tickets.category")}</th>
-                    <th className="py-1.5 ps-3 text-end font-medium">{t("reports.legend.created")}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-subtle">
-                  {data.byCategory.map((row) => (
-                    <tr key={row.categoryId ?? "uncategorized"}>
-                      <td className="py-1.5 pe-3">
-                        <span
-                          className="line-clamp-1 break-words font-medium text-foreground"
-                          title={row.categoryName ?? t("reports.uncategorized")}
-                        >
-                          {row.categoryName ?? t("reports.uncategorized")}
-                        </span>
-                      </td>
-                      <td className="py-1.5 ps-3 text-end tabular-nums text-foreground">
-                        {nf.format(row.created)}
-                      </td>
+              <div className="max-h-[220px] overflow-y-auto">
+                <table className="mt-3 w-full text-sm">
+                  <thead className="sticky top-0 z-10 bg-card">
+                    <tr className="border-b border-border text-xs text-muted-foreground">
+                      <th className="py-1.5 pe-3 text-start font-medium">{t("tickets.category")}</th>
+                      <th className="py-1.5 ps-3 text-end font-medium">{t("reports.legend.created")}</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-border-subtle">
+                    {data.byCategory.map((row) => (
+                      <tr key={row.categoryId ?? "uncategorized"}>
+                        <td className="py-1.5 pe-3">
+                          <span
+                            className="line-clamp-1 break-words font-medium text-foreground"
+                            title={row.categoryName ?? t("reports.uncategorized")}
+                          >
+                            {row.categoryName ?? t("reports.uncategorized")}
+                          </span>
+                        </td>
+                        <td className="py-1.5 ps-3 text-end tabular-nums text-foreground">
+                          {nf.format(row.created)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </div>

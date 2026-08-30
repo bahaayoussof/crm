@@ -70,7 +70,7 @@ export const listTasksQuerySchema = z
     ticketId: idSchema.optional(),
     search: z.string().trim().max(200).optional(),
     page: z.coerce.number().int().min(1).default(1),
-    limit: z.coerce.number().int().min(1).max(50).default(20),
+    limit: z.coerce.number().int().min(1).max(50).default(15),
   })
   .strict();
 

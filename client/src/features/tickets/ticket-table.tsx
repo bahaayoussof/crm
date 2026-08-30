@@ -41,20 +41,6 @@ export function TicketTable({
   const columns = useMemo<ColumnDef<TicketListItem>[]>(
     () => [
       {
-        id: "id",
-        accessorKey: "id",
-        header: t("tickets.columns.id"),
-        cell: ({ row }) => (
-          <Link
-            className="font-mono text-[11px] font-medium text-muted-foreground/80 hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            title={row.original.id}
-            to={`/tickets/${row.original.id}`}
-          >
-            <bdi dir="ltr">{ticketReference(row.original.id)}</bdi>
-          </Link>
-        ),
-      },
-      {
         id: "ticket",
         header: t("tickets.columns.ticket"),
         cell: ({ row }) => (
@@ -250,10 +236,9 @@ function changePage(
 function columnClass(id: string) {
   return (
     {
-      id: "w-[90px]",
       ticket: "w-auto",
       customer: "w-[140px]",
-      status: "w-[110px]",
+      status: "w-[155px]",
       priority: "w-[90px]",
       category: "w-[120px]",
       agent: "w-[150px]",

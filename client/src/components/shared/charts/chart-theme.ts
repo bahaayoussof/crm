@@ -1,17 +1,10 @@
 import type { TicketPriority, TicketStatus } from "@/features/tickets/ticket.types";
 
-/**
- * Standard status order for consistent display across all chart views.
- */
-export const CANONICAL_STATUS_ORDER: readonly TicketStatus[] = [
-  "NEW",
-  "OPEN",
-  "IN_PROGRESS",
-  "WAITING_CUSTOMER",
-  "ESCALATED",
-  "RESOLVED",
-  "CLOSED",
-] as const;
+export {
+  CANONICAL_STATUS_ORDER,
+  CANONICAL_STATUS_THEME,
+  getStatusChartColor,
+} from "@/features/tickets/ticket-status-theme";
 
 /**
  * Standard priority order for charts.
@@ -27,7 +20,7 @@ export const CANONICAL_PRIORITY_ORDER: readonly TicketPriority[] = [
  * Semantic CSS variable mappings matching ticket badges and app alerts.
  */
 export const STATUS_CHART_COLORS: Record<TicketStatus, string> = {
-  NEW: "var(--info)",
+  NEW: "#06B6D4",
   OPEN: "var(--info)",
   IN_PROGRESS: "var(--progress)",
   WAITING_CUSTOMER: "var(--warning)",
@@ -66,10 +59,6 @@ export const CHART_THEME_TOKENS = {
   tooltipBorder: "var(--chart-tooltip-border)",
   tooltipForeground: "var(--chart-tooltip-foreground)",
 } as const;
-
-export function getStatusChartColor(status: TicketStatus): string {
-  return STATUS_CHART_COLORS[status] ?? "var(--chart-1)";
-}
 
 export function getSlaChartColor(state: SlaCategory): string {
   return SLA_CHART_COLORS[state] ?? "var(--chart-1)";

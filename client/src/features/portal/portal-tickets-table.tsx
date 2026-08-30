@@ -46,19 +46,6 @@ export function PortalTicketsTable({
   const columns = useMemo<ColumnDef<PortalTicketRow>[]>(
     () => [
       {
-        id: "id",
-        header: t("portal.ticketId"),
-        cell: ({ row }) => (
-          <Link
-            className="rounded-sm hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            title={row.original.id}
-            to={`/portal/tickets/${row.original.id}`}
-          >
-            <TicketRef id={row.original.id} />
-          </Link>
-        ),
-      },
-      {
         id: "subject",
         header: t("portal.subject"),
         cell: ({ row }) => (
@@ -220,9 +207,8 @@ function changePage(updater: Updater<PaginationState>, current: PaginationState,
 function columnClass(id: string) {
   return (
     {
-      id: "w-[120px]",
       subject: "w-auto",
-      status: "w-[140px]",
+      status: "w-[160px]",
       priority: "w-[100px]",
       category: "w-[140px]",
       updated: "w-[160px]",

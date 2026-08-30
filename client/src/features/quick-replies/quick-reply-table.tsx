@@ -1,7 +1,7 @@
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef, type PaginationState, type Updater } from "@tanstack/react-table";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Table,
   TableHeader,
@@ -10,6 +10,7 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
+import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
 import { DataTablePagination } from "@/components/shared/data-table/data-table-pagination";
 import { formatQuickReplyDate } from "./quick-reply-format";
 import { useDeleteQuickReply } from "./quick-reply-hooks";
@@ -24,15 +25,6 @@ interface QuickReplyTableProps {
   totalCount?: number;
   onPageChange: (page: number) => void;
 }
-
-const ICON_BUTTON =
-  "inline-flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors " +
-  "hover:bg-surface-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
-  "disabled:cursor-not-allowed disabled:opacity-60";
-const ICON_BUTTON_DANGER =
-  "inline-flex size-8 items-center justify-center rounded-lg border border-danger-soft text-danger-foreground transition-colors " +
-  "hover:bg-danger-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/30 " +
-  "disabled:cursor-not-allowed disabled:opacity-60";
 
 const columnClasses: Record<string, string> = {
   title: "w-[24%]",
@@ -210,19 +202,15 @@ export function QuickReplyTable({
 
 function RowActions({ quickReply }: { quickReply: QuickReply }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const remove = useDeleteQuickReply();
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const remove = useDeleteQuickReply();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const deleteRef = useRef<HTMLButtonElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    if (confirming) confirmRef.current?.focus();
-  }, [confirming]);
-
   const cancel = () => {
-    if (remove.isPending) return;
     setConfirming(false);
     setError(null);
     deleteRef.current?.focus();
@@ -232,15 +220,42 @@ function RowActions({ quickReply }: { quickReply: QuickReply }) {
     setError(null);
     try {
       await remove.mutateAsync(quickReply.id);
+      setConfirming(false);
     } catch {
       setError(t("quickReplies.deleteError"));
+      confirmRef.current?.focus();
     }
   };
+
+  useEffect(() => {
+    if (confirming) {
+      confirmRef.current?.focus();
+    }
+  }, [confirming]);
+
+  const menuItems: ActionMenuItem[] = [
+    {
+      key: "edit",
+      label: t("quickReplies.editAction"),
+      icon: <PencilIcon />,
+      onClick: () => navigate(`/quick-replies/${quickReply.id}/edit`),
+    },
+    {
+      key: "delete",
+      label: t("quickReplies.deleteAction"),
+      icon: <TrashIcon />,
+      destructive: true,
+      onClick: () => {
+        setError(null);
+        setConfirming(true);
+      },
+    },
+  ];
 
   return (
     <div
       ref={wrapperRef}
-      className="relative inline-flex items-center gap-1.5"
+      className="relative inline-flex items-center justify-end"
       onKeyDown={(event) => {
         if (event.key === "Escape" && confirming) {
           event.stopPropagation();
@@ -258,29 +273,11 @@ function RowActions({ quickReply }: { quickReply: QuickReply }) {
         }
       }}
     >
-      <Link
-        className={ICON_BUTTON}
-        to={`/quick-replies/${quickReply.id}/edit`}
-        aria-label={t("quickReplies.editAction")}
-        title={t("quickReplies.editAction")}
-      >
-        <PencilIcon />
-      </Link>
-      <button
-        ref={deleteRef}
-        type="button"
-        className={ICON_BUTTON_DANGER}
-        aria-label={t("quickReplies.deleteAction")}
-        title={t("quickReplies.deleteAction")}
-        aria-haspopup="dialog"
-        aria-expanded={confirming}
-        onClick={() => {
-          setError(null);
-          setConfirming(true);
-        }}
-      >
-        <TrashIcon />
-      </button>
+      <ActionMenu
+        items={menuItems}
+        triggerLabel={t("quickReplies.columns.actions")}
+        externalTriggerRef={deleteRef}
+      />
 
       {confirming && (
         <div

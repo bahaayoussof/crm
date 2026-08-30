@@ -159,7 +159,7 @@ describe("customer pages", () => {
     expect(view.container.querySelectorAll('a[href="/tickets/ticket-unassigned"]')).toHaveLength(2);
     expect(view.container.querySelectorAll('a[href="/tickets/ticket-other"]')).toHaveLength(0);
     expect(screen.getAllByText("Read-only — assigned to another agent")).toHaveLength(2);
-    expect(view.container.querySelectorAll("bdi[dir='ltr']").length).toBeGreaterThanOrEqual(6);
+    expect(view.container.querySelectorAll("bdi[dir='ltr']").length).toBeGreaterThanOrEqual(3);
   });
 
   it.each(["ADMIN", "MANAGER"] as const)("links every customer-history summary for %s", (role) => {

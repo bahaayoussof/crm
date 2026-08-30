@@ -102,29 +102,33 @@ describe("users management — table", () => {
     expect(emailCell.className).not.toMatch(/overflow-wrap:anywhere/);
   });
 
-  it("groups Edit and the status action in one Actions cell with a non-shield icon", () => {
+  it("groups Edit and the status action in one Actions ellipsis dropdown menu", () => {
     renderAt("/users", <Route path="/users" element={<UserListPage />} />);
     const table = screen.getByRole("table");
     const agentRow = within(table).getAllByRole("row").find((row) => within(row).queryByText("Ghali Agent"))!;
-    const cells = within(agentRow).getAllByRole("cell");
-    const actionsCell = cells[cells.length - 1];
-    expect(within(actionsCell).getByRole("link", { name: "Edit user" })).toHaveAttribute("href", "/users/u-agent/edit");
+    const actionsTrigger = within(agentRow).getByRole("button", { name: "Actions" });
+    fireEvent.click(actionsTrigger);
+    expect(screen.getByRole("menuitem", { name: "Edit user" })).toBeInTheDocument();
     // agent is inactive -> Reactivate
-    expect(within(actionsCell).getByRole("button", { name: "Reactivate user" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Reactivate user" })).toBeInTheDocument();
   });
 
-  it("marks the current user's row with a You badge and hides self-deactivation", () => {
+  it("marks the current user's row with a You badge and disables self-deactivation", () => {
     renderAt("/users", <Route path="/users" element={<UserListPage />} />);
     const table = screen.getByRole("table");
     const selfRow = within(table).getAllByRole("row").find((row) => within(row).queryByText("Aisha Admin"))!;
     expect(within(selfRow).getByText("You")).toBeInTheDocument();
-    expect(within(selfRow).getByRole("button", { name: "Deactivate user" })).toBeDisabled();
+    const actionsTrigger = within(selfRow).getByRole("button", { name: "Actions" });
+    fireEvent.click(actionsTrigger);
+    expect(screen.getByRole("menuitem", { name: "Deactivate user" })).toBeDisabled();
   });
 
   const adminRowTrigger = (name: string) => {
     const table = screen.getByRole("table");
     const row = within(table).getAllByRole("row").find((r) => within(r).queryByText(name))!;
-    return within(row).getByRole("button", { name: /(Deactivate|Reactivate) user/ });
+    const actionsTrigger = within(row).getByRole("button", { name: "Actions" });
+    fireEvent.click(actionsTrigger);
+    return screen.getByRole("menuitem", { name: /(Deactivate|Reactivate) user/ });
   };
 
   it("opens the confirmation through a portal outside the table and its scroll wrapper", () => {
@@ -140,10 +144,7 @@ describe("users management — table", () => {
     expect(scrollWrapper.contains(dialog)).toBe(false);
     expect(dialog.closest("[data-user-status-confirm]")).toBe(dialog);
     expect(dialog.parentElement).toBe(document.body);
-    // trigger <-> panel association
-    expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
-    expect(trigger).toHaveAttribute("aria-expanded", "true");
-    expect(trigger).toHaveAttribute("aria-controls", dialog.id);
+    expect(dialog).toHaveClass("fixed", "inset-0", "z-50", "flex", "items-center", "justify-center");
     // nothing injected inside the table's scroll container
     expect(scrollWrapper.querySelector("[data-user-status-confirm]")).toBeNull();
   });
@@ -156,14 +157,13 @@ describe("users management — table", () => {
     await waitFor(() => expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveFocus());
   });
 
-  it("performs no mutation on Cancel and restores focus to the trigger", async () => {
+  it("performs no mutation on Cancel", async () => {
     renderAt("/users", <Route path="/users" element={<UserListPage />} />);
     const trigger = adminRowTrigger("Bilal Admin");
     fireEvent.click(trigger);
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
     expect(mocks.update).not.toHaveBeenCalled();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    await waitFor(() => expect(trigger).toHaveFocus());
   });
 
   it("closes on Escape and on an outside pointer interaction", () => {
@@ -244,7 +244,7 @@ describe("users management — table", () => {
     expect(within(list).queryByRole("combobox")).not.toBeInTheDocument();
     const cards = within(list).getAllByRole("listitem");
     expect(cards).toHaveLength(3);
-    expect(within(cards[0]).getByRole("link", { name: "Edit user" })).toBeInTheDocument();
+    expect(within(cards[0]).getByRole("button", { name: "Actions" })).toBeInTheDocument();
   });
 
   it("renders exactly one chevron per filter select", () => {

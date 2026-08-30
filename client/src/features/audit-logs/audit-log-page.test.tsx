@@ -66,7 +66,7 @@ const sampleLogs: AuditLogList = {
   ],
   meta: {
     page: 1,
-    limit: 20,
+    limit: 15,
     total: 3,
     totalPages: 1,
   },
@@ -238,7 +238,7 @@ describe("AuditLogPage", () => {
 
   it("renders empty state when no audit logs exist", () => {
     mockUseAuditLogs.mockReturnValue({
-      data: { data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 0 } },
+      data: { data: [], meta: { page: 1, limit: 15, total: 0, totalPages: 0 } },
       isLoading: false,
       isError: false,
       refetch: vi.fn(),
@@ -252,7 +252,7 @@ describe("AuditLogPage", () => {
 
   it("renders filtered empty state when filters match nothing", () => {
     mockUseAuditLogs.mockReturnValue({
-      data: { data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 0 } },
+      data: { data: [], meta: { page: 1, limit: 15, total: 0, totalPages: 0 } },
       isLoading: false,
       isError: false,
       refetch: vi.fn(),
@@ -264,11 +264,16 @@ describe("AuditLogPage", () => {
     expect(screen.getAllByText("Try changing your search or filters.").length).toBeGreaterThan(0);
   });
 
+  it("queries 15 records per page by default", () => {
+    renderPage();
+    expect(mockUseAuditLogs).toHaveBeenCalledWith(expect.objectContaining({ page: 1, limit: 15 }));
+  });
+
   it("handles pagination page changes", () => {
     mockUseAuditLogs.mockReturnValue({
       data: {
         data: sampleLogs.data,
-        meta: { page: 1, limit: 20, total: 45, totalPages: 3 },
+        meta: { page: 1, limit: 15, total: 45, totalPages: 3 },
       },
       isLoading: false,
       isError: false,

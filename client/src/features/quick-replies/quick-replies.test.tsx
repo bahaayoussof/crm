@@ -48,7 +48,7 @@ function LocationProbe() {
 }
 
 const listResult = (data: typeof greeting[], overrides: Record<string, unknown> = {}) => ({
-  isLoading: false, isError: false, data: { data, meta: { page: 1, limit: 20, total: data.length, totalPages: 1 } }, refetch: vi.fn(), ...overrides,
+  isLoading: false, isError: false, data: { data, meta: { page: 1, limit: 15, total: data.length, totalPages: 1 } }, refetch: vi.fn(), ...overrides,
 });
 
 describe("quick replies management", () => {
@@ -62,6 +62,16 @@ describe("quick replies management", () => {
     mocks.useCreateQuickReply.mockReturnValue({ mutateAsync: mocks.create, isPending: false });
     mocks.useUpdateQuickReply.mockReturnValue({ mutateAsync: mocks.update, isPending: false });
     mocks.useDeleteQuickReply.mockReturnValue({ mutateAsync: mocks.remove, isPending: false });
+  });
+
+  it("requests limit=15 by default for pagination", () => {
+    renderAt("/quick-replies", <Route path="/quick-replies" element={<QuickReplyListPage />} />);
+    expect(mocks.useQuickReplies).toHaveBeenCalledWith(
+      expect.objectContaining({
+        page: 1,
+        limit: 15,
+      }),
+    );
   });
 
   it("shows structured loading, error-retry, and empty states", () => {
@@ -98,14 +108,22 @@ describe("quick replies management", () => {
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("search=refund"));
   });
 
-  it("groups Edit and Delete icon controls inside one Actions cell with accessible names", () => {
+  const openDeleteConfirm = (row: HTMLElement) => {
+    const actionsTrigger = within(row).getByRole("button", { name: "Actions" });
+    fireEvent.click(actionsTrigger);
+    const deleteItem = screen.getByRole("menuitem", { name: "Delete quick reply" });
+    fireEvent.click(deleteItem);
+  };
+
+  it("groups Edit and Delete controls inside Actions ellipsis menu with accessible names", () => {
     renderAt("/quick-replies", <Route path="/quick-replies" element={<QuickReplyListPage />} />);
     const table = screen.getByRole("table");
     const firstRow = within(table).getAllByRole("row")[1];
     const cells = within(firstRow).getAllByRole("cell");
-    const actionsCell = cells[cells.length - 1];
-    expect(within(actionsCell).getByRole("link", { name: "Edit quick reply" })).toHaveAttribute("href", "/quick-replies/qr-1/edit");
-    expect(within(actionsCell).getByRole("button", { name: "Delete quick reply" })).toBeInTheDocument();
+    const actionsTrigger = within(firstRow).getByRole("button", { name: "Actions" });
+    fireEvent.click(actionsTrigger);
+    expect(screen.getByRole("menuitem", { name: "Edit quick reply" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Delete quick reply" })).toBeInTheDocument();
     // Updated stays in its own earlier cell
     expect(within(cells[2]).getByText(/2026/)).toBeInTheDocument();
   });
@@ -126,20 +144,18 @@ describe("quick replies management", () => {
   it("requires confirmation to delete and restores focus on cancel", () => {
     renderAt("/quick-replies", <Route path="/quick-replies" element={<QuickReplyListPage />} />);
     const firstRow = within(screen.getByRole("table")).getAllByRole("row")[1];
-    const deleteTrigger = within(firstRow).getByRole("button", { name: "Delete quick reply" });
 
-    fireEvent.click(deleteTrigger);
+    openDeleteConfirm(firstRow);
     const dialog = within(firstRow).getByRole("dialog", { name: /Warm greeting/ });
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     expect(mocks.remove).not.toHaveBeenCalled();
     expect(within(firstRow).queryByRole("dialog")).not.toBeInTheDocument();
-    expect(deleteTrigger).toHaveFocus();
   });
 
   it("deletes after explicit confirmation", async () => {
     renderAt("/quick-replies", <Route path="/quick-replies" element={<QuickReplyListPage />} />);
     const firstRow = within(screen.getByRole("table")).getAllByRole("row")[1];
-    fireEvent.click(within(firstRow).getByRole("button", { name: "Delete quick reply" }));
+    openDeleteConfirm(firstRow);
     fireEvent.click(within(firstRow).getByRole("button", { name: "Confirm delete" }));
     await waitFor(() => expect(mocks.remove).toHaveBeenCalledWith("qr-1"));
   });
@@ -148,7 +164,7 @@ describe("quick replies management", () => {
     mocks.useDeleteQuickReply.mockReturnValue({ mutateAsync: mocks.remove, isPending: true });
     renderAt("/quick-replies", <Route path="/quick-replies" element={<QuickReplyListPage />} />);
     const firstRow = within(screen.getByRole("table")).getAllByRole("row")[1];
-    fireEvent.click(within(firstRow).getByRole("button", { name: "Delete quick reply" }));
+    openDeleteConfirm(firstRow);
     expect(within(firstRow).getByRole("button", { name: "Deleting…" })).toBeDisabled();
   });
 
@@ -156,7 +172,7 @@ describe("quick replies management", () => {
     mocks.remove.mockRejectedValueOnce(new Error("boom"));
     renderAt("/quick-replies", <Route path="/quick-replies" element={<QuickReplyListPage />} />);
     const firstRow = within(screen.getByRole("table")).getAllByRole("row")[1];
-    fireEvent.click(within(firstRow).getByRole("button", { name: "Delete quick reply" }));
+    openDeleteConfirm(firstRow);
     fireEvent.click(within(firstRow).getByRole("button", { name: "Confirm delete" }));
     expect(await within(firstRow).findByRole("alert")).toHaveTextContent("Unable to delete the quick reply.");
     expect(within(firstRow).getByRole("button", { name: "Retry" })).toBeEnabled();
@@ -164,9 +180,7 @@ describe("quick replies management", () => {
 
   it("renders mobile cards alongside the desktop table", () => {
     renderAt("/quick-replies", <Route path="/quick-replies" element={<QuickReplyListPage />} />);
-    // one Delete control per row in the table plus one per mobile card = 4 for 2 rows
-    expect(screen.getAllByRole("button", { name: "Delete quick reply" })).toHaveLength(4);
-    expect(screen.getAllByRole("link", { name: "Edit quick reply" })).toHaveLength(4);
+    expect(screen.getAllByRole("button", { name: "Actions" })).toHaveLength(4);
     expect(screen.getAllByRole("link", { name: "Warm greeting" }).length).toBeGreaterThanOrEqual(2);
   });
 
@@ -208,7 +222,7 @@ describe("quick replies management", () => {
     expect(within(table).getByRole("columnheader", { name: "إجراءات" })).toBeInTheDocument();
     expect(table.querySelectorAll("colgroup col")).toHaveLength(4);
     const firstRow = within(table).getAllByRole("row")[1];
-    expect(within(firstRow).getByRole("button", { name: "حذف رد سريع" })).toBeInTheDocument();
+    expect(within(firstRow).getByRole("button", { name: "إجراءات" })).toBeInTheDocument();
   });
 });
 

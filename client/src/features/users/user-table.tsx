@@ -1,7 +1,7 @@
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef, type PaginationState, type Updater } from "@tanstack/react-table";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Table,
   TableHeader,
@@ -10,9 +10,10 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
+import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
 import { DataTablePagination } from "@/components/shared/data-table/data-table-pagination";
 import { formatUserDate } from "./user-format";
-import { PencilIcon } from "./user-icons";
+import { PencilIcon, UserRoundCheckIcon, UserRoundXIcon } from "./user-icons";
 import { UserStatusConfirm } from "./user-status-confirm";
 import { RoleBadge, StatusBadge, YouBadge } from "./users-ui";
 import type { User } from "./user.types";
@@ -36,10 +37,6 @@ interface UserTableMeta {
   requestOpenConfirm: (id: string, variant: ConfirmVariant) => void;
   closeConfirm: () => void;
 }
-
-const ICON_LINK =
-  "inline-flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors " +
-  "hover:bg-surface-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 const columnClasses: Record<string, string> = {
   name: "w-[22%]",
@@ -273,6 +270,8 @@ function RowActions({
   variant: ConfirmVariant;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const isSelf = user.id === meta.currentUserId;
   const lockedLastAdmin = meta.provableLastActiveAdmin === user.id;
@@ -284,16 +283,30 @@ function RowActions({
       : t("users.lastAdminBlocked")
     : undefined;
 
+  const menuItems: ActionMenuItem[] = [
+    {
+      key: "edit",
+      label: t("users.editAction"),
+      icon: <PencilIcon />,
+      onClick: () => navigate(`/users/${user.id}/edit`),
+    },
+    {
+      key: "status",
+      label: deactivating ? t("users.deactivateAction") : t("users.reactivateAction"),
+      icon: deactivating ? <UserRoundXIcon /> : <UserRoundCheckIcon />,
+      disabled,
+      destructive: deactivating,
+      onClick: () => meta.requestOpenConfirm(user.id, variant),
+    },
+  ];
+
   return (
-    <div className="inline-flex items-center gap-1.5">
-      <Link
-        className={ICON_LINK}
-        to={`/users/${user.id}/edit`}
-        aria-label={t("users.editAction")}
-        title={t("users.editAction")}
-      >
-        <PencilIcon />
-      </Link>
+    <div className="inline-flex items-center justify-end">
+      <ActionMenu
+        items={menuItems}
+        triggerLabel={t("users.columns.actions")}
+        externalTriggerRef={triggerRef}
+      />
       <UserStatusConfirm
         user={user}
         disabled={disabled}
@@ -301,6 +314,8 @@ function RowActions({
         open={meta.openConfirm?.id === user.id && meta.openConfirm.variant === variant}
         onRequestOpen={() => meta.requestOpenConfirm(user.id, variant)}
         onRequestClose={meta.closeConfirm}
+        hideTrigger
+        externalTriggerRef={triggerRef}
       />
     </div>
   );

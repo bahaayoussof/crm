@@ -1,6 +1,6 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { MoreHorizontal } from "lucide-react";
+import { MoreVertical } from "lucide-react";
 import { useAnchoredPopover } from "@/components/shared/use-anchored-popover";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +18,7 @@ export interface ActionMenuProps {
   triggerLabel?: string;
   className?: string;
   align?: "start" | "end";
+  externalTriggerRef?: React.Ref<HTMLButtonElement>;
 }
 
 export function ActionMenu({
@@ -25,6 +26,7 @@ export function ActionMenu({
   triggerLabel = "Actions",
   className,
   align = "end",
+  externalTriggerRef,
 }: ActionMenuProps) {
   const [open, setOpen] = React.useState(false);
   const { triggerRef, panelRef, style } = useAnchoredPopover<HTMLButtonElement, HTMLDivElement>({
@@ -37,10 +39,22 @@ export function ActionMenu({
     gap: 4,
   });
 
+  const handleRef = React.useCallback(
+    (el: HTMLButtonElement | null) => {
+      (triggerRef as React.MutableRefObject<HTMLButtonElement | null>).current = el;
+      if (typeof externalTriggerRef === "function") {
+        externalTriggerRef(el);
+      } else if (externalTriggerRef && "current" in externalTriggerRef) {
+        (externalTriggerRef as React.MutableRefObject<HTMLButtonElement | null>).current = el;
+      }
+    },
+    [externalTriggerRef, triggerRef]
+  );
+
   return (
     <>
       <button
-        ref={triggerRef}
+        ref={handleRef}
         type="button"
         onClick={() => setOpen((prev) => !prev)}
         aria-haspopup="menu"
@@ -52,7 +66,7 @@ export function ActionMenu({
           className
         )}
       >
-        <MoreHorizontal className="size-4" strokeWidth={1.75} aria-hidden="true" />
+        <MoreVertical className="size-4" strokeWidth={1.75} aria-hidden="true" />
       </button>
 
       {open &&

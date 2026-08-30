@@ -6,6 +6,7 @@ import { CheckCircle2, Clock3, FolderCog, MessageSquareQuote, Pencil, Power, Plu
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ActionMenu } from "@/components/ui/action-menu";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, SearchInput } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -73,13 +74,26 @@ function CategoryRows({ rows, pending, onEdit, onToggle }: { rows: SettingCatego
                     <Status active={r.isActive} />
                   </TableCell>
                   <TableCell>
-                    <div className="flex justify-end gap-1">
-                      <Button size="icon" variant="ghost" aria-label={t("common.edit")} onClick={() => onEdit(r)}>
-                        <Pencil className="size-4" />
-                      </Button>
-                      <Button size="icon" variant="ghost" disabled={pending} aria-label={r.isActive ? t("settings.deactivate") : t("settings.activate")} onClick={() => onToggle(r)}>
-                        <Power className="size-4" />
-                      </Button>
+                    <div className="flex justify-end">
+                      <ActionMenu
+                        triggerLabel={t("settings.actions")}
+                        items={[
+                          {
+                            key: "edit",
+                            label: t("common.edit"),
+                            icon: <Pencil className="size-4" />,
+                            onClick: () => onEdit(r),
+                          },
+                          {
+                            key: "status",
+                            label: r.isActive ? t("settings.deactivate") : t("settings.activate"),
+                            icon: <Power className="size-4" />,
+                            disabled: pending,
+                            destructive: r.isActive,
+                            onClick: () => onToggle(r),
+                          },
+                        ]}
+                      />
                     </div>
                   </TableCell>
                 </TableRow>

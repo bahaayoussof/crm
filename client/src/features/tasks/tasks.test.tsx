@@ -155,8 +155,10 @@ describe("tasks workspace", () => {
       listResult([{ ...baseTask, creatorId: "admin-1", assigneeId: "agent-9" }]),
     );
     renderAt("/tasks", <Route path="/tasks" element={<TaskListPage />} />);
-    const rows = screen.getAllByRole("button", { name: "Mark done" });
-    fireEvent.click(rows[0]);
+    const actionsButtons = screen.getAllByRole("button", { name: "Actions" });
+    fireEvent.click(actionsButtons[0]);
+    const toggleItem = screen.getByRole("menuitem", { name: "Mark done" });
+    fireEvent.click(toggleItem);
     await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({ status: "DONE" }));
   });
 
@@ -167,13 +169,22 @@ describe("tasks workspace", () => {
       listResult([{ ...baseTask, creatorId: "admin-1", assigneeId: "agent-9" }]),
     );
     renderAt("/tasks", <Route path="/tasks" element={<TaskListPage />} />);
-    expect(screen.queryByRole("link", { name: "Edit task" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Delete task" })).not.toBeInTheDocument();
+    const actionsButtons = screen.getAllByRole("button", { name: "Actions" });
+    fireEvent.click(actionsButtons[0]);
+    expect(screen.queryByRole("menuitem", { name: "Edit task" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Delete task" })).not.toBeInTheDocument();
   });
+
+  const openDeleteConfirm = (index = 0) => {
+    const actionsButtons = screen.getAllByRole("button", { name: "Actions" });
+    fireEvent.click(actionsButtons[index]);
+    const deleteItem = screen.getByRole("menuitem", { name: "Delete task" });
+    fireEvent.click(deleteItem);
+  };
 
   it("confirms before deleting from the row", async () => {
     renderAt("/tasks", <Route path="/tasks" element={<TaskListPage />} />);
-    fireEvent.click(screen.getAllByRole("button", { name: "Delete task" })[0]);
+    openDeleteConfirm(0);
     const dialog = screen.getByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: "Confirm delete" }));
     await waitFor(() => expect(mocks.remove).toHaveBeenCalledWith("task-1"));
@@ -181,13 +192,39 @@ describe("tasks workspace", () => {
 
   it("portals the delete confirmation onto document.body, outside the table wrapper", () => {
     renderAt("/tasks", <Route path="/tasks" element={<TaskListPage />} />);
-    fireEvent.click(screen.getAllByRole("button", { name: "Delete task" })[0]);
+    openDeleteConfirm(0);
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveAttribute("data-task-delete-confirm");
     expect(dialog.parentElement).toBe(document.body);
+    expect(dialog).toHaveClass("fixed", "inset-0", "z-50", "flex", "items-center", "justify-center");
     expect(dialog.closest(".overflow-x-auto")).toBeNull();
     // exactly one dialog even though desktop + mobile rows are both mounted in JSDOM
     expect(screen.getAllByRole("dialog")).toHaveLength(1);
+  });
+
+  it("navigates to /tasks/new on Create task click and does not open a modal", () => {
+    renderAt(
+      "/tasks",
+      <>
+        <Route path="/tasks" element={<TaskListPage />} />
+        <Route path="/tasks/new" element={<h1>New Task Page</h1>} />
+      </>,
+    );
+    const createButton = screen.getByRole("link", { name: "Create task" });
+    expect(createButton).toHaveAttribute("href", "/tasks/new");
+    fireEvent.click(createButton);
+    expect(screen.getByRole("heading", { name: "New Task Page" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("requests limit=15 by default for pagination", () => {
+    renderAt("/tasks", <Route path="/tasks" element={<TaskListPage />} />);
+    expect(mocks.useTasks).toHaveBeenCalledWith(
+      expect.objectContaining({
+        page: 1,
+        limit: 15,
+      }),
+    );
   });
 
   it("moves the open confirmation when a different row trigger is used", () => {
@@ -196,9 +233,9 @@ describe("tasks workspace", () => {
     );
     renderAt("/tasks", <Route path="/tasks" element={<TaskListPage />} />);
     // order: desktop rows first, then mobile cards — re-query after each render
-    fireEvent.click(screen.getAllByRole("button", { name: "Delete task" })[0]);
+    openDeleteConfirm(0);
     expect(screen.getByRole("dialog")).toHaveTextContent("Follow up with customer");
-    fireEvent.click(screen.getAllByRole("button", { name: "Delete task" })[1]);
+    openDeleteConfirm(1);
     const dialogs = screen.getAllByRole("dialog");
     expect(dialogs).toHaveLength(1);
     expect(dialogs[0]).toHaveTextContent("Second task");

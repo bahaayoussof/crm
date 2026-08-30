@@ -1,7 +1,6 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { useAnchoredPopover } from "@/components/shared/use-anchored-popover";
 import { getLocalizedTaskError } from "./task-error";
 import { useDeleteTask } from "./task-hooks";
 import { SpinnerIcon, TrashIcon } from "./task-icons";
@@ -17,20 +16,24 @@ interface TaskDeleteConfirmProps {
   open: boolean;
   onRequestOpen: () => void;
   onRequestClose: () => void;
+  hideTrigger?: boolean;
+  externalTriggerRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
 /**
- * Delete trigger + its confirmation popover for a task table row.
+ * Centered modal confirmation dialog for Task deletion.
  *
- * The confirmation is rendered through a portal on `document.body` (never inside
- * the Tasks table or its `overflow-x-auto` wrapper) and pinned to the trigger's
- * logical end via `useAnchoredPopover` — so it floats above the table, flips
- * above when space is short, clamps to the viewport, and never grows the table
- * scroll area. Single-open coordination and stale-state closing on
- * filter/pagination are owned by `TaskTable` through the `open` / `onRequest*`
- * props (keyed by `{ id, variant }`).
+ * Renders portalled onto `document.body` with a full-viewport backdrop overlay,
+ * centered horizontally and vertically in the browser viewport.
  */
-export function TaskDeleteConfirm({ task, open, onRequestOpen, onRequestClose }: TaskDeleteConfirmProps) {
+export function TaskDeleteConfirm({
+  task,
+  open,
+  onRequestOpen,
+  onRequestClose,
+  hideTrigger = false,
+  externalTriggerRef,
+}: TaskDeleteConfirmProps) {
   const { t } = useTranslation();
   const rootId = useId();
   const panelId = `${rootId}-panel`;
@@ -38,20 +41,17 @@ export function TaskDeleteConfirm({ task, open, onRequestOpen, onRequestClose }:
 
   const remove = useDeleteTask();
   const [error, setError] = useState<string | null>(null);
+  const internalTriggerRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = externalTriggerRef ?? internalTriggerRef;
+  const contentRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
   const wasOpenRef = useRef(false);
-  // The task targeted when the popover opened — Confirm always acts on this id,
-  // regardless of any row reshuffle from filtering/pagination behind the portal.
   const targetRef = useRef(task);
 
-  const { triggerRef, panelRef, position, style } = useAnchoredPopover<HTMLButtonElement, HTMLDivElement>({
-    open,
-    align: "end",
-    onDismiss: () => {
-      if (!remove.isPending) onRequestClose();
-    },
-  });
+  const requestClose = useCallback(() => {
+    if (!remove.isPending) onRequestClose();
+  }, [onRequestClose, remove.isPending]);
 
   useEffect(() => {
     if (open && !wasOpenRef.current) {
@@ -68,9 +68,29 @@ export function TaskDeleteConfirm({ task, open, onRequestOpen, onRequestClose }:
     }
   }, [open, task, triggerRef]);
 
-  const requestClose = () => {
-    if (!remove.isPending) onRequestClose();
-  };
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (contentRef.current && !contentRef.current.contains(e.target as Node)) {
+        requestClose();
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open, requestClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        requestClose();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open, requestClose]);
 
   const onConfirm = async () => {
     setError(null);
@@ -82,7 +102,6 @@ export function TaskDeleteConfirm({ task, open, onRequestOpen, onRequestClose }:
     }
   };
 
-  // Minimal focus trap: Cancel <-> Confirm are the only stops.
   const onPanelKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === "Escape") {
       event.preventDefault();
@@ -110,35 +129,36 @@ export function TaskDeleteConfirm({ task, open, onRequestOpen, onRequestClose }:
     }
   };
 
-  const panel =
-    open && position
-      ? createPortal(
+  const panel = open
+    ? createPortal(
+        <div
+          id={panelId}
+          data-task-delete-confirm=""
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs animate-in fade-in-0 duration-150"
+          onKeyDown={onPanelKeyDown}
+        >
           <div
-            ref={panelRef}
-            id={panelId}
-            data-task-delete-confirm=""
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
-            className="fixed z-50 flex flex-col overflow-hidden rounded-md border border-border bg-popover text-start text-popover-foreground shadow-flyout"
-            style={style}
-            onKeyDown={onPanelKeyDown}
+            ref={contentRef}
+            className="relative flex w-full max-w-md flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-flyout animate-in zoom-in-95 fade-in-0 duration-150"
           >
-            <div className="min-h-0 flex-1 overflow-y-auto p-3">
-              <p id={titleId} className="text-sm font-medium leading-5 text-foreground" dir="auto">
+            <div className="min-h-0 flex-1 overflow-y-auto p-5 text-start">
+              <h3 id={titleId} className="text-base font-semibold leading-6 text-foreground" dir="auto">
                 {t("tasks.deleteConfirmLabel", { title: task.title })}
-              </p>
+              </h3>
               {error && (
-                <p role="alert" className="mt-2 text-xs leading-5 text-danger-foreground">
+                <p role="alert" className="mt-2 text-sm text-danger-foreground">
                   {error}
                 </p>
               )}
             </div>
-            <div className="flex shrink-0 justify-end gap-2 border-t border-border bg-surface-secondary p-2.5">
+            <div className="flex shrink-0 justify-end gap-2 border-t border-border bg-surface-secondary px-5 py-3">
               <button
                 ref={cancelRef}
                 type="button"
-                className="button-ghost min-h-9 w-auto px-3 py-1 text-xs"
+                className="button-ghost min-h-9 px-4 py-2 text-xs font-medium"
                 disabled={remove.isPending}
                 onClick={requestClose}
               >
@@ -147,7 +167,7 @@ export function TaskDeleteConfirm({ task, open, onRequestOpen, onRequestClose }:
               <button
                 ref={confirmRef}
                 type="button"
-                className="button-danger min-h-9 w-auto gap-1.5 px-3 py-1 text-xs"
+                className="button-danger min-h-9 gap-1.5 px-4 py-2 text-xs font-medium"
                 disabled={remove.isPending}
                 onClick={onConfirm}
               >
@@ -163,10 +183,15 @@ export function TaskDeleteConfirm({ task, open, onRequestOpen, onRequestClose }:
                 )}
               </button>
             </div>
-          </div>,
-          document.body,
-        )
-      : null;
+          </div>
+        </div>,
+        document.body,
+      )
+    : null;
+
+  if (hideTrigger) {
+    return <>{panel}</>;
+  }
 
   return (
     <>
@@ -175,7 +200,6 @@ export function TaskDeleteConfirm({ task, open, onRequestOpen, onRequestClose }:
         type="button"
         className={TRIGGER}
         aria-label={t("tasks.deleteAction")}
-        title={t("tasks.deleteAction")}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}

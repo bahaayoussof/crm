@@ -1,17 +1,9 @@
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { ArrowDown, Minus, ArrowUp } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { TicketPriority, TicketStatus } from "./ticket.types";
-
-const statusVariants: Record<TicketStatus, "neutral" | "info" | "progress" | "warning" | "success" | "danger"> = {
-  NEW: "neutral",
-  OPEN: "info",
-  IN_PROGRESS: "progress",
-  WAITING_CUSTOMER: "warning",
-  RESOLVED: "success",
-  CLOSED: "neutral",
-  ESCALATED: "danger",
-};
+import { CANONICAL_STATUS_THEME } from "./ticket-status-theme";
 
 const priorityConfig: Record<TicketPriority, { icon: typeof ArrowDown; iconColor: string; textColor: string }> = {
   LOW: { icon: ArrowDown, iconColor: "text-emerald-500 dark:text-emerald-400", textColor: "text-foreground/80 font-normal" },
@@ -22,8 +14,13 @@ const priorityConfig: Record<TicketPriority, { icon: typeof ArrowDown; iconColor
 
 export function TicketStatusBadge({ status }: { status: TicketStatus }) {
   const { t } = useTranslation();
+  const theme = CANONICAL_STATUS_THEME[status];
   return (
-    <Badge variant={statusVariants[status]} size="default">
+    <Badge
+      variant={theme?.badgeVariant ?? "neutral"}
+      size="default"
+      className={cn("whitespace-nowrap", theme?.badgeCustomClass)}
+    >
       {t(`tickets.status.${status}`)}
     </Badge>
   );

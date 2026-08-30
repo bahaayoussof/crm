@@ -36,7 +36,7 @@ export function PortalKnowledgeBasePage() {
   const page = Math.max(1, Number(params.get("page")) || 1);
   const search = params.get("search") ?? "";
   const category = params.get("category") ?? "";
-  const query = usePortalKnowledgeArticles({ page, limit: 10, search, category: category.trim() || undefined });
+  const query = usePortalKnowledgeArticles({ page, limit: 5, search, category: category.trim() || undefined });
 
   const update = (key: string, value: string) => {
     const next = new URLSearchParams(params);

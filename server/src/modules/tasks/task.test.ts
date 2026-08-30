@@ -133,6 +133,15 @@ describe("tasks API", () => {
       expect(where.assigneeId).toBe("agent-9");
     });
 
+    it("defaults to limit=15 and takes 15 in findMany", async () => {
+      mocks.taskFindMany.mockResolvedValue([]);
+      mocks.taskCount.mockResolvedValue(0);
+      const response = await request(app).get("/api/tasks").set(auth(adminToken));
+      expect(response.status).toBe(200);
+      expect(response.body.meta.limit).toBe(15);
+      expect(mocks.taskFindMany.mock.calls[0][0].take).toBe(15);
+    });
+
     it("returns pagination meta", async () => {
       mocks.taskFindMany.mockResolvedValue([taskRow()]);
       mocks.taskCount.mockResolvedValue(3);

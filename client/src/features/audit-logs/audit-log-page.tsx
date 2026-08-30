@@ -253,7 +253,7 @@ export function AuditLogPage() {
   const filters: AuditLogFilters = useMemo(
     () => ({
       page,
-      limit: 20,
+      limit: 15,
       ...(debounced ? { search: debounced } : {}),
       ...(action ? { action } : {}),
       ...(entityType ? { entityType } : {}),
@@ -735,7 +735,7 @@ export function AuditLogPage() {
           }
           pagination={{
             page,
-            pageSize: 20,
+            pageSize: 15,
             pageCount: query.data?.meta.totalPages ?? 0,
             totalCount: query.data?.meta.total,
             onPageChange: (next) => setFilter("page", String(next)),

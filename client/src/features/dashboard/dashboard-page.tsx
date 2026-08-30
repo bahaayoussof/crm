@@ -159,11 +159,10 @@ function TicketSection({
             <TableContainer>
               <Table className={detailed ? "min-w-[68rem]" : "min-w-[54rem]"}>
                 <colgroup>
-                  <col className="w-28" />
                   <col className={detailed ? "w-64" : "w-72"} />
                   {detailed && <col className="w-40" />}
                   <col className="w-28" />
-                  <col className="w-32" />
+                  <col className="w-40" />
                   {detailed && <col className="w-36" />}
                   <col className="w-44" />
                   <col className="w-40" />
@@ -171,7 +170,6 @@ function TicketSection({
                 <TableHeader>
                   <TableRow>
                     {[
-                      t("tickets.columns.id"),
                       t("tickets.subject"),
                       ...(detailed ? [t("tickets.customer")] : []),
                       t("tickets.priorityLabel"),
@@ -192,18 +190,13 @@ function TicketSection({
                       <TableCell>
                         <Link
                           aria-label={`${t("tickets.columns.id")} ${ticket.id}`}
-                          className="font-mono text-xs font-medium text-muted-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          title={ticket.id}
+                          className="line-clamp-2 min-w-0 break-words font-medium text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          title={ticket.subject}
                           to={`/tickets/${ticket.id}`}
                           dir="ltr"
                         >
-                          {ticketReference(ticket.id)}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        <span className="line-clamp-2 min-w-0 break-words font-medium text-foreground" title={ticket.subject}>
                           {ticket.subject}
-                        </span>
+                        </Link>
                       </TableCell>
                       {detailed && (
                         <TableCell>

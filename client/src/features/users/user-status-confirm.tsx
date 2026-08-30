@@ -1,7 +1,6 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { useAnchoredPopover } from "@/components/shared/use-anchored-popover";
 import { getLocalizedUserError } from "./user-error";
 import { useUpdateUser } from "./user-hooks";
 import { SpinnerIcon, UserRoundCheckIcon, UserRoundXIcon } from "./user-icons";
@@ -20,20 +19,26 @@ interface UserStatusConfirmProps {
   open: boolean;
   onRequestOpen: () => void;
   onRequestClose: () => void;
+  hideTrigger?: boolean;
+  externalTriggerRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
 /**
- * Deactivate / Reactivate trigger + its confirmation popover.
+ * Centered modal confirmation dialog for User deactivation / reactivation.
  *
- * The confirmation is rendered through a portal on `document.body` (never inside
- * the Users table or its `overflow-x-auto` wrapper) and pinned to the trigger's
- * logical end via `useAnchoredPopover` — so it floats above the table, flips
- * above when space is short, clamps to the viewport, and never adds a scrollbar
- * to the table. Single-open coordination and stale-state closing on
- * filter/pagination are owned by `UserTable` through the `open` / `onRequest*`
- * props (keyed by stable user id).
+ * Renders portalled onto `document.body` with a full-viewport backdrop overlay,
+ * centered horizontally and vertically in the browser viewport.
  */
-export function UserStatusConfirm({ user, disabled, disabledReason, open, onRequestOpen, onRequestClose }: UserStatusConfirmProps) {
+export function UserStatusConfirm({
+  user,
+  disabled,
+  disabledReason,
+  open,
+  onRequestOpen,
+  onRequestClose,
+  hideTrigger = false,
+  externalTriggerRef,
+}: UserStatusConfirmProps) {
   const { t } = useTranslation();
   const rootId = useId();
   const panelId = `${rootId}-panel`;
@@ -42,26 +47,24 @@ export function UserStatusConfirm({ user, disabled, disabledReason, open, onRequ
 
   const update = useUpdateUser(user.id);
   const [error, setError] = useState<string | null>(null);
+  const internalTriggerRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = externalTriggerRef ?? internalTriggerRef;
+  const contentRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
   const wasOpenRef = useRef(false);
-  // The user targeted when the popover opened — Confirm always acts on this,
-  // regardless of any row reshuffle from filtering/pagination behind the portal.
   const targetRef = useRef(user);
 
   const deactivating = user.isActive;
 
-  const { triggerRef, panelRef, position, style } = useAnchoredPopover<HTMLButtonElement, HTMLDivElement>({
-    open,
-    align: "end",
-    onDismiss: () => { if (!update.isPending) onRequestClose(); },
-  });
+  const requestClose = useCallback(() => {
+    if (!update.isPending) onRequestClose();
+  }, [onRequestClose, update.isPending]);
 
   useEffect(() => {
     if (open && !wasOpenRef.current) {
       targetRef.current = user;
       setError(null);
-      // focus the safest first action once the portalled panel is placed
       const id = window.requestAnimationFrame(() => cancelRef.current?.focus());
       wasOpenRef.current = true;
       return () => window.cancelAnimationFrame(id);
@@ -73,29 +76,65 @@ export function UserStatusConfirm({ user, disabled, disabledReason, open, onRequ
     }
   }, [open, user, triggerRef]);
 
-  const requestClose = () => { if (!update.isPending) onRequestClose(); };
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (contentRef.current && !contentRef.current.contains(e.target as Node)) {
+        requestClose();
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open, requestClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        requestClose();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open, requestClose]);
 
   const onConfirm = async () => {
     setError(null);
     try {
       await update.mutateAsync({ isActive: !targetRef.current.isActive });
-      onRequestClose(); // row re-renders from cache invalidation; focus returns to the (relabelled) trigger
+      onRequestClose();
     } catch (mutationError) {
       setError(getLocalizedUserError(mutationError, t("users.statusChangeError"), t));
     }
   };
 
-  // Minimal focus trap: Cancel <-> Confirm are the only stops.
   const onPanelKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); requestClose(); return; }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      requestClose();
+      return;
+    }
     if (event.key !== "Tab") return;
-    const focusables = [cancelRef.current, confirmRef.current].filter((el): el is HTMLButtonElement => Boolean(el) && !el!.disabled);
-    if (focusables.length === 0) { event.preventDefault(); return; }
+    const focusables = [cancelRef.current, confirmRef.current].filter(
+      (el): el is HTMLButtonElement => Boolean(el) && !el!.disabled
+    );
+    if (focusables.length === 0) {
+      event.preventDefault();
+      return;
+    }
     const first = focusables[0];
     const last = focusables[focusables.length - 1];
     const active = document.activeElement;
-    if (event.shiftKey && active === first) { event.preventDefault(); last.focus(); }
-    else if (!event.shiftKey && active === last) { event.preventDefault(); first.focus(); }
+    if (event.shiftKey && active === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    }
   };
 
   const StatusIcon = deactivating ? UserRoundXIcon : UserRoundCheckIcon;
@@ -104,63 +143,95 @@ export function UserStatusConfirm({ user, disabled, disabledReason, open, onRequ
     ? t("users.deactivateConfirmTitle", { name: user.name })
     : t("users.reactivateConfirmTitle", { name: user.name });
 
-  const panel = open && position
+  const panel = open
     ? createPortal(
         <div
-          ref={panelRef}
           id={panelId}
           data-user-status-confirm=""
           role="dialog"
           aria-modal="true"
           aria-labelledby={titleId}
           aria-describedby={deactivating ? descId : undefined}
-          className="fixed z-50 flex flex-col overflow-hidden rounded-md border border-border bg-popover text-start shadow-flyout"
-          style={style}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs animate-in fade-in-0 duration-150"
           onKeyDown={onPanelKeyDown}
         >
-          <div className="min-h-0 flex-1 overflow-y-auto p-3">
-            <p id={titleId} className="text-sm font-medium leading-5 text-foreground" dir="auto">{title}</p>
-            {deactivating && <p id={descId} className="mt-1 text-xs leading-5 text-muted-foreground">{t("users.deactivateConsequence")}</p>}
-            {error && <p role="alert" className="mt-2 text-xs leading-5 text-danger-foreground">{error}</p>}
-          </div>
-          <div className="flex shrink-0 justify-end gap-2 border-t border-border bg-surface-secondary p-2.5">
-            <button ref={cancelRef} type="button" className="button-ghost min-h-9 w-auto px-3 py-1 text-xs" disabled={update.isPending} onClick={requestClose}>
-              {t("common.cancel")}
-            </button>
-            <button
-              ref={confirmRef}
-              type="button"
-              className={`${deactivating ? "button-danger" : "button-link"} min-h-9 w-auto gap-1.5 px-3 py-1 text-xs`}
-              disabled={update.isPending}
-              onClick={onConfirm}
-            >
-              {update.isPending
-                ? <><SpinnerIcon className="size-3.5" />{deactivating ? t("users.deactivating") : t("users.reactivating")}</>
-                : error
-                  ? t("common.retry")
-                  : deactivating ? t("users.confirmDeactivate") : t("users.confirmReactivate")}
-            </button>
+          <div
+            ref={contentRef}
+            className="relative flex w-full max-w-md flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-flyout animate-in zoom-in-95 fade-in-0 duration-150"
+          >
+            <div className="min-h-0 flex-1 overflow-y-auto p-5 text-start">
+              <h3 id={titleId} className="text-base font-semibold leading-6 text-foreground" dir="auto">
+                {title}
+              </h3>
+              {deactivating && (
+                <p id={descId} className="mt-2 text-sm leading-5 text-muted-foreground" dir="auto">
+                  {t("users.deactivateConsequence")}
+                </p>
+              )}
+              {error && (
+                <p role="alert" className="mt-2 text-sm text-danger-foreground">
+                  {error}
+                </p>
+              )}
+            </div>
+            <div className="flex shrink-0 justify-end gap-2 border-t border-border bg-surface-secondary px-5 py-3">
+              <button
+                ref={cancelRef}
+                type="button"
+                className="button-ghost min-h-9 px-4 py-2 text-xs font-medium"
+                disabled={update.isPending}
+                onClick={requestClose}
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                ref={confirmRef}
+                type="button"
+                className={`${deactivating ? "button-danger" : "button-link"} min-h-9 gap-1.5 px-4 py-2 text-xs font-medium`}
+                disabled={update.isPending}
+                onClick={onConfirm}
+              >
+                {update.isPending ? (
+                  <>
+                    <SpinnerIcon className="size-3.5" />
+                    {deactivating ? t("users.deactivating") : t("users.reactivating")}
+                  </>
+                ) : error ? (
+                  t("common.retry")
+                ) : deactivating ? (
+                  t("users.confirmDeactivate")
+                ) : (
+                  t("users.confirmReactivate")
+                )}
+              </button>
+            </div>
           </div>
         </div>,
-        document.body,
+        document.body
       )
     : null;
 
-  return <>
-    <button
-      ref={triggerRef}
-      type="button"
-      className={`${TRIGGER_BASE} ${deactivating ? TRIGGER_DANGER : TRIGGER_NEUTRAL}`}
-      aria-label={statusLabel}
-      title={disabledReason ?? statusLabel}
-      aria-haspopup="dialog"
-      aria-expanded={open}
-      aria-controls={open ? panelId : undefined}
-      disabled={disabled}
-      onClick={() => (open ? requestClose() : onRequestOpen())}
-    >
-      <StatusIcon />
-    </button>
-    {panel}
-  </>;
+  if (hideTrigger) {
+    return <>{panel}</>;
+  }
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        className={`${TRIGGER_BASE} ${deactivating ? TRIGGER_DANGER : TRIGGER_NEUTRAL}`}
+        aria-label={statusLabel}
+        title={disabledReason ?? statusLabel}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={open ? panelId : undefined}
+        disabled={disabled}
+        onClick={() => (open ? requestClose() : onRequestOpen())}
+      >
+        <StatusIcon />
+      </button>
+      {panel}
+    </>
+  );
 }

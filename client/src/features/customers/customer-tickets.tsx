@@ -42,12 +42,11 @@ export function CustomerTickets({ customerId }: { customerId: string }) {
   return (
     <DataTableSurface>
       <div className="hidden md:block overflow-x-auto">
-        <Table className="min-w-[58rem]">
+        <Table className="min-w-[54rem]">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-28">{t("tickets.columns.id")}</TableHead>
               <TableHead className="w-auto">{t("tickets.columns.ticket")}</TableHead>
-              <TableHead className="w-36">{t("tickets.statusLabel")}</TableHead>
+              <TableHead className="w-44">{t("tickets.statusLabel")}</TableHead>
               <TableHead className="w-28">{t("tickets.priorityLabel")}</TableHead>
               <TableHead className="w-36">{t("tickets.category")}</TableHead>
               <TableHead className="w-44">{t("tickets.assignedAgent")}</TableHead>
@@ -97,9 +96,6 @@ function TicketRow({
   const { t } = useTranslation();
   return (
     <TableRow>
-      <TableCell className="font-mono text-xs font-medium text-muted-foreground">
-        <bdi dir="ltr">{ticketReference(ticket.id)}</bdi>
-      </TableCell>
       <TableCell>
         <TicketSubject ticket={ticket} />
         <AccessLabel ticket={ticket} />

@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useCustomers } from "./customer-hooks";
 import { CustomerTable } from "./customer-table";
 import { CustomerPage, PageHeader, StatePanel } from "./customer-ui";
+import { CustomerCreateModal } from "./customer-create-modal";
 import { useDebouncedValue } from "./use-debounced-value";
 import { useAuth } from "@/features/auth/auth-state";
 import { canManageCustomers } from "./customer-permissions";
@@ -18,6 +20,7 @@ export function CustomerListPage() {
   const { user } = useAuth();
   const canManage = Boolean(user && canManageCustomers(user.role));
   const [params, setParams] = useSearchParams();
+  const [createOpen, setCreateOpen] = useState(false);
   const search = params.get("search") ?? "";
   const parsedPage = Number(params.get("page") ?? "1");
   const page = Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
@@ -44,7 +47,7 @@ export function CustomerListPage() {
         <PageHeader
           title={t("customers.title")}
           description={t("customers.description")}
-          actions={canManage ? <Link className="button-link" to="/customers/new">{t("customers.add")}</Link> : undefined}
+          actions={canManage ? <button type="button" className="button-link" onClick={() => setCreateOpen(true)}>{t("customers.add")}</button> : undefined}
         />
 
         {/* Unified DataTable Surface */}
@@ -86,7 +89,7 @@ export function CustomerListPage() {
             </div>
           ) : customers.data?.data.length === 0 ? (
             <div className="p-6">
-              <StatePanel action={debouncedSearch ? <button className="button-secondary" onClick={() => setSearch("")}>{t("common.clearSearch")}</button> : canManage ? <Link className="button-link" to="/customers/new">{t("customers.add")}</Link> : undefined}>
+              <StatePanel action={debouncedSearch ? <button className="button-secondary" onClick={() => setSearch("")}>{t("common.clearSearch")}</button> : canManage ? <button type="button" className="button-link" onClick={() => setCreateOpen(true)}>{t("customers.add")}</button> : undefined}>
                 {debouncedSearch ? t("customers.noMatches", { search: debouncedSearch }) : t("customers.empty")}
               </StatePanel>
             </div>
@@ -101,6 +104,12 @@ export function CustomerListPage() {
             />
           )}
         </DataTableSurface>
+
+        <CustomerCreateModal
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          onSuccess={() => customers.refetch()}
+        />
       </div>
     </CustomerPage>
   );

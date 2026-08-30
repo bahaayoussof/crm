@@ -86,7 +86,14 @@ describe("quick replies API", () => {
     });
   });
 
-  it("bounds and computes list pagination", async () => {
+  it("defaults to limit=15 and bounds list pagination", async () => {
+    mocks.findMany.mockResolvedValue([greetingRow]);
+    mocks.count.mockResolvedValue(1);
+    const defaultResponse = await request(app).get("/api/quick-replies").set(auth(adminToken));
+    expect(defaultResponse.status).toBe(200);
+    expect(defaultResponse.body.meta.limit).toBe(15);
+    expect(mocks.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 15 }));
+
     const rejected = await request(app).get("/api/quick-replies?limit=500").set(auth(adminToken));
     expect(rejected.status).toBe(400);
     mocks.findMany.mockResolvedValue([greetingRow]);

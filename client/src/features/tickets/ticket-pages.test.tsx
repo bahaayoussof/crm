@@ -83,7 +83,22 @@ describe("ticket pages", () => {
     const loading = renderAt("/tickets", <Route path="/tickets" element={<TicketListPage />} />); expect(screen.getByLabelText("loading")).toBeInTheDocument(); loading.unmount();
     renderAt("/tickets", <Route path="/tickets" element={<TicketListPage />} />);
     expect(screen.getAllByText("No tickets yet.")).toHaveLength(2);
-    expect(within(screen.getByRole("table")).getByRole("columnheader", { name: "ID" })).toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByRole("columnheader", { name: "Customer" })).toBeInTheDocument();
+  });
+
+  it("navigates to /tickets/new on New Ticket click and does not open a modal", () => {
+    renderAt(
+      "/tickets",
+      <>
+        <Route path="/tickets" element={<TicketListPage />} />
+        <Route path="/tickets/new" element={<h1>New Ticket Page</h1>} />
+      </>,
+    );
+    const newButton = screen.getByRole("link", { name: /new ticket/i });
+    expect(newButton).toHaveAttribute("href", "/tickets/new");
+    fireEvent.click(newButton);
+    expect(screen.getByRole("heading", { name: "New Ticket Page" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it.each([
@@ -121,7 +136,7 @@ describe("ticket pages", () => {
     mocks.useTickets.mockReturnValue({ isLoading: false, isError: false, data: { data: [listTicket], meta: { page: 2, limit: 20, total: 60, totalPages: 3 } }, refetch: mocks.refetch });
     renderAt("/tickets?page=2", <Route path="/tickets" element={<TicketListPage />} />);
     expect(within(screen.getByRole("table")).getByRole("columnheader", { name: "Ticket" })).toBeInTheDocument();
-    expect(within(screen.getByRole("table")).getByRole("columnheader", { name: "ID" })).toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByRole("columnheader", { name: "Customer" })).toBeInTheDocument();
     expect(screen.getAllByTitle(ticket.id).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     await waitFor(() => expect(mocks.useTickets).toHaveBeenLastCalledWith(expect.objectContaining({ page: 3 })));
@@ -335,7 +350,7 @@ describe("ticket pages", () => {
   it("renders representative ticket UI in Arabic", async () => {
     await changeAppLanguage("ar"); mocks.useTickets.mockReturnValue({ isLoading: false, isError: false, data: { data: [listTicket], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } }, refetch: mocks.refetch });
     renderAt("/tickets", <Route path="/tickets" element={<TicketListPage />} />);
-    expect(screen.getByRole("heading", { name: "التذاكر" })).toBeInTheDocument(); expect(within(screen.getByRole("table")).getByRole("columnheader", { name: "المعرّف" })).toBeInTheDocument(); expect(screen.getAllByText("قيد التنفيذ").length).toBeGreaterThan(0);
+    expect(screen.getByRole("heading", { name: "التذاكر" })).toBeInTheDocument(); expect(within(screen.getByRole("table")).getByRole("columnheader", { name: "العميل" })).toBeInTheDocument(); expect(screen.getAllByText("قيد التنفيذ").length).toBeGreaterThan(0);
   });
 
   it("localizes filtered-empty messaging in Arabic", async () => {

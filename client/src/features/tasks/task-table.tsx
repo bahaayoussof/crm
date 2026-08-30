@@ -6,16 +6,17 @@ import {
   type PaginationState,
   type Updater,
 } from "@tanstack/react-table";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
 import { DataTablePagination } from "@/components/shared/data-table/data-table-pagination";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Role } from "@/features/auth/auth.types";
 import { TaskDeleteConfirm } from "./task-delete-confirm";
 import { formatTaskDateTime, isTaskOverdue } from "./task-format";
 import { useUpdateTask } from "./task-hooks";
-import { CheckIcon, PencilIcon, ReopenIcon, SpinnerIcon } from "./task-icons";
+import { CheckIcon, PencilIcon, ReopenIcon, TrashIcon } from "./task-icons";
 import { taskEditScope } from "./task-permissions";
 import { OverdueBadge, TaskStatusBadge } from "./tasks-ui";
 import type { Task } from "./task.types";
@@ -36,11 +37,6 @@ interface TaskTableProps {
   totalCount?: number;
   onPageChange: (page: number) => void;
 }
-
-const ICON_BUTTON =
-  "inline-flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors " +
-  "hover:bg-surface-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
-  "disabled:cursor-not-allowed disabled:opacity-60";
 
 const columnClasses: Record<string, string> = {
   title: "w-auto",
@@ -277,6 +273,8 @@ function RowActions({
   onCloseConfirm,
 }: RowActionsShared & { task: Task; variant: ConfirmVariant }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const scope = taskEditScope(task, currentUserId, currentUserRole);
   const update = useUpdateTask(task.id);
 
@@ -288,44 +286,56 @@ function RowActions({
     }
   };
 
+  const menuItems: ActionMenuItem[] = [
+    ...(scope.canEditStatus
+      ? [
+          {
+            key: "status",
+            label: task.status === "OPEN" ? t("tasks.markDone") : t("tasks.reopen"),
+            icon: task.status === "OPEN" ? <CheckIcon /> : <ReopenIcon />,
+            disabled: update.isPending,
+            onClick: toggleStatus,
+          },
+        ]
+      : []),
+    ...(scope.canEditContent
+      ? [
+          {
+            key: "edit",
+            label: t("tasks.editAction"),
+            icon: <PencilIcon />,
+            onClick: () => navigate(`/tasks/${task.id}/edit`),
+          },
+        ]
+      : []),
+    ...(scope.canDelete
+      ? [
+          {
+            key: "delete",
+            label: t("tasks.deleteAction"),
+            icon: <TrashIcon />,
+            destructive: true,
+            onClick: () => onOpenConfirm(task.id, variant),
+          },
+        ]
+      : []),
+  ];
+
   return (
-    <div className="inline-flex items-center gap-1.5">
-      {scope.canEditStatus && (
-        <button
-          type="button"
-          className={ICON_BUTTON}
-          aria-label={task.status === "OPEN" ? t("tasks.markDone") : t("tasks.reopen")}
-          title={task.status === "OPEN" ? t("tasks.markDone") : t("tasks.reopen")}
-          disabled={update.isPending}
-          onClick={toggleStatus}
-        >
-          {update.isPending ? (
-            <SpinnerIcon className="size-4" />
-          ) : task.status === "OPEN" ? (
-            <CheckIcon />
-          ) : (
-            <ReopenIcon />
-          )}
-        </button>
-      )}
-
-      {scope.canEditContent && (
-        <Link
-          className={ICON_BUTTON}
-          to={`/tasks/${task.id}/edit`}
-          aria-label={t("tasks.editAction")}
-          title={t("tasks.editAction")}
-        >
-          <PencilIcon />
-        </Link>
-      )}
-
+    <div className="inline-flex items-center justify-end">
+      <ActionMenu
+        items={menuItems}
+        triggerLabel={t("tasks.columns.actions")}
+        externalTriggerRef={triggerRef}
+      />
       {scope.canDelete && (
         <TaskDeleteConfirm
           task={task}
           open={openConfirm?.id === task.id && openConfirm.variant === variant}
           onRequestOpen={() => onOpenConfirm(task.id, variant)}
           onRequestClose={onCloseConfirm}
+          hideTrigger
+          externalTriggerRef={triggerRef}
         />
       )}
     </div>

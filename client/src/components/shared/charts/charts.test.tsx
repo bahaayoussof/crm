@@ -28,6 +28,7 @@ describe("Chart Theme System", () => {
   });
 
   it("resolves semantic CSS variables for statuses", () => {
+    expect(getStatusChartColor("NEW")).toBe("#06B6D4");
     expect(getStatusChartColor("OPEN")).toBe("var(--info)");
     expect(getStatusChartColor("IN_PROGRESS")).toBe("var(--progress)");
     expect(getStatusChartColor("WAITING_CUSTOMER")).toBe("var(--warning)");

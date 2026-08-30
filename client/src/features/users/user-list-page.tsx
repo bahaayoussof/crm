@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { AppSelect } from "@/components/ui/app-select";
 import {
   DataTableSurface,
@@ -11,6 +12,7 @@ import { useAuth } from "@/features/auth/auth-state";
 import { useDebouncedValue } from "@/features/customers/use-debounced-value";
 import { useUsers } from "./user-hooks";
 import { UserTable } from "./user-table";
+import { UserCreateModal } from "./user-create-modal";
 import { PageHeader, StatePanel, UsersPage } from "./users-ui";
 import { MANAGEABLE_ROLES, type ManageableRole } from "./user.types";
 
@@ -20,6 +22,7 @@ export function UserListPage() {
   const { t } = useTranslation();
   const { user: currentUser } = useAuth();
   const [params, setParams] = useSearchParams();
+  const [createOpen, setCreateOpen] = useState(false);
 
   const search = params.get("search") ?? "";
   const debouncedSearch = useDebouncedValue(search);
@@ -30,7 +33,7 @@ export function UserListPage() {
   const rawPage = Number(params.get("page") ?? "1");
   const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1;
 
-  const users = useUsers({ search: debouncedSearch, role, status, page, limit: 20 });
+  const users = useUsers({ search: debouncedSearch, role, status, page, limit: 15 });
 
   const setFilter = (key: string, value: string) => {
     const next = new URLSearchParams(params);
@@ -62,7 +65,7 @@ export function UserListPage() {
         <PageHeader
           title={t("users.title")}
           description={t("users.description")}
-          actions={<Link className="button-link" to="/users/new">{t("users.create")}</Link>}
+          actions={<button type="button" className="button-link" onClick={() => setCreateOpen(true)}>{t("users.create")}</button>}
         />
 
         {/* Unified DataTable Surface */}
@@ -122,7 +125,7 @@ export function UserListPage() {
             </div>
           ) : users.data && users.data.data.length === 0 ? (
             <div className="p-6">
-              <StatePanel action={hasFilters ? <button className="button-secondary" onClick={() => setParams({})}>{t("users.clearFilters")}</button> : <Link className="button-link" to="/users/new">{t("users.create")}</Link>}>
+              <StatePanel action={hasFilters ? <button className="button-secondary" onClick={() => setParams({})}>{t("users.clearFilters")}</button> : <button type="button" className="button-link" onClick={() => setCreateOpen(true)}>{t("users.create")}</button>}>
                 {hasFilters ? t("users.noMatches") : t("users.empty")}
               </StatePanel>
             </div>
@@ -138,6 +141,12 @@ export function UserListPage() {
             />
           )}
         </DataTableSurface>
+
+        <UserCreateModal
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          onSuccess={() => users.refetch()}
+        />
       </div>
     </UsersPage>
   );

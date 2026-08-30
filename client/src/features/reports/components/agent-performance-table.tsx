@@ -58,7 +58,7 @@ function AgentTable({
   return (
     <>
       <div className="hidden md:block">
-        <TableContainer>
+        <TableContainer className="max-h-[420px] overflow-auto">
           <Table className="min-w-[52rem]">
             <colgroup>
               <col className="w-64" />
@@ -68,7 +68,7 @@ function AgentTable({
               <col className="w-28" />
               <col className="w-32" />
             </colgroup>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-10 bg-table-header backdrop-blur-xs">
               <TableRow>
                 <TableHead>{t("reports.agents.name")}</TableHead>
                 {numericHeaders.map((label) => (
@@ -112,7 +112,7 @@ function AgentTable({
         </TableContainer>
       </div>
 
-      <ul className="grid gap-3 md:hidden">
+      <ul className="grid gap-3 md:hidden max-h-[420px] overflow-y-auto p-1">
         {rows.map((row) => (
           <li
             key={row.agentId}

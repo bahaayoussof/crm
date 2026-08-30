@@ -38,7 +38,7 @@ export function TaskListPage() {
   const tasks = useTasks({
     search: debouncedSearch,
     page,
-    limit: 20,
+    limit: 15,
     status,
     assigneeId,
   });
@@ -118,7 +118,7 @@ export function TaskListPage() {
             </div>
           </DataTableToolbar>
 
-          {tasks.isLoading || !user ? (
+          {tasks.isLoading ? (
             <div className="p-4" aria-label={t("common.loading")}>
               <DataTableSkeleton columns={5} />
             </div>
@@ -155,10 +155,10 @@ export function TaskListPage() {
           ) : (
             <TaskTable
               tasks={tasks.data?.data ?? []}
-              currentUserId={user.id}
-              currentUserRole={user.role}
+              currentUserId={user?.id ?? ""}
+              currentUserRole={user?.role ?? "AGENT"}
               page={page}
-              pageSize={tasks.data?.meta.limit ?? 20}
+              pageSize={tasks.data?.meta.limit ?? 15}
               pageCount={tasks.data?.meta.totalPages ?? 0}
               totalCount={tasks.data?.meta.total}
               onPageChange={(nextPage) => setFilter("page", nextPage > 1 ? String(nextPage) : "")}
