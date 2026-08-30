@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, type Role } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../audit-logs/audit-log.constants.js";
@@ -6,12 +6,26 @@ import type { AuditRequestContext } from "../audit-logs/audit-request-context.js
 import { changedFields, createAuditLog } from "../audit-logs/audit-log.service.js";
 import type { PortalProfileUpdateInput } from "./portal.schema.js";
 
-export type PortalProfile = { name: string; email: string; phone: string | null };
+export type PortalProfile = {
+  name: string;
+  email: string;
+  phone: string | null;
+  role: Role;
+  createdAt: string;
+  passwordChangedAt: string | null;
+};
 
 async function ownCustomer(userId: string) {
   const customer = await prisma.customer.findUnique({
     where: { userId },
-    select: { id: true, name: true, email: true, phone: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      createdAt: true,
+      user: { select: { role: true, passwordChangedAt: true } },
+    },
   });
   if (!customer) {
     throw new AppError(403, "CUSTOMER_PROFILE_REQUIRED", "A linked customer profile is required");
@@ -19,9 +33,24 @@ async function ownCustomer(userId: string) {
   return customer;
 }
 
+type OwnCustomer = Awaited<ReturnType<typeof ownCustomer>>;
+
+function toPortalProfile(customer: OwnCustomer, phone: string | null): PortalProfile {
+  return {
+    name: customer.name,
+    email: customer.email,
+    phone,
+    role: customer.user?.role ?? "CUSTOMER",
+    createdAt: customer.createdAt.toISOString(),
+    passwordChangedAt: customer.user?.passwordChangedAt
+      ? customer.user.passwordChangedAt.toISOString()
+      : null,
+  };
+}
+
 export async function getProfile(userId: string): Promise<PortalProfile> {
   const customer = await ownCustomer(userId);
-  return { name: customer.name, email: customer.email, phone: customer.phone };
+  return toPortalProfile(customer, customer.phone);
 }
 
 export async function updateProfile(
@@ -53,7 +82,7 @@ export async function updateProfile(
       });
       await tx.user.update({
         where: { id: userId },
-        data: { name: nextName, email: nextEmail },
+        data: { name: nextName, email: nextEmail, phone: nextPhone },
       });
     });
   } catch (error) {
@@ -63,7 +92,11 @@ export async function updateProfile(
     throw error;
   }
 
-  const next: PortalProfile = { name: nextName, email: nextEmail, phone: nextPhone };
+  const next: PortalProfile = {
+    ...toPortalProfile(current, nextPhone),
+    name: nextName,
+    email: nextEmail,
+  };
   await createAuditLog({
     actorId: userId,
     action: AUDIT_ACTIONS.PROFILE_UPDATED,
@@ -71,7 +104,7 @@ export async function updateProfile(
     entityId: current.id,
     changes: changedFields(
       { name: current.name, email: current.email, phone: current.phone },
-      next,
+      { name: nextName, email: nextEmail, phone: nextPhone },
       ["name", "email", "phone"],
     ),
     requestContext,

@@ -1,21 +1,25 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { useAnchoredPopover } from "@/components/shared/use-anchored-popover";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { AuthUser } from "@/features/auth/auth.types";
+import type { ProtectedAudience } from "@/features/auth/auth-routing";
 import { cn } from "@/lib/utils";
-import { ChevronDownNavIcon, LogoutIcon } from "../nav-icons";
+import { ChevronDownNavIcon, LogoutIcon, ProfileNavIcon } from "../nav-icons";
 
 interface SidebarUserMenuProps {
   user: AuthUser | null;
+  audience: ProtectedAudience;
   collapsed: boolean;
   onLogout: () => void;
 }
 
-export function SidebarUserMenu({ user, collapsed, onLogout }: SidebarUserMenuProps) {
+export function SidebarUserMenu({ user, audience, collapsed, onLogout }: SidebarUserMenuProps) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
 
   const { triggerRef, panelRef, style } = useAnchoredPopover<HTMLButtonElement, HTMLDivElement>({
@@ -38,6 +42,11 @@ export function SidebarUserMenu({ user, collapsed, onLogout }: SidebarUserMenuPr
   const handleSignOut = () => {
     setOpen(false);
     onLogout();
+  };
+
+  const handleProfile = () => {
+    setOpen(false);
+    navigate("/profile");
   };
 
   return (
@@ -150,6 +159,17 @@ export function SidebarUserMenu({ user, collapsed, onLogout }: SidebarUserMenuPr
 
             {/* Actions List */}
             <div className="pt-1">
+              {audience === "internal" && user?.role !== "CUSTOMER" && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={handleProfile}
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:bg-surface-hover"
+                >
+                  <ProfileNavIcon className="size-3.5 text-muted-foreground" />
+                  <span>{t("auth.myProfile")}</span>
+                </button>
+              )}
               <button
                 type="button"
                 role="menuitem"

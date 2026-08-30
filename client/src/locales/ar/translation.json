@@ -609,6 +609,40 @@
       }
     }
   },
+  "profile": {
+    "title": "الملف الشخصي",
+    "description": "إدارة معلوماتك الشخصية وأمان حسابك.",
+    "loading": "جارٍ تحميل ملفك الشخصي...",
+    "loadError": "تعذّر تحميل ملفك الشخصي.",
+    "personalInformation": "المعلومات الشخصية",
+    "fullName": "الاسم الكامل",
+    "emailAddress": "البريد الإلكتروني",
+    "phoneNumber": "رقم الهاتف",
+    "notProvided": "غير متوفر",
+    "language": "اللغة",
+    "timeZone": "المنطقة الزمنية",
+    "edit": "تعديل",
+    "editTitle": "تعديل الملف الشخصي",
+    "saveChanges": "حفظ التغييرات",
+    "saving": "جارٍ الحفظ...",
+    "changePassword": "تغيير كلمة المرور",
+    "lastChanged": "آخر تغيير لكلمة المرور",
+    "passwordNeverChanged": "لم تتغير بعد",
+    "joinedOn": "انضم في {{date}}",
+    "security": {
+      "blurb": "استخدم كلمة مرور قوية وفريدة لحماية حسابك."
+    },
+    "roles": {
+      "admin": "مسؤول",
+      "manager": "مدير",
+      "agent": "وكيل دعم",
+      "customer": "عميل"
+    },
+    "errors": {
+      "EMAIL_IN_USE": "هذا البريد الإلكتروني مستخدم بالفعل.",
+      "updateFailed": "تعذّر حفظ تغييراتك. يرجى المحاولة مرة أخرى."
+    }
+  },
   "auth": {
     "loginTitle": "تسجيل الدخول", "loginDescription": "الوصول إلى حساب دعم العملاء.",
     "registerTitle": "إنشاء حساب دعم", "registerDescription": "سجّل كعميل لطلب الدعم ومتابعته.",
@@ -616,7 +650,7 @@
     "show": "إظهار", "hide": "إخفاء", "signIn": "تسجيل الدخول", "signingIn": "جارٍ تسجيل الدخول…", "register": "إنشاء حساب",
     "createAccount": "إنشاء الحساب", "creatingAccount": "جارٍ إنشاء الحساب…", "needAccount": "تحتاج إلى حساب عميل؟", "haveAccount": "لديك حساب بالفعل؟",
     "dashboardPlaceholder": "مساحة العمل الداخلية", "portalPlaceholder": "بوابة العميل",
-    "signedInAs": "تم تسجيل الدخول باسم {{name}}. سيتم تنفيذ هذه المساحة في ميزة لاحقة.", "logout": "تسجيل الخروج",
+    "signedInAs": "تم تسجيل الدخول باسم {{name}}. سيتم تنفيذ هذه المساحة في ميزة لاحقة.", "myProfile": "ملفي الشخصي", "logout": "تسجيل الخروج",
     "forgotPassword": {
       "link": "هل نسيت كلمة المرور؟",
       "title": "نسيت كلمة المرور؟",

@@ -203,7 +203,7 @@ export function Sidebar({ user, audience, collapsed, onToggleCollapsed, onLogout
           collapsed ? "py-2 px-0 flex items-center justify-center" : "p-3"
         )}
       >
-        <SidebarUserMenu user={user} collapsed={collapsed} onLogout={onLogout} />
+        <SidebarUserMenu user={user} audience={audience} collapsed={collapsed} onLogout={onLogout} />
       </div>
     </aside>
   );

@@ -21,6 +21,14 @@ const agentUser: AuthUser = {
   customer: null,
 };
 
+const managerUser: AuthUser = {
+  id: "u-manager",
+  name: "Manager User",
+  email: "manager@example.com",
+  role: "MANAGER",
+  customer: null,
+};
+
 const customerUser: AuthUser = {
   id: "u-customer",
   name: "Ahmed Customer",
@@ -164,6 +172,7 @@ describe("Sidebar component", () => {
 
     // Menu panel should show email and logout action
     expect(screen.getByText("bahaa@example.com")).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "My Profile" })).toBeInTheDocument();
     const logoutBtn = screen.getByRole("menuitem", { name: "Log out" });
     expect(logoutBtn).toBeInTheDocument();
 
@@ -182,10 +191,27 @@ describe("Sidebar component", () => {
 
     // Menu panel is portalled
     expect(screen.getByText("bahaa@example.com")).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "My Profile" })).toBeInTheDocument();
     const logoutBtn = screen.getByRole("menuitem", { name: "Log out" });
     fireEvent.click(logoutBtn);
 
     expect(onLogout).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["ADMIN", adminUser],
+    ["MANAGER", managerUser],
+    ["AGENT", agentUser],
+  ])("shows My Profile for %s and navigates to the shared internal route", (_role, user) => {
+    window.history.pushState({}, "", "/dashboard");
+    renderSidebar({ user, audience: "internal", collapsed: false });
+    fireEvent.click(screen.getByRole("button", { name: user.name }));
+
+    const profileAction = screen.getByRole("menuitem", { name: "My Profile" });
+    fireEvent.click(profileAction);
+
+    expect(window.location.pathname).toBe("/profile");
+    expect(screen.queryByRole("menuitem", { name: "My Profile" })).not.toBeInTheDocument();
   });
 
   it("respects RBAC visibility for AGENT role", () => {
@@ -224,5 +250,7 @@ describe("Sidebar component", () => {
     // Shared shell behavior is preserved (collapse control + user menu)
     expect(screen.getByRole("button", { name: "Collapse sidebar" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Ahmed Customer/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Ahmed Customer/i }));
+    expect(screen.queryByRole("menuitem", { name: "My Profile" })).not.toBeInTheDocument();
   });
 });

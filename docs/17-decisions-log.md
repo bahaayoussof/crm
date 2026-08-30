@@ -1107,7 +1107,7 @@ Previously, clicking the Link button in the Lexical reply toolbar triggered brow
 - Safe, validated link insertion with full keyboard and screen-reader accessibility.
 - Server-side sanitizer allowlists in `reply-html.ts` continue to enforce `target="_blank"` and `rel="noopener noreferrer nofollow"`.
 
-# ADR-042: Account Management — password reset for all roles + customer self-service profile
+# ADR-042: Account Management - password reset and shared self-profile for all roles
 
 **Status:** Implemented on `feature/account-management` (not yet integrated). Additive migration `20260830190000_add_password_reset`.
 
@@ -1123,8 +1123,9 @@ Login/register existed but there was no way to recover a forgotten password (any
 4. **Change password** (`PATCH /auth/change-password`, authenticated, any role) verifies the current password, rejects new === current, and returns a **fresh JWT** so the acting session survives while `passwordChangedAt` is bumped.
 5. **Email abstraction.** `server/src/modules/email/` — an `EmailProvider` interface with a Resend adapter (used when `RESEND_API_KEY` + `EMAIL_FROM` are set) and a log-transport fallback that prints the message (incl. the reset URL) to the server console in development. `sendEmail` swallows provider errors so a mail outage never 500s a security flow. New env: `APP_URL` (falls back to `CLIENT_URL`), `RESEND_API_KEY`, `EMAIL_FROM`. Added the `resend` dependency (server).
 6. **Scoped session invalidation.** The JWT now carries `iat` (`request.auth.issuedAt`). `middleware/require-fresh-token.ts` rejects a token issued before `passwordChangedAt` (`401 SESSION_EXPIRED`). It is mounted ONLY on `portalRouter`; `/auth/me` performs the same check inside `getCurrentUser` (which already reads the user row). Global `requireAuth` is **not** modified — a DB-backed `requireAuth` breaks ~10 module test suites (see `.wolf/cerebrum.md`). All other internal routes stay bounded by the 8-hour JWT expiry. Documented limitation.
-7. **Customer profile.** `GET/PATCH /api/portal/profile` derives the customer from `req.auth.userId`. `PATCH` accepts a strict `{ name, email, phone }` whitelist only; a changed email is checked for uniqueness across `User` + `Customer` (pre-check and `P2002` both → `409 EMAIL_IN_USE`); `Customer` and `User` are updated in one transaction so the login identity stays synced; `PROFILE_UPDATED` is audited. Phone gets **no** uniqueness constraint (WhatsApp customer matching keys on phone). The page is read-only by default with two cards (Personal Information / Security); Edit Profile and Change Password use shared portalled modals matching `FileUploadModal`.
-8. **Audit actions added:** `PASSWORD_RESET_REQUESTED`, `PASSWORD_RESET_COMPLETED`, `PASSWORD_CHANGED`, `PROFILE_UPDATED`. Tokens, hashes and raw URLs are never logged.
+7. **Shared profile.** Internal users use `/profile` with dedicated `GET/PATCH /api/auth/profile`; customers use `/portal/profile` with the existing portal endpoints. Sensitive routes use `requireAuth -> requireFreshToken`, with strict PATCH validation. The server derives the current account from `request.auth.userId`. `User.phone String?` is added by migration `20260830210000_add_user_phone`. Linked CUSTOMER identities synchronize `User` and `Customer` name/email/phone transactionally. Duplicate email pre-checks and `P2002` both return `409 EMAIL_IN_USE`.
+8. **Shared client architecture.** Both routes are thin wrappers around `client/src/features/profile/`: page header, identity hero, initials avatar, role badge, email, joined date, Personal Information, Security/Change Password, and edit/change dialogs. The layout is single-column by default and `lg:grid-cols-2` on desktop, with EN/AR and RTL support. Language and timezone are runtime information only. Concrete hooks are created once at module setup; hook callers never receive runtime configuration.
+9. **Audit actions added:** `PASSWORD_RESET_REQUESTED`, `PASSWORD_RESET_COMPLETED`, `PASSWORD_CHANGED`, `PROFILE_UPDATED`. Tokens, hashes and raw URLs are never logged.
 
 ## Alternatives rejected
 

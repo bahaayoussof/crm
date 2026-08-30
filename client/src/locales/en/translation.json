@@ -609,6 +609,40 @@
       }
     }
   },
+  "profile": {
+    "title": "Profile",
+    "description": "Manage your personal information and account security.",
+    "loading": "Loading your profile...",
+    "loadError": "Unable to load your profile.",
+    "personalInformation": "Personal Information",
+    "fullName": "Full name",
+    "emailAddress": "Email address",
+    "phoneNumber": "Phone number",
+    "notProvided": "Not provided",
+    "language": "Language",
+    "timeZone": "Time zone",
+    "edit": "Edit",
+    "editTitle": "Edit profile",
+    "saveChanges": "Save changes",
+    "saving": "Saving...",
+    "changePassword": "Change Password",
+    "lastChanged": "Last password change",
+    "passwordNeverChanged": "Not changed yet",
+    "joinedOn": "Joined {{date}}",
+    "security": {
+      "blurb": "Use a strong, unique password to protect your account."
+    },
+    "roles": {
+      "admin": "Admin",
+      "manager": "Manager",
+      "agent": "Agent",
+      "customer": "Customer"
+    },
+    "errors": {
+      "EMAIL_IN_USE": "This email is already in use.",
+      "updateFailed": "Unable to save your changes. Please try again."
+    }
+  },
   "auth": {
     "loginTitle": "Sign in", "loginDescription": "Access your customer support account.",
     "registerTitle": "Create a support account", "registerDescription": "Register as a customer to request and track support.",
@@ -616,7 +650,7 @@
     "show": "Show", "hide": "Hide", "signIn": "Sign in", "signingIn": "Signing in…", "register": "Register",
     "createAccount": "Create account", "creatingAccount": "Creating account…", "needAccount": "Need a customer account?", "haveAccount": "Already have an account?",
     "dashboardPlaceholder": "Internal workspace", "portalPlaceholder": "Customer portal",
-    "signedInAs": "Signed in as {{name}}. This area will be implemented in a later feature.", "logout": "Log out",
+    "signedInAs": "Signed in as {{name}}. This area will be implemented in a later feature.", "myProfile": "My Profile", "logout": "Log out",
     "forgotPassword": {
       "link": "Forgot password?",
       "title": "Forgot your password?",

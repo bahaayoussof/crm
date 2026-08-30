@@ -4,9 +4,14 @@ import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../audit-logs/audit-log.constants.js";
 import type { AuditRequestContext } from "../audit-logs/audit-request-context.js";
-import { createAuditLog } from "../audit-logs/audit-log.service.js";
+import { changedFields, createAuditLog } from "../audit-logs/audit-log.service.js";
 import { createAccessToken } from "./auth-token.js";
-import type { ChangePasswordInput, LoginInput, RegisterInput } from "./auth.schema.js";
+import type {
+  ChangePasswordInput,
+  LoginInput,
+  RegisterInput,
+  SelfProfileUpdateInput,
+} from "./auth.schema.js";
 import type { AuthResponse, AuthUser } from "./auth.types.js";
 
 const authUserSelect = {
@@ -168,4 +173,115 @@ export async function changePassword(
 
   // Fresh token so the caller's own session survives the passwordChangedAt bump.
   return { token: createAccessToken(user) };
+}
+
+const selfProfileSelect = {
+  id: true,
+  name: true,
+  email: true,
+  phone: true,
+  role: true,
+  isActive: true,
+  createdAt: true,
+  passwordChangedAt: true,
+  customerProfile: { select: { id: true, name: true, email: true, phone: true } },
+} satisfies Prisma.UserSelect;
+
+export type SelfProfile = {
+  name: string;
+  email: string;
+  phone: string | null;
+  role: Role;
+  createdAt: string;
+  passwordChangedAt: string | null;
+};
+
+type SelfProfileUser = Prisma.UserGetPayload<{ select: typeof selfProfileSelect }>;
+
+/**
+ * For a CUSTOMER the linked Customer row is the display source of truth
+ * (name/email/phone are kept in sync there); internal roles read straight
+ * off the User row.
+ */
+function toSelfProfile(user: SelfProfileUser): SelfProfile {
+  const customer = user.customerProfile;
+  return {
+    name: customer?.name ?? user.name,
+    email: customer?.email ?? user.email,
+    phone: customer ? customer.phone : user.phone,
+    role: user.role,
+    createdAt: user.createdAt.toISOString(),
+    passwordChangedAt: user.passwordChangedAt ? user.passwordChangedAt.toISOString() : null,
+  };
+}
+
+export async function getSelfProfile(userId: string): Promise<SelfProfile> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: selfProfileSelect });
+  if (!user || !user.isActive) {
+    throw new AppError(401, "INVALID_TOKEN", "Authentication token is invalid or expired");
+  }
+  return toSelfProfile(user);
+}
+
+export async function updateSelfProfile(
+  userId: string,
+  input: SelfProfileUpdateInput,
+  requestContext?: AuditRequestContext,
+): Promise<SelfProfile> {
+  const current = await prisma.user.findUnique({ where: { id: userId }, select: selfProfileSelect });
+  if (!current || !current.isActive) {
+    throw new AppError(401, "INVALID_TOKEN", "Authentication token is invalid or expired");
+  }
+
+  const before = toSelfProfile(current);
+  const nextName = input.name;
+  const nextEmail = input.email;
+  const nextPhone = input.phone === undefined ? before.phone : input.phone;
+
+  if (nextEmail !== before.email) {
+    const [userClash, customerClash] = await Promise.all([
+      prisma.user.findFirst({ where: { email: nextEmail, NOT: { id: userId } }, select: { id: true } }),
+      prisma.customer.findFirst({ where: { email: nextEmail, NOT: { userId } }, select: { id: true } }),
+    ]);
+    if (userClash || customerClash) {
+      throw new AppError(409, "EMAIL_IN_USE", "This email is already in use");
+    }
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: { name: nextName, email: nextEmail, phone: nextPhone },
+      });
+      if (current.customerProfile) {
+        await tx.customer.update({
+          where: { id: current.customerProfile.id },
+          data: { name: nextName, email: nextEmail, phone: nextPhone },
+        });
+      }
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new AppError(409, "EMAIL_IN_USE", "This email is already in use");
+    }
+    throw error;
+  }
+
+  const after: SelfProfile = { ...before, name: nextName, email: nextEmail, phone: nextPhone };
+
+  await createAuditLog({
+    actorId: userId,
+    action: AUDIT_ACTIONS.PROFILE_UPDATED,
+    entityType: AUDIT_ENTITY_TYPES.USER,
+    entityId: userId,
+    changes: changedFields(
+      { name: before.name, email: before.email, phone: before.phone },
+      { name: after.name, email: after.email, phone: after.phone },
+      ["name", "email", "phone"],
+    ),
+    requestContext,
+  });
+
+  return after;
 }

@@ -1,14 +1,17 @@
 import { Router } from "express";
 import { requireAuth } from "../../middleware/auth.js";
 import { rateLimit } from "../../middleware/rate-limit.js";
+import { requireFreshToken } from "../../middleware/require-fresh-token.js";
 import { validateBody } from "../../middleware/validate.js";
 import {
   changePasswordHandler,
   forgotPassword,
+  getProfileHandler,
   me,
   register,
   resetPasswordHandler,
   signIn,
+  updateProfileHandler,
 } from "./auth.controller.js";
 import {
   changePasswordSchema,
@@ -16,6 +19,7 @@ import {
   loginSchema,
   registerSchema,
   resetPasswordSchema,
+  selfProfileUpdateSchema,
 } from "./auth.schema.js";
 
 export const authRouter = Router();
@@ -45,3 +49,11 @@ authRouter.post("/forgot-password", forgotPasswordRateLimit, validateBody(forgot
 authRouter.post("/reset-password", resetPasswordRateLimit, validateBody(resetPasswordSchema), resetPasswordHandler);
 authRouter.patch("/change-password", requireAuth, validateBody(changePasswordSchema), changePasswordHandler);
 authRouter.get("/me", requireAuth, me);
+authRouter.get("/profile", requireAuth, requireFreshToken, getProfileHandler);
+authRouter.patch(
+  "/profile",
+  requireAuth,
+  requireFreshToken,
+  validateBody(selfProfileUpdateSchema),
+  updateProfileHandler,
+);

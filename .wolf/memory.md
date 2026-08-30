@@ -595,6 +595,10 @@ Summary: Completed **Tasks & Reminders** end to end on uncommitted `feature/task
 
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
+| 19:01 | Audited Claude account-management continuation | Git, Prisma, auth/portal/profile files, tests | Found shared profile work partially integrated; baseline portal fixture failures and missing internal route/tests | ~8k |
+| 19:05 | Finished shared Account Management profile | client/src/features/profile, portal wrapper, app-router, auth profile tests, i18n | Internal `/profile` and portal shared redesign complete; strict self-profile API coverage green | ~10k |
+| 19:08 | Applied phone migration and verified repository | Prisma/Neon, full client/server checks | Migration applied; server 548/548, client suite green, typecheck/build/lint/parity/diff checks green | ~5k |
+| 19:18 | Fixed missing internal profile menu entry | SidebarUserMenu, Sidebar, i18n, focused tests | ADMIN/MANAGER/AGENT now see My Profile in expanded/collapsed menu; click closes and navigates; CUSTOMER excluded | ~3k |
 
 ## Session: 2026-08-30 17:22
 
@@ -617,3 +621,8 @@ Summary: Completed **Tasks & Reminders** end to end on uncommitted `feature/task
 | — | i18n EN/AR | locales/{en,ar}/translation.json | +auth.forgotPassword/resetPassword/changePassword, portal.profile, errors.auth codes; parity 1081/1081 | 3k |
 | — | Client tests | features/auth/*.test.tsx (3), features/portal/profile/profile-page.test.tsx, portal-routing.test.tsx | +14 tests → 603/603 client pass | 4k |
 | — | Verify | — | server 538/538, client 603/603, lint clean, tsc clean, vite build green | 1k |
+
+## Session: 2026-08-30 18:23
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|

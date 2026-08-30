@@ -25,6 +25,8 @@ GET   /auth/me
 POST  /auth/forgot-password
 POST  /auth/reset-password
 PATCH /auth/change-password
+GET   /auth/profile
+PATCH /auth/profile
 ```
 
 `POST /auth/register` accepts `{ name, email, password, phone? }`, rejects unknown fields, and always creates a customer identity. `POST /auth/login` accepts `{ email, password }`. Both successful endpoints return:
@@ -55,6 +57,14 @@ Works for every role (ADMIN / MANAGER / AGENT / CUSTOMER).
 - `PATCH /auth/change-password` — authenticated; `{ currentPassword, newPassword, confirmPassword }`. Verifies the current password (`401 INVALID_PASSWORD`), rejects a new password equal to the current one (`422 SAME_PASSWORD` / `400 VALIDATION_ERROR`), writes `passwordHash` + `passwordChangedAt`, audits `PASSWORD_CHANGED`, and returns `200 { "data": { "token": "<fresh-jwt>" } }` so the caller's own session survives.
 
 **Session invalidation (bounded):** the JWT now carries `iat`; `require-fresh-token` middleware rejects a token issued before `passwordChangedAt` with `401 SESSION_EXPIRED`. It is enforced ONLY on `/auth/me` and every `/portal/*` route. All other internal routes remain bounded by the 8-hour JWT expiry (no server-side session registry, no refresh tokens).
+
+### Shared self-profile - LIVE (on `feature/account-management`, not yet integrated)
+
+- `GET /auth/profile` and `PATCH /auth/profile` are dedicated self-profile endpoints for every authenticated role. Both use `requireAuth -> requireFreshToken`; PATCH additionally uses strict body validation before its handler.
+- The server derives the account from the JWT user id. Clients never submit a user id.
+- PATCH accepts only `{ name, email, phone }`; unknown fields are `400 VALIDATION_ERROR`. Duplicate email pre-checks and Prisma `P2002` races both return `409 EMAIL_IN_USE`.
+- Internal roles persist phone on `User.phone` (additive migration `20260830210000_add_user_phone`). Linked CUSTOMER identities update `User` and `Customer` name/email/phone transactionally.
+- Responses contain `{ name, email, phone, role, createdAt, passwordChangedAt }` and never contain `passwordHash`.
 
 ## Users — LIVE
 

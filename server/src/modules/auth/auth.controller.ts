@@ -7,8 +7,16 @@ import type {
   LoginInput,
   RegisterInput,
   ResetPasswordInput,
+  SelfProfileUpdateInput,
 } from "./auth.schema.js";
-import { changePassword, getCurrentUser, login, registerCustomer } from "./auth.service.js";
+import {
+  changePassword,
+  getCurrentUser,
+  getSelfProfile,
+  login,
+  registerCustomer,
+  updateSelfProfile,
+} from "./auth.service.js";
 import { requestPasswordReset, resetPassword } from "./password-reset.service.js";
 
 export const register: RequestHandler<unknown, unknown, RegisterInput> = async (request, response) => {
@@ -28,6 +36,27 @@ export const me: RequestHandler = async (request, response) => {
 
   const user = await getCurrentUser(request.auth.userId, request.auth.issuedAt);
   response.status(200).json({ data: { user } });
+};
+
+export const getProfileHandler: RequestHandler = async (request, response) => {
+  if (!request.auth) {
+    throw new AppError(401, "AUTHENTICATION_REQUIRED", "Authentication is required");
+  }
+
+  const profile = await getSelfProfile(request.auth.userId);
+  response.status(200).json({ data: profile });
+};
+
+export const updateProfileHandler: RequestHandler<unknown, unknown, SelfProfileUpdateInput> = async (
+  request,
+  response,
+) => {
+  if (!request.auth) {
+    throw new AppError(401, "AUTHENTICATION_REQUIRED", "Authentication is required");
+  }
+
+  const profile = await updateSelfProfile(request.auth.userId, request.body, getAuditRequestContext(request));
+  response.status(200).json({ data: profile });
 };
 
 export const forgotPassword: RequestHandler<unknown, unknown, ForgotPasswordInput> = async (request, response) => {

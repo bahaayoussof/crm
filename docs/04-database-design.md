@@ -11,6 +11,7 @@ This is the planned logical model. Exact Prisma syntax may be implemented during
 - passwordHash
 - role
 - isActive (default true)
+- phone optional - editable self-profile phone for internal roles; synchronized with `Customer.phone` for linked customer identities
 - passwordChangedAt optional — set on every password reset / change; `require-fresh-token` rejects tokens issued before it (`feature/account-management`)
 - departmentId optional
 - branchId optional

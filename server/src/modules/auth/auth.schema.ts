@@ -55,7 +55,27 @@ export const changePasswordSchema = z
     path: ["newPassword"],
   });
 
+/**
+ * Self-service profile edit for any authenticated role. Explicit whitelist —
+ * name / email / phone only. `.strict()` rejects role / language / timeZone / etc.
+ * with a 400 rather than silently dropping them.
+ */
+export const selfProfileUpdateSchema = z
+  .object({
+    name: z.string().trim().min(2).max(100),
+    email: normalizedEmail,
+    phone: z
+      .string()
+      .trim()
+      .max(30)
+      .transform((value) => (value.length ? value : null))
+      .nullable()
+      .optional(),
+  })
+  .strict();
+
 export type RegisterInput = z.infer<typeof registerSchema>;
+export type SelfProfileUpdateInput = z.infer<typeof selfProfileUpdateSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

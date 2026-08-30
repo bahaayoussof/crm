@@ -36,6 +36,8 @@ beforeEach(() => {
     name: "Bahaa Youssof",
     email: "bahaa@example.com",
     phone: "+201000000000",
+    createdAt: new Date("2025-01-15T00:00:00.000Z"),
+    user: { role: Role.CUSTOMER, passwordChangedAt: null },
   });
   mocks.userFindFirst.mockResolvedValue(null);
   mocks.customerFindFirst.mockResolvedValue(null);
@@ -51,7 +53,14 @@ describe("portal profile", () => {
   it("returns the authenticated customer's own profile", async () => {
     const response = await request(app).get("/api/portal/profile").set(customerAuth);
     expect(response.status).toBe(200);
-    expect(response.body.data).toEqual({ name: "Bahaa Youssof", email: "bahaa@example.com", phone: "+201000000000" });
+    expect(response.body.data).toEqual({
+      name: "Bahaa Youssof",
+      email: "bahaa@example.com",
+      phone: "+201000000000",
+      role: "CUSTOMER",
+      createdAt: "2025-01-15T00:00:00.000Z",
+      passwordChangedAt: null,
+    });
   });
 
   it("rejects internal roles", async () => {
@@ -69,12 +78,12 @@ describe("portal profile", () => {
       .set(customerAuth)
       .send({ name: "Bahaa Y", email: "new@example.com", phone: "+201111111111" });
     expect(response.status).toBe(200);
-    expect(response.body.data).toEqual({ name: "Bahaa Y", email: "new@example.com", phone: "+201111111111" });
+    expect(response.body.data).toMatchObject({ name: "Bahaa Y", email: "new@example.com", phone: "+201111111111" });
     expect(mocks.customerUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ data: { name: "Bahaa Y", email: "new@example.com", phone: "+201111111111" } }),
     );
     expect(mocks.userUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { name: "Bahaa Y", email: "new@example.com" } }),
+      expect.objectContaining({ data: { name: "Bahaa Y", email: "new@example.com", phone: "+201111111111" } }),
     );
     expect(mocks.auditCreate).toHaveBeenCalled();
   });

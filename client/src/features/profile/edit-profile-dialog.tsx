@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { UseMutationResult } from "@tanstack/react-query";
 import axios from "axios";
 import { Loader2, X } from "lucide-react";
 import { useEffect, useId, useRef } from "react";
@@ -7,8 +8,7 @@ import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { AuthField } from "@/features/auth/auth-field";
-import type { PortalProfile } from "./profile.api";
-import { useUpdatePortalProfile } from "./profile.queries";
+import type { SelfProfile, SelfProfileUpdate } from "./profile.types";
 
 const editProfileSchema = z.strictObject({
   name: z.string().trim().min(2, "validation.nameMin").max(100),
@@ -32,16 +32,22 @@ function errorCode(error: unknown): string | undefined {
 interface EditProfileDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  profile: PortalProfile;
+  profile: SelfProfile;
+  updateMutation: UseMutationResult<SelfProfile, unknown, SelfProfileUpdate>;
   returnFocusRef?: React.RefObject<HTMLElement | null>;
 }
 
-export function EditProfileDialog({ open, onOpenChange, profile, returnFocusRef }: EditProfileDialogProps) {
+export function EditProfileDialog({
+  open,
+  onOpenChange,
+  profile,
+  updateMutation,
+  returnFocusRef,
+}: EditProfileDialogProps) {
   const { t } = useTranslation();
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const hasOpenedRef = useRef(false);
-  const mutation = useUpdatePortalProfile();
 
   const {
     register,
@@ -61,7 +67,7 @@ export function EditProfileDialog({ open, onOpenChange, profile, returnFocusRef 
       dialogRef.current?.focus();
       return;
     }
-    mutation.reset();
+    updateMutation.reset();
     if (!hasOpenedRef.current) return;
     const target = returnFocusRef?.current;
     if (target && document.body.contains(target)) target.focus();
@@ -75,7 +81,7 @@ export function EditProfileDialog({ open, onOpenChange, profile, returnFocusRef 
 
   const onSubmit = handleSubmit(async (values) => {
     try {
-      await mutation.mutateAsync({
+      await updateMutation.mutateAsync({
         name: values.name.trim(),
         email: values.email.trim().toLowerCase(),
         phone: values.phone.trim() ? values.phone.trim() : null,
@@ -83,10 +89,10 @@ export function EditProfileDialog({ open, onOpenChange, profile, returnFocusRef 
       onOpenChange(false);
     } catch (error) {
       if (errorCode(error) === "EMAIL_IN_USE") {
-        setError("email", { message: "portal.profile.errors.EMAIL_IN_USE" });
+        setError("email", { message: "profile.errors.EMAIL_IN_USE" });
         return;
       }
-      setError("root", { message: "portal.profile.errors.updateFailed" });
+      setError("root", { message: "profile.errors.updateFailed" });
     }
   });
 
@@ -120,7 +126,11 @@ export function EditProfileDialog({ open, onOpenChange, profile, returnFocusRef 
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4 sm:p-6">
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-xs animate-in fade-in-0 duration-200" onMouseDown={close} aria-hidden="true" />
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-xs animate-in fade-in-0 duration-200"
+        onMouseDown={close}
+        aria-hidden="true"
+      />
       <div
         ref={dialogRef}
         role="dialog"
@@ -132,7 +142,7 @@ export function EditProfileDialog({ open, onOpenChange, profile, returnFocusRef 
       >
         <header className="flex items-center justify-between border-b border-border/80 px-6 py-4">
           <h2 id={titleId} className="text-base font-semibold text-foreground">
-            {t("portal.profile.editTitle")}
+            {t("profile.editTitle")}
           </h2>
           <button
             type="button"
@@ -148,27 +158,68 @@ export function EditProfileDialog({ open, onOpenChange, profile, returnFocusRef 
         <form onSubmit={onSubmit} noValidate className="flex flex-col">
           <div className="flex flex-col gap-4 p-6">
             {rootError && (
-              <div role="alert" className="rounded-lg border border-danger-subtle bg-danger-subtle/40 p-3 text-sm font-medium text-danger">
+              <div
+                role="alert"
+                className="rounded-lg border border-danger-subtle bg-danger-subtle/40 p-3 text-sm font-medium text-danger"
+              >
                 {rootError}
               </div>
             )}
-            <AuthField id="ep-name" label={t("portal.profile.name")} error={errors.name?.message ? t(errors.name.message) : undefined}>
-              <input id="ep-name" className="input" autoComplete="name" aria-invalid={Boolean(errors.name)} {...register("name")} />
+            <AuthField
+              id="ep-name"
+              label={t("profile.fullName")}
+              error={errors.name?.message ? t(errors.name.message) : undefined}
+            >
+              <input
+                id="ep-name"
+                className="input"
+                autoComplete="name"
+                aria-invalid={Boolean(errors.name)}
+                {...register("name")}
+              />
             </AuthField>
-            <AuthField id="ep-email" label={t("portal.profile.email")} error={errors.email?.message ? t(errors.email.message) : undefined}>
-              <input id="ep-email" className="input text-start" dir="ltr" type="email" autoComplete="email" aria-invalid={Boolean(errors.email)} {...register("email")} />
+            <AuthField
+              id="ep-email"
+              label={t("profile.emailAddress")}
+              error={errors.email?.message ? t(errors.email.message) : undefined}
+            >
+              <input
+                id="ep-email"
+                className="input text-start"
+                dir="ltr"
+                type="email"
+                autoComplete="email"
+                aria-invalid={Boolean(errors.email)}
+                {...register("email")}
+              />
             </AuthField>
-            <AuthField id="ep-phone" label={t("portal.profile.phone")} error={errors.phone?.message ? t(errors.phone.message) : undefined}>
-              <input id="ep-phone" className="input text-start" dir="ltr" type="tel" autoComplete="tel" aria-invalid={Boolean(errors.phone)} {...register("phone")} />
+            <AuthField
+              id="ep-phone"
+              label={t("profile.phoneNumber")}
+              error={errors.phone?.message ? t(errors.phone.message) : undefined}
+            >
+              <input
+                id="ep-phone"
+                className="input text-start"
+                dir="ltr"
+                type="tel"
+                autoComplete="tel"
+                aria-invalid={Boolean(errors.phone)}
+                {...register("phone")}
+              />
             </AuthField>
           </div>
           <footer className="flex items-center justify-end gap-3 border-t border-border/80 bg-surface/40 px-6 py-4">
             <button type="button" disabled={isSubmitting} onClick={close} className="button-secondary sm:w-auto">
               {t("common.cancel")}
             </button>
-            <button type="submit" disabled={isSubmitting} className="button-primary inline-flex items-center gap-2 sm:w-auto">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="button-primary inline-flex items-center gap-2 sm:w-auto"
+            >
               {isSubmitting && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-              <span>{isSubmitting ? t("portal.profile.saving") : t("portal.profile.saveChanges")}</span>
+              <span>{isSubmitting ? t("profile.saving") : t("profile.saveChanges")}</span>
             </button>
           </footer>
         </form>
