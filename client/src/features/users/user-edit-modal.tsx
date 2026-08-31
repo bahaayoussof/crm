@@ -2,13 +2,15 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
-import { z } from "zod";
 import { PhoneInput } from "@/components/shared/phone-input";
+import { AppSelectField } from "@/components/ui/app-select";
 import { Modal } from "@/components/ui/modal";
-import { optionalPhoneInputSchema } from "@/lib/phone";
+import { useAuth } from "@/features/auth/auth-state";
 import { getLocalizedUserError } from "./user-error";
 import { useUpdateUser } from "./user-hooks";
-import type { User } from "./user.types";
+import { UserBranchDepartmentFields } from "./user-org-fields";
+import { userEditFormSchema, type UserEditFormValues } from "./user.schemas";
+import { MANAGEABLE_ROLES, type User } from "./user.types";
 
 export interface UserEditModalProps {
   user: User | null;
@@ -17,13 +19,6 @@ export interface UserEditModalProps {
   onSuccess?: () => void;
 }
 
-const editUserModalSchema = z.object({
-  phone: optionalPhoneInputSchema,
-  isActive: z.boolean().optional(),
-});
-
-type EditUserModalValues = z.infer<typeof editUserModalSchema>;
-
 export function UserEditModal({
   user,
   open,
@@ -31,26 +26,51 @@ export function UserEditModal({
   onSuccess,
 }: UserEditModalProps) {
   const { t } = useTranslation();
+  const { user: currentUser } = useAuth();
   const update = useUpdateUser(user?.id ?? "");
   const [apiError, setApiError] = useState<string | null>(null);
+
+  const isSelf = Boolean(user && currentUser && user.id === currentUser.id);
 
   const {
     register,
     control,
     reset,
+    setValue,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<EditUserModalValues>({
-    resolver: zodResolver(editUserModalSchema),
-    defaultValues: { phone: user?.phone ?? "", isActive: user?.isActive ?? true },
+  } = useForm<UserEditFormValues>({
+    resolver: zodResolver(userEditFormSchema),
+    defaultValues: {
+      name: user?.name ?? "",
+      email: user?.email ?? "",
+      role: user?.role ?? "AGENT",
+      phone: user?.phone ?? "",
+      isActive: user?.isActive ?? true,
+      departmentId: user?.departmentId ?? "",
+      branchId: user?.branchId ?? "",
+    },
   });
 
   useEffect(() => {
     if (open && user) {
-      reset({ phone: user.phone ?? "", isActive: user.isActive });
+      reset({
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        phone: user.phone ?? "",
+        isActive: user.isActive,
+        departmentId: user.departmentId ?? "",
+        branchId: user.branchId ?? "",
+      });
       setApiError(null);
     }
   }, [open, user, reset]);
+
+  const roleOptions = MANAGEABLE_ROLES.map((option) => ({
+    value: option,
+    label: t(`users.roles.${option}`),
+  }));
 
   if (!user) return null;
 
@@ -64,8 +84,13 @@ export function UserEditModal({
     setApiError(null);
     try {
       await update.mutateAsync({
+        name: values.name,
+        email: values.email,
+        role: values.role,
         phone: values.phone || null,
         isActive: values.isActive,
+        departmentId: values.departmentId ? values.departmentId : null,
+        branchId: values.branchId ? values.branchId : null,
       });
       handleClose();
       onSuccess?.();
@@ -96,43 +121,60 @@ export function UserEditModal({
 
         <div>
           <label htmlFor="modal-edit-user-name" className="block text-xs font-medium text-foreground">
-            {t("users.fieldName")}
+            {t("users.fieldName")} <span className="text-danger">*</span>
           </label>
           <input
             id="modal-edit-user-name"
-            className="input mt-1 bg-surface-muted/50 text-muted-foreground cursor-not-allowed"
+            className="input mt-1"
             dir="auto"
-            readOnly
-            disabled
-            value={user.name}
+            aria-invalid={Boolean(errors.name)}
+            aria-describedby={errors.name ? "modal-edit-user-name-error" : undefined}
+            {...register("name")}
           />
+          {errors.name?.message && (
+            <p id="modal-edit-user-name-error" role="alert" className="mt-1 text-xs text-danger">
+              {t(errors.name.message)}
+            </p>
+          )}
         </div>
 
         <div>
           <label htmlFor="modal-edit-user-email" className="block text-xs font-medium text-foreground">
-            {t("users.fieldEmail")}
+            {t("users.fieldEmail")} <span className="text-danger">*</span>
           </label>
           <input
             id="modal-edit-user-email"
-            className="input mt-1 text-start bg-surface-muted/50 text-muted-foreground cursor-not-allowed"
+            className="input mt-1 text-start"
             dir="ltr"
             type="email"
-            readOnly
-            disabled
-            value={user.email}
+            autoComplete="email"
+            aria-invalid={Boolean(errors.email)}
+            aria-describedby={errors.email ? "modal-edit-user-email-error" : undefined}
+            {...register("email")}
           />
+          {errors.email?.message && (
+            <p id="modal-edit-user-email-error" role="alert" className="mt-1 text-xs text-danger">
+              {t(errors.email.message)}
+            </p>
+          )}
         </div>
 
         <div>
-          <label htmlFor="modal-edit-user-role" className="block text-xs font-medium text-foreground">
-            {t("users.fieldRole")}
-          </label>
-          <input
-            id="modal-edit-user-role"
-            className="input mt-1 bg-surface-muted/50 text-muted-foreground cursor-not-allowed"
-            readOnly
-            disabled
-            value={t(`users.roles.${user.role}`) || user.role}
+          <Controller
+            control={control}
+            name="role"
+            render={({ field }) => (
+              <AppSelectField
+                id="modal-edit-user-role"
+                label={t("users.fieldRole")}
+                value={field.value}
+                options={roleOptions}
+                onValueChange={field.onChange}
+                disabled={isSelf}
+                helperText={isSelf ? t("users.selfRoleReadonly") : undefined}
+                error={errors.role?.message ? t(errors.role.message) : undefined}
+              />
+            )}
           />
         </div>
 
@@ -163,17 +205,20 @@ export function UserEditModal({
           )}
         </div>
 
+        <UserBranchDepartmentFields control={control} setValue={setValue} idPrefix="modal-edit-user" />
+
         <div className="rounded-lg border border-border bg-surface-subtle/50 p-3">
           <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
               className="mt-0.5 size-4 rounded border-border text-primary focus:ring-primary/30"
+              disabled={isSelf}
               {...register("isActive")}
             />
             <span>
               <span className="block text-xs font-medium text-foreground">{t("users.fieldActive")}</span>
               <span className="mt-0.5 block text-xs text-muted-foreground">
-                {t("users.activeHelp")}
+                {isSelf ? t("users.selfDeactivateBlocked") : t("users.activeHelp")}
               </span>
             </span>
           </label>

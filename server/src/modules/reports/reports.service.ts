@@ -53,6 +53,9 @@ async function loadTickets(range: ReportsRange): Promise<ReportTicket[]> {
         { createdAt: { gte: range.start, lte: range.end } },
         { resolvedAt: { gte: range.start, lte: range.end } },
       ],
+      // Optional organizational scoping — ANDed with the date window by Prisma.
+      ...(range.departmentId ? { departmentId: range.departmentId } : {}),
+      ...(range.branchId ? { branchId: range.branchId } : {}),
     },
     select: reportTicketSelect,
     orderBy: { createdAt: "asc" },

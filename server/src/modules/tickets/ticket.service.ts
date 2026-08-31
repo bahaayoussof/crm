@@ -43,6 +43,8 @@ export async function listTickets(query: TicketListQuery, actor: Actor) {
     ...(query.categoryId && { categoryId: query.categoryId }),
     ...(query.assignedAgentId && { assignedAgentId: query.assignedAgentId }),
     ...(query.customerId && { customerId: query.customerId }),
+    ...(query.departmentId && { departmentId: query.departmentId }),
+    ...(query.branchId && { branchId: query.branchId }),
     ...(query.search && { AND: [{ OR: [
       { id: query.search },
       { subject: { contains: query.search, mode: "insensitive" } },

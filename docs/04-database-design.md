@@ -151,17 +151,26 @@ Suggested fields:
 ### Department
 - id
 - name
+- description optional (`feature/departments-branches`, migration `20260830220000_departments_branches_fields`)
+- isActive default true (same migration)
 - branchId optional
 - createdAt
 - updatedAt
+- indexes: `isActive`, `branchId`
 
-Department names are unique within a branch through the compound `(branchId, name)` constraint. The same name may be used by different branches. `Branch.name` remains globally unique.
+Department names are unique within a branch through the compound `(branchId, name)` constraint. The same name may be used by different branches. `Branch.name` remains globally unique. Branchless department-name uniqueness and case-insensitive matching are enforced by `department.service.ts` (409 `DEPARTMENT_NAME_ALREADY_EXISTS`). Departments are retired via `isActive = false`; hard delete is refused with 409 `DEPARTMENT_IN_USE` while any user or ticket references the row.
 
 ### Branch
 - id
-- name
+- name (globally unique)
+- code optional, globally unique (`feature/departments-branches`, same migration)
+- address optional (same migration)
+- isActive default true (same migration)
 - createdAt
 - updatedAt
+- index: `isActive`
+
+Branches are retired via `isActive = false`; hard delete is refused with 409 `BRANCH_IN_USE` while any department, user or ticket references the row. `code` is matched case-insensitively at the service (409 `BRANCH_CODE_ALREADY_EXISTS`).
 
 ### AuditLog
 P2 unless time allows.
@@ -215,6 +224,6 @@ P2 unless time allows.
 - Tickets store SLA deadline snapshots in `firstResponseDueAt` and `resolutionDueAt`; `firstRespondedAt` records the actual first public agent response. `SlaRule` stores configurable targets by priority.
 - Support-history relations use `Restrict` or `SetNull` delete behavior rather than cascading historical records.
 - Attachment context is validated in the service layer: at least one supported context (`ticketId`, `messageId`, or `customerId`) is required; a supplied message must belong to the supplied ticket; and customer-level attachments must belong to the intended customer. Prisma relations alone cannot enforce these cross-record invariants. `feature/attachments` (integrated into `master` at `8e24d22`; ADR-021) enforces exactly three shapes — ticket-only (`ticketId` set, `messageId`/`customerId` null), message-level (`ticketId` + `messageId` set, `customerId` null), and customer-only (`customerId` set, others null); any other combination, an empty context, and a client-supplied `storageKey`/context are rejected. Bytes are stored in a private object store keyed by a server-generated `storageKey`; PostgreSQL holds metadata only. The model has no uploader, size, checksum, `updatedAt`, or soft-delete column, so the API cannot report who uploaded a file or its size from the database, and there is no attachment deletion.
-- The `(branchId, name)` database constraint prevents duplicate department names within a non-null branch. Because PostgreSQL treats `NULL` values as distinct in unique constraints, branchless department-name uniqueness—if required—must be enforced by later service validation.
+- The `(branchId, name)` database constraint prevents duplicate department names within a non-null branch. Because PostgreSQL treats `NULL` values as distinct in unique constraints, branchless department-name uniqueness—if required—must be enforced by later service validation. `feature/departments-branches` (ADR-043, migration `20260830220000_departments_branches_fields`) adds this service validation (case-insensitive, branch-scoped) plus `Department.description/isActive`, `Branch.code(@unique)/address/isActive`, and safe-delete conflict guards; `User.departmentId/branchId` and `Ticket.departmentId/branchId` remain nullable with `SetNull` on delete so retiring an org unit never invalidates existing users or tickets. A user's department must belong to its branch when both are set (`DEPARTMENT_BRANCH_MISMATCH`), matching the SLA auto-assignment eligibility rule.
 
 Any schema change that alters these concepts must update this document before or with implementation.

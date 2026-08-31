@@ -6,6 +6,7 @@ import { AppSelectField } from "@/components/ui/app-select";
 import { Modal } from "@/components/ui/modal";
 import { getLocalizedUserError } from "./user-error";
 import { useCreateUser } from "./user-hooks";
+import { UserBranchDepartmentFields } from "./user-org-fields";
 import { userCreateFormSchema, type UserCreateFormValues } from "./user.schemas";
 import { MANAGEABLE_ROLES } from "./user.types";
 
@@ -28,11 +29,12 @@ export function UserCreateModal({
     register,
     control,
     reset,
+    setValue,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<UserCreateFormValues>({
     resolver: zodResolver(userCreateFormSchema),
-    defaultValues: { name: "", email: "", password: "", role: "AGENT" },
+    defaultValues: { name: "", email: "", password: "", role: "AGENT", departmentId: "", branchId: "" },
   });
 
   const roleOptions = MANAGEABLE_ROLES.map((option) => ({
@@ -154,6 +156,8 @@ export function UserCreateModal({
             )}
           />
         </div>
+
+        <UserBranchDepartmentFields control={control} setValue={setValue} idPrefix="modal-user" />
 
         <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
           <button

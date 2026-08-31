@@ -628,3 +628,33 @@ Summary: Completed **Tasks & Reminders** end to end on uncommitted `feature/task
 |------|--------|---------|---------|--------|
 | 19:35 | Account/profile validation audit | auth/profile schemas, shared phone utilities, WhatsApp matching, tests/docs | libphonenumber-js E.164/isPossible alignment; server 562, client 620; typecheck/lint/client build green; server Prisma build lock remains | ~18k |
 | 19:55 | Role-based profile edit permissions (client + server) | auth controller/service/schema/tests, client profile permissions/dialog/card/tests, locales/docs | Matrix enforced; 403 FORBIDDEN without field leak; atomic mixed rejection; server 573/573, client 628/628; lint/typecheck/client build green; ADR-042 updated | ~18k |
+
+## Session: 2026-08-30 23:33
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-08-31 (feature/departments-branches)
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| — | Audit: Department/Branch models already exist (skeletal); SLA auto-assign already consumes user.departmentId/branchId; Ticket already has dept/branch cols + create/update support | schema.prisma, sla-automation, ticket.service | Extend, not recreate | 120k |
+| — | Additive migration: Department += description/isActive; Branch += code(@unique)/address/isActive; applied to Neon | prisma/migrations/20260830220000_departments_branches_fields | applied OK | 5k |
+| — | New server modules: departments/ + branches/ (schema/service/controller/routes/test), ADMIN CRUD on settingsRouter, lookup routers at /api/{departments,branches} | server/src/modules/{departments,branches}/*, settings.routes.ts, app.ts | 78 module tests green | 40k |
+| — | User dept/branch assignment: schema + service (validate active + DEPARTMENT_BRANCH_MISMATCH) + audit + userSelect | users/user.{schema,service,test}.ts | 35 user tests green | 15k |
+| — | Ticket list + Reports dept/branch filters (direct columns) | ticket.{schema,service}.ts, reports.{schema,service}.ts | server 608/608 | 8k |
+| — | Client: new features/organization/ data layer; Settings Departments/Branches tabs; user forms + table; ticket filter popover; reports toolbar | client/src/features/organization/*, settings/organization-sections.tsx, users/*, tickets/ticket-{filters-popover,list-page}.tsx, reports/* | client 668/668, build green | 60k |
+| — | i18n EN+AR keys (targeted edits, no reformat), parity 1188/1188 | client/src/locales/{en,ar}/translation.json | valid, parity OK | 10k |
+| — | Seed: 4 branches + 8 departments, staff + ticket assignment | server/scripts/seed-test-data.ts | ran clean on Neon | 8k |
+| — | Docs: 04, 05, 17 (ADR-043), 19, dev-test-data.md; STATUS/memory/cerebrum | docs/*, .wolf/* | updated | 6k |
+
+## Session: 2026-08-31 (feature/departments-branches — user edit flow)
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| — | Server: updateUserSchema += phone (shared optionalPhoneSchema, no dup); user.service writes+audits phone | server/src/modules/users/user.{schema,service,test}.ts | 612/612 (+4) | 15k |
+| — | Client shared branch-first dependent dept fields | client/src/features/users/user-org-fields.tsx (new) | branch→department, clears incompatible | 8k |
+| — | Removed name/email/role readonly in edit modal + form page; full ADMIN edit; one userEditFormSchema | user-edit-modal.tsx, user-form-page.tsx, user.schemas.ts, user-api.ts, user-create-modal.tsx | editable, isSelf guards kept | 20k |
+| — | users.test.tsx rewritten for new behavior + branch-dependent dept tests; orgHooks hoisted mutable mock | client/src/features/users/users.test.tsx | 671/671 | 12k |
+| — | i18n users.selectBranchFirst EN/AR | locales/{en,ar}/translation.json | parity 1189 | 2k |
+| — | Docs: 05, 17 (ADR-043 follow-up), 19; STATUS/memory/cerebrum/anatomy | docs/*, .wolf/* | updated | 5k |

@@ -73,22 +73,22 @@ GET    /users/agents      LIVE
 GET    /users             LIVE   (ADMIN)
 GET    /users/:id         LIVE   (ADMIN)
 POST   /users             LIVE   (ADMIN)
-PATCH  /users/:id         LIVE   (ADMIN)   name / email / role / isActive
+PATCH  /users/:id         LIVE   (ADMIN)   name / email / phone / role / branch / department / isActive
 ```
 
 `GET /users/agents` is an internal-only Ticket Management lookup that returns safe summaries of **active** `AGENT` users (`id`, `name`, `email`) to `ADMIN`, `MANAGER`, and `AGENT`. It never returns password hashes or customer identities. It is JWT-role gated (not DB-fresh).
 
 The remaining routes are the `feature/user-management` administration surface (roadmap order 6) and are **ADMIN only** — `MANAGER`/`AGENT`/`CUSTOMER`/anonymous receive `403`/`401`. They act on internal identities only (`CUSTOMER` rows are invisible: a `CUSTOMER` id returns `404 USER_NOT_FOUND`). Each admin route runs a `requireActiveUser` middleware that resolves the caller's **current database role and active state** before `requireRole(ADMIN)`, so a stale JWT cannot keep ADMIN access after a demotion, and a deactivated caller gets `401 ACCOUNT_DEACTIVATED` on the next request.
 
-- `GET /users` — paginated list (`page`, `limit≤100`, `search` over name/email, optional `role` filter in `{ADMIN,MANAGER,AGENT}`, optional `status` in `{active,inactive}`; unknown query keys and `role=CUSTOMER` → `400`). Ordered `createdAt DESC, id ASC`. Row shape: `{ id, name, email, role, isActive, createdAt, updatedAt }` (no `passwordHash`). Envelope: `{ data, meta: { page, limit, total, totalPages } }`.
+- `GET /users` — paginated list (`page`, `limit≤100`, `search` over name/email, optional `role` filter in `{ADMIN,MANAGER,AGENT}`, optional `status` in `{active,inactive}`; unknown query keys and `role=CUSTOMER` → `400`). Ordered `createdAt DESC, id ASC`. Row shape: `{ id, name, email, phone, role, isActive, departmentId, branchId, department: { id, name } | null, branch: { id, name } | null, createdAt, updatedAt }` (no `passwordHash`). Envelope: `{ data, meta: { page, limit, total, totalPages } }`.
 - `GET /users/:id` — same row shape; `404 USER_NOT_FOUND`.
 - `POST /users` — strict body `{ name (2–100), email, password (8–128), role in {ADMIN,MANAGER,AGENT} }`. `role=CUSTOMER` or any extra field → `400`. Duplicate email → `409 EMAIL_ALREADY_REGISTERED`. Password is bcrypt-hashed (cost 12). `201` with the row shape.
-- `PATCH /users/:id` — the single safe update path. Strict partial body `{ name?, email?, role?, isActive? }` (≥1 key; unknown fields → `400`; `role=CUSTOMER` → `400`). Only submitted fields are written. Read-check-write runs inside one transaction. Conflicts:
+- `PATCH /users/:id` — the single safe update path. An active `ADMIN` may edit every field of another internal user. Strict partial body `{ name?, email?, phone?, role?, isActive?, departmentId?, branchId? }` (≥1 key; unknown fields → `400`; `role=CUSTOMER` → `400`). `phone` reuses the shared `optionalPhoneSchema` (same normalization/validation as `/auth/profile` — no duplicate schema); `""`/`null` clears it, a malformed value → `400 VALIDATION_ERROR`. `departmentId`/`branchId` accept an id, `""` or `null` (clears); `INVALID_BRANCH` / `INVALID_DEPARTMENT` (unknown or inactive) and `DEPARTMENT_BRANCH_MISMATCH` (department not in the chosen branch) → `400`, validated centrally in `user.service.assertOrgAssignment`. Only submitted fields are written. Read-check-write runs inside one transaction. Conflicts:
   - changing **your own** role → `409 SELF_ROLE_CHANGE_FORBIDDEN` (submitting your own unchanged role is allowed);
   - deactivating **your own** account → `409 SELF_DEACTIVATION_FORBIDDEN`;
   - demoting or deactivating the **last active `ADMIN`** (no other active `ADMIN` remains) → `409 LAST_ACTIVE_ADMIN_REQUIRED`;
   - email collision → `409 EMAIL_ALREADY_REGISTERED`.
-  `200` with the row shape. There is no separate `PATCH /users/:id/role` route — role changes go through this payload (the Edit User form is the only client entry point).
+  `200` with the row shape (`{ …, phone, departmentId, branchId, department, branch }`). There is no separate `PATCH /users/:id/role` route — role changes go through this payload. The client Edit User surfaces (modal + `/users/:id/edit` page) render every field as editable for ADMIN; on the caller's **own** row the role select and active checkbox are disabled (the server guards remain authoritative).
 
 Internal-user administration is separate from public customer registration; this surface never creates or exposes `CUSTOMER` accounts. There is no user-deletion route — accounts are retired by setting `isActive=false`, which blocks login (`403 ACCOUNT_DEACTIVATED`) and, on a live session, `GET /auth/me` and every `/api/users` admin request (`401 ACCOUNT_DEACTIVATED`).
 
@@ -99,6 +99,23 @@ Every `/settings/*` endpoint requires an authenticated, currently active `ADMIN`
 Category management returns active and inactive rows; supports strict name search, create, edit, and activation; and never deletes. Names are trimmed, 2–100 characters, and unique; descriptions are at most 500 characters. Duplicate names return `409 CATEGORY_NAME_ALREADY_EXISTS`; missing rows return `404 CATEGORY_NOT_FOUND`. The existing `GET /categories` contract remains active-only and unchanged.
 
 SLA management returns all configured rules and safely creates or updates one LOW, MEDIUM, HIGH, or URGENT resource. Minute values are integers from 1 through 525,600 and resolution cannot be lower than first response. Rules are activated/deactivated, never deleted. Changes are prospective and existing Ticket deadline snapshots are never rewritten. Background automation remains deferred.
+
+### Departments & Branches — LIVE on `feature/departments-branches` (ADR-043)
+
+ADMIN-only administrative CRUD is mounted on the same `settingsRouter`:
+
+- `GET /settings/departments?page&limit&search&status` — paginated (`{ data, meta }`), `search` is a case-insensitive name contains, `status` is `active|inactive`. Rows include `branch: { id, name } | null`, `userCount`, `ticketCount`.
+- `POST /settings/departments` — `{ name (2–100, trimmed), description? (≤500), branchId? }`. Duplicate name within the same branch scope → `409 DEPARTMENT_NAME_ALREADY_EXISTS`; unknown `branchId` → `404 BRANCH_NOT_FOUND`.
+- `PATCH /settings/departments/:id` — any subset of `{ name?, description?, isActive?, branchId? }` (empty string / `null` clears the branch). Missing row → `404 DEPARTMENT_NOT_FOUND`.
+- `DELETE /settings/departments/:id` — hard delete; `409 DEPARTMENT_IN_USE` (`details: { users, tickets }`) while any user or ticket references it; otherwise `204`.
+- `GET/POST /settings/branches`, `PATCH/DELETE /settings/branches/:id` — same shape with `{ name (2–100), code? (≤40, globally unique, case-insensitive), address? (≤300), isActive? }`. Search covers name and code. Conflicts: `409 BRANCH_NAME_ALREADY_EXISTS` / `409 BRANCH_CODE_ALREADY_EXISTS`. Delete conflict: `409 BRANCH_IN_USE` (`details: { departments, users, tickets }`).
+
+Every create/update/activate/deactivate/delete writes an `AuditLog` row (`DEPARTMENT_*` / `BRANCH_*` actions).
+
+Active-only lookups, open to every internal role (`ADMIN`/`MANAGER`/`AGENT`, like `GET /categories`):
+
+- `GET /api/departments` → `{ data: [{ id, name, branchId }] }` (active only, name-ordered).
+- `GET /api/branches` → `{ data: [{ id, name, code }] }` (active only, name-ordered).
 
 ## Categories
 

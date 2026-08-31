@@ -7,6 +7,8 @@ import { notFoundHandler } from "./middleware/not-found.js";
 import { authRouter } from "./modules/auth/auth.routes.js";
 import { customerRouter } from "./modules/customers/customer.routes.js";
 import { categoryRouter } from "./modules/categories/category.routes.js";
+import { departmentRouter } from "./modules/departments/department.routes.js";
+import { branchRouter } from "./modules/branches/branch.routes.js";
 import { ticketRouter } from "./modules/tickets/ticket.routes.js";
 import { userRouter } from "./modules/users/user.routes.js";
 import { dashboardRouter } from "./modules/dashboard/dashboard.routes.js";
@@ -65,6 +67,8 @@ app.get("/api/health", (_request, response) => {
 app.use("/api/auth", authRouter);
 app.use("/api/customers", customerRouter);
 app.use("/api/categories", categoryRouter);
+app.use("/api/departments", departmentRouter);
+app.use("/api/branches", branchRouter);
 app.use("/api/users", userRouter);
 app.use("/api/tickets", ticketRouter);
 app.use("/api/dashboard", dashboardRouter);

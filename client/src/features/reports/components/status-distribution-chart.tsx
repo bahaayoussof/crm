@@ -33,10 +33,10 @@ export function StatusDistributionChart({ distribution }: { distribution: Status
     <ReportPanel title={t("reports.statusTitle")}>
       {data.length ? (
         <div
-          className="flex h-full flex-col items-center justify-center gap-5"
+          className="flex h-full flex-col items-center justify-center gap-2"
           data-testid="status-chart"
         >
-          <div className="relative size-55 shrink-0">
+          <div className="relative size-45 shrink-0">
             <ChartContainer label={t("reports.statusTitle")}>
               <PieChart>
                 <Pie

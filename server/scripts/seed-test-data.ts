@@ -208,6 +208,58 @@ export async function seedTestData() {
   console.log(`  ✓ ${categories.length} Categories ready.`);
 
   // -------------------------------------------------------------------------
+  // STEP 1b: Branches & Departments (organizational entities). Idempotent by
+  // name; not tied to seed-user ids, so they persist across re-seeds and their
+  // ids stay stable. Assigned to staff users and a subset of tickets below.
+  // -------------------------------------------------------------------------
+  console.log("[1b/10] Upserting Branches & Departments...");
+  const branchDefs = [
+    { name: "Headquarters", code: "HQ", address: "100 Central Plaza, Metro City" },
+    { name: "North Regional Office", code: "NRO", address: "22 Pine Avenue, Northgate" },
+    { name: "West Coast Hub", code: "WCH", address: "9 Harbor Blvd, Bayside" },
+    { name: "Remote / Distributed", code: "RMT", address: null },
+  ];
+  const branches: { id: string; name: string }[] = [];
+  for (const def of branchDefs) {
+    const row = await prisma.branch.upsert({
+      where: { name: def.name },
+      create: { name: def.name, code: def.code, address: def.address, isActive: true },
+      update: { code: def.code, address: def.address, isActive: true },
+      select: { id: true, name: true },
+    });
+    branches.push(row);
+  }
+  const branchByName = new Map(branches.map((b) => [b.name, b.id]));
+
+  const departmentDefs: { name: string; description: string; branch: string | null }[] = [
+    { name: "Customer Support", description: "First-line customer support queue", branch: "Headquarters" },
+    { name: "Technical Support", description: "Escalated technical troubleshooting", branch: "Headquarters" },
+    { name: "Billing Operations", description: "Invoicing, refunds and payment disputes", branch: "Headquarters" },
+    { name: "Field Services", description: "On-site installation and repair", branch: "North Regional Office" },
+    { name: "Sales Engineering", description: "Pre-sales and integration support", branch: "West Coast Hub" },
+    { name: "Onboarding", description: "New account onboarding and setup", branch: "West Coast Hub" },
+    { name: "Quality Assurance", description: "Support quality review", branch: "Remote / Distributed" },
+    { name: "Escalations", description: "Cross-branch escalation handling", branch: null },
+  ];
+  const departments: { id: string; name: string; branchId: string | null }[] = [];
+  for (const def of departmentDefs) {
+    const branchId = def.branch ? branchByName.get(def.branch) ?? null : null;
+    const existing = await prisma.department.findFirst({ where: { name: def.name }, select: { id: true } });
+    const row = existing
+      ? await prisma.department.update({
+          where: { id: existing.id },
+          data: { description: def.description, branchId, isActive: true },
+          select: { id: true, name: true, branchId: true },
+        })
+      : await prisma.department.create({
+          data: { name: def.name, description: def.description, branchId, isActive: true },
+          select: { id: true, name: true, branchId: true },
+        });
+    departments.push(row);
+  }
+  console.log(`  ✓ ${branches.length} Branches and ${departments.length} Departments ready.`);
+
+  // -------------------------------------------------------------------------
   // STEP 2: Clean up previous seed data (Child-first for FK safety)
   // -------------------------------------------------------------------------
   console.log("[2/10] Cleaning prior test seed records (idempotent reset)...");
@@ -428,7 +480,23 @@ export async function seedTestData() {
   }
 
   const allStaffUsers = [...adminUsers, ...managerUsers, ...agentUsers];
+
+  // Assign a department + its branch to most staff users (deterministic, and
+  // internally consistent so SLA auto-assignment eligibility keeps matching).
+  // Every 7th staff user is left unassigned to exercise the "no department /
+  // no branch" path.
+  const staffOrg = new Map<string, { departmentId: string; branchId: string | null }>();
+  for (let i = 0; i < allStaffUsers.length; i++) {
+    if (i % 7 === 6) continue;
+    const dept = departments[i % departments.length];
+    await prisma.user.update({
+      where: { id: allStaffUsers[i].id },
+      data: { departmentId: dept.id, branchId: dept.branchId },
+    });
+    staffOrg.set(allStaffUsers[i].id, { departmentId: dept.id, branchId: dept.branchId });
+  }
   console.log(`  ✓ Seeded ${allStaffUsers.length} staff users (3 Admins, 5 Managers, 35 Agents [33 active, 2 inactive]) and 5 Portal Customer users.`);
+  console.log(`  ✓ Assigned departments/branches to ${staffOrg.size} of ${allStaffUsers.length} staff users.`);
 
   // -------------------------------------------------------------------------
   // STEP 4: Seed Customers (185 records)
@@ -565,6 +633,23 @@ export async function seedTestData() {
 
     const updatedAt = closedAt ?? resolvedAt ?? firstRespondedAt ?? createdAt;
 
+    // Organizational context: prefer the assigned agent's department/branch;
+    // otherwise round-robin a department for coverage. Every 4th ticket is left
+    // with no department/branch to exercise the unfiltered path.
+    let ticketDepartmentId: string | null = null;
+    let ticketBranchId: string | null = null;
+    if (i % 4 !== 0) {
+      const agentOrg = assignedAgentId ? staffOrg.get(assignedAgentId) : undefined;
+      if (agentOrg) {
+        ticketDepartmentId = agentOrg.departmentId;
+        ticketBranchId = agentOrg.branchId;
+      } else {
+        const dept = departments[i % departments.length];
+        ticketDepartmentId = dept.id;
+        ticketBranchId = dept.branchId;
+      }
+    }
+
     const ticket = await prisma.ticket.create({
       data: {
         subject,
@@ -575,6 +660,8 @@ export async function seedTestData() {
         customerId: customer.id,
         assignedAgentId,
         categoryId: category.id,
+        departmentId: ticketDepartmentId,
+        branchId: ticketBranchId,
         firstResponseDueAt,
         firstRespondedAt,
         resolutionDueAt,
@@ -936,6 +1023,8 @@ export async function seedTestData() {
   console.log(`Ticket Messages:    ${await prisma.ticketMessage.count()}`);
   console.log(`Ticket Notes:       ${await prisma.ticketNote.count()}`);
   console.log(`Categories:         ${await prisma.category.count()}`);
+  console.log(`Branches:           ${await prisma.branch.count()}`);
+  console.log(`Departments:        ${await prisma.department.count()}`);
   console.log(`Tasks:              ${await prisma.task.count()}`);
   console.log(`Knowledge Articles: ${await prisma.knowledgeArticle.count()}`);
   console.log(`Quick Replies:      ${await prisma.quickReply.count()}`);

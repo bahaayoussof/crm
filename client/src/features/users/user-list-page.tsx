@@ -117,7 +117,7 @@ export function UserListPage() {
           {/* Table Body & Loading / Error / Empty States */}
           {users.isLoading ? (
             <div className="p-4">
-              <DataTableSkeleton columns={6} />
+              <DataTableSkeleton columns={7} />
             </div>
           ) : users.isError ? (
             <div className="p-6">

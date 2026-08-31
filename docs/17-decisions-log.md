@@ -1142,3 +1142,36 @@ Login/register existed but there was no way to recover a forgotten password (any
 - Every role can self-serve a password reset; links expire and are one-time; a reset/change immediately invalidates other sessions on `/auth/me` + portal routes (other internal routes on token expiry).
 - Customers can fix their own name/email/phone and rotate their password without contacting support; the header/avatar refresh without re-login.
 - Development needs no mail account — the reset URL is printed to the server console.
+
+# ADR-043: Departments & Branches end-to-end
+
+**Status:** Implemented on `feature/departments-branches` (not yet integrated). Additive migration `20260830220000_departments_branches_fields`.
+
+## Context
+
+The `Department` and `Branch` Prisma models already existed as skeletons (`id`, `name`, timestamps; `Department.branchId -> Branch`; `@@unique([branchId, name])`) with nullable `User.departmentId/branchId` and `Ticket.departmentId/branchId` relations and an existing consumer (SLA auto-assignment eligibility). They had no fields for lifecycle/metadata, no API, and no UI.
+
+## Decisions
+
+1. **Extend, do not recreate.** Additive migration adds `Department.description/isActive` and `Branch.code(@unique)/address/isActive` plus `isActive`/`branchId` indexes. `@@unique([branchId, name])` is kept (a schema test pins it) and enforced alongside a case-insensitive service-level duplicate check scoped to the same branch. `Branch.name` and `Branch.code` are globally unique (case-insensitive at the service).
+2. **RBAC = ADMIN-only CRUD.** Matches the existing Settings + User-administration philosophy (`settingsRouter` and the `/api/users` admin routes are ADMIN-only). CRUD is mounted on `settingsRouter` (`/api/settings/{departments,branches}`); active-only lookups (`/api/departments`, `/api/branches`) are open to every internal role, mirroring `/api/categories`. CUSTOMER has no access to any of it. Unauthorised access returns the standard `403 FORBIDDEN`.
+3. **Safe delete.** Hard delete is refused with `409` (`DEPARTMENT_IN_USE` / `BRANCH_IN_USE`, `details` carrying the blocking counts) whenever users, tickets (or, for a branch, departments) still reference the row. Deactivation is the intended path for retiring an org unit.
+4. **User assignment consistency.** `POST/PATCH /api/users` accept nullable `departmentId`/`branchId`; the server rejects inactive/unknown ids and enforces `DEPARTMENT_BRANCH_MISMATCH` (the department must belong to the selected branch) so a user assignment always satisfies the SLA auto-assignment eligibility predicate. Profile self-edit permissions are untouched.
+5. **Ticket filtering is column-based, not derived.** Tickets already have direct `departmentId`/`branchId` columns; the ticket list and Reports filter on those columns directly (deterministic, no ambiguity). Reports metrics are unchanged when no org filter is selected.
+6. **Client reuse.** Settings gains Departments/Branches tabs built from the shared `DataTable*` primitives, `Modal`, searchable `AppSelectField`, and one shared `OrgConfirmDialog`; no new duplicate components. A single `client/src/features/organization/` module owns the query keys, lookups and admin mutations consumed by Settings, the user forms, the ticket filter popover and the Reports toolbar.
+
+## Alternatives rejected
+
+- Making Department/Branch config MANAGER-accessible (rejected — diverges from the current ADMIN-only Settings/User-admin boundary). A separate top-level `/api/departments` CRUD router (rejected — Settings already owns organizational configuration; kept lookups top-level only). Cascading hard-delete of referencing rows (rejected — destructive; deactivate instead). Deriving a ticket's department from its assigned agent at query time (rejected — non-deterministic and ambiguous; the stored columns are authoritative).
+
+## Consequences
+
+- ADMIN can manage Departments and Branches from Settings; every internal role can assign/filter by them; SLA auto-assignment now has real org data to match on.
+- New audit actions: `DEPARTMENT_CREATED/UPDATED/ACTIVATED/DEACTIVATED/DELETED` and the `BRANCH_*` equivalents; user department/branch changes ride the existing `USER_UPDATED` diff.
+- New error codes surfaced to i18n: `DEPARTMENT_IN_USE`, `BRANCH_IN_USE`, `DEPARTMENT_NAME_ALREADY_EXISTS`, `BRANCH_NAME_ALREADY_EXISTS`, `BRANCH_CODE_ALREADY_EXISTS`, `INVALID_DEPARTMENT`, `INVALID_BRANCH`, `DEPARTMENT_BRANCH_MISMATCH`.
+
+## Follow-up (2026-08-31): user edit flow
+
+- **Branch-first, dependent Department (client only).** All four internal-user create/edit surfaces render Branch before Department via the shared `client/src/features/users/user-org-fields.tsx`. Department is disabled until a Branch is chosen and then only lists active Departments belonging to that Branch; changing the Branch clears an incompatible `departmentId`. This is UX prevention only — the server keeps `INVALID_BRANCH` / `INVALID_DEPARTMENT` / `DEPARTMENT_BRANCH_MISMATCH` as the integrity boundary.
+- **Full ADMIN user editing.** Reverted the name/email/role read-only treatment in the user-management Edit modal + page (a documented earlier state; see ADR-025 note "name/email/role `<select>`"). An active ADMIN edits name, email, phone, role, branch, department and status. Self-guards kept: own-row role select + active checkbox disabled; server guards unchanged. Non-ADMIN and `/auth/profile` self-edit permissions untouched.
+- **Phone on `PATCH /api/users/:id`.** `updateUserSchema` gains `phone: optionalPhoneSchema` (the same shared schema the profile endpoints use — no second phone implementation). `user.service.updateUser` writes + audits `phone`; the client `updateUser` forwards it; the client uses one `userEditFormSchema` for both the modal and the page.

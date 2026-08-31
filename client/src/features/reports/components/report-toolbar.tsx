@@ -1,6 +1,12 @@
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { DateRangePicker, type DateRange } from "@/components/date-picker/date-range-picker";
+import { AppSelect } from "@/components/ui/app-select";
+
+interface OrgOption {
+  value: string;
+  label: string;
+}
 
 interface ReportToolbarProps {
   presets: readonly number[];
@@ -11,6 +17,11 @@ interface ReportToolbarProps {
   range: { from?: string; to?: string };
   hasCustomRange: boolean;
   onReset: () => void;
+  departmentId?: string;
+  branchId?: string;
+  departmentOptions: OrgOption[];
+  branchOptions: OrgOption[];
+  onOrgFilterChange: (key: "departmentId" | "branchId", value: string) => void;
 }
 
 export function ReportToolbar({
@@ -22,6 +33,11 @@ export function ReportToolbar({
   range,
   hasCustomRange,
   onReset,
+  departmentId,
+  branchId,
+  departmentOptions,
+  branchOptions,
+  onOrgFilterChange,
 }: ReportToolbarProps) {
   const { t } = useTranslation();
   const rangeLabel = `${t("reports.filters.from")} – ${t("reports.filters.to")}`;
@@ -59,6 +75,32 @@ export function ReportToolbar({
         className="w-60"
         triggerClassName="h-8 min-h-8 text-xs"
       />
+
+      <div className="w-44">
+        <AppSelect
+          ariaLabel={t("reports.filters.department")}
+          searchable
+          searchPlaceholder={t("common.search")}
+          emptySearchMessage={t("common.noResults")}
+          value={departmentId ?? ""}
+          onValueChange={(value) => onOrgFilterChange("departmentId", value)}
+          options={departmentOptions}
+          triggerClassName="h-8 min-h-8 text-xs"
+        />
+      </div>
+
+      <div className="w-44">
+        <AppSelect
+          ariaLabel={t("reports.filters.branch")}
+          searchable
+          searchPlaceholder={t("common.search")}
+          emptySearchMessage={t("common.noResults")}
+          value={branchId ?? ""}
+          onValueChange={(value) => onOrgFilterChange("branchId", value)}
+          options={branchOptions}
+          triggerClassName="h-8 min-h-8 text-xs"
+        />
+      </div>
 
       {hasCustomRange && (
         <button type="button" className="button-ghost min-h-8 px-2 text-xs" onClick={onReset}>

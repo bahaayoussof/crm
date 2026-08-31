@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { PageHeader } from "@/components/shared/page-header";
+import { useBranchOptions, useDepartmentOptions } from "@/features/organization/organization-hooks";
 import { useAgentReports, useReportsOverview, useSlaReports, useTicketReports } from "./reports-hooks";
 import type { ReportsRangeParams } from "./reports.types";
 import type { DateRange } from "@/components/date-picker/date-range-picker";
@@ -32,18 +33,46 @@ export function ReportsPage() {
   const range = useMemo<ReportsRangeParams>(() => {
     const from = params.get("from") ?? undefined;
     const to = params.get("to") ?? undefined;
-    return { ...(from ? { from } : {}), ...(to ? { to } : {}) };
+    const departmentId = params.get("departmentId") ?? undefined;
+    const branchId = params.get("branchId") ?? undefined;
+    return {
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
+      ...(departmentId ? { departmentId } : {}),
+      ...(branchId ? { branchId } : {}),
+    };
   }, [params]);
 
   const overview = useReportsOverview(range);
   const sla = useSlaReports(range);
   const agents = useAgentReports(range);
   const tickets = useTicketReports(range);
+  const departments = useDepartmentOptions();
+  const branches = useBranchOptions();
+
+  const departmentOptions = [
+    { value: "", label: t("reports.filters.allDepartments") },
+    ...(departments.data?.map((item) => ({ value: item.id, label: item.name })) ?? []),
+  ];
+  const branchOptions = [
+    { value: "", label: t("reports.filters.allBranches") },
+    ...(branches.data?.map((item) => ({ value: item.id, label: item.name })) ?? []),
+  ];
+
+  const setParam = (key: string, value: string) => {
+    const next = new URLSearchParams(params);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    setParams(next);
+  };
 
   const applyPreset = (days: number) => {
     const to = new Date();
     const from = new Date(to.getTime() - days * 86_400_000);
-    setParams({ from: from.toISOString(), to: to.toISOString() });
+    const next = new URLSearchParams(params);
+    next.set("from", from.toISOString());
+    next.set("to", to.toISOString());
+    setParams(next);
   };
 
   const activePreset = useMemo(() => {
@@ -102,8 +131,13 @@ export function ReportsPage() {
         rangeValue={rangeValue}
         onRangeChange={setRange}
         range={range}
-        hasCustomRange={Boolean(range.from || range.to)}
+        hasCustomRange={Boolean(range.from || range.to || range.departmentId || range.branchId)}
         onReset={() => setParams({})}
+        departmentId={range.departmentId}
+        branchId={range.branchId}
+        departmentOptions={departmentOptions}
+        branchOptions={branchOptions}
+        onOrgFilterChange={setParam}
       />
 
       <ReportKpiGrid kpis={data.kpis} />

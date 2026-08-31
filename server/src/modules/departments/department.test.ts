@@ -1,0 +1,197 @@
+import { Role } from "@prisma/client";
+import request from "supertest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({
+  user: vi.fn(),
+  findMany: vi.fn(),
+  count: vi.fn(),
+  findUnique: vi.fn(),
+  findFirst: vi.fn(),
+  create: vi.fn(),
+  update: vi.fn(),
+  remove: vi.fn(),
+  branchFindUnique: vi.fn(),
+  auditCreate: vi.fn(),
+}));
+
+vi.mock("../../config/prisma.js", () => {
+  const department = {
+    findMany: mocks.findMany,
+    count: mocks.count,
+    findUnique: mocks.findUnique,
+    findFirst: mocks.findFirst,
+    create: mocks.create,
+    update: mocks.update,
+    delete: mocks.remove,
+  };
+  const branch = { findUnique: mocks.branchFindUnique };
+  const auditLog = { create: mocks.auditCreate };
+  return {
+    prisma: {
+      user: { findUnique: mocks.user },
+      department,
+      branch,
+      auditLog,
+      $transaction: vi.fn(async (value: unknown) =>
+        typeof value === "function"
+          ? (value as (tx: unknown) => unknown)({ department, branch, auditLog })
+          : Promise.all(value as Promise<unknown>[])),
+    },
+  };
+});
+
+import { app } from "../../app.js";
+import { createAccessToken } from "../auth/auth-token.js";
+
+const token = (role: Role, id = role.toLowerCase()) => createAccessToken({ id, role });
+const auth = (role: Role) => ({ Authorization: `Bearer ${token(role)}` });
+
+const row = {
+  id: "d1",
+  name: "Support",
+  description: null,
+  isActive: true,
+  branchId: null,
+  branch: null,
+  _count: { users: 0, tickets: 0 },
+  createdAt: new Date("2026-08-30T00:00:00.000Z"),
+  updatedAt: new Date("2026-08-30T00:00:00.000Z"),
+};
+
+describe("departments API", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.user.mockImplementation(({ where }: { where: { id: string } }) =>
+      Promise.resolve({ role: where.id.toUpperCase() as Role, isActive: true }),
+    );
+    mocks.findMany.mockResolvedValue([]);
+    mocks.count.mockResolvedValue(0);
+    mocks.findFirst.mockResolvedValue(null);
+    mocks.findUnique.mockResolvedValue(null);
+    mocks.branchFindUnique.mockResolvedValue({ id: "b1", isActive: true });
+    mocks.create.mockResolvedValue(row);
+    mocks.update.mockResolvedValue(row);
+    mocks.remove.mockResolvedValue(row);
+  });
+
+  it("requires authentication for the admin surface", async () => {
+    expect((await request(app).get("/api/settings/departments")).status).toBe(401);
+    expect((await request(app).post("/api/settings/departments").send({ name: "X" })).status).toBe(401);
+    expect((await request(app).patch("/api/settings/departments/d1").send({ name: "X" })).status).toBe(401);
+    expect((await request(app).delete("/api/settings/departments/d1")).status).toBe(401);
+  });
+
+  it.each([Role.MANAGER, Role.AGENT, Role.CUSTOMER])("rejects %s from admin CRUD", async (role) => {
+    expect((await request(app).get("/api/settings/departments").set(auth(role))).status).toBe(403);
+    expect((await request(app).post("/api/settings/departments").set(auth(role)).send({ name: "Support" })).status).toBe(403);
+  });
+
+  it("lists departments with search and status filters for ADMIN", async () => {
+    mocks.findMany.mockResolvedValue([row]);
+    mocks.count.mockResolvedValue(1);
+    const response = await request(app)
+      .get("/api/settings/departments?search=sup&status=active")
+      .set(auth(Role.ADMIN));
+    expect(response.status).toBe(200);
+    expect(response.body.data).toHaveLength(1);
+    expect(response.body.data[0]).toMatchObject({ id: "d1", userCount: 0, ticketCount: 0 });
+    expect(mocks.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { name: { contains: "sup", mode: "insensitive" }, isActive: true },
+      }),
+    );
+  });
+
+  it("creates and trims a department", async () => {
+    const response = await request(app)
+      .post("/api/settings/departments")
+      .set(auth(Role.ADMIN))
+      .send({ name: "  Support  ", description: "  front line " });
+    expect(response.status).toBe(201);
+    expect(mocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ name: "Support", description: "front line" }) }),
+    );
+    expect(mocks.auditCreate).toHaveBeenCalled();
+  });
+
+  it("rejects a duplicate department name in the same branch scope", async () => {
+    mocks.findFirst.mockResolvedValue({ id: "other" });
+    const response = await request(app)
+      .post("/api/settings/departments")
+      .set(auth(Role.ADMIN))
+      .send({ name: "Support" });
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe("DEPARTMENT_NAME_ALREADY_EXISTS");
+  });
+
+  it("rejects an unknown branch on create", async () => {
+    mocks.branchFindUnique.mockResolvedValue(null);
+    const response = await request(app)
+      .post("/api/settings/departments")
+      .set(auth(Role.ADMIN))
+      .send({ name: "Support", branchId: "missing" });
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe("BRANCH_NOT_FOUND");
+  });
+
+  it.each([{ name: "" }, { name: "x" }, { name: "ok", unknown: true }])(
+    "rejects invalid create input %j",
+    async (body) => {
+      expect((await request(app).post("/api/settings/departments").set(auth(Role.ADMIN)).send(body)).status).toBe(400);
+    },
+  );
+
+  it("returns 404 when updating a missing department", async () => {
+    mocks.findUnique.mockResolvedValue(null);
+    const response = await request(app)
+      .patch("/api/settings/departments/missing")
+      .set(auth(Role.ADMIN))
+      .send({ name: "New" });
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe("DEPARTMENT_NOT_FOUND");
+  });
+
+  it("deactivates a department without deleting it", async () => {
+    mocks.findUnique.mockResolvedValue({ id: "d1", name: "Support", description: null, isActive: true, branchId: null });
+    mocks.update.mockResolvedValue({ ...row, isActive: false });
+    const response = await request(app)
+      .patch("/api/settings/departments/d1")
+      .set(auth(Role.ADMIN))
+      .send({ isActive: false });
+    expect(response.status).toBe(200);
+    expect(mocks.update).toHaveBeenCalled();
+    expect(mocks.auditCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ action: "DEPARTMENT_DEACTIVATED" }) }),
+    );
+  });
+
+  it("blocks deletion while the department is still referenced (409 CONFLICT)", async () => {
+    mocks.findUnique.mockResolvedValue({ id: "d1", name: "Support", _count: { users: 3, tickets: 0 } });
+    const response = await request(app).delete("/api/settings/departments/d1").set(auth(Role.ADMIN));
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe("DEPARTMENT_IN_USE");
+    expect(response.body.error.details).toMatchObject({ users: 3, tickets: 0 });
+    expect(mocks.remove).not.toHaveBeenCalled();
+  });
+
+  it("deletes an unreferenced department", async () => {
+    mocks.findUnique.mockResolvedValue({ id: "d1", name: "Support", _count: { users: 0, tickets: 0 } });
+    const response = await request(app).delete("/api/settings/departments/d1").set(auth(Role.ADMIN));
+    expect(response.status).toBe(204);
+    expect(mocks.remove).toHaveBeenCalledWith({ where: { id: "d1" } });
+  });
+
+  it("exposes an active-only lookup to every internal role", async () => {
+    mocks.findMany.mockResolvedValue([{ id: "d1", name: "Support", branchId: null }]);
+    for (const role of [Role.ADMIN, Role.MANAGER, Role.AGENT]) {
+      const response = await request(app).get("/api/departments").set(auth(role));
+      expect(response.status).toBe(200);
+      expect(response.body.data).toEqual([{ id: "d1", name: "Support", branchId: null }]);
+    }
+    expect((await request(app).get("/api/departments").set(auth(Role.CUSTOMER))).status).toBe(403);
+    expect(mocks.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { isActive: true } }),
+    );
+  });
+});

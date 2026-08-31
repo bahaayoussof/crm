@@ -396,28 +396,37 @@ model QuickReply {
 }
 
 model Department {
-  id        String   @id @default(cuid())
-  name      String
-  branchId  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  branchId    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   branch  Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
   users   User[]
   tickets Ticket[]
 
   @@unique([branchId, name])
+  @@index([isActive])
+  @@index([branchId])
 }
 
 model Branch {
   id        String   @id @default(cuid())
   name      String   @unique
+  code      String?  @unique
+  address   String?
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   departments Department[]
   users       User[]
   tickets     Ticket[]
+
+  @@index([isActive])
 }
 
 model Task {

@@ -1,5 +1,6 @@
 import { Role } from "@prisma/client";
 import { z } from "zod";
+import { optionalPhoneSchema } from "../../shared/utils/phone.js";
 
 // Internal users only — CUSTOMER identities are managed through registration and
 // the Customer module, never this administrative surface.
@@ -8,6 +9,12 @@ export const manageableRoleSchema = z.nativeEnum(Role).refine((role) => role !==
 });
 
 const normalizedEmail = z.string().trim().email().transform((value) => value.toLowerCase());
+
+// Absent key -> undefined (leave unchanged). Empty string / null -> null (clear).
+const orgId = z.preprocess(
+  (value) => (value === "" ? null : value),
+  z.string().trim().min(1).nullable().optional(),
+);
 
 export const userListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -24,15 +31,23 @@ export const createUserSchema = z.object({
   email: normalizedEmail,
   password: z.string().min(8).max(128),
   role: manageableRoleSchema,
+  departmentId: orgId,
+  branchId: orgId,
 }).strict();
 
-// One safe update payload. Role is part of it (the Edit User form is the only
-// place a role changes); every field is optional and unknown fields are rejected.
+// One safe update payload for the ADMIN-only user-management surface. Every field
+// is optional (partial updates are allowed), unknown fields are rejected, and an
+// active ADMIN may edit all of them: name, email, phone, role, branch,
+// department, and activation. Phone reuses the shared `optionalPhoneSchema`
+// (same normalization/validation as the profile endpoints) — no duplicate.
 export const updateUserSchema = z.object({
   name: z.string().trim().min(2).max(100).optional(),
   email: normalizedEmail.optional(),
+  phone: optionalPhoneSchema,
   role: manageableRoleSchema.optional(),
   isActive: z.boolean().optional(),
+  departmentId: orgId,
+  branchId: orgId,
 }).strict().refine((value) => Object.keys(value).length > 0, { message: "At least one user field is required" });
 
 export type UserListQuery = z.infer<typeof userListQuerySchema>;

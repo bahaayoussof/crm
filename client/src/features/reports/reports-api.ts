@@ -5,6 +5,8 @@ function rangeQuery(range: ReportsRangeParams) {
   const params: Record<string, string> = {};
   if (range.from) params.from = range.from;
   if (range.to) params.to = range.to;
+  if (range.departmentId) params.departmentId = range.departmentId;
+  if (range.branchId) params.branchId = range.branchId;
   return params;
 }
 

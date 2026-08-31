@@ -18,6 +18,11 @@ vi.mock("./reports-hooks", () => ({
   useTicketReports: mocks.tickets,
 }));
 
+vi.mock("@/features/organization/organization-hooks", () => ({
+  useDepartmentOptions: () => ({ data: [] }),
+  useBranchOptions: () => ({ data: [] }),
+}));
+
 vi.mock("recharts", () => ({
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   BarChart: ({ data, children }: { data: unknown; children: React.ReactNode }) => <div data-chart={JSON.stringify(data)}>{children}</div>,

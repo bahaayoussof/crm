@@ -79,6 +79,8 @@ Record counts are intentionally configured as **non-round numbers** so tables do
 | **Tasks** (`/tasks`) | **107** (+ 2 pre-existing) | 20 | **6 pages** | 7 on page 6 | Status filter (`OPEN` vs `DONE`), overdue tasks (past due date), upcoming tasks, assignee filter, RBAC visibility |
 | **Knowledge Base** (`/knowledge-base`) | **63** (+ 1 pre-existing) | 20 | **4 pages** | 3 on page 4 | Status filter (`DRAFT` vs `PUBLISHED`), category filter, title & content full text search |
 | **Quick Replies** (`/quick-replies`) | **47** (+ 3 pre-existing) | 20 | **3 pages** | 7 on page 3 | Category title search, body keyword search, modal picker search pagination |
+| **Departments** (`/settings` → Departments) | **8** | 15 | **1 page** | — | Name search, active/inactive filter, branch column, user count, create/edit modal, activate/deactivate, safe-delete 409 (`DEPARTMENT_IN_USE`). 6 of 8 are branch-scoped; "Escalations" is branchless. |
+| **Branches** (`/settings` → Branches) | **4** | 15 | **1 page** | — | Name/code search, active/inactive filter, address column, create/edit modal, activate/deactivate, safe-delete 409 (`BRANCH_IN_USE`). "Remote / Distributed" has no address. |
 | **Audit Logs** (`/audit-logs`) | **412** (+ 4 pre-existing) | 20 | **21 pages** | 12 on page 21 | Filter by Action, Entity Type, Actor ID, Date range picker, free-text search, details Sheet diffs |
 | **Portal Tickets** (`/portal/tickets`) | **27** (Layla Hassan) | 20 | **2 pages** | 7 on page 2 | Customer-safe portal pagination, status mapping (`OPEN`, `IN_PROGRESS`, `WAITING_FOR_YOU`, `RESOLVED`, `CLOSED`) |
 | **Notifications** | **85** (+ 2 pre-existing) | N/A | Popover | N/A | Read vs unread state, bell badge count, ticket mention & assignment activity |

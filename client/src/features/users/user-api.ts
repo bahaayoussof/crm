@@ -19,6 +19,8 @@ export async function createUser(values: UserCreateFormValues) {
     email: values.email.trim().toLowerCase(),
     password: values.password,
     role: values.role,
+    departmentId: values.departmentId ? values.departmentId : null,
+    branchId: values.branchId ? values.branchId : null,
   });
   return response.data.data;
 }
@@ -31,6 +33,9 @@ export async function updateUser(id: string, payload: UserUpdatePayload) {
   if (payload.email !== undefined) body.email = payload.email.trim().toLowerCase();
   if (payload.role !== undefined) body.role = payload.role;
   if (payload.isActive !== undefined) body.isActive = payload.isActive;
+  if (payload.phone !== undefined) body.phone = payload.phone;
+  if (payload.departmentId !== undefined) body.departmentId = payload.departmentId;
+  if (payload.branchId !== undefined) body.branchId = payload.branchId;
 
   const response = await apiClient.patch<ApiEnvelope<User>>(`/users/${id}`, body);
   return response.data.data;

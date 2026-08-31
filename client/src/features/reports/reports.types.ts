@@ -3,6 +3,8 @@ import type { TicketPriority, TicketStatus } from "../tickets/ticket.types";
 export interface ReportsRangeParams {
   from?: string;
   to?: string;
+  departmentId?: string;
+  branchId?: string;
 }
 
 interface RangeMeta {

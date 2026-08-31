@@ -5,20 +5,27 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   findMany: vi.fn(), count: vi.fn(), findUnique: vi.fn(), findFirst: vi.fn(),
   create: vi.fn(), update: vi.fn(), auditCreate: vi.fn(),
+  deptFindUnique: vi.fn(), branchFindUnique: vi.fn(),
 }));
 
-vi.mock("../../config/prisma.js", () => ({
-  prisma: {
-    user: {
-      findMany: mocks.findMany, count: mocks.count, findUnique: mocks.findUnique,
-      findFirst: mocks.findFirst, create: mocks.create, update: mocks.update,
+vi.mock("../../config/prisma.js", () => {
+  const department = { findUnique: mocks.deptFindUnique };
+  const branch = { findUnique: mocks.branchFindUnique };
+  return {
+    prisma: {
+      user: {
+        findMany: mocks.findMany, count: mocks.count, findUnique: mocks.findUnique,
+        findFirst: mocks.findFirst, create: mocks.create, update: mocks.update,
+      },
+      department,
+      branch,
+      $transaction: vi.fn(async (value: unknown) =>
+        typeof value === "function"
+          ? (value as (tx: { user: typeof mocks; department: typeof department; branch: typeof branch; auditLog: { create: typeof mocks.auditCreate } }) => unknown)({ user: mocks, department, branch, auditLog: { create: mocks.auditCreate } })
+          : Promise.all(value as Promise<unknown>[])),
     },
-    $transaction: vi.fn(async (value: unknown) =>
-      typeof value === "function"
-        ? (value as (tx: { user: typeof mocks; auditLog: { create: typeof mocks.auditCreate } }) => unknown)({ user: mocks, auditLog: { create: mocks.auditCreate } })
-        : Promise.all(value as Promise<unknown>[])),
-  },
-}));
+  };
+});
 
 vi.mock("bcrypt", () => ({ default: { hash: vi.fn(async () => "hashed-password"), compare: vi.fn(async () => true) } }));
 
@@ -86,7 +93,13 @@ describe("users administration API", () => {
     const call = mocks.findMany.mock.calls[0]?.[0];
     expect(call.where.role).toEqual({ in: [Role.ADMIN, Role.MANAGER, Role.AGENT] });
     expect(call.orderBy).toEqual([{ createdAt: "desc" }, { id: "asc" }]);
-    expect(call.select).toEqual({ id: true, name: true, email: true, role: true, isActive: true, createdAt: true, updatedAt: true });
+    expect(call.select).toEqual({
+      id: true, name: true, email: true, role: true, isActive: true, phone: true,
+      departmentId: true, branchId: true,
+      department: { select: { id: true, name: true } },
+      branch: { select: { id: true, name: true } },
+      createdAt: true, updatedAt: true,
+    });
   });
 
   it("filters the list by role and status", async () => {
@@ -138,12 +151,100 @@ describe("users administration API", () => {
     expect(data).toEqual({ name: "Agent Nine", email: "agent9@example.com", passwordHash: "hashed-password", role: "AGENT" });
   });
 
+  it("assigns a department and branch on create after validating both", async () => {
+    mocks.findFirst.mockResolvedValue(null);
+    mocks.deptFindUnique.mockResolvedValue({ id: "dep-1", isActive: true, branchId: "br-1" });
+    mocks.branchFindUnique.mockResolvedValue({ id: "br-1", isActive: true });
+    mocks.create.mockResolvedValue({ ...agentRow, departmentId: "dep-1", branchId: "br-1" });
+    const response = await request(app).post("/api/users").set(auth(adminToken))
+      .send({ name: "Agent Nine", email: "agent9@example.com", password: "password123", role: "AGENT", departmentId: "dep-1", branchId: "br-1" });
+    expect(response.status).toBe(201);
+    expect(mocks.create.mock.calls[0]?.[0].data).toMatchObject({
+      department: { connect: { id: "dep-1" } },
+      branch: { connect: { id: "br-1" } },
+    });
+  });
+
+  it("rejects an inactive department assignment", async () => {
+    mocks.findFirst.mockResolvedValue(null);
+    mocks.deptFindUnique.mockResolvedValue({ id: "dep-1", isActive: false, branchId: null });
+    const response = await request(app).post("/api/users").set(auth(adminToken))
+      .send({ name: "Agent Nine", email: "agent9@example.com", password: "password123", role: "AGENT", departmentId: "dep-1" });
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("INVALID_DEPARTMENT");
+  });
+
+  it("rejects a department that does not belong to the chosen branch", async () => {
+    mocks.findFirst.mockResolvedValue(null);
+    mocks.deptFindUnique.mockResolvedValue({ id: "dep-1", isActive: true, branchId: "br-9" });
+    mocks.branchFindUnique.mockResolvedValue({ id: "br-1", isActive: true });
+    const response = await request(app).post("/api/users").set(auth(adminToken))
+      .send({ name: "Agent Nine", email: "agent9@example.com", password: "password123", role: "AGENT", departmentId: "dep-1", branchId: "br-1" });
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("DEPARTMENT_BRANCH_MISMATCH");
+  });
+
+  it("clears a user's department when departmentId is null", async () => {
+    mocks.findFirst.mockResolvedValueOnce({ id: "agent-9", role: Role.AGENT, isActive: true, departmentId: "dep-1", branchId: null });
+    mocks.update.mockResolvedValue({ ...agentRow, departmentId: null });
+    const response = await request(app).patch("/api/users/agent-9").set(auth(adminToken)).send({ departmentId: null });
+    expect(response.status).toBe(200);
+    expect(mocks.update.mock.calls[0]?.[0].data).toEqual({ department: { disconnect: true } });
+  });
+
   it("promotes another internal user to ADMIN", async () => {
     mocks.findFirst.mockResolvedValueOnce({ id: "agent-9", role: Role.AGENT, isActive: true });
     mocks.update.mockResolvedValue({ ...agentRow, role: Role.ADMIN });
     const response = await request(app).patch("/api/users/agent-9").set(auth(adminToken)).send({ role: "ADMIN" });
     expect(response.status).toBe(200);
     expect(mocks.update.mock.calls[0]?.[0]).toMatchObject({ where: { id: "agent-9" }, data: { role: "ADMIN" } });
+  });
+
+  it("lets an ADMIN edit name, email, phone, role, branch, department, and status of another user in one request", async () => {
+    mocks.findFirst.mockResolvedValueOnce({ id: "agent-9", name: "Old Name", email: "old@example.com", phone: null, role: Role.AGENT, isActive: true, departmentId: null, branchId: null });
+    mocks.branchFindUnique.mockResolvedValue({ id: "br-1", isActive: true });
+    mocks.deptFindUnique.mockResolvedValue({ id: "dep-1", isActive: true, branchId: "br-1" });
+    mocks.update.mockResolvedValue({ ...agentRow, name: "New Name", email: "new@example.com", phone: "+442079460958", role: Role.MANAGER, isActive: false, departmentId: "dep-1", branchId: "br-1" });
+    const response = await request(app).patch("/api/users/agent-9").set(auth(adminToken)).send({
+      name: "  New Name  ", email: "New@Example.com", phone: "+44 20 7946 0958", role: "MANAGER", branchId: "br-1", departmentId: "dep-1", isActive: false,
+    });
+    expect(response.status).toBe(200);
+    expect(mocks.update.mock.calls[0]?.[0].data).toMatchObject({
+      name: "New Name", email: "new@example.com", phone: "+442079460958", role: "MANAGER", isActive: false,
+      branch: { connect: { id: "br-1" } }, department: { connect: { id: "dep-1" } },
+    });
+  });
+
+  it("lets an ADMIN update another user's phone with the shared phone validation", async () => {
+    mocks.findFirst.mockResolvedValue({ id: "agent-9", role: Role.AGENT, isActive: true, phone: null, departmentId: null, branchId: null });
+    mocks.update.mockResolvedValue({ ...agentRow, phone: "+442079460958" });
+    const ok = await request(app).patch("/api/users/agent-9").set(auth(adminToken)).send({ phone: "+44 20 7946 0958" });
+    expect(ok.status).toBe(200);
+    expect(mocks.update.mock.calls[0]?.[0].data).toEqual({ phone: "+442079460958" });
+    const bad = await request(app).patch("/api/users/agent-9").set(auth(adminToken)).send({ phone: "12" });
+    expect(bad.status).toBe(400);
+  });
+
+  it("still rejects an incompatible department/branch combination on update", async () => {
+    mocks.findFirst.mockResolvedValueOnce({ id: "agent-9", role: Role.AGENT, isActive: true, departmentId: null, branchId: null });
+    mocks.branchFindUnique.mockResolvedValue({ id: "br-1", isActive: true });
+    mocks.deptFindUnique.mockResolvedValue({ id: "dep-1", isActive: true, branchId: "br-9" });
+    const response = await request(app).patch("/api/users/agent-9").set(auth(adminToken)).send({ branchId: "br-1", departmentId: "dep-1" });
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("DEPARTMENT_BRANCH_MISMATCH");
+  });
+
+  it("still rejects an inactive branch or department on update", async () => {
+    mocks.findFirst.mockResolvedValue({ id: "agent-9", role: Role.AGENT, isActive: true, departmentId: null, branchId: null });
+    mocks.branchFindUnique.mockResolvedValue({ id: "br-1", isActive: false });
+    const inactiveBranch = await request(app).patch("/api/users/agent-9").set(auth(adminToken)).send({ branchId: "br-1" });
+    expect(inactiveBranch.status).toBe(400);
+    expect(inactiveBranch.body.error.code).toBe("INVALID_BRANCH");
+    mocks.branchFindUnique.mockResolvedValue({ id: "br-1", isActive: true });
+    mocks.deptFindUnique.mockResolvedValue({ id: "dep-1", isActive: false, branchId: "br-1" });
+    const inactiveDept = await request(app).patch("/api/users/agent-9").set(auth(adminToken)).send({ branchId: "br-1", departmentId: "dep-1" });
+    expect(inactiveDept.status).toBe(400);
+    expect(inactiveDept.body.error.code).toBe("INVALID_DEPARTMENT");
   });
 
   it.each([["AGENT", "MANAGER"], ["MANAGER", "AGENT"]] as const)(

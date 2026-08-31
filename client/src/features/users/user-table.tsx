@@ -41,11 +41,12 @@ interface UserTableMeta {
 }
 
 const columnClasses: Record<string, string> = {
-  name: "w-[22%]",
+  name: "w-[20%]",
   email: "w-auto",
-  role: "w-[132px]",
-  status: "w-[120px]",
-  createdAt: "w-[150px]",
+  role: "w-[120px]",
+  department: "w-[170px]",
+  status: "w-[110px]",
+  createdAt: "w-[140px]",
   actions: "w-[112px]",
 };
 
@@ -117,6 +118,22 @@ export function UserTable({
         cell: ({ row }) => <RoleBadge role={row.original.role} />,
       },
       {
+        id: "department",
+        header: () => t("users.columns.department"),
+        cell: ({ row }) => (
+          <div className="min-w-0">
+            <span className="block truncate text-xs text-foreground" dir="auto">
+              {row.original.department?.name ?? t("users.departmentNone")}
+            </span>
+            {row.original.branch && (
+              <span className="block truncate text-[11px] text-muted-foreground" dir="auto">
+                {row.original.branch.name}
+              </span>
+            )}
+          </div>
+        ),
+      },
+      {
         id: "status",
         accessorKey: "isActive",
         header: () => t("users.columns.status"),
@@ -175,7 +192,7 @@ export function UserTable({
   return (
     <>
       <div className="hidden md:block overflow-x-auto">
-        <Table className="min-w-[52rem]">
+        <Table className="min-w-[60rem]">
           <colgroup>
             {table.getAllLeafColumns().map((column) => (
               <col key={column.id} className={columnClasses[column.id] ?? ""} />
@@ -238,6 +255,10 @@ export function UserTable({
                 {t("users.columns.created")}: <bdi dir="ltr">{formatUserDate(user.createdAt, i18n.language)}</bdi>
               </span>
             </div>
+            <p className="mt-1 truncate text-xs text-muted-foreground" dir="auto">
+              {t("users.columns.department")}: {user.department?.name ?? t("users.departmentNone")}
+              {user.branch ? ` · ${user.branch.name}` : ""}
+            </p>
             <div className="mt-3 flex justify-end">
               <RowActions user={user} meta={meta} variant="mobile" />
             </div>

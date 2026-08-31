@@ -1,5 +1,10 @@
 export type ManageableRole = "ADMIN" | "MANAGER" | "AGENT";
 
+export interface OrgRef {
+  id: string;
+  name: string;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -7,6 +12,10 @@ export interface User {
   role: ManageableRole;
   isActive: boolean;
   phone?: string | null;
+  departmentId: string | null;
+  branchId: string | null;
+  department: OrgRef | null;
+  branch: OrgRef | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -30,7 +39,9 @@ export type UserUpdatePayload = Partial<{
   email: string;
   role: ManageableRole;
   isActive: boolean;
-  phone?: string | null;
+  phone: string | null;
+  departmentId: string | null;
+  branchId: string | null;
 }>;
 
 export const MANAGEABLE_ROLES: ManageableRole[] = ["ADMIN", "MANAGER", "AGENT"];

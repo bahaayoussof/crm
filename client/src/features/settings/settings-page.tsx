@@ -21,16 +21,22 @@ import {
 } from "@/components/ui/table";
 import { useCreateCategory, usePutSlaRule, useSettingCategories, useSlaRules, useUpdateCategory } from "./settings-hooks";
 import type { Priority, SettingCategory, SlaRule } from "./settings.types";
+import { BranchesSection, DepartmentsSection } from "./organization-sections";
 
 const priorities: Priority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
+const SECTIONS = ["categories", "departments", "branches", "sla", "quick"] as const;
 export function SettingsPage() {
   const { t } = useTranslation();
-  const [section, setSection] = useState<"categories" | "sla" | "quick">("categories");
+  const [section, setSection] = useState<(typeof SECTIONS)[number]>("categories");
   return <main className="page-container space-y-6"><PageHeader title={t("settings.title")} description={t("settings.description")} />
     <nav className="flex max-w-full gap-1 overflow-x-auto rounded-lg border bg-surface p-1" aria-label={t("settings.sectionsLabel")}>
-      {(["categories", "sla", "quick"] as const).map((key) => <Button key={key} variant={section === key ? "primary" : "ghost"} size="sm" onClick={() => setSection(key)}>{t(`settings.tabs.${key}`)}</Button>)}
+      {SECTIONS.map((key) => <Button key={key} variant={section === key ? "primary" : "ghost"} size="sm" onClick={() => setSection(key)}>{t(`settings.tabs.${key}`)}</Button>)}
     </nav>
-    {section === "categories" && <CategoriesSection />}{section === "sla" && <SlaSection />}{section === "quick" && <QuickRepliesSection />}
+    {section === "categories" && <CategoriesSection />}
+    {section === "departments" && <DepartmentsSection />}
+    {section === "branches" && <BranchesSection />}
+    {section === "sla" && <SlaSection />}
+    {section === "quick" && <QuickRepliesSection />}
   </main>;
 }
 

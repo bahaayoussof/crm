@@ -10,10 +10,19 @@ const mocks = vi.hoisted(() => ({
   currentUser: { id: "u-admin", name: "Aisha Admin", email: "aisha@example.com", role: "ADMIN" as string, customer: null },
 }));
 
+const orgHooks = vi.hoisted(() => ({
+  branches: [] as { id: string; name: string; code: string | null }[],
+  departments: [] as { id: string; name: string; branchId: string | null }[],
+}));
+
 vi.mock("@/features/auth/auth-state", () => ({
   useAuth: () => ({ user: mocks.currentUser, isLoading: false, logout: vi.fn() }),
 }));
 vi.mock("@/features/notifications/notification-bell", () => ({ NotificationBell: () => null }));
+vi.mock("@/features/organization/organization-hooks", () => ({
+  useDepartmentOptions: () => ({ data: orgHooks.departments }),
+  useBranchOptions: () => ({ data: orgHooks.branches }),
+}));
 
 vi.mock("./user-hooks", () => ({
   useUsers: mocks.useUsers,
@@ -30,7 +39,8 @@ import type { User } from "./user.types";
 
 const admin: User = {
   id: "u-admin", name: "Aisha Admin", email: "aisha@example.com", role: "ADMIN",
-  isActive: true, createdAt: "2026-08-01T10:00:00.000Z", updatedAt: "2026-08-10T10:00:00.000Z",
+  isActive: true, departmentId: null, branchId: null, department: null, branch: null,
+  createdAt: "2026-08-01T10:00:00.000Z", updatedAt: "2026-08-10T10:00:00.000Z",
 };
 const admin2: User = { ...admin, id: "u-admin2", name: "Bilal Admin", email: "bilal@example.com" };
 const agent: User = {
@@ -76,13 +86,13 @@ describe("users management — table", () => {
     mocks.useUpdateUser.mockReturnValue({ mutateAsync: mocks.update, isPending: false });
   });
 
-  it("renders semantic Name, Email, Role, Status, Created and Actions headers", () => {
+  it("renders semantic Name, Email, Role, Department, Status, Created and Actions headers", () => {
     renderAt("/users", <Route path="/users" element={<UserListPage />} />);
     const table = screen.getByRole("table");
-    for (const name of ["Name", "Email", "Role", "Status", "Created", "Actions"]) {
+    for (const name of ["Name", "Email", "Role", "Department", "Status", "Created", "Actions"]) {
       expect(within(table).getByRole("columnheader", { name })).toBeInTheDocument();
     }
-    expect(table.querySelectorAll("colgroup col")).toHaveLength(6);
+    expect(table.querySelectorAll("colgroup col")).toHaveLength(7);
   });
 
   it("shows Role and Status as display badges, never as table dropdowns", () => {
@@ -285,7 +295,7 @@ describe("users management — table", () => {
     expect(document.documentElement).toHaveAttribute("dir", "rtl");
     const table = screen.getByRole("table");
     expect(within(table).getByRole("columnheader", { name: "الاسم" })).toBeInTheDocument();
-    expect(table.querySelectorAll("colgroup col")).toHaveLength(6);
+    expect(table.querySelectorAll("colgroup col")).toHaveLength(7);
   });
 });
 
@@ -306,6 +316,8 @@ describe("users management — forms", () => {
     }
     await changeAppLanguage("en");
     vi.clearAllMocks();
+    orgHooks.branches = [];
+    orgHooks.departments = [];
     mocks.currentUser = { id: "u-admin", name: "Aisha Admin", email: "aisha@example.com", role: "ADMIN", customer: null };
     mocks.useUser.mockReturnValue({ isLoading: false, isError: false, data: admin2 });
     mocks.useCreateUser.mockReturnValue({ mutateAsync: mocks.create, isPending: false });
@@ -325,7 +337,7 @@ describe("users management — forms", () => {
     fireEvent.click(screen.getByRole("option", { name: "Manager" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(mocks.create).toHaveBeenCalledWith({ name: "New Person", email: "new@example.com", password: "password123", role: "MANAGER" }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledWith({ name: "New Person", email: "new@example.com", password: "password123", role: "MANAGER", departmentId: "", branchId: "" }));
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/users"));
   });
 
@@ -339,32 +351,125 @@ describe("users management — forms", () => {
     expect(mocks.create).not.toHaveBeenCalled();
   });
 
-  it("edits another user: displays name, email, role as read-only and submits phone and active state", async () => {
+  it("lets an ADMIN edit name, email, role, phone, branch and department of another user", async () => {
+    orgHooks.branches = [{ id: "b1", name: "HQ", code: null }];
+    orgHooks.departments = [{ id: "d1", name: "Support", branchId: "b1" }];
     mocks.update.mockResolvedValue(admin2);
     renderAt("/users/u-admin2/edit", <><Route path="/users/:id/edit" element={<UserFormPage />} /><Route path="/users" element={<LocationProbe />} /></>);
-    expect(screen.getByLabelText(/Name/)).toBeDisabled();
-    expect(screen.getByLabelText(/Email/)).toBeDisabled();
-    expect(screen.getByLabelText(/Role/)).toBeDisabled();
+    expect(screen.getByLabelText(/Name/)).toBeEnabled();
+    expect(screen.getByLabelText(/Email/)).toBeEnabled();
+    expect(screen.getByLabelText(/Role/)).toBeEnabled();
     expect(screen.getByLabelText(/Phone number/)).toBeEnabled();
+    expect(screen.getByLabelText("Department")).toBeDisabled();
 
+    fireEvent.change(screen.getByLabelText(/Name/), { target: { value: "Bilal Renamed" } });
+    fireEvent.change(screen.getByLabelText(/Email/), { target: { value: "Bilal.New@Example.com" } });
     fireEvent.change(screen.getByLabelText(/Phone number/), { target: { value: "+201234567890" } });
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Branch" }));
+    fireEvent.click(await screen.findByRole("option", { name: "HQ" }));
+    const department = screen.getByLabelText("Department");
+    await waitFor(() => expect(department).toBeEnabled());
+    fireEvent.click(department);
+    fireEvent.click(await screen.findByRole("option", { name: "Support" }));
+
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({ phone: "+201234567890", isActive: true }));
+    await waitFor(() =>
+      expect(mocks.update).toHaveBeenCalledWith({
+        name: "Bilal Renamed",
+        email: "bilal.new@example.com",
+        role: "ADMIN",
+        phone: "+201234567890",
+        isActive: true,
+        branchId: "b1",
+        departmentId: "d1",
+      }),
+    );
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/users"));
   });
 
-  it("makes Active disabled when editing your own account", async () => {
+  it("Department is branch-dependent: disabled until a branch is chosen, then only that branch's departments", async () => {
+    orgHooks.branches = [
+      { id: "b1", name: "HQ", code: null },
+      { id: "b2", name: "West", code: null },
+    ];
+    orgHooks.departments = [
+      { id: "d1", name: "Support", branchId: "b1" },
+      { id: "d2", name: "Sales", branchId: "b2" },
+    ];
+    renderAt("/users/u-admin2/edit", <Route path="/users/:id/edit" element={<UserFormPage />} />);
+    expect(screen.getByLabelText("Department")).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Branch" }));
+    fireEvent.click(await screen.findByRole("option", { name: "HQ" }));
+    const department = screen.getByLabelText("Department");
+    await waitFor(() => expect(department).toBeEnabled());
+    fireEvent.click(department);
+    expect(await screen.findByRole("option", { name: "Support" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Sales" })).not.toBeInTheDocument();
+  });
+
+  it("changing Branch clears a Department that does not belong to the new Branch", async () => {
+    orgHooks.branches = [
+      { id: "b1", name: "HQ", code: null },
+      { id: "b2", name: "West", code: null },
+    ];
+    orgHooks.departments = [
+      { id: "d1", name: "Support", branchId: "b1" },
+      { id: "d2", name: "Sales", branchId: "b2" },
+    ];
+    mocks.useUser.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: { ...admin2, branchId: "b1", departmentId: "d1", branch: { id: "b1", name: "HQ" }, department: { id: "d1", name: "Support" } },
+    });
+    mocks.update.mockResolvedValue(admin2);
+    renderAt("/users/u-admin2/edit", <><Route path="/users/:id/edit" element={<UserFormPage />} /><Route path="/users" element={<LocationProbe />} /></>);
+    expect(screen.getByLabelText("Department")).toHaveTextContent("Support");
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Branch" }));
+    fireEvent.click(await screen.findByRole("option", { name: "West" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ branchId: "b2", departmentId: null })),
+    );
+  });
+
+  it("populates existing user values into the edit form", async () => {
+    orgHooks.branches = [{ id: "b1", name: "HQ", code: null }];
+    orgHooks.departments = [{ id: "d1", name: "Support", branchId: "b1" }];
+    mocks.useUser.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: {
+        ...admin2,
+        phone: "+201234567890",
+        branchId: "b1",
+        departmentId: "d1",
+        branch: { id: "b1", name: "HQ" },
+        department: { id: "d1", name: "Support" },
+      },
+    });
+    renderAt("/users/u-admin2/edit", <Route path="/users/:id/edit" element={<UserFormPage />} />);
+    expect(screen.getByLabelText(/Name/)).toHaveValue("Bilal Admin");
+    expect(screen.getByLabelText(/Email/)).toHaveValue("bilal@example.com");
+    expect(screen.getByLabelText(/Role/)).toHaveTextContent("Admin");
+    expect(screen.getByLabelText("Branch")).toHaveTextContent("HQ");
+    expect(screen.getByLabelText("Department")).toHaveTextContent("Support");
+  });
+
+  it("keeps role and Active disabled when editing your own account but allows name/email edits", async () => {
     mocks.useUser.mockReturnValue({ isLoading: false, isError: false, data: admin });
     renderAt("/users/u-admin/edit", <Route path="/users/:id/edit" element={<UserFormPage />} />);
-    expect(screen.getByLabelText(/Name/)).toBeDisabled();
-    expect(screen.getByLabelText(/Email/)).toBeDisabled();
+    expect(screen.getByLabelText(/Name/)).toBeEnabled();
+    expect(screen.getByLabelText(/Email/)).toBeEnabled();
     expect(screen.getByLabelText(/Role/)).toBeDisabled();
     expect(screen.getByLabelText(/Active account/)).toBeDisabled();
     expect(screen.getByText("An administrator cannot deactivate their own account.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /Edit user/ })).toHaveTextContent("You");
   });
 
-  it("UserListPage opens UserEditModal when clicking edit user row action", async () => {
+  it("UserListPage opens an editable UserEditModal when clicking the edit row action", async () => {
     mocks.useUsers.mockReturnValue(listResult([admin2]));
     renderAt("/users", <Route path="/users" element={<UserListPage />} />);
     const table = screen.getByRole("table");
@@ -376,10 +481,11 @@ describe("users management — forms", () => {
 
     const dialog = screen.getByRole("dialog", { name: /Edit user/ });
     expect(dialog).toBeInTheDocument();
-    expect(within(dialog).getByLabelText(/Name/)).toBeDisabled();
-    expect(within(dialog).getByLabelText(/Email/)).toBeDisabled();
-    expect(within(dialog).getByLabelText(/Role/)).toBeDisabled();
+    expect(within(dialog).getByLabelText(/Name/)).toBeEnabled();
+    expect(within(dialog).getByLabelText(/Email/)).toBeEnabled();
+    expect(within(dialog).getByLabelText(/Role/)).toBeEnabled();
     expect(within(dialog).getByLabelText(/Phone number/)).toBeEnabled();
+    expect(within(dialog).getByLabelText("Department")).toBeDisabled();
   });
 
   it("prevents duplicate submission while the edit is pending", async () => {

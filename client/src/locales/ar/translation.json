@@ -123,7 +123,7 @@
     "loadError": "تعذّر تحميل التقارير.", "sectionError": "تعذّر تحميل هذا القسم.",
     "kpisLabel": "أبرز مؤشرات التقرير", "uncategorized": "بدون تصنيف", "total": "الإجمالي",
     "sections": { "insights": "تحليلات التذاكر", "performance": "الأداء والجودة", "trends": "اتجاهات التذاكر", "trendsDescription": "كيف يتغيّر إنشاء التذاكر وحلّها عبر الزمن.", "operational": "الأداء التشغيلي", "feedback": "آراء العملاء" },
-    "filters": { "label": "مرشّحات التقرير", "presetLabel": "نطاقات سريعة", "lastDays": "آخر {{count}} يوم", "from": "من", "to": "إلى", "reset": "إعادة تعيين", "timezone": "الأوقات معروضة بتوقيت UTC" },
+    "filters": { "label": "مرشّحات التقرير", "presetLabel": "نطاقات سريعة", "lastDays": "آخر {{count}} يوم", "from": "من", "to": "إلى", "reset": "إعادة تعيين", "timezone": "الأوقات معروضة بتوقيت UTC", "department": "القسم", "branch": "الفرع", "allDepartments": "كل الأقسام", "allBranches": "كل الفروع" },
     "kpis": { "createdTickets": "التذاكر المُنشأة", "resolvedTickets": "التذاكر المُحلّة", "slaCompliance": "الالتزام باتفاقية الخدمة", "averageResponse": "متوسط أول ردّ", "satisfaction": "رضا العملاء", "satisfactionResponses": "{{count}} ردّ" },
     "volumeTitle": "حجم التذاكر", "volumeDescription": "التذاكر المُنشأة مقابل المُحلّة يوميًا.", "emptyVolume": "لا يوجد نشاط تذاكر في هذا النطاق.",
     "statusTitle": "توزيع الحالات", "emptyStatus": "لا توجد بيانات لهذا النطاق.",
@@ -142,7 +142,7 @@
     "formDescription": "تسجيل المشكلة والتصنيف والمسؤولية التشغيلية.", "ticketDetails": "تفاصيل التذكرة", "classification": "التصنيف", "subject": "الموضوع", "descriptionLabel": "الوصف",
     "customer": "العميل", "customerComboboxPlaceholder": "ابحث عن عميل أو اختره…", "customerResults": "نتائج البحث عن العملاء", "customerSearching": "جارٍ البحث عن العملاء…", "customerSearchError": "تعذر البحث عن العملاء.", "noCustomerResults": "لا يوجد عملاء يطابقون بحثك.", "category": "التصنيف", "selectCategory": "اختر تصنيفًا",
     "assignedAgent": "الموظف المسؤول", "unassigned": "غير مسندة", "searchAssignee": "البحث عن موظف…", "noAssigneesFound": "لم يتم العثور على موظفين", "statusLabel": "الحالة", "priorityLabel": "الأولوية", "channelLabel": "القناة", "created": "تاريخ الإنشاء", "updated": "آخر تحديث", "history": "السجل", "activity": "النشاط", "viewAllActivity": "عرض الكل", "workspaceTabs": "مساحة عمل التذكرة", "addAttachment": "إضافة مرفق", "viewCustomer": "عرض العميل", "metadata": "بيانات التذكرة", "operations": "إدارة التذكرة",
-    "search": "البحث برقم التذكرة أو الموضوع أو العميل…", "allStatuses": "كل الحالات", "allPriorities": "كل الأولويات", "allCategories": "كل التصنيفات", "allAgents": "كل الموظفين", "clearFilters": "مسح عوامل التصفية",
+    "search": "البحث برقم التذكرة أو الموضوع أو العميل…", "allStatuses": "كل الحالات", "allPriorities": "كل الأولويات", "allCategories": "كل التصنيفات", "allAgents": "كل الموظفين", "department": "القسم", "branch": "الفرع", "allDepartments": "كل الأقسام", "allBranches": "كل الفروع", "clearFilters": "مسح عوامل التصفية",
     "empty": "لا توجد تذاكر بعد.", "noSearchMatches": "لم يتم العثور على تذاكر لـ «{{search}}».", "noStatusMatches": "لا توجد تذاكر بالحالة «{{status}}».", "noPriorityMatches": "لا توجد تذاكر بالأولوية «{{priority}}».", "noCategoryMatches": "لا توجد تذاكر في التصنيف «{{category}}».", "noAgentMatches": "لا توجد تذاكر مسندة إلى «{{agent}}».", "noMatches": "لا توجد تذاكر تطابق عوامل التصفية الحالية.", "loadError": "تعذر تحميل التذاكر.", "loadDetailError": "تعذر تحميل هذه التذكرة.", "notFound": "التذكرة غير موجودة.", "unauthorized": "ليس لديك صلاحية للوصول إلى هذه التذكرة.",
     "saveError": "تعذر حفظ التذكرة.", "updateError": "تعذر تحديث التذكرة.", "saveOperations": "حفظ التغييرات", "backToList": "العودة إلى التذاكر", "pagination": "صفحات قائمة التذاكر", "page": "الصفحة {{page}} من {{total}}", "noHistory": "لا يوجد سجل للتذكرة بعد.", "systemActor": "النظام", "closeTicket": "إغلاق التذكرة", "closeConfirmation": "الإغلاق نهائي ويمنع ردود العميل اللاحقة. هل تريد إغلاق التذكرة؟", "confirmClose": "تأكيد الإغلاق", "cancelClose": "إلغاء", "closing": "جارٍ الإغلاق...", "closeError": "تعذر إغلاق التذكرة.", "unassignedReadOnly": "يجب إسناد هذه التذكرة إليك قبل أن تتمكن من تغيير سير العمل أو المحادثة.",
     "firstResponseDue": "موعد الرد الأول", "resolutionDue": "موعد الحل",
@@ -340,11 +340,13 @@
     }
   },
   "settings": {
-    "title": "الإعدادات", "description": "إدارة الإعدادات التشغيلية المستخدمة في التذاكر وسير عمل الدعم.", "sectionsLabel": "أقسام الإعدادات", "tabs": { "categories": "التصنيفات", "sla": "قواعد اتفاقية الخدمة", "quick": "الردود السريعة" },
-    "status": "الحالة", "actions": "الإجراءات", "active": "نشط", "inactive": "معطّل", "activate": "تفعيل", "deactivate": "تعطيل",
+    "title": "الإعدادات", "description": "إدارة الإعدادات التشغيلية المستخدمة في التذاكر وسير عمل الدعم.", "sectionsLabel": "أقسام الإعدادات", "tabs": { "categories": "التصنيفات", "departments": "الأقسام", "branches": "الفروع", "sla": "قواعد اتفاقية الخدمة", "quick": "الردود السريعة" },
+    "status": "الحالة", "actions": "الإجراءات", "active": "نشط", "inactive": "معطّل", "activate": "تفعيل", "deactivate": "تعطيل", "delete": "حذف", "allStatuses": "كل الحالات", "clearFilters": "مسح عوامل التصفية",
     "categories": { "title": "التصنيفات", "description": "إدارة تصنيفات التذاكر النشطة والمتوقفة مع الحفاظ على السجل.", "formDescription": "حدّد اسم التصنيف والوصف الاختياري الذي يستخدمه فريق الدعم.", "search": "ابحث عن التصنيفات بالاسم…", "create": "إنشاء تصنيف", "edit": "تعديل التصنيف", "name": "الاسم", "fieldDescription": "الوصف", "empty": "لم تتم تهيئة تصنيفات بعد.", "noResults": "لا توجد تصنيفات مطابقة لهذا البحث.", "loadError": "تعذر تحميل التصنيفات.", "saveError": "تعذر حفظ التصنيف.", "validation": "أدخل اسم تصنيف من حرفين إلى 100 حرف.", "deactivateTitle": "تعطيل {{name}}؟", "activateTitle": "تفعيل {{name}}؟", "confirmDeactivate": "ستحتفظ التذاكر الحالية بهذا التصنيف، لكنه سيُحذف من القوائم النشطة.", "confirmActivate": "سيصبح هذا التصنيف متاحًا في قوائم التذاكر النشطة.", "statusError": "تعذر تغيير حالة التصنيف." },
     "sla": { "loadError": "تعذر تحميل قواعد اتفاقية الخدمة.", "first": "الرد الأول (بالدقائق)", "resolution": "الحل (بالدقائق)", "enabled": "القاعدة نشطة", "configured": "مهيأة لمواعيد التذاكر المستقبلية.", "missing": "لا توجد قاعدة لهذه الأولوية بعد.", "create": "إنشاء القاعدة", "saveError": "تعذر حفظ قاعدة اتفاقية الخدمة.", "validation": "استخدم قيماً موجبة حتى 525600، ولا يمكن أن يكون الحل أقل من الرد الأول." },
-    "quick": { "title": "الردود السريعة", "description": "أدر نصوص الردود القابلة لإعادة الاستخدام في مساحة الردود السريعة الحالية. تبقى صلاحيات الوكلاء والمحرر كما هي.", "open": "فتح الردود السريعة" }
+    "quick": { "title": "الردود السريعة", "description": "أدر نصوص الردود القابلة لإعادة الاستخدام في مساحة الردود السريعة الحالية. تبقى صلاحيات الوكلاء والمحرر كما هي.", "open": "فتح الردود السريعة" },
+    "departments": { "title": "الأقسام", "description": "إدارة الأقسام التنظيمية المُسندة إلى المستخدمين الداخليين والتذاكر.", "formDescription": "حدد اسم القسم ووصفًا اختياريًا وفرعًا اختياريًا.", "search": "ابحث عن الأقسام بالاسم…", "create": "إنشاء قسم", "edit": "تعديل القسم", "name": "الاسم", "fieldDescription": "الوصف", "branch": "الفرع", "noBranch": "بدون فرع", "users": "المستخدمون", "empty": "لم يتم تكوين أي أقسام.", "noResults": "لا توجد أقسام مطابقة لهذا البحث.", "loadError": "تعذّر تحميل الأقسام.", "saveError": "تعذّر حفظ القسم.", "validation": "أدخل اسم قسم من حرفين إلى 100 حرف.", "statusError": "تعذّر تغيير حالة القسم.", "deleteError": "تعذّر حذف القسم.", "deleteConflict": "لا يزال هذا القسم مُسندًا إلى مستخدمين أو تذاكر ولا يمكن حذفه. قم بتعطيله بدلاً من ذلك.", "pagination": "ترقيم صفحات الأقسام", "deactivateTitle": "تعطيل {{name}}؟", "activateTitle": "تفعيل {{name}}؟", "confirmDeactivate": "يحتفظ المستخدمون والتذاكر الحاليون بهذا القسم، لكنه سيُخفى من القوائم النشطة.", "confirmActivate": "سيصبح هذا القسم متاحًا في القوائم النشطة مرة أخرى.", "deleteTitle": "حذف {{name}}؟", "confirmDelete": "يؤدي هذا إلى إزالة القسم نهائيًا، ولا يمكن ذلك إلا عندما لا يشير إليه أي مستخدم أو تذكرة." },
+    "branches": { "title": "الفروع", "description": "إدارة الفروع التنظيمية المُسندة إلى المستخدمين الداخليين والتذاكر.", "formDescription": "حدد اسم الفرع ورمزًا اختياريًا وعنوانًا اختياريًا.", "search": "ابحث عن الفروع بالاسم أو الرمز…", "create": "إنشاء فرع", "edit": "تعديل الفرع", "name": "الاسم", "code": "الرمز", "address": "العنوان", "users": "المستخدمون", "empty": "لم يتم تكوين أي فروع.", "noResults": "لا توجد فروع مطابقة لهذا البحث.", "loadError": "تعذّر تحميل الفروع.", "saveError": "تعذّر حفظ الفرع.", "validation": "أدخل اسم فرع من حرفين إلى 100 حرف.", "statusError": "تعذّر تغيير حالة الفرع.", "deleteError": "تعذّر حذف الفرع.", "deleteConflict": "لا يزال هذا الفرع مُسندًا إلى أقسام أو مستخدمين أو تذاكر ولا يمكن حذفه. قم بتعطيله بدلاً من ذلك.", "pagination": "ترقيم صفحات الفروع", "deactivateTitle": "تعطيل {{name}}؟", "activateTitle": "تفعيل {{name}}؟", "confirmDeactivate": "تحتفظ السجلات الحالية بهذا الفرع، لكنه سيُخفى من القوائم النشطة.", "confirmActivate": "سيصبح هذا الفرع متاحًا في القوائم النشطة مرة أخرى.", "deleteTitle": "حذف {{name}}؟", "confirmDelete": "يؤدي هذا إلى إزالة الفرع نهائيًا، ولا يمكن ذلك إلا عندما لا يشير إليه أي قسم أو مستخدم أو تذكرة." }
   },
   "users": {
     "title": "المستخدمون",
@@ -371,6 +373,11 @@
     "fieldPhone": "رقم الهاتف",
     "fieldPassword": "كلمة مرور مؤقتة",
     "fieldRole": "الدور",
+    "fieldDepartment": "القسم",
+    "fieldBranch": "الفرع",
+    "departmentNone": "بدون قسم",
+    "branchNone": "بدون فرع",
+    "selectBranchFirst": "اختر الفرع أولاً",
     "fieldActive": "حساب نشط",
     "passwordHelp": "8 أحرف على الأقل. شاركها مع المستخدم بأمان، ويمكنه تغييرها بعد تسجيل الدخول.",
     "activeHelp": "لا يمكن للحسابات المعطّلة تسجيل الدخول ولا تظهر في إسناد التذاكر.",
@@ -390,7 +397,7 @@
     "selfRoleReadonly": "لا يمكن لمدير النظام تغيير دوره الخاص.",
     "selfDeactivateBlocked": "لا يمكن لمدير النظام تعطيل حسابه الخاص.",
     "lastAdminBlocked": "يجب أن يبقى مدير نظام نشط واحد على الأقل.",
-    "columns": { "name": "الاسم", "email": "البريد الإلكتروني", "role": "الدور", "status": "الحالة", "created": "تاريخ الإنشاء", "actions": "إجراءات" },
+    "columns": { "name": "الاسم", "email": "البريد الإلكتروني", "role": "الدور", "department": "القسم", "status": "الحالة", "created": "تاريخ الإنشاء", "actions": "إجراءات" },
     "roles": { "ADMIN": "مدير النظام", "MANAGER": "مدير", "AGENT": "موظف دعم" },
     "status": { "active": "نشط", "inactive": "معطّل" },
     "validation": {
@@ -408,7 +415,10 @@
       "LAST_ACTIVE_ADMIN_REQUIRED": "يجب أن يبقى مدير نظام نشط واحد على الأقل.",
       "ACCOUNT_DEACTIVATED": "تم تعطيل هذا الحساب.",
       "VALIDATION_ERROR": "راجع بيانات النموذج وحاول مرة أخرى.",
-      "FORBIDDEN": "ليست لديك صلاحية لتنفيذ هذا الإجراء."
+      "FORBIDDEN": "ليست لديك صلاحية لتنفيذ هذا الإجراء.",
+      "INVALID_DEPARTMENT": "القسم المحدد غير صالح أو غير نشط.",
+      "INVALID_BRANCH": "الفرع المحدد غير صالح أو غير نشط.",
+      "DEPARTMENT_BRANCH_MISMATCH": "القسم المحدد لا ينتمي إلى الفرع المحدد."
     }
   },
   "collaboration": {

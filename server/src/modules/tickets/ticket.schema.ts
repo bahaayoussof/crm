@@ -12,6 +12,8 @@ export const ticketListQuerySchema = z.object({
   categoryId: z.string().trim().min(1).optional(),
   assignedAgentId: z.string().trim().min(1).optional(),
   customerId: z.string().trim().min(1).optional(),
+  departmentId: z.string().trim().min(1).optional(),
+  branchId: z.string().trim().min(1).optional(),
 }).strict();
 
 export const ticketParamsSchema = z.object({ id: z.string().trim().min(1) }).strict();

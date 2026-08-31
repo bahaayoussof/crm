@@ -9,6 +9,7 @@ import {
   DataTableSkeleton,
 } from "@/components/shared/data-table";
 import { useDebouncedValue } from "@/features/customers/use-debounced-value";
+import { useBranchOptions, useDepartmentOptions } from "@/features/organization/organization-hooks";
 import { useAgents, useCategories, useTickets } from "./ticket-hooks";
 import { TicketTable } from "./ticket-table";
 import { TicketFiltersPopover } from "./ticket-filters-popover";
@@ -29,10 +30,14 @@ export function TicketListPage() {
   const priority = priorities.includes(params.get("priority") as TicketPriority) ? (params.get("priority") as TicketPriority) : undefined;
   const categoryId = params.get("categoryId") || undefined;
   const assignedAgentId = params.get("assignedAgentId") || undefined;
+  const departmentId = params.get("departmentId") || undefined;
+  const branchId = params.get("branchId") || undefined;
 
-  const tickets = useTickets({ search: debounced, page, limit: 20, status, priority, categoryId, assignedAgentId });
+  const tickets = useTickets({ search: debounced, page, limit: 20, status, priority, categoryId, assignedAgentId, departmentId, branchId });
   const categories = useCategories();
   const agents = useAgents();
+  const departments = useDepartmentOptions();
+  const branches = useBranchOptions();
 
   const setFilter = (key: string, value: string) => {
     const next = new URLSearchParams(params);
@@ -42,8 +47,8 @@ export function TicketListPage() {
     setParams(next, { replace: key === "search" });
   };
 
-  const hasFilters = Boolean(debounced || status || priority || categoryId || assignedAgentId);
-  const emptyMessage = getEmptyMessage({ search: debounced, status, priority, categoryId, assignedAgentId }, categories.data, agents.data, t);
+  const hasFilters = Boolean(debounced || status || priority || categoryId || assignedAgentId || departmentId || branchId);
+  const emptyMessage = getEmptyMessage({ search: debounced, status, priority, categoryId, assignedAgentId, departmentId, branchId }, categories.data, agents.data, t);
 
   const statusOptions = [
     { value: "", label: t("tickets.allStatuses") },
@@ -63,6 +68,16 @@ export function TicketListPage() {
   const agentOptions = [
     { value: "", label: t("tickets.allAgents") },
     ...(agents.data?.map((item) => ({ value: item.id, label: item.name, searchText: item.email })) ?? []),
+  ];
+
+  const departmentOptions = [
+    { value: "", label: t("tickets.allDepartments") },
+    ...(departments.data?.map((item) => ({ value: item.id, label: item.name })) ?? []),
+  ];
+
+  const branchOptions = [
+    { value: "", label: t("tickets.allBranches") },
+    ...(branches.data?.map((item) => ({ value: item.id, label: item.name })) ?? []),
   ];
 
   return (
@@ -99,10 +114,14 @@ export function TicketListPage() {
                 priority={priority}
                 categoryId={categoryId}
                 assignedAgentId={assignedAgentId}
+                departmentId={departmentId}
+                branchId={branchId}
                 statusOptions={statusOptions}
                 priorityOptions={priorityOptions}
                 categoryOptions={categoryOptions}
                 agentOptions={agentOptions}
+                departmentOptions={departmentOptions}
+                branchOptions={branchOptions}
                 onFilterChange={setFilter}
                 onClearFilters={() => {
                   const next = new URLSearchParams(params);
@@ -110,6 +129,8 @@ export function TicketListPage() {
                   next.delete("priority");
                   next.delete("categoryId");
                   next.delete("assignedAgentId");
+                  next.delete("departmentId");
+                  next.delete("branchId");
                   setParams(next);
                 }}
               />
@@ -155,12 +176,12 @@ export function TicketListPage() {
 }
 
 function getEmptyMessage(
-  filters: { search: string; status?: TicketStatus; priority?: TicketPriority; categoryId?: string; assignedAgentId?: string },
+  filters: { search: string; status?: TicketStatus; priority?: TicketPriority; categoryId?: string; assignedAgentId?: string; departmentId?: string; branchId?: string },
   categories: { id: string; name: string }[] | undefined,
   agents: { id: string; name: string }[] | undefined,
   t: ReturnType<typeof useTranslation>["t"]
 ) {
-  const active = [filters.search, filters.status, filters.priority, filters.categoryId, filters.assignedAgentId].filter(Boolean);
+  const active = [filters.search, filters.status, filters.priority, filters.categoryId, filters.assignedAgentId, filters.departmentId, filters.branchId].filter(Boolean);
   if (active.length === 0) return t("tickets.empty");
   if (active.length > 1) return t("tickets.noMatches");
   if (filters.search) return t("tickets.noSearchMatches", { search: filters.search });

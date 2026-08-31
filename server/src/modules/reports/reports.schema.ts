@@ -12,6 +12,8 @@ export const reportsRangeQuerySchema = z
   .object({
     from: z.coerce.date().optional(),
     to: z.coerce.date().optional(),
+    departmentId: z.string().trim().min(1).optional(),
+    branchId: z.string().trim().min(1).optional(),
   })
   .strict()
   .transform((value, ctx) => {
@@ -31,7 +33,7 @@ export const reportsRangeQuerySchema = z
       return z.NEVER;
     }
 
-    return { start, end };
+    return { start, end, departmentId: value.departmentId, branchId: value.branchId };
   });
 
 export type ReportsRange = z.infer<typeof reportsRangeQuerySchema>;

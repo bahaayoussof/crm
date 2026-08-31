@@ -123,7 +123,7 @@
     "loadError": "Unable to load reports.", "sectionError": "This section could not be loaded.",
     "kpisLabel": "Report highlights", "uncategorized": "Uncategorized", "total": "Total",
     "sections": { "insights": "Ticket insights", "performance": "Performance & quality", "trends": "Ticket trends", "trendsDescription": "How ticket creation and resolution change over time.", "operational": "Operational performance", "feedback": "Customer feedback" },
-    "filters": { "label": "Report filters", "presetLabel": "Quick ranges", "lastDays": "Last {{count}} days", "from": "From", "to": "To", "reset": "Reset", "timezone": "Times shown in UTC" },
+    "filters": { "label": "Report filters", "presetLabel": "Quick ranges", "lastDays": "Last {{count}} days", "from": "From", "to": "To", "reset": "Reset", "timezone": "Times shown in UTC", "department": "Department", "branch": "Branch", "allDepartments": "All departments", "allBranches": "All branches" },
     "kpis": { "createdTickets": "Created tickets", "resolvedTickets": "Resolved tickets", "slaCompliance": "SLA compliance", "averageResponse": "Avg. first response", "satisfaction": "Customer satisfaction", "satisfactionResponses": "{{count}} responses" },
     "volumeTitle": "Ticket volume", "volumeDescription": "Created vs. resolved tickets per day.", "emptyVolume": "No ticket activity in this range.",
     "statusTitle": "Status distribution", "emptyStatus": "No data for this range.",
@@ -142,7 +142,7 @@
     "formDescription": "Record the issue, classification, and operational ownership.", "ticketDetails": "Ticket details", "classification": "Classification", "subject": "Subject", "descriptionLabel": "Description",
     "customer": "Customer", "customerComboboxPlaceholder": "Search or select customer…", "customerResults": "Customer search results", "customerSearching": "Searching customers…", "customerSearchError": "Unable to search customers.", "noCustomerResults": "No customers match your search.", "category": "Category", "selectCategory": "Select a category",
     "assignedAgent": "Assigned agent", "unassigned": "Unassigned", "searchAssignee": "Search assignee…", "noAssigneesFound": "No assignees found", "statusLabel": "Status", "priorityLabel": "Priority", "channelLabel": "Channel", "created": "Created", "updated": "Updated", "history": "History", "activity": "Activity", "viewAllActivity": "View all", "workspaceTabs": "Ticket workspace", "addAttachment": "Add attachment", "viewCustomer": "View customer", "metadata": "Ticket metadata", "operations": "Manage ticket",
-    "search": "Search tickets by ID, subject, or customer…", "allStatuses": "All statuses", "allPriorities": "All priorities", "allCategories": "All categories", "allAgents": "All agents", "clearFilters": "Clear filters",
+    "search": "Search tickets by ID, subject, or customer…", "allStatuses": "All statuses", "allPriorities": "All priorities", "allCategories": "All categories", "allAgents": "All agents", "department": "Department", "branch": "Branch", "allDepartments": "All departments", "allBranches": "All branches", "clearFilters": "Clear filters",
     "empty": "No tickets yet.", "noSearchMatches": "No tickets found for “{{search}}”.", "noStatusMatches": "No tickets with status “{{status}}”.", "noPriorityMatches": "No tickets with priority “{{priority}}”.", "noCategoryMatches": "No tickets in category “{{category}}”.", "noAgentMatches": "No tickets assigned to “{{agent}}”.", "noMatches": "No tickets match the current filters.", "loadError": "Unable to load tickets.", "loadDetailError": "Unable to load this ticket.", "notFound": "Ticket not found.", "unauthorized": "You do not have access to this ticket.",
     "saveError": "Unable to save ticket.", "updateError": "Unable to update ticket.", "saveOperations": "Save changes", "backToList": "Back to tickets", "pagination": "Ticket list pages", "page": "Page {{page}} of {{total}}", "noHistory": "No ticket history yet.", "systemActor": "System", "closeTicket": "Close ticket", "closeConfirmation": "Closing is final and prevents further customer replies. Close this ticket?", "confirmClose": "Confirm close", "cancelClose": "Cancel", "closing": "Closing...", "closeError": "Unable to close ticket.", "unassignedReadOnly": "This ticket must be assigned to you before you can change its workflow or conversation.",
     "firstResponseDue": "First response due", "resolutionDue": "Resolution due",
@@ -340,11 +340,13 @@
     }
   },
   "settings": {
-    "title": "Settings", "description": "Manage operational configuration used by tickets and support workflows.", "sectionsLabel": "Settings sections", "tabs": { "categories": "Categories", "sla": "SLA Rules", "quick": "Quick Replies" },
-    "status": "Status", "actions": "Actions", "active": "Active", "inactive": "Inactive", "activate": "Activate", "deactivate": "Deactivate",
+    "title": "Settings", "description": "Manage operational configuration used by tickets and support workflows.", "sectionsLabel": "Settings sections", "tabs": { "categories": "Categories", "departments": "Departments", "branches": "Branches", "sla": "SLA Rules", "quick": "Quick Replies" },
+    "status": "Status", "actions": "Actions", "active": "Active", "inactive": "Inactive", "activate": "Activate", "deactivate": "Deactivate", "delete": "Delete", "allStatuses": "All statuses", "clearFilters": "Clear filters",
     "categories": { "title": "Categories", "description": "Manage active and retired ticket categories without changing ticket history.", "formDescription": "Set the category name and optional description used by the support team.", "search": "Search categories by name…", "create": "Create category", "edit": "Edit category", "name": "Name", "fieldDescription": "Description", "empty": "No categories have been configured.", "noResults": "No categories match this search.", "loadError": "Unable to load categories.", "saveError": "Unable to save the category.", "validation": "Enter a category name between 2 and 100 characters.", "deactivateTitle": "Deactivate {{name}}?", "activateTitle": "Activate {{name}}?", "confirmDeactivate": "Existing tickets keep this category, but it will be removed from active selectors.", "confirmActivate": "This category will become available in active ticket selectors.", "statusError": "Unable to change the category status." },
     "sla": { "loadError": "Unable to load SLA rules.", "first": "First response (minutes)", "resolution": "Resolution (minutes)", "enabled": "Rule is active", "configured": "Configured for prospective ticket deadlines.", "missing": "No rule exists for this priority yet.", "create": "Create rule", "saveError": "Unable to save the SLA rule.", "validation": "Use positive values up to 525,600; resolution cannot be lower than first response." },
-    "quick": { "title": "Quick Replies", "description": "Manage reusable reply text in the existing Quick Replies workspace. Agent composer access and current permissions remain unchanged.", "open": "Open Quick Replies" }
+    "quick": { "title": "Quick Replies", "description": "Manage reusable reply text in the existing Quick Replies workspace. Agent composer access and current permissions remain unchanged.", "open": "Open Quick Replies" },
+    "departments": { "title": "Departments", "description": "Manage organizational departments assigned to internal users and tickets.", "formDescription": "Set the department name, an optional description and an optional branch.", "search": "Search departments by name…", "create": "Create department", "edit": "Edit department", "name": "Name", "fieldDescription": "Description", "branch": "Branch", "noBranch": "No branch", "users": "Users", "empty": "No departments have been configured.", "noResults": "No departments match this search.", "loadError": "Unable to load departments.", "saveError": "Unable to save the department.", "validation": "Enter a department name between 2 and 100 characters.", "statusError": "Unable to change the department status.", "deleteError": "Unable to delete the department.", "deleteConflict": "This department is still assigned to users or tickets and cannot be deleted. Deactivate it instead.", "pagination": "Departments pagination", "deactivateTitle": "Deactivate {{name}}?", "activateTitle": "Activate {{name}}?", "confirmDeactivate": "Existing users and tickets keep this department, but it will be hidden from active selectors.", "confirmActivate": "This department will become available in active selectors again.", "deleteTitle": "Delete {{name}}?", "confirmDelete": "This permanently removes the department. It is only possible when no users or tickets reference it." },
+    "branches": { "title": "Branches", "description": "Manage organizational branches assigned to internal users and tickets.", "formDescription": "Set the branch name, an optional code and an optional address.", "search": "Search branches by name or code…", "create": "Create branch", "edit": "Edit branch", "name": "Name", "code": "Code", "address": "Address", "users": "Users", "empty": "No branches have been configured.", "noResults": "No branches match this search.", "loadError": "Unable to load branches.", "saveError": "Unable to save the branch.", "validation": "Enter a branch name between 2 and 100 characters.", "statusError": "Unable to change the branch status.", "deleteError": "Unable to delete the branch.", "deleteConflict": "This branch is still assigned to departments, users or tickets and cannot be deleted. Deactivate it instead.", "pagination": "Branches pagination", "deactivateTitle": "Deactivate {{name}}?", "activateTitle": "Activate {{name}}?", "confirmDeactivate": "Existing records keep this branch, but it will be hidden from active selectors.", "confirmActivate": "This branch will become available in active selectors again.", "deleteTitle": "Delete {{name}}?", "confirmDelete": "This permanently removes the branch. It is only possible when no departments, users or tickets reference it." }
   },
   "users": {
     "title": "Users",
@@ -371,6 +373,11 @@
     "fieldPhone": "Phone number",
     "fieldPassword": "Temporary password",
     "fieldRole": "Role",
+    "fieldDepartment": "Department",
+    "fieldBranch": "Branch",
+    "departmentNone": "No department",
+    "branchNone": "No branch",
+    "selectBranchFirst": "Select a branch first",
     "fieldActive": "Active account",
     "passwordHelp": "At least 8 characters. Share it with the user securely; they can change it after signing in.",
     "activeHelp": "Deactivated accounts cannot sign in and are hidden from ticket assignment.",
@@ -390,7 +397,7 @@
     "selfRoleReadonly": "An administrator cannot change their own role.",
     "selfDeactivateBlocked": "An administrator cannot deactivate their own account.",
     "lastAdminBlocked": "At least one active administrator must remain.",
-    "columns": { "name": "Name", "email": "Email", "role": "Role", "status": "Status", "created": "Created", "actions": "Actions" },
+    "columns": { "name": "Name", "email": "Email", "role": "Role", "department": "Department", "status": "Status", "created": "Created", "actions": "Actions" },
     "roles": { "ADMIN": "Admin", "MANAGER": "Manager", "AGENT": "Agent" },
     "status": { "active": "Active", "inactive": "Inactive" },
     "validation": {
@@ -408,7 +415,10 @@
       "LAST_ACTIVE_ADMIN_REQUIRED": "At least one active administrator must remain.",
       "ACCOUNT_DEACTIVATED": "This account has been deactivated.",
       "VALIDATION_ERROR": "Check the form and try again.",
-      "FORBIDDEN": "You do not have permission to perform this action."
+      "FORBIDDEN": "You do not have permission to perform this action.",
+      "INVALID_DEPARTMENT": "The selected department is invalid or inactive.",
+      "INVALID_BRANCH": "The selected branch is invalid or inactive.",
+      "DEPARTMENT_BRANCH_MISMATCH": "The selected department does not belong to the selected branch."
     }
   },
   "collaboration": {

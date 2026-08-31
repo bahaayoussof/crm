@@ -11,12 +11,47 @@ import type { AuditRequestContext } from "../audit-logs/audit-request-context.js
 const internalRoles: Role[] = [Role.ADMIN, Role.MANAGER, Role.AGENT];
 
 const userSelect = {
-  id: true, name: true, email: true, role: true, isActive: true,
+  id: true, name: true, email: true, role: true, isActive: true, phone: true,
+  departmentId: true, branchId: true,
+  department: { select: { id: true, name: true } },
+  branch: { select: { id: true, name: true } },
   createdAt: true, updatedAt: true,
 } satisfies Prisma.UserSelect;
 
 function notFound() {
   return new AppError(404, "USER_NOT_FOUND", "User not found");
+}
+
+/**
+ * Validates a department/branch assignment for an internal user. Both are
+ * optional; when set they must exist and be active. When both are set the
+ * department must belong to the chosen branch (matches the ticket rule and the
+ * SLA auto-assignment eligibility check).
+ */
+async function assertOrgAssignment(
+  tx: Prisma.TransactionClient,
+  assignment: { departmentId: string | null; branchId: string | null },
+) {
+  const department = assignment.departmentId
+    ? await tx.department.findUnique({ where: { id: assignment.departmentId }, select: { id: true, isActive: true, branchId: true } })
+    : null;
+  if (assignment.departmentId && (!department || !department.isActive)) {
+    throw new AppError(400, "INVALID_DEPARTMENT", "Department is invalid or inactive");
+  }
+  const branch = assignment.branchId
+    ? await tx.branch.findUnique({ where: { id: assignment.branchId }, select: { id: true, isActive: true } })
+    : null;
+  if (assignment.branchId && (!branch || !branch.isActive)) {
+    throw new AppError(400, "INVALID_BRANCH", "Branch is invalid or inactive");
+  }
+  if (department && assignment.branchId && department.branchId !== assignment.branchId) {
+    throw new AppError(400, "DEPARTMENT_BRANCH_MISMATCH", "Department does not belong to the selected branch");
+  }
+}
+
+function orgConnect(id: string | null | undefined) {
+  if (id === undefined) return undefined;
+  return id ? { connect: { id } } : { disconnect: true };
 }
 
 function emailTaken() {
@@ -59,11 +94,21 @@ export async function createUser(input: CreateUserInput, actorId: string, reques
   if (existing) throw emailTaken();
 
   const passwordHash = await bcrypt.hash(input.password, 12);
+  const departmentId = input.departmentId ?? null;
+  const branchId = input.branchId ?? null;
 
   try {
     return await prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({ data: { name: input.name, email: input.email, passwordHash, role: input.role }, select: userSelect });
-      await createAuditLog({ actorId, action: AUDIT_ACTIONS.USER_CREATED, entityType: AUDIT_ENTITY_TYPES.USER, entityId: user.id, changes: { name: { to: user.name }, email: { to: user.email }, role: { to: user.role }, isActive: { to: user.isActive } }, requestContext }, tx);
+      await assertOrgAssignment(tx, { departmentId, branchId });
+      const user = await tx.user.create({
+        data: {
+          name: input.name, email: input.email, passwordHash, role: input.role,
+          ...(departmentId ? { department: { connect: { id: departmentId } } } : {}),
+          ...(branchId ? { branch: { connect: { id: branchId } } } : {}),
+        },
+        select: userSelect,
+      });
+      await createAuditLog({ actorId, action: AUDIT_ACTIONS.USER_CREATED, entityType: AUDIT_ENTITY_TYPES.USER, entityId: user.id, changes: { name: { to: user.name }, email: { to: user.email }, role: { to: user.role }, isActive: { to: user.isActive }, departmentId: { to: user.departmentId }, branchId: { to: user.branchId } }, requestContext }, tx);
       return user;
     });
   } catch (error) {
@@ -81,7 +126,7 @@ export async function updateUser(id: string, input: UpdateUserInput, actor: { us
   return prisma.$transaction(async (tx) => {
     const target = await tx.user.findFirst({
       where: { id, role: { in: internalRoles } },
-      select: { id: true, name: true, email: true, role: true, isActive: true },
+      select: { id: true, name: true, email: true, phone: true, role: true, isActive: true, departmentId: true, branchId: true },
     });
     if (!target) throw notFound();
 
@@ -117,15 +162,25 @@ export async function updateUser(id: string, input: UpdateUserInput, actor: { us
       if (emailOwner && emailOwner.id !== id) throw emailTaken();
     }
 
+    if (input.departmentId !== undefined || input.branchId !== undefined) {
+      await assertOrgAssignment(tx, {
+        departmentId: input.departmentId !== undefined ? input.departmentId : target.departmentId,
+        branchId: input.branchId !== undefined ? input.branchId : target.branchId,
+      });
+    }
+
     const data: Prisma.UserUpdateInput = {};
     if (input.name !== undefined) data.name = input.name;
     if (input.email !== undefined) data.email = input.email;
+    if (input.phone !== undefined) data.phone = input.phone;
     if (input.role !== undefined) data.role = input.role;
     if (input.isActive !== undefined) data.isActive = input.isActive;
+    if (input.departmentId !== undefined) data.department = orgConnect(input.departmentId);
+    if (input.branchId !== undefined) data.branch = orgConnect(input.branchId);
 
     try {
       const updated = await tx.user.update({ where: { id }, data, select: userSelect });
-      const changes = changedFields(target, updated, ["name", "email", "role", "isActive"]);
+      const changes = changedFields(target, updated, ["name", "email", "phone", "role", "isActive", "departmentId", "branchId"]);
       const action = changes.role ? AUDIT_ACTIONS.USER_ROLE_CHANGED : changes.isActive ? (updated.isActive ? AUDIT_ACTIONS.USER_ACTIVATED : AUDIT_ACTIONS.USER_DEACTIVATED) : AUDIT_ACTIONS.USER_UPDATED;
       if (Object.keys(changes).length) await createAuditLog({ actorId: actor.userId, action, entityType: AUDIT_ENTITY_TYPES.USER, entityId: id, changes, requestContext }, tx);
       return updated;

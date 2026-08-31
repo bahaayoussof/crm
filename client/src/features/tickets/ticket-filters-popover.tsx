@@ -16,10 +16,14 @@ interface TicketFiltersPopoverProps {
   priority?: string;
   categoryId?: string;
   assignedAgentId?: string;
+  departmentId?: string;
+  branchId?: string;
   statusOptions: Option[];
   priorityOptions: Option[];
   categoryOptions: Option[];
   agentOptions: Option[];
+  departmentOptions: Option[];
+  branchOptions: Option[];
   onFilterChange: (key: string, value: string) => void;
   onClearFilters: () => void;
 }
@@ -29,17 +33,21 @@ export function TicketFiltersPopover({
   priority,
   categoryId,
   assignedAgentId,
+  departmentId,
+  branchId,
   statusOptions,
   priorityOptions,
   categoryOptions,
   agentOptions,
+  departmentOptions,
+  branchOptions,
   onFilterChange,
   onClearFilters,
 }: TicketFiltersPopoverProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
-  const activeCount = [status, priority, categoryId, assignedAgentId].filter(Boolean).length;
+  const activeCount = [status, priority, categoryId, assignedAgentId, departmentId, branchId].filter(Boolean).length;
 
   const { triggerRef, panelRef, style } = useAnchoredPopover<HTMLButtonElement, HTMLDivElement>({
     open,
@@ -157,6 +165,36 @@ export function TicketFiltersPopover({
                   value={assignedAgentId ?? ""}
                   onValueChange={(val) => onFilterChange("assignedAgentId", val)}
                   options={agentOptions}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                  {t("tickets.department")}
+                </label>
+                <AppSelect
+                  ariaLabel={t("tickets.department")}
+                  searchable
+                  searchPlaceholder={t("common.search")}
+                  emptySearchMessage={t("common.noResults")}
+                  value={departmentId ?? ""}
+                  onValueChange={(val) => onFilterChange("departmentId", val)}
+                  options={departmentOptions}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                  {t("tickets.branch")}
+                </label>
+                <AppSelect
+                  ariaLabel={t("tickets.branch")}
+                  searchable
+                  searchPlaceholder={t("common.search")}
+                  emptySearchMessage={t("common.noResults")}
+                  value={branchId ?? ""}
+                  onValueChange={(val) => onFilterChange("branchId", val)}
+                  options={branchOptions}
                 />
               </div>
             </div>
