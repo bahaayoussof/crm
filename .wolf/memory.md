@@ -671,3 +671,11 @@ Summary: Completed **Tasks & Reminders** end to end on uncommitted `feature/task
 | — | (Codex) Added common.schema.test.ts (4) + updated module tests to cuid-shaped IDs | shared/validation/common.schema.test.ts (new), modules/**/*.test.ts | — | — |
 | — | (continuation) Reviewed full diff, ran checks — no code changes needed | — | server tsc clean; vitest 618/618 (36 files); lint clean (1 pre-existing warn); build = tsc half clean, prisma generate EPERM (env) | 6k |
 | — | (continuation) Removed unused `trimmedNonEmptyString` (zero consumers); added `nullableDatabaseIdSchema` test (CUID / ""→null / null / undefined / malformed) | shared/validation/common.schema.{ts,test.ts} | server tsc clean; vitest 619/619 (+1) | 3k |
+
+## Session: 2026-08-31 — feature/email-channel
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| — | Built isolated Resend inbound/outbound transport over the ticket conversation flow | server/src/modules/integrations/email/*, ticket.service.ts, app.ts | Signed webhook, safe threading, idempotency, attachments, transactional outbound | — |
+| — | Added provider-neutral correlation fields and additive migration | prisma/schema.prisma, migrations/20260831180000_add_email_channel_metadata | Created; not database-applied | — |
+| — | Added tests/docs and ran verification | email*.test.ts, ticket.test.ts, docs/21-email-integration.md | Focused 92; server 634; client 671 pass; server build blocked only by known Prisma DLL EPERM | — |

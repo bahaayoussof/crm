@@ -53,6 +53,7 @@ This is the planned logical model. Exact Prisma syntax may be implemented during
 - authorUserId required; customer authors use their linked `User` identity
 - body
 - externalId optional, unique; external provider message id (e.g. WhatsApp Cloud API `wamid`). Inbound: the idempotency anchor for webhook de-duplication. Outbound: stored for traceability. `NULL` for WEB/Portal messages (`feature/whatsapp-integration`, ADR-030).
+- externalMessageId optional, unique; provider-neutral RFC Message-ID used for EMAIL reply correlation (`feature/email-channel`, ADR-044).
 - createdAt
 
 `TicketMessage` contains public, customer-visible conversation only.
@@ -85,6 +86,7 @@ Inbound WhatsApp messages are authored by a single login-less system `User` (`wh
 - fileName
 - mimeType
 - storageKey
+- externalId optional and unique; inbound provider attachment idempotency key (`NULL` for CRM/Portal uploads)
 - createdAt
 
 ### Category

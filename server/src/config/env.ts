@@ -18,7 +18,10 @@ const envSchema = z.object({
   // prints the message (incl. the reset URL in development) to the server console.
   // Never exposed to the browser.
   RESEND_API_KEY: z.string().min(1).optional(),
+  RESEND_WEBHOOK_SECRET: z.string().min(1).optional(),
+  EMAIL_INBOUND_ADDRESS: z.string().email().optional(),
   EMAIL_FROM: z.string().min(1).optional(),
+  EMAIL_FROM_NAME: z.string().trim().min(1).max(100).optional(),
   DATABASE_URL: z
     .string()
     .min(1, "DATABASE_URL is required")

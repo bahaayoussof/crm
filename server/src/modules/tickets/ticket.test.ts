@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   ticketFindMany: vi.fn(), ticketCount: vi.fn(), ticketFindFirst: vi.fn(), ticketCreate: vi.fn(), ticketUpdate: vi.fn(),
-  ticketUpdateMany: vi.fn(), messageCreate: vi.fn(), noteCreate: vi.fn(),
+  ticketUpdateMany: vi.fn(), messageCreate: vi.fn(), messageFindMany: vi.fn(), noteCreate: vi.fn(),
   historyCreate: vi.fn(), historyCreateMany: vi.fn(), customerFind: vi.fn(), userFindFirst: vi.fn(), userFindMany: vi.fn(),
   categoryFindFirst: vi.fn(), categoryFindMany: vi.fn(), departmentFind: vi.fn(), branchFind: vi.fn(), slaFind: vi.fn(), transaction: vi.fn(),
   watcherCreateMany: vi.fn(), watcherFindMany: vi.fn(), watcherDeleteMany: vi.fn(), watcherCount: vi.fn(), watcherFindFirst: vi.fn(),
@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../../config/prisma.js", () => {
   const prisma = {
     ticket: { findMany: mocks.ticketFindMany, count: mocks.ticketCount, findFirst: mocks.ticketFindFirst, create: mocks.ticketCreate, update: mocks.ticketUpdate, updateMany: mocks.ticketUpdateMany },
-    ticketMessage: { create: mocks.messageCreate }, ticketNote: { create: mocks.noteCreate },
+    ticketMessage: { create: mocks.messageCreate, findMany: mocks.messageFindMany }, ticketNote: { create: mocks.noteCreate },
     ticketHistory: { create: mocks.historyCreate, createMany: mocks.historyCreateMany },
     ticketWatcher: { createMany: mocks.watcherCreateMany, findMany: mocks.watcherFindMany, deleteMany: mocks.watcherDeleteMany, count: mocks.watcherCount, findFirst: mocks.watcherFindFirst },
     ticketMention: { createMany: mocks.mentionCreateMany },
@@ -31,11 +31,17 @@ vi.mock("../../config/prisma.js", () => {
 vi.mock("../integrations/whatsapp/whatsapp.service.js", () => ({
   deliverOutboundReply: vi.fn().mockResolvedValue({ channel: "WHATSAPP", status: "SENT", externalId: "wamid.OUT" }),
 }));
+vi.mock("../integrations/email/email.service.js", () => ({
+  deliverEmailReply: vi.fn().mockResolvedValue({ channel: "EMAIL", status: "SENT", externalId: "resend:email-out-1" }),
+}));
 
 import { app } from "../../app.js";
 import { createAccessToken } from "../auth/auth-token.js";
+import { AppError } from "../../shared/errors/app-error.js";
 import { deliverOutboundReply } from "../integrations/whatsapp/whatsapp.service.js";
+import { deliverEmailReply } from "../integrations/email/email.service.js";
 const deliverOutboundReplyMock = vi.mocked(deliverOutboundReply);
+const deliverEmailReplyMock = vi.mocked(deliverEmailReply);
 
 const admin = { id: "admin-1", role: Role.ADMIN };
 const manager = { id: "c6fd0a01a46ed4545f0a5e774", role: Role.MANAGER };
@@ -56,7 +62,7 @@ describe("ticket API", () => {
     mocks.ticketFindMany.mockResolvedValue([]); mocks.ticketCount.mockResolvedValue(0);
     mocks.transaction.mockImplementation(async (value: unknown) => typeof value === "function" ? value({
       ticket: { findFirst: mocks.ticketFindFirst, create: mocks.ticketCreate, update: mocks.ticketUpdate, updateMany: mocks.ticketUpdateMany },
-      ticketMessage: { create: mocks.messageCreate }, ticketNote: { create: mocks.noteCreate },
+      ticketMessage: { create: mocks.messageCreate, findMany: mocks.messageFindMany }, ticketNote: { create: mocks.noteCreate },
       ticketHistory: { create: mocks.historyCreate, createMany: mocks.historyCreateMany }, customer: { findUnique: mocks.customerFind },
       ticketWatcher: { createMany: mocks.watcherCreateMany, findMany: mocks.watcherFindMany, deleteMany: mocks.watcherDeleteMany, count: mocks.watcherCount, findFirst: mocks.watcherFindFirst },
       ticketMention: { createMany: mocks.mentionCreateMany },
@@ -78,6 +84,8 @@ describe("ticket API", () => {
     mocks.watcherDeleteMany.mockResolvedValue({ count: 0 }); mocks.watcherCount.mockResolvedValue(0);
     mocks.watcherFindFirst.mockResolvedValue(null); mocks.mentionCreateMany.mockResolvedValue({ count: 0 });
     mocks.notificationCreateMany.mockResolvedValue({ count: 0 });
+    mocks.messageFindMany.mockResolvedValue([]);
+    deliverEmailReplyMock.mockResolvedValue({ channel: "EMAIL", status: "SENT", externalId: "resend:email-out-1" });
   });
 
   it("rejects unauthenticated and CUSTOMER access", async () => {
@@ -301,6 +309,55 @@ describe("ticket API", () => {
     const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "Web reply" });
     expect(response.status).toBe(201);
     expect(deliverOutboundReplyMock).not.toHaveBeenCalled();
+    expect(deliverEmailReplyMock).not.toHaveBeenCalled();
+  });
+
+  it("sends an authorized EMAIL public reply to the customer and persists the provider id", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({
+      id: summary.id,
+      subject: summary.subject,
+      assignedAgentId: agent.id,
+      channel: "EMAIL",
+      emailThreadToken: "thread-token",
+      customer: { email: "customer@example.net", phone: null },
+    });
+    mocks.messageFindMany.mockResolvedValue([{ externalMessageId: "<inbound@example.net>" }]);
+    const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "Email reply" });
+    expect(response.status).toBe(201);
+    expect(deliverEmailReplyMock).toHaveBeenCalledWith(expect.objectContaining({
+      ticketId: summary.id,
+      recipient: "customer@example.net",
+      subject: summary.subject,
+      threadToken: "thread-token",
+      inReplyTo: "<inbound@example.net>",
+    }));
+    expect(mocks.messageCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ externalId: "resend:email-out-1" }),
+    }));
+    expect(response.body.data.delivery).toMatchObject({ channel: "EMAIL", status: "SENT", externalId: "resend:email-out-1" });
+  });
+
+  it("rolls back EMAIL reply persistence when Resend rejects the send", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({
+      id: summary.id,
+      subject: summary.subject,
+      assignedAgentId: agent.id,
+      channel: "EMAIL",
+      emailThreadToken: "thread-token",
+      customer: { email: "customer@example.net", phone: null },
+    });
+    deliverEmailReplyMock.mockRejectedValueOnce(new AppError(502, "EMAIL_DELIVERY_FAILED", "Resend rejected the email"));
+    const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "Email reply" });
+    expect(response.status).toBe(502);
+    expect(mocks.messageCreate).not.toHaveBeenCalled();
+    expect(mocks.ticketUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("never sends an EMAIL for an internal note", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, subject: summary.subject, assignedAgentId: agent.id, channel: "EMAIL" });
+    const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/notes").set(auth(agent)).send({ body: "Private note" });
+    expect(response.status).toBe(201);
+    expect(deliverEmailReplyMock).not.toHaveBeenCalled();
   });
 
   it("keeps RBAC ahead of WhatsApp transport for an unassigned agent", async () => {

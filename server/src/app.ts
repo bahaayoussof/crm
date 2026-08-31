@@ -26,6 +26,7 @@ import { portalAttachmentRouter } from "./modules/attachments/attachment.portal.
 import { taskRouter } from "./modules/tasks/task.routes.js";
 import { taskReminderRouter } from "./modules/tasks/task-reminder.routes.js";
 import { whatsappRouter } from "./modules/integrations/whatsapp/whatsapp.routes.js";
+import { emailIntegrationRouter } from "./modules/integrations/email/email.routes.js";
 
 
 const allowedOrigins = new Set(env.CLIENT_URLS ?? [env.CLIENT_URL]);
@@ -58,6 +59,7 @@ app.use(cors(corsOptions));
 // WhatsApp webhook is mounted before express.json() so its POST body stays a raw
 // Buffer for HMAC signature verification. All other routes use parsed JSON below.
 app.use("/api/integrations/whatsapp", whatsappRouter);
+app.use("/api/integrations/email", emailIntegrationRouter);
 
 app.use(express.json());
 

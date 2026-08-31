@@ -4,6 +4,31 @@ Use this file for decisions not already fixed by the project documentation.
 
 Do not record trivial implementation details.
 
+### ADR-044: EMAIL is a Resend transport over Ticket conversation
+
+**Date:** 2026-08-31
+
+`feature/email-channel` keeps EMAIL inside the existing Ticket/TicketMessage,
+authorization, workflow, SLA, history, notification, attachment, and Ticket
+Details architecture. Resend-specific code is isolated under
+`server/src/modules/integrations/email/`; the existing transactional
+`modules/email` facility remains separate.
+
+Threading uses, in order, same-Customer RFC `In-Reply-To`/`References`, a random
+unique `Ticket.emailThreadToken` carried by the Reply-To local part, the existing
+8-character public ticket reference as a controlled same-Customer fallback, and
+an exactly-one-active-EMAIL-ticket fallback. `TicketMessage.externalId` stores
+the Resend email id; new provider-neutral `externalMessageId` stores RFC
+Message-ID; `Attachment.externalId` makes inbound files idempotent. All are
+additive nullable unique fields.
+
+Outbound EMAIL uses the existing public-reply transaction and calls Resend with
+a message-derived idempotency key before the transaction commits. Provider
+rejection rolls back message/first-response/notification effects. This is
+intentionally stricter than the established WhatsApp persist-then-report-failure
+policy. No custom domain is required for development; moving to a verified
+domain is configuration-only.
+
 ### ADR-039: Customer Portal Ticket Details — 2-Column Workspace Redesign & Workspace Tabs
 
 **Date:** 2026-08-30

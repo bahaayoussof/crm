@@ -50,3 +50,12 @@ Expected categories:
 - Full setup steps: `docs/20-whatsapp-integration.md`.
 
 Never commit secrets.
+
+## Resend EMAIL channel
+
+Development does not require a custom domain: configure a Resend-managed
+`*.resend.app` receiving address, `email.received` webhook, signing secret, API
+key, and provider-supported test sender. Production later requires verifying the
+sending/receiving domain and updating `EMAIL_FROM` / `EMAIL_INBOUND_ADDRESS`
+only. See `docs/21-email-integration.md`; never deploy Resend or Blob secrets to
+the frontend environment.

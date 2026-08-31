@@ -1,4 +1,5 @@
 import { Channel, Prisma, Role, TicketStatus } from "@prisma/client";
+import { randomBytes, randomUUID } from "node:crypto";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import { deriveSla } from "../../shared/sla/derive-sla.js";
@@ -9,6 +10,7 @@ import {
   NOTIFICATION_WATCH_ACTIVITY,
 } from "../collaboration/collaboration.service.js";
 import { deliverOutboundReply } from "../integrations/whatsapp/whatsapp.service.js";
+import { deliverEmailReply } from "../integrations/email/email.service.js";
 import { replyHtmlToPlainText, sanitizeReplyHtml } from "../../shared/rich-text/reply-html.js";
 import type { CreateTicketInput, TicketConversationInput, TicketListQuery, UpdateTicketInput } from "./ticket.schema.js";
 import { ticketVisibilityWhere, type TicketActor as Actor } from "./ticket-visibility.js";
@@ -94,14 +96,40 @@ export async function getTicket(ticketId: string, actor: Actor, now = new Date()
 
 export async function addTicketMessage(ticketId: string, input: TicketConversationInput, actor: Actor) {
   const createdAt = new Date();
+  const messageId = randomUUID();
   // Public replies are rich text from the Lexical composer. Sanitize to the
   // support-reply allowlist here — this is the trust boundary, not the client.
   const body = sanitizeReplyHtml(input.body);
   if (!body) throw new AppError(422, "EMPTY_MESSAGE", "Message body is required");
-  const { message, channel, customerPhone } = await prisma.$transaction(async (tx) => {
+  const { message, channel, customerPhone, emailExternalId } = await prisma.$transaction(async (tx) => {
     const ticket = await requireConversationMutationAccess(tx, ticketId, actor);
+    let emailExternalId: string | null = null;
+    if (ticket.channel === Channel.EMAIL) {
+      const threadToken = ticket.emailThreadToken ?? randomBytes(18).toString("base64url");
+      if (!ticket.emailThreadToken) {
+        await tx.ticket.update({ where: { id: ticketId }, data: { emailThreadToken: threadToken } });
+      }
+      const thread = await tx.ticketMessage.findMany({
+        where: { ticketId, externalMessageId: { not: null } },
+        orderBy: { createdAt: "asc" },
+        take: 100,
+        select: { externalMessageId: true },
+      });
+      const references = thread.flatMap((item) => item.externalMessageId ? [item.externalMessageId] : []);
+      const delivery = await deliverEmailReply({
+        ticketId,
+        messageId,
+        recipient: ticket.customer.email,
+        subject: ticket.subject,
+        body,
+        threadToken,
+        inReplyTo: references.at(-1) ?? null,
+        references,
+      });
+      emailExternalId = delivery.externalId;
+    }
     const created = await tx.ticketMessage.create({
-      data: { ticketId, authorUserId: actor.userId, body, createdAt },
+      data: { id: messageId, ticketId, authorUserId: actor.userId, body, createdAt, externalId: emailExternalId },
       select: conversationSelect,
     });
     await tx.ticket.updateMany({ where: { id: ticketId, firstRespondedAt: null }, data: { firstRespondedAt: createdAt } });
@@ -117,6 +145,7 @@ export async function addTicketMessage(ticketId: string, input: TicketConversati
       message: { ...created, kind: "PUBLIC_MESSAGE" as const },
       channel: ticket.channel,
       customerPhone: ticket.customer?.phone ?? null,
+      emailExternalId,
     };
   });
 
@@ -132,6 +161,9 @@ export async function addTicketMessage(ticketId: string, input: TicketConversati
       text: replyHtmlToPlainText(body),
     });
     return { ...message, delivery };
+  }
+  if (channel === Channel.EMAIL) {
+    return { ...message, delivery: { channel: "EMAIL", status: "SENT", externalId: emailExternalId! } as const };
   }
   return message;
 }
@@ -306,7 +338,14 @@ const conversationSelect = {
 async function requireConversationMutationAccess(tx: Prisma.TransactionClient, ticketId: string, actor: Actor) {
   const ticket = await tx.ticket.findFirst({
     where: { id: ticketId, ...ticketVisibilityWhere(actor) },
-    select: { id: true, subject: true, assignedAgentId: true, channel: true, customer: { select: { phone: true } } },
+    select: {
+      id: true,
+      subject: true,
+      assignedAgentId: true,
+      channel: true,
+      emailThreadToken: true,
+      customer: { select: { phone: true, email: true } },
+    },
   });
   if (!ticket) throw new AppError(404, "TICKET_NOT_FOUND", "Ticket not found");
   if (actor.role === Role.AGENT && ticket.assignedAgentId !== actor.userId) throw forbidden("Ticket must be assigned to the agent before adding conversation content");

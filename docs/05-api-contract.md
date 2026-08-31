@@ -238,6 +238,8 @@ Both mutations accept the strict body `{ body: string }` (`min 1`, `max 50000` �
 
 When `ticket.channel === "WHATSAPP"` the persisted reply is also sent to the customer through the WhatsApp Cloud API after the message transaction commits, and the response carries an extra `delivery` field: `{ data: { kind: "PUBLIC_MESSAGE", …, delivery: { channel: "WHATSAPP", status: "SENT", externalId } } }` on success, or `{ …, delivery: { channel: "WHATSAPP", status: "FAILED", reason } }` on failure (`reason` ∈ `INTEGRATION_NOT_CONFIGURED | NO_RECIPIENT_PHONE | PROVIDER_REJECTED | PROVIDER_UNREACHABLE`). A send failure never rolls back the message; it is also recorded as a `WHATSAPP_DELIVERY_FAILED` ticket-history row. Non-WhatsApp tickets are unchanged (no `delivery` field). See "WhatsApp Integration" below and `docs/20-whatsapp-integration.md`.
 
+When `ticket.channel === "EMAIL"`, the same authorized public-reply mutation sends through Resend inside the message transaction. Success returns `delivery: { channel: "EMAIL", status: "SENT", externalId }` and stores the provider email id. A provider/configuration failure returns a structured `502 EMAIL_DELIVERY_FAILED` or `503 EMAIL_NOT_CONFIGURED` / `EMAIL_SENDER_INVALID` and rolls back message, first-response, and notification writes. Internal notes never send. See `docs/21-email-integration.md`.
+
 `POST /tickets/:id/notes` creates an internal-only `TicketNote`, never a `TicketMessage` or `CustomerNote`, and never changes `firstRespondedAt`, ticket status, `resolvedAt`, or `closedAt`. The note body is now **rich text (HTML) from the same Lexical composer as public replies** and is **sanitized server-side on write** to the identical support allowlist; a body that is empty once sanitized is rejected with `422 EMPTY_MESSAGE`. `@[Name](userId)` mention tokens are plain text and survive the sanitizer intact, so mention resolution (below) is unchanged and runs on the sanitized body. The AI prompt context flattens note HTML to plain text. The response is `{ data: { kind: "INTERNAL_NOTE", id, body, createdAt, author } }` (`body` = the sanitized HTML).
 
 `ADMIN` and `MANAGER` may read and mutate conversation on any ticket. `AGENT` may read assigned or unassigned tickets but may create replies or notes only on tickets assigned to that agent. Tickets assigned to another agent are hidden. `CUSTOMER` cannot access these internal routes. Public replies and internal notes do not perform automatic status transitions, including on `RESOLVED` or `CLOSED` tickets.
@@ -485,6 +487,10 @@ Machine endpoints — **no product JWT**. `whatsappRouter` is mounted in `server
 - The webhook needs a public HTTPS URL: `https://<api-domain>/api/integrations/whatsapp/webhook`. Required Meta webhook subscription: **`messages`** only.
 
 Known limitations: text only (in and out); no media/templates/interactive/status-receipt UI; no multi-number/multi-WABA; no historical import; ambiguous phone matches route to one existing customer (logged, never merged); a WhatsApp message after a ticket is `RESOLVED`/`CLOSED` opens a new ticket rather than reopening. Full detail in `docs/20-whatsapp-integration.md`.
+
+## Resend EMAIL Integration — IMPLEMENTED ON `feature/email-channel`
+
+`POST /api/integrations/email/webhook` is a public machine endpoint (no product JWT). It verifies the exact raw request body with the official Resend SDK and `svix-*` headers, handles `email.received`, and returns `200` for unsupported signed events and duplicates. Full content and attachments are retrieved through Resend's Receiving API and integrated with the existing Customer, EMAIL Ticket, TicketMessage, Attachment, history, SLA, and notification flows. See `docs/21-email-integration.md` for matching order, errors, environment variables, and limitations.
 
 ## Tasks — LIVE (on `feature/tasks-reminders`, not yet integrated)
 

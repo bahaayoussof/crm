@@ -63,22 +63,22 @@ model User {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  department        Department?        @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  branch            Branch?            @relation(fields: [branchId], references: [id], onDelete: SetNull)
-  customerProfile   Customer?
-  assignedTickets   Ticket[]           @relation("AssignedAgent")
-  ticketMessages    TicketMessage[]
-  ticketNotes       TicketNote[]
-  customerNotes     CustomerNote[]
-  ticketHistory     TicketHistory[]
-  knowledgeArticles KnowledgeArticle[]
-  notifications     Notification[]
-  quickReplies      QuickReply[]
-  createdTasks      Task[]             @relation("TaskCreator")
-  assignedTasks     Task[]             @relation("TaskAssignee")
-  ticketWatchers    TicketWatcher[]
-  ticketMentions    TicketMention[]
-  auditLogs         AuditLog[]
+  department          Department?          @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  branch              Branch?              @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  customerProfile     Customer?
+  assignedTickets     Ticket[]             @relation("AssignedAgent")
+  ticketMessages      TicketMessage[]
+  ticketNotes         TicketNote[]
+  customerNotes       CustomerNote[]
+  ticketHistory       TicketHistory[]
+  knowledgeArticles   KnowledgeArticle[]
+  notifications       Notification[]
+  quickReplies        QuickReply[]
+  createdTasks        Task[]               @relation("TaskCreator")
+  assignedTasks       Task[]               @relation("TaskAssignee")
+  ticketWatchers      TicketWatcher[]
+  ticketMentions      TicketMention[]
+  auditLogs           AuditLog[]
   passwordResetTokens PasswordResetToken[]
 
   @@index([role])
@@ -119,6 +119,7 @@ model Ticket {
   resolutionDueAt    DateTime?
   resolvedAt         DateTime?
   closedAt           DateTime?
+  emailThreadToken   String?        @unique
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
 
@@ -148,14 +149,16 @@ model Ticket {
 }
 
 model TicketMessage {
-  id           String   @id @default(cuid())
-  ticketId     String
-  authorUserId String
-  body         String
+  id                String   @id @default(cuid())
+  ticketId          String
+  authorUserId      String
+  body              String
   // External provider message id (e.g. WhatsApp Cloud API wamid). Inbound: the
   // idempotency anchor for webhook de-duplication. Outbound: stored for traceability.
-  externalId   String?  @unique
-  createdAt    DateTime @default(now())
+  externalId        String?  @unique
+  // RFC Message-ID used for provider-neutral email thread correlation.
+  externalMessageId String?  @unique
+  createdAt         DateTime @default(now())
 
   ticket      Ticket       @relation(fields: [ticketId], references: [id], onDelete: Restrict)
   author      User         @relation(fields: [authorUserId], references: [id], onDelete: Restrict)
@@ -243,6 +246,8 @@ model Attachment {
   fileName   String
   mimeType   String
   storageKey String   @unique
+  // External provider attachment id. NULL for uploads created inside the CRM.
+  externalId String?  @unique
   createdAt  DateTime @default(now())
 
   ticket   Ticket?        @relation(fields: [ticketId], references: [id], onDelete: Restrict)
