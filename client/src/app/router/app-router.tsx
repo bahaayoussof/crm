@@ -36,9 +36,10 @@ import { TaskListPage } from "@/features/tasks/task-list-page";
 import { AuditLogPage } from "@/features/audit-logs/audit-log-page";
 import { AuditLogRoute } from "./audit-log-route";
 import { InternalProfilePage } from "@/features/profile/internal-profile-page";
+import { RealtimeProvider } from "@/features/realtime/realtime-provider";
 
 export function AppRouter() {
-  return <BrowserRouter><Routes>
+  return <BrowserRouter><RealtimeProvider><Routes>
     <Route path="/login" element={<LoginPage />} />
     <Route path="/register" element={<RegisterPage />} />
     <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -92,5 +93,5 @@ export function AppRouter() {
       <Route path="/portal/knowledge-base/:id" element={<PortalKnowledgeArticlePage />} />
     </Route>
     <Route path="*" element={<Navigate to="/login" replace />} />
-  </Routes></BrowserRouter>;
+  </Routes></RealtimeProvider></BrowserRouter>;
 }

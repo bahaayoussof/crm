@@ -418,7 +418,15 @@ PATCH /api/notifications/read-all         mark all current user's notifications 
 PATCH /api/notifications/:id/read         mark one owned notification read
 ```
 
-All routes require `ADMIN`, `MANAGER`, or `AGENT`; `CUSTOMER` is rejected. List query supports bounded `page`, `limit`, and `read=true|false`; every operation is scoped to `request.auth.userId`, and a missing or wrong-owner id returns the same `404 NOTIFICATION_NOT_FOUND`. Assignment, customer-reply, escalation, mention, and watcher-activity notifications are written atomically with their ticket transaction and may carry an optional `ticketId` link. Unread count polls every 30 seconds in the internal client. There is no Portal notification surface, realtime transport, email/push delivery, or arbitrary-update notification fan-out.
+All routes require `ADMIN`, `MANAGER`, or `AGENT`; `CUSTOMER` is rejected. List query supports bounded `page`, `limit`, and `read=true|false`; every operation is scoped to `request.auth.userId`, and a missing or wrong-owner id returns the same `404 NOTIFICATION_NOT_FOUND`. Assignment, customer-reply, escalation, mention, and watcher-activity notifications are written atomically with their ticket transaction and may carry an optional `ticketId` link. Unread count polls every 30 seconds in the internal client. There is no Portal notification surface, email/push delivery, or arbitrary-update notification fan-out. **Realtime:** on `feature/realtime-events`, `createNotifications` emits a `notification.created` SSE event (and `markRead` emits `notification.read`) to the recipient user only, so the header badge/list update without reload — see Realtime Events below.
+
+## Realtime Events (SSE) — LIVE (on `feature/realtime-events`, not yet integrated)
+
+```text
+GET /api/realtime/events    authenticated Server-Sent Events stream (internal roles only)
+```
+
+`requireAuth` + `requireRole(ADMIN, MANAGER, AGENT)`; `CUSTOMER` is rejected `403` (portal realtime deferred). Consumed with `fetch` + `ReadableStream` so the existing `Authorization: Bearer <jwt>` header is used — no token in the URL, no cookie, no new auth path. Emits three small "something changed" events — `ticket.message.created` `{ticketId,messageId,visibility}`, `ticket.updated` `{ticketId}`, `notification.created` `{notificationId|null}` (+ `notification.read` `{notificationId}`) — as `event: crm-event` frames with a 25s `: ping` heartbeat comment. Events are published by the centralized ticket / portal / inbound-EMAIL / inbound-WhatsApp / SLA / notification services **after** the producing transaction commits (`withRealtimeOutbox`); a rolled-back transaction publishes nothing. Authorization mirrors `ticket-visibility.ts` (ADMIN/MANAGER all tickets; AGENT assigned-or-unassigned) and targets `notification.*` to the one recipient. The frontend reacts with targeted TanStack Query invalidations — no domain records cross the wire, no durable queue, best-effort delivery with client auto-reconnect; REST + focus/reconnect refetch is the fallback. See `docs/22-realtime-events.md` and ADR-045. Deployment note: long-lived on a persistent Node host; force-closed at `maxDuration` on Vercel serverless (client reconnects).
 
 ## Team Collaboration — LIVE (on `feature/team-collaboration`, not yet integrated)
 

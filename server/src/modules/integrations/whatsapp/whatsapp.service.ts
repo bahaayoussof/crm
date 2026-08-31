@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { Channel, Prisma, Role, TicketPriority, TicketStatus } from "@prisma/client";
 import { prisma } from "../../../config/prisma.js";
 import { createNotifications } from "../../notifications/notification.service.js";
+import { emitTicketMessageCreated, withRealtimeOutbox } from "../../realtime/realtime.publisher.js";
 import { getSendConfig } from "./whatsapp.config.js";
 import { whatsappClient, WhatsappApiError } from "./whatsapp.client.js";
 import type {
@@ -172,12 +173,13 @@ async function fanOutInboundNotification(
  * delivery of the same provider message id makes no further writes.
  */
 export async function processInboundTextMessage(message: InboundTextMessage): Promise<InboundResult> {
-  return prisma.$transaction(async (tx) => {
+  return withRealtimeOutbox(async () => {
+   const { outcome, assignedAgentId } = await prisma.$transaction(async (tx) => {
     const duplicate = await tx.ticketMessage.findUnique({
       where: { externalId: message.externalId },
       select: { id: true },
     });
-    if (duplicate) return { status: "DUPLICATE" };
+    if (duplicate) return { outcome: { status: "DUPLICATE" } as InboundResult, assignedAgentId: null };
 
     const author = await ensureSystemUser(tx);
     const customer = await matchOrCreateCustomer(tx, message.from, message.profileName);
@@ -205,7 +207,7 @@ export async function processInboundTextMessage(message: InboundTextMessage): Pr
         select: { id: true },
       });
     } catch (error) {
-      if (isUniqueConstraintError(error)) return { status: "DUPLICATE" };
+      if (isUniqueConstraintError(error)) return { outcome: { status: "DUPLICATE" } as InboundResult, assignedAgentId: ticket.assignedAgentId };
       throw error;
     }
 
@@ -228,10 +230,24 @@ export async function processInboundTextMessage(message: InboundTextMessage): Pr
     await fanOutInboundNotification(tx, ticket);
 
     return {
-      status: createdTicket ? "TICKET_CREATED" : "MESSAGE_APPENDED",
-      ticketId: ticket.id,
-      messageId: record.id,
+      outcome: {
+        status: createdTicket ? "TICKET_CREATED" : "MESSAGE_APPENDED",
+        ticketId: ticket.id,
+        messageId: record.id,
+      } as InboundResult,
+      assignedAgentId: ticket.assignedAgentId,
     };
+   });
+
+   if (outcome.status !== "DUPLICATE" && outcome.ticketId && outcome.messageId) {
+     emitTicketMessageCreated({
+       ticketId: outcome.ticketId,
+       messageId: outcome.messageId,
+       assignedAgentId,
+       visibility: "public",
+     });
+   }
+   return outcome;
   });
 }
 

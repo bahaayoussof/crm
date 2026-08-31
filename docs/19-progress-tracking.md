@@ -238,6 +238,13 @@ Verification outstanding on implemented work: 6 areas — basic SLA derivation/p
 
 ## 3. Completed Work
 
+### Realtime CRM Events (SSE)
+
+- Branch: `feature/realtime-events` (not committed). ADR-045, `docs/22-realtime-events.md`.
+- Delivered: transport-neutral realtime layer. `server/src/modules/realtime/` (`realtime.types` / `service` / `publisher` / `controller` / `routes` / `test`); authenticated `GET /api/realtime/events` (SSE, internal roles only); event contract `ticket.message.created` / `ticket.updated` / `notification.created` (+ `notification.read`). Emission wired at centralized service points only — `ticket.service` (add message/note, create/update), `portal.service.reply`, inbound EMAIL, inbound WhatsApp, `sla-automation` auto-assign/escalate, `createNotifications`, `markRead`. Transaction-safe via `withRealtimeOutbox` (AsyncLocalStorage buffer, flushed post-commit, discarded on rollback). Authorization mirrors `ticket-visibility.ts`; notifications targeted to the recipient user only. Frontend `client/src/features/realtime/` — one app-level `fetch`-stream connection (Authorization header, not `EventSource`), full-jitter reconnect backoff, `handleRealtimeEvent` → targeted TanStack Query invalidations reusing existing key factories. `RealtimeProvider` mounted once in `app-router.tsx`. No schema change, no new dependency, no existing API changed.
+- Tests: server vitest 660/660 (`realtime.test.ts` 18 + emit assertions added to ticket / portal / email / whatsapp / notification suites); client vitest 690/690 (`realtime-client.test.ts` 9 + `realtime.test.tsx` 10). Server + client typecheck clean; repo lint 0 errors (1 pre-existing warning); client production build green; `git diff --check` clean.
+- Limitations: **customer portal realtime deferred** (endpoint rejects CUSTOMER; server transport is customer-capable for a later pass). **Vercel serverless force-closes long-lived SSE at `maxDuration`** — client reconnects each cycle; a persistent Node host / Fluid Compute / managed provider is the production path (no hosting migration done). No live Resend/WhatsApp/browser QA performed in this environment. Production readiness for realtime not claimed until the API runs on a long-lived-response host.
+
 ### Project Foundation
 
 - Branch: `feature/project-foundation` (contained in `master`).

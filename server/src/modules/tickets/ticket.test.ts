@@ -34,14 +34,24 @@ vi.mock("../integrations/whatsapp/whatsapp.service.js", () => ({
 vi.mock("../integrations/email/email.service.js", () => ({
   deliverEmailReply: vi.fn().mockResolvedValue({ channel: "EMAIL", status: "SENT", externalId: "resend:email-out-1" }),
 }));
+vi.mock("../realtime/realtime.publisher.js", () => ({
+  withRealtimeOutbox: (fn: () => unknown) => fn(),
+  emitTicketMessageCreated: vi.fn(),
+  emitTicketUpdated: vi.fn(),
+  emitNotificationCreated: vi.fn(),
+  emitNotificationRead: vi.fn(),
+}));
 
 import { app } from "../../app.js";
 import { createAccessToken } from "../auth/auth-token.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import { deliverOutboundReply } from "../integrations/whatsapp/whatsapp.service.js";
 import { deliverEmailReply } from "../integrations/email/email.service.js";
+import { emitTicketMessageCreated, emitTicketUpdated } from "../realtime/realtime.publisher.js";
 const deliverOutboundReplyMock = vi.mocked(deliverOutboundReply);
 const deliverEmailReplyMock = vi.mocked(deliverEmailReply);
+const emitMessageMock = vi.mocked(emitTicketMessageCreated);
+const emitUpdatedMock = vi.mocked(emitTicketUpdated);
 
 const admin = { id: "admin-1", role: Role.ADMIN };
 const manager = { id: "c6fd0a01a46ed4545f0a5e774", role: Role.MANAGER };
@@ -244,6 +254,21 @@ describe("ticket API", () => {
     expect(mocks.ticketUpdateMany).toHaveBeenCalledWith({ where: { id: "c737ce60fccf9da889f4605c0", firstRespondedAt: null }, data: { firstRespondedAt: expect.any(Date) } });
   });
 
+  it("emits ticket.message.created after a public reply is persisted", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: agent.id });
+    await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "Checking now." });
+    expect(emitMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({ ticketId: "c737ce60fccf9da889f4605c0", visibility: "public" }),
+    );
+  });
+
+  it("does not emit ticket.message.created when reply persistence fails", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: agent.id });
+    mocks.messageCreate.mockRejectedValueOnce(new Error("db down"));
+    await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "Reply" });
+    expect(emitMessageMock).not.toHaveBeenCalled();
+  });
+
   it("rejects spoofed authors and empty replies", async () => {
     const spoofed = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth()).send({ body: "Reply", authorUserId: otherAgent.id });
     const empty = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth()).send({ body: "   " });
@@ -256,6 +281,7 @@ describe("ticket API", () => {
     expect(response.status).toBe(201); expect(response.body.data.kind).toBe("INTERNAL_NOTE");
     expect(mocks.noteCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ authorUserId: agent.id, body: "Check provider logs." }) }));
     expect(mocks.messageCreate).not.toHaveBeenCalled(); expect(mocks.ticketUpdateMany).not.toHaveBeenCalled();
+    expect(emitMessageMock).toHaveBeenCalledWith(expect.objectContaining({ ticketId: "c737ce60fccf9da889f4605c0", visibility: "internal" }));
   });
 
   it("records @mentions on a new note: mention rows, auto-watch, and one mention notification", async () => {
@@ -444,6 +470,13 @@ describe("ticket API", () => {
     await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(agent)).send({ status: "RESOLVED" });
     expect(mocks.ticketUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "RESOLVED", resolvedAt: expect.any(Date) }) }));
     expect(mocks.historyCreateMany).toHaveBeenCalledWith({ data: [expect.objectContaining({ action: "STATUS_CHANGED", oldValue: "IN_PROGRESS", newValue: "RESOLVED" })] });
+    expect(emitUpdatedMock).toHaveBeenCalledWith(expect.objectContaining({ ticketId: "c737ce60fccf9da889f4605c0" }));
+  });
+
+  it("does not emit ticket.updated for a no-op PATCH", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({ ...current, status: TicketStatus.IN_PROGRESS, assignedAgentId: agent.id });
+    await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(agent)).send({ status: "IN_PROGRESS" });
+    expect(emitUpdatedMock).not.toHaveBeenCalled();
   });
 
   it.each(["subject", "description", "categoryId", "departmentId", "branchId", "assignedAgentId"])("rejects assigned-agent updates to forbidden field %s", async (field) => {

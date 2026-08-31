@@ -2,6 +2,7 @@ import { Prisma, Role, TaskStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import { createNotifications } from "../notifications/notification.service.js";
+import { withRealtimeOutbox } from "../realtime/realtime.publisher.js";
 import { ticketVisibilityWhere } from "../tickets/ticket-visibility.js";
 import type { CreateTaskInput, ListTasksQuery, UpdateTaskInput } from "./task.schema.js";
 
@@ -190,7 +191,7 @@ export async function createTask(actor: TaskActor, input: CreateTaskInput) {
 
   const isAssigningToOther = assigneeId !== actor.userId;
 
-  const task = await prisma.$transaction(async (tx) => {
+  const task = await withRealtimeOutbox(() => prisma.$transaction(async (tx) => {
     const created = await tx.task.create({
       data: {
         title: input.title,
@@ -217,7 +218,7 @@ export async function createTask(actor: TaskActor, input: CreateTaskInput) {
     }
 
     return created;
-  });
+  }));
 
   return task;
 }
@@ -319,7 +320,7 @@ export async function updateTask(actor: TaskActor, taskId: string, input: Update
 
   const previousAssigneeId = existing.assigneeId;
 
-  const updated = await prisma.$transaction(async (tx) => {
+  const updated = await withRealtimeOutbox(() => prisma.$transaction(async (tx) => {
     const result = await tx.task.update({
       where: { id: taskId },
       data: updateData,
@@ -340,7 +341,7 @@ export async function updateTask(actor: TaskActor, taskId: string, input: Update
     }
 
     return result;
-  });
+  }));
 
   return updated;
 }

@@ -1,6 +1,7 @@
 import { Role, TicketStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { createNotifications } from "../notifications/notification.service.js";
+import { emitTicketUpdated, withRealtimeOutbox } from "../realtime/realtime.publisher.js";
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../audit-logs/audit-log.constants.js";
 import { createAuditLog } from "../audit-logs/audit-log.service.js";
 
@@ -30,6 +31,7 @@ export interface SlaMonitorResult {
 }
 
 export async function runSlaMonitor(now = new Date()): Promise<SlaMonitorResult> {
+ return withRealtimeOutbox(async () => {
   const assignment = await assignUnassignedTickets();
   const escalation = await escalateBreachedTickets(now);
   return {
@@ -38,6 +40,7 @@ export async function runSlaMonitor(now = new Date()): Promise<SlaMonitorResult>
     inspected: { unassigned: assignment.inspected, breached: escalation.inspected },
     generatedAt: now.toISOString(),
   };
+ });
 }
 
 async function assignUnassignedTickets() {
@@ -105,6 +108,7 @@ async function assignUnassignedTickets() {
     if (assigned) {
       updated += 1;
       agent.activeTicketCount += 1;
+      emitTicketUpdated({ ticketId: ticket.id, assignedAgentId: agent.id });
     }
   }
   return { inspected: tickets.length, updated };
@@ -120,7 +124,7 @@ async function escalateBreachedTickets(now: Date) {
     },
     take: SLA_MONITOR_BATCH_SIZE,
     orderBy: [{ resolutionDueAt: "asc" }, { id: "asc" }],
-    select: { id: true, subject: true, status: true },
+    select: { id: true, subject: true, status: true, assignedAgentId: true },
   });
   let updated = 0;
 
@@ -162,7 +166,10 @@ async function escalateBreachedTickets(now: Date) {
       );
       return true;
     });
-    if (escalated) updated += 1;
+    if (escalated) {
+      updated += 1;
+      emitTicketUpdated({ ticketId: ticket.id, assignedAgentId: ticket.assignedAgentId });
+    }
   }
   return { inspected: tickets.length, updated };
 }

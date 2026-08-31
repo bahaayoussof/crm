@@ -58,8 +58,17 @@ vi.mock("../../attachments/attachment-storage.js", async (importOriginal) => {
 });
 
 vi.mock("bcrypt", () => ({ default: { hash: vi.fn().mockResolvedValue("hashed") } }));
+vi.mock("../../realtime/realtime.publisher.js", () => ({
+  withRealtimeOutbox: (fn: () => unknown) => fn(),
+  emitTicketMessageCreated: vi.fn(),
+  emitTicketUpdated: vi.fn(),
+  emitNotificationCreated: vi.fn(),
+  emitNotificationRead: vi.fn(),
+}));
 
 import { app } from "../../../app.js";
+import { emitTicketMessageCreated } from "../../realtime/realtime.publisher.js";
+const emitMessageMock = vi.mocked(emitTicketMessageCreated);
 
 const webhookEvent = {
   type: "email.received",
@@ -156,6 +165,7 @@ describe("Resend email integration", () => {
       ticketId: "ticket-1", authorUserId: "email-system", externalId: "resend:email-in-1", externalMessageId: "<message-in-1@example.net>",
     }) }));
     expect(mocks.notificationCreateMany).toHaveBeenCalled();
+    expect(emitMessageMock).toHaveBeenCalledWith(expect.objectContaining({ ticketId: "ticket-1", visibility: "public" }));
   });
 
   it("returns a successful no-op for a repeated provider email id", async () => {
@@ -165,6 +175,14 @@ describe("Resend email integration", () => {
     expect(response.body.data.status).toBe("DUPLICATE");
     expect(mocks.retrieve).not.toHaveBeenCalled();
     expect(mocks.ticketCreate).not.toHaveBeenCalled();
+    expect(emitMessageMock).not.toHaveBeenCalled();
+  });
+
+  it("does not emit ticket.message.created when the inbound transaction fails", async () => {
+    mocks.messageCreate.mockRejectedValueOnce(new Error("db write failed"));
+    const response = await signed();
+    expect(response.status).toBeGreaterThanOrEqual(500);
+    expect(emitMessageMock).not.toHaveBeenCalled();
   });
 
   it("correlates a known RFC reference only within the sender customer's EMAIL tickets", async () => {

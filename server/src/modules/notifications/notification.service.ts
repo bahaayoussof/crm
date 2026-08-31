@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
+import { emitNotificationCreated, emitNotificationRead } from "../realtime/realtime.publisher.js";
 import type { NotificationQuery } from "./notification.schema.js";
 
 /** Safe projection — never expose other users' data. */
@@ -67,11 +68,14 @@ export async function markRead(userId: string, notificationId: string) {
     });
     return current!;
   }
-  return prisma.notification.update({
+  const updated = await prisma.notification.update({
     where: { id: notificationId },
     data: { readAt: new Date() },
     select: notificationSelect,
   });
+  // Multi-tab: let this user's other connected sessions drop the unread badge too.
+  emitNotificationRead(userId, updated.id);
+  return updated;
 }
 
 export async function markAllRead(userId: string) {
@@ -102,7 +106,7 @@ export async function createNotifications(
   taskId?: string | null,
 ) {
   const unique = [...new Set(recipients)].filter(Boolean);
-  if (unique.length === 0) return;
+  if (unique.length === 0) return unique;
   const now = new Date();
   await tx.notification.createMany({
     data: unique.map((userId) => ({
@@ -115,4 +119,10 @@ export async function createNotifications(
       createdAt: now,
     })),
   });
+  // Realtime: one targeted `notification.created` per recipient. Buffered by
+  // `withRealtimeOutbox` when the caller opened a scope (so it fires only after
+  // this transaction commits); published immediately otherwise. Best-effort —
+  // a delivery failure never affects the surrounding transaction.
+  emitNotificationCreated(unique);
+  return unique;
 }

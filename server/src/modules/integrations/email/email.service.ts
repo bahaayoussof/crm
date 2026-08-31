@@ -6,6 +6,7 @@ import { AppError } from "../../../shared/errors/app-error.js";
 import { emailSchema } from "../../../shared/validation/common.schema.js";
 import { replyHtmlToPlainText, sanitizeReplyHtml } from "../../../shared/rich-text/reply-html.js";
 import { createNotifications } from "../../notifications/notification.service.js";
+import { emitTicketMessageCreated, withRealtimeOutbox } from "../../realtime/realtime.publisher.js";
 import { MAX_ATTACHMENT_BYTES } from "../../attachments/attachment.constants.js";
 import { detectFileType } from "../../attachments/detect-file-type.js";
 import { sanitizeFileName } from "../../attachments/file-name.js";
@@ -262,8 +263,9 @@ export async function processInboundEmail(event: InboundEmailEvent) {
   }
 
   const messageId = randomUUID();
-  try {
-    return await prisma.$transaction(async (tx) => {
+  return withRealtimeOutbox(async () => {
+   try {
+    const outcome = await prisma.$transaction(async (tx) => {
       const raced = await tx.ticketMessage.findUnique({ where: { externalId: `resend:${event.emailId}` }, select: { id: true } });
       if (raced) return { status: "DUPLICATE" as const };
       const author = await ensureSystemUser(tx);
@@ -309,13 +311,28 @@ export async function processInboundEmail(event: InboundEmailEvent) {
         });
       }
       await notifyInbound(tx, ticket);
-      return { status: createdTicket ? "TICKET_CREATED" as const : "MESSAGE_APPENDED" as const, ticketId: ticket.id, messageId };
+      return {
+        status: createdTicket ? "TICKET_CREATED" as const : "MESSAGE_APPENDED" as const,
+        ticketId: ticket.id,
+        messageId,
+        assignedAgentId: ticket.assignedAgentId,
+      };
     });
-  } catch (error) {
+    // Committed — tell connected staff. Rolled-back / duplicate paths never reach here.
+    if (outcome.status === "DUPLICATE") return outcome;
+    emitTicketMessageCreated({
+      ticketId: outcome.ticketId,
+      messageId: outcome.messageId,
+      assignedAgentId: outcome.assignedAgentId,
+      visibility: "public",
+    });
+    return { status: outcome.status, ticketId: outcome.ticketId, messageId: outcome.messageId };
+   } catch (error) {
     for (const attachment of prepared) await storage?.remove(attachment.storageKey).catch(() => undefined);
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") return { status: "DUPLICATE" as const };
     throw error;
-  }
+   }
+  });
 }
 
 export async function deliverEmailReply(params: {

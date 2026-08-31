@@ -27,6 +27,7 @@ import { taskRouter } from "./modules/tasks/task.routes.js";
 import { taskReminderRouter } from "./modules/tasks/task-reminder.routes.js";
 import { whatsappRouter } from "./modules/integrations/whatsapp/whatsapp.routes.js";
 import { emailIntegrationRouter } from "./modules/integrations/email/email.routes.js";
+import { realtimeRouter } from "./modules/realtime/realtime.routes.js";
 
 
 const allowedOrigins = new Set(env.CLIENT_URLS ?? [env.CLIENT_URL]);
@@ -80,6 +81,7 @@ app.use("/api/quick-replies", quickReplyRouter);
 app.use("/api/settings", settingsRouter);
 app.use("/api/audit-logs", auditLogRouter);
 app.use("/api/notifications", notificationRouter);
+app.use("/api/realtime", realtimeRouter);
 app.use("/api/internal/sla-monitor", slaAutomationRouter);
 app.use("/api/internal/task-reminders", taskReminderRouter);
 app.use("/api/tasks", taskRouter);

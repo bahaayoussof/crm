@@ -1200,3 +1200,32 @@ The `Department` and `Branch` Prisma models already existed as skeletons (`id`, 
 - **Branch-first, dependent Department (client only).** All four internal-user create/edit surfaces render Branch before Department via the shared `client/src/features/users/user-org-fields.tsx`. Department is disabled until a Branch is chosen and then only lists active Departments belonging to that Branch; changing the Branch clears an incompatible `departmentId`. This is UX prevention only — the server keeps `INVALID_BRANCH` / `INVALID_DEPARTMENT` / `DEPARTMENT_BRANCH_MISMATCH` as the integrity boundary.
 - **Full ADMIN user editing.** Reverted the name/email/role read-only treatment in the user-management Edit modal + page (a documented earlier state; see ADR-025 note "name/email/role `<select>`"). An active ADMIN edits name, email, phone, role, branch, department and status. Self-guards kept: own-row role select + active checkbox disabled; server guards unchanged. Non-ADMIN and `/auth/profile` self-edit permissions untouched.
 - **Phone on `PATCH /api/users/:id`.** `updateUserSchema` gains `phone: optionalPhoneSchema` (the same shared schema the profile endpoints use — no second phone implementation). `user.service.updateUser` writes + audits `phone`; the client `updateUser` forwards it; the client uses one `userEditFormSchema` for both the modal and the page.
+
+---
+
+# ADR-045: Realtime CRM Events — REST for writes + SSE for server→client invalidation signals
+
+**Status:** implemented on `feature/realtime-events` (not committed). Full detail: `docs/22-realtime-events.md`.
+
+## Context
+
+Server-side changes (customer email/WhatsApp/portal replies, ticket status/assignment changes, notifications) only appeared in the CRM after a manual page reload. We want connected clients to update automatically, without turning this into a live-chat/presence system and without replacing the REST mutation APIs.
+
+## Decision
+
+- **Transport:** REST for all writes (unchanged), **Server-Sent Events** for server→client "something changed" signals, **TanStack Query** invalidate/refetch as the reaction. The database + REST APIs remain authoritative.
+- **Why SSE, not Socket.IO:** the need is one-directional server→client invalidation. SSE needs no dependency (client or server), rides plain HTTP, and reconnects natively. A transport-neutral publisher seam (`realtime.publisher.emit*()`, never `response.write` from domain code) means a later switch to WebSocket/Socket.IO/a managed provider touches only `realtime.service.ts` + `realtime.controller.ts`.
+- **Event contract:** three events (`ticket.message.created`, `ticket.updated`, `notification.created`) + `notification.read`. Small IDs only — no domain records over the wire (limits stale data, authz-leak risk, payload size, DTO coupling).
+- **Domain events first:** EMAIL / WhatsApp / portal stay unaware of SSE. Each event is emitted from the centralized conversation / ticket / notification service after successful persistence.
+- **Transaction safety:** `withRealtimeOutbox` (AsyncLocalStorage) buffers `emit*` calls made inside a `prisma.$transaction` and flushes only after the wrapped service call resolves; a thrown/rolled-back transaction discards the buffer. EMAIL rollback semantics unchanged.
+- **Authorization:** `canReceive` mirrors `ticket-visibility.ts` (ADMIN/MANAGER all; AGENT assigned-or-unassigned) and targets `notification.*` to the single recipient user. No event is broadcast to every authenticated user.
+- **Auth strategy:** `GET /api/realtime/events` behind `requireAuth` + `requireRole(ADMIN,MANAGER,AGENT)`. The client consumes it with `fetch` + `ReadableStream` (not native `EventSource`) so the existing `Authorization: Bearer <jwt>` header is sent — no token in the URL, no cookie, no second auth system, JWT validation unchanged.
+- **Delivery semantics:** best-effort. No durable queue (no Kafka/Redis Streams/RabbitMQ/event-sourcing). Missed events self-heal via TanStack Query focus/reconnect refetch. `Last-Event-ID` is sent on reconnect as a documented seam but no replay is implemented.
+- **Reconnection:** one app-level connection per tab; full-jitter backoff 1s→30s; `401/403` stops; a failed realtime connection never breaks REST. Existing focus/reconnect refetch + the 30s unread poll are kept as fallback — no `refetchInterval` added.
+- **Customer portal:** deferred. The endpoint rejects `CUSTOMER`; the server transport is customer-capable for a later pass. No customer ticket isolation weakened.
+- **Explicitly out of scope:** typing indicators, presence, read receipts, live cursors, WebRTC, chat rooms, arbitrary event broadcasting.
+
+## Consequences
+
+- No schema change, no new dependency, no change to any existing mutation API.
+- **Hosting:** persistent Node hosts support the long-lived SSE response fully. On Vercel serverless the connection is force-closed at `maxDuration` and the client reconnects each cycle — functional but not recommended for production realtime; a persistent Node host, Vercel Fluid Compute, or a managed realtime provider (via the publisher seam) is the production path. No hosting migration was done in this task; the limitation is documented, not hidden. Production readiness for realtime is not claimed until the API runs on a long-lived-response host.

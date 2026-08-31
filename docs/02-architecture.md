@@ -19,6 +19,24 @@ Prisma ORM
 PostgreSQL
 ```
 
+## Realtime Signalling (additive, `feature/realtime-events`)
+
+```text
+Domain service commit
+        |
+   realtimePublisher.emit*()   (transport-neutral; buffered until tx commits)
+        |
+   SSE transport  --event: crm-event-->  one per-tab authenticated stream
+        |
+   frontend handler  -->  TanStack Query invalidate / refetch
+        |
+   UI updates without reload
+```
+
+REST + Prisma + PostgreSQL remain authoritative; SSE only tells clients which
+query to refetch. Transport detail lives only in `modules/realtime/`. See
+`docs/22-realtime-events.md`.
+
 ## Frontend Data Flow
 
 ```text

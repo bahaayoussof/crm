@@ -679,3 +679,22 @@ Summary: Completed **Tasks & Reminders** end to end on uncommitted `feature/task
 | — | Built isolated Resend inbound/outbound transport over the ticket conversation flow | server/src/modules/integrations/email/*, ticket.service.ts, app.ts | Signed webhook, safe threading, idempotency, attachments, transactional outbound | — |
 | — | Added provider-neutral correlation fields and additive migration | prisma/schema.prisma, migrations/20260831180000_add_email_channel_metadata | Created; not database-applied | — |
 | — | Added tests/docs and ran verification | email*.test.ts, ticket.test.ts, docs/21-email-integration.md | Focused 92; server 634; client 671 pass; server build blocked only by known Prisma DLL EPERM | — |
+
+## Session: 2026-08-31 18:31
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-08-31 — feature/realtime-events (ADR-045)
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| — | Inspected ticket/email/whatsapp/portal/notification services, auth, query keys, Vercel deploy | (read-only) | SSE + fetch-stream + TanStack invalidation design chosen; Vercel maxDuration flagged | 40k |
+| — | New server realtime module | server/src/modules/realtime/{types,service,publisher,controller,routes,test}.ts | transport-neutral SSE + withRealtimeOutbox (ALS) + canReceive RBAC; 18 tests | 12k |
+| — | Wired emit at domain services | ticket/portal/email/whatsapp/sla-automation/notification/task services | post-commit emits, transaction-safe; no schema/API change | 10k |
+| — | New client realtime feature | client/src/features/realtime/{types,client,event-handler,provider}.tsx + 2 tests | one fetch-stream connection, Authorization header, backoff reconnect, targeted invalidation; mounted in app-router | 9k |
+| — | Emit assertions added to existing module tests | ticket/portal/email/whatsapp/notification .test | server 660/660 | 4k |
+| — | Docs | docs/22 (new) + ADR-045 in docs/17 + docs/02/05/13/19 | complete | 6k |
+| — | Verification | — | server tsc/lint/660 ✓; client tsc/lint/690 ✓ build ✓; git diff --check ✓ (users.test.tsx flaked once under concurrency, green isolated) | 3k |
+
+Session summary: Implemented the full realtime event layer per the spec. REST unchanged; SSE `GET /api/realtime/events` (internal roles only) + `fetch`+`ReadableStream` client (JWT in Authorization header, not EventSource). Events `ticket.message.created` / `ticket.updated` / `notification.created` (+ `notification.read`) emitted from centralized services after commit via `withRealtimeOutbox` (AsyncLocalStorage buffer). Authorization mirrors `ticket-visibility.ts`; notifications targeted per-user. Frontend maps events to targeted TanStack Query invalidations reusing existing key factories; one `RealtimeProvider` connection in `app-router.tsx`. Customer portal realtime deferred (endpoint 403s CUSTOMER). No schema change, no new dependency. Hosting caveat documented: Vercel serverless force-closes SSE at `maxDuration` — persistent Node host / Fluid Compute / managed provider is the production path. Not committed. Live Resend/WhatsApp/browser QA outstanding.

@@ -1,6 +1,7 @@
 import { TaskStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { createNotifications } from "../notifications/notification.service.js";
+import { withRealtimeOutbox } from "../realtime/realtime.publisher.js";
 
 /** Bounded batch per sweep so a backlog cannot stall the cron request. */
 export const TASK_REMINDER_BATCH_SIZE = 100;
@@ -21,6 +22,7 @@ export interface TaskReminderResult {
  * be reminded again after such an edit.
  */
 export async function runTaskReminders(now = new Date()): Promise<TaskReminderResult> {
+ return withRealtimeOutbox(async () => {
   const due = await prisma.task.findMany({
     where: {
       status: TaskStatus.OPEN,
@@ -58,4 +60,5 @@ export async function runTaskReminders(now = new Date()): Promise<TaskReminderRe
   }
 
   return { inspected: due.length, reminded, generatedAt: now.toISOString() };
+ });
 }

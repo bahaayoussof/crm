@@ -49,6 +49,21 @@ Expected categories:
 - The webhook needs a public **HTTPS** URL: `https://<api-domain>/api/integrations/whatsapp/webhook`. Subscribe the Meta app to the **`messages`** webhook field only. The hostname is never hard-coded in application logic.
 - Full setup steps: `docs/20-whatsapp-integration.md`.
 
+## Realtime events (SSE) — `feature/realtime-events`
+
+- `GET /api/realtime/events` is a long-lived `text/event-stream` response (25s
+  heartbeat comment, client auto-reconnect). No new env var, no schema change.
+- **Persistent Node host** (Render / Railway / Fly / container): full support.
+- **Vercel serverless**: each function invocation is bounded by `maxDuration`, so
+  the SSE response is force-closed at that limit and the client reconnects every
+  few minutes (functional, not ideal). For production realtime, run the API as a
+  persistent Node service, or use Vercel Fluid Compute with an extended
+  `maxDuration`, or replace the SSE transport with a managed realtime provider
+  (the `realtime.publisher` seam keeps domain code unchanged).
+- Set `X-Accel-Buffering: no` is sent by the endpoint; a buffering CDN/proxy in
+  front of the API would still delay events.
+- See `docs/22-realtime-events.md` and ADR-045.
+
 Never commit secrets.
 
 ## Resend EMAIL channel

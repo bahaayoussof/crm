@@ -35,8 +35,19 @@ vi.mock("../../config/prisma.js", () => ({
   },
 }));
 
+vi.mock("../realtime/realtime.publisher.js", () => ({
+  withRealtimeOutbox: (fn: () => unknown) => fn(),
+  emitTicketMessageCreated: vi.fn(),
+  emitTicketUpdated: vi.fn(),
+  emitNotificationCreated: vi.fn(),
+  emitNotificationRead: vi.fn(),
+}));
+
 import { app } from "../../app.js";
 import { createAccessToken } from "../auth/auth-token.js";
+import { emitNotificationCreated, emitNotificationRead } from "../realtime/realtime.publisher.js";
+const emitCreatedMock = vi.mocked(emitNotificationCreated);
+const emitReadMock = vi.mocked(emitNotificationRead);
 
 const token = (role: Role, id = role.toLowerCase()) => createAccessToken({ id, role });
 const auth = (role: Role, id?: string) => ({ Authorization: `Bearer ${token(role, id)}` });
@@ -67,6 +78,16 @@ describe("notifications API", () => {
     });
     mocks.notificationFindMany.mockResolvedValue([]);
     mocks.notificationCount.mockResolvedValue(0);
+  });
+
+  it("emits notification.read to the owner after marking one read", async () => {
+    mocks.notificationFindFirst.mockResolvedValue({ id: "c676b8bb84ce7267dd520deca", readAt: null });
+    mocks.notificationUpdate.mockResolvedValue({ id: "c676b8bb84ce7267dd520deca", readAt: new Date() });
+    const response = await request(app)
+      .patch("/api/notifications/c676b8bb84ce7267dd520deca/read")
+      .set(auth(Role.AGENT, "agent-1"));
+    expect(response.status).toBe(200);
+    expect(emitReadMock).toHaveBeenCalledWith("agent-1", "c676b8bb84ce7267dd520deca");
   });
 
   it("rejects a malformed notification id before database lookup", async () => {
@@ -251,6 +272,14 @@ describe("createNotifications (service unit)", () => {
     const txMock = { notification: { createMany: vi.fn() } };
     await createNotifications(txMock as never, [], "TYPE", "T", "M", "ticket-1");
     expect(txMock.notification.createMany).not.toHaveBeenCalled();
+    expect(emitCreatedMock).not.toHaveBeenCalled();
+  });
+
+  it("emits notification.created for the deduplicated recipient set", async () => {
+    const { createNotifications } = await import("./notification.service.js");
+    const txMock = { notification: { createMany: vi.fn().mockResolvedValue({ count: 2 }) } };
+    await createNotifications(txMock as never, ["u1", "u2", "u1"], "TYPE", "T", "M", "ticket-1");
+    expect(emitCreatedMock).toHaveBeenCalledWith(["u1", "u2"]);
   });
 
   it("stores ticketId on each notification", async () => {

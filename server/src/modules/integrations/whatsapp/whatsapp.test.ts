@@ -43,8 +43,17 @@ vi.mock("./whatsapp.client.js", async (importOriginal) => {
 });
 
 vi.mock("bcrypt", () => ({ default: { hash: vi.fn().mockResolvedValue("hashed") } }));
+vi.mock("../../realtime/realtime.publisher.js", () => ({
+  withRealtimeOutbox: (fn: () => unknown) => fn(),
+  emitTicketMessageCreated: vi.fn(),
+  emitTicketUpdated: vi.fn(),
+  emitNotificationCreated: vi.fn(),
+  emitNotificationRead: vi.fn(),
+}));
 
 import { app } from "../../../app.js";
+import { emitTicketMessageCreated } from "../../realtime/realtime.publisher.js";
+const emitMessageMock = vi.mocked(emitTicketMessageCreated);
 import { env } from "../../../config/env.js";
 import { WhatsappApiError } from "./whatsapp.client.js";
 import { deliverOutboundReply } from "./whatsapp.service.js";
@@ -228,6 +237,15 @@ describe("WhatsApp integration", () => {
         }),
       );
       expect(mocks.notificationCreateMany).toHaveBeenCalled();
+      expect(emitMessageMock).toHaveBeenCalledWith(
+        expect.objectContaining({ ticketId: "cd3448751688c18a75abee51f", visibility: "public" }),
+      );
+    });
+
+    it("does not emit ticket.message.created for a duplicate inbound webhook", async () => {
+      mocks.messageFindUnique.mockResolvedValue({ id: "existing" });
+      await send(textPayload());
+      expect(emitMessageMock).not.toHaveBeenCalled();
     });
 
     it("ignores invalid extracted sender data before persistence", async () => {

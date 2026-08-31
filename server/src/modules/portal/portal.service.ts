@@ -4,6 +4,7 @@ import { AppError } from "../../shared/errors/app-error.js";
 import { createNotifications } from "../notifications/notification.service.js";
 import { notifyWatchers, NOTIFICATION_WATCH_ACTIVITY } from "../collaboration/collaboration.service.js";
 import { sanitizeReplyHtml } from "../../shared/rich-text/reply-html.js";
+import { emitTicketMessageCreated, withRealtimeOutbox } from "../realtime/realtime.publisher.js";
 import type { PortalCreateTicketInput, PortalReplyInput, PortalStatus, PortalTicketListQuery } from "./portal.schema.js";
 
 const listSelect = { id: true, subject: true, status: true, category: { select: { id: true, name: true } }, createdAt: true, updatedAt: true } satisfies Prisma.TicketSelect;
@@ -94,7 +95,8 @@ export async function createTicket(input: PortalCreateTicketInput, userId: strin
 
 export async function reply(id: string, input: PortalReplyInput, userId: string) {
   const customerId = await customerIdFor(userId);
-  return prisma.$transaction(async (tx) => {
+  return withRealtimeOutbox(async () => {
+   const { result, assignedAgentId } = await prisma.$transaction(async (tx) => {
     const ticket = await tx.ticket.findFirst({ where: { id, customerId }, select: { id: true, status: true, subject: true, assignedAgentId: true } });
     if (!ticket) throw new AppError(404, "TICKET_NOT_FOUND", "Ticket not found");
     if (ticket.status === TicketStatus.CLOSED) throw new AppError(409, "TICKET_CLOSED", "Closed tickets do not accept replies");
@@ -137,7 +139,13 @@ export async function reply(id: string, input: PortalReplyInput, userId: string)
       excludeUserIds: filtered,
     });
 
-    return { id: message.id, body: message.body, createdAt: message.createdAt, author: { id: message.author.id, name: message.author.name, kind: "CUSTOMER" as const } };
+    return {
+      result: { id: message.id, body: message.body, createdAt: message.createdAt, author: { id: message.author.id, name: message.author.name, kind: "CUSTOMER" as const } },
+      assignedAgentId: ticket.assignedAgentId,
+    };
+   });
+   emitTicketMessageCreated({ ticketId: id, messageId: result.id, assignedAgentId, visibility: "public" });
+   return result;
   });
 }
 

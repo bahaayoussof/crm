@@ -12,6 +12,11 @@ import {
 import { deliverOutboundReply } from "../integrations/whatsapp/whatsapp.service.js";
 import { deliverEmailReply } from "../integrations/email/email.service.js";
 import { replyHtmlToPlainText, sanitizeReplyHtml } from "../../shared/rich-text/reply-html.js";
+import {
+  emitTicketMessageCreated,
+  emitTicketUpdated,
+  withRealtimeOutbox,
+} from "../realtime/realtime.publisher.js";
 import type { CreateTicketInput, TicketConversationInput, TicketListQuery, UpdateTicketInput } from "./ticket.schema.js";
 import { ticketVisibilityWhere, type TicketActor as Actor } from "./ticket-visibility.js";
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../audit-logs/audit-log.constants.js";
@@ -95,13 +100,14 @@ export async function getTicket(ticketId: string, actor: Actor, now = new Date()
 }
 
 export async function addTicketMessage(ticketId: string, input: TicketConversationInput, actor: Actor) {
+ return withRealtimeOutbox(async () => {
   const createdAt = new Date();
   const messageId = randomUUID();
   // Public replies are rich text from the Lexical composer. Sanitize to the
   // support-reply allowlist here — this is the trust boundary, not the client.
   const body = sanitizeReplyHtml(input.body);
   if (!body) throw new AppError(422, "EMPTY_MESSAGE", "Message body is required");
-  const { message, channel, customerPhone, emailExternalId } = await prisma.$transaction(async (tx) => {
+  const { message, channel, customerPhone, emailExternalId, assignedAgentId } = await prisma.$transaction(async (tx) => {
     const ticket = await requireConversationMutationAccess(tx, ticketId, actor);
     let emailExternalId: string | null = null;
     if (ticket.channel === Channel.EMAIL) {
@@ -146,8 +152,13 @@ export async function addTicketMessage(ticketId: string, input: TicketConversati
       channel: ticket.channel,
       customerPhone: ticket.customer?.phone ?? null,
       emailExternalId,
+      assignedAgentId: ticket.assignedAgentId,
     };
   });
+
+  // Persistence committed — signal connected clients (transaction-safe: buffered
+  // by withRealtimeOutbox, flushed when this function resolves).
+  emitTicketMessageCreated({ ticketId, messageId: message.id, assignedAgentId, visibility: "public" });
 
   // Outbound transport for WhatsApp-originated tickets. The message is already
   // committed above, so a delivery failure never corrupts the conversation — it
@@ -166,6 +177,7 @@ export async function addTicketMessage(ticketId: string, input: TicketConversati
     return { ...message, delivery: { channel: "EMAIL", status: "SENT", externalId: emailExternalId! } as const };
   }
   return message;
+ });
 }
 
 export async function addTicketNote(ticketId: string, input: TicketConversationInput, actor: Actor) {
@@ -174,7 +186,8 @@ export async function addTicketNote(ticketId: string, input: TicketConversationI
   // the `@[Name](userId)` mention tokens are plain text and survive intact.
   const body = sanitizeReplyHtml(input.body);
   if (!body) throw new AppError(422, "EMPTY_MESSAGE", "Note body is required");
-  return prisma.$transaction(async (tx) => {
+  return withRealtimeOutbox(async () => {
+   const result = await prisma.$transaction(async (tx) => {
     const ticket = await requireConversationMutationAccess(tx, ticketId, actor);
     const note = await tx.ticketNote.create({
       data: { ticketId, authorUserId: actor.userId, body },
@@ -198,7 +211,15 @@ export async function addTicketNote(ticketId: string, input: TicketConversationI
       message: `${note.author.name} added an internal note on ticket #${ticketId}: ${ticket.subject}`,
       excludeUserIds: mentionedIds,
     });
-    return { ...note, kind: "INTERNAL_NOTE" as const };
+    return { note: { ...note, kind: "INTERNAL_NOTE" as const }, assignedAgentId: ticket.assignedAgentId };
+   });
+   emitTicketMessageCreated({
+     ticketId,
+     messageId: result.note.id,
+     assignedAgentId: result.assignedAgentId,
+     visibility: "internal",
+   });
+   return result.note;
   });
 }
 
@@ -206,7 +227,8 @@ export async function createTicket(input: CreateTicketInput, actor: Actor, reque
   if (actor.role === Role.AGENT && input.assignedAgentId !== undefined) throw forbidden("Agents cannot choose a ticket assignee");
   const creationInput: CreateTicketInput = actor.role === Role.AGENT ? { ...input, assignedAgentId: actor.userId } : input;
   const now = new Date();
-  return prisma.$transaction(async (tx) => {
+  return withRealtimeOutbox(async () => {
+   const ticket = await prisma.$transaction(async (tx) => {
     const relations = await validateRelations(tx, creationInput);
     const sla = await tx.slaRule.findFirst({ where: { priority: creationInput.priority, isActive: true } });
     const ticket = await tx.ticket.create({
@@ -229,12 +251,16 @@ export async function createTicket(input: CreateTicketInput, actor: Actor, reque
       }
     }
     return ticket;
+   });
+   emitTicketUpdated({ ticketId: ticket.id, assignedAgentId: ticket.assignedAgent?.id ?? null });
+   return ticket;
   });
 }
 
 export async function updateTicket(ticketId: string, input: UpdateTicketInput, actor: Actor, requestContext?: AuditRequestContext) {
   const now = new Date();
-  return prisma.$transaction(async (tx) => {
+  return withRealtimeOutbox(async () => {
+   const { updated, changed } = await prisma.$transaction(async (tx) => {
     const current = await tx.ticket.findFirst({
       where: { id: ticketId, ...ticketVisibilityWhere(actor) },
       select: { id: true, subject: true, description: true, status: true, priority: true, categoryId: true, assignedAgentId: true, departmentId: true, branchId: true, firstRespondedAt: true, category: { select: { name: true } }, assignedAgent: { select: { name: true } } },
@@ -326,7 +352,20 @@ export async function updateTicket(ticketId: string, input: UpdateTicketInput, a
       });
     }
 
-    return updated;
+    const changed =
+      (input.subject !== undefined && input.subject !== current.subject) ||
+      (input.description !== undefined && input.description !== current.description) ||
+      (input.priority !== undefined && input.priority !== current.priority) ||
+      (input.status !== undefined && input.status !== current.status) ||
+      (input.categoryId !== undefined && input.categoryId !== current.categoryId) ||
+      (input.assignedAgentId !== undefined && input.assignedAgentId !== current.assignedAgentId) ||
+      (input.departmentId !== undefined && input.departmentId !== current.departmentId) ||
+      (input.branchId !== undefined && input.branchId !== current.branchId);
+    return { updated, changed };
+   });
+   // Only signal when visible ticket state actually changed — a no-op PATCH stays quiet.
+   if (changed) emitTicketUpdated({ ticketId, assignedAgentId: updated.assignedAgent?.id ?? null });
+   return updated;
   });
 }
 
