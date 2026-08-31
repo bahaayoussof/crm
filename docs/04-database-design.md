@@ -196,7 +196,6 @@ P2 unless time allows.
 - CUSTOMER
 
 ### TicketStatus
-- NEW
 - OPEN
 - IN_PROGRESS
 - WAITING_CUSTOMER

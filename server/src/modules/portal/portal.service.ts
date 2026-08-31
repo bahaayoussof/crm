@@ -13,11 +13,11 @@ const listSelect = { id: true, subject: true, status: true, category: { select: 
 const ticketListSelect = { ...listSelect, priority: true } satisfies Prisma.TicketSelect;
 const messageSelect = { id: true, body: true, createdAt: true, author: { select: { id: true, name: true, role: true } } } satisfies Prisma.TicketMessageSelect;
 const statusMap: Record<TicketStatus, PortalStatus> = {
-  NEW: "OPEN", OPEN: "OPEN", IN_PROGRESS: "IN_PROGRESS", ESCALATED: "IN_PROGRESS",
+  OPEN: "OPEN", IN_PROGRESS: "IN_PROGRESS", ESCALATED: "IN_PROGRESS",
   WAITING_CUSTOMER: "WAITING_FOR_YOU", RESOLVED: "RESOLVED", CLOSED: "CLOSED",
 };
 const storedStatuses: Record<PortalStatus, TicketStatus[]> = {
-  OPEN: [TicketStatus.NEW, TicketStatus.OPEN], IN_PROGRESS: [TicketStatus.IN_PROGRESS, TicketStatus.ESCALATED],
+  OPEN: [TicketStatus.OPEN], IN_PROGRESS: [TicketStatus.IN_PROGRESS, TicketStatus.ESCALATED],
   WAITING_FOR_YOU: [TicketStatus.WAITING_CUSTOMER], RESOLVED: [TicketStatus.RESOLVED], CLOSED: [TicketStatus.CLOSED],
 };
 
@@ -31,7 +31,7 @@ const ticketItem = <T extends { status: TicketStatus }>(ticket: T) => ({ ...tick
 export async function overview(userId: string) {
   const customerId = await customerIdFor(userId);
   const [open, waitingForYou, resolved, recent] = await prisma.$transaction([
-    prisma.ticket.count({ where: { customerId, status: { in: [TicketStatus.NEW, TicketStatus.OPEN, TicketStatus.IN_PROGRESS, TicketStatus.ESCALATED] } } }),
+    prisma.ticket.count({ where: { customerId, status: { in: [TicketStatus.OPEN, TicketStatus.IN_PROGRESS, TicketStatus.ESCALATED] } } }),
     prisma.ticket.count({ where: { customerId, status: TicketStatus.WAITING_CUSTOMER } }),
     prisma.ticket.count({ where: { customerId, status: TicketStatus.RESOLVED } }),
     prisma.ticket.findMany({ where: { customerId }, take: 5, orderBy: [{ updatedAt: "desc" }, { id: "asc" }], select: listSelect }),
@@ -83,12 +83,12 @@ export async function createTicket(input: PortalCreateTicketInput, userId: strin
     }
     const sla = await tx.slaRule.findFirst({ where: { priority: TicketPriority.MEDIUM, isActive: true } });
     const ticket = await tx.ticket.create({ data: { subject: input.subject, description: input.description, categoryId: input.categoryId ?? null,
-      customerId, status: TicketStatus.NEW, priority: TicketPriority.MEDIUM, channel: Channel.WEB,
+      customerId, status: TicketStatus.OPEN, priority: TicketPriority.MEDIUM, channel: Channel.WEB,
       assignedAgentId: null, departmentId: null, branchId: null, createdAt: now,
       firstResponseDueAt: sla ? addMinutes(now, sla.firstResponseMinutes) : null,
       resolutionDueAt: sla ? addMinutes(now, sla.resolutionMinutes) : null,
     }, select: listSelect });
-    await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorUserId: userId, action: "TICKET_CREATED", newValue: TicketStatus.NEW } });
+    await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorUserId: userId, action: "TICKET_CREATED", newValue: TicketStatus.OPEN } });
     return ticketItem(ticket);
   });
 }

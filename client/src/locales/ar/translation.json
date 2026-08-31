@@ -191,7 +191,7 @@
       "roles": { "ADMIN": "مسؤول", "MANAGER": "مدير", "AGENT": "وكيل دعم", "CUSTOMER": "عميل" }
     },
     "columns": { "id": "المعرّف", "ticket": "التذكرة" },
-    "status": { "NEW": "جديدة", "OPEN": "مفتوحة", "IN_PROGRESS": "قيد التنفيذ", "WAITING_CUSTOMER": "بانتظار العميل", "RESOLVED": "تم حلها", "CLOSED": "مغلقة", "ESCALATED": "مصعّدة" },
+    "status": { "OPEN": "مفتوحة", "IN_PROGRESS": "قيد التنفيذ", "WAITING_CUSTOMER": "بانتظار العميل", "RESOLVED": "تم حلها", "CLOSED": "مغلقة", "ESCALATED": "مصعّدة" },
     "priority": { "LOW": "منخفضة", "MEDIUM": "متوسطة", "HIGH": "عالية", "URGENT": "عاجلة" },
     "channel": { "WEB": "الويب", "EMAIL": "البريد الإلكتروني", "WHATSAPP": "واتساب", "SMS": "رسالة نصية", "LIVE_CHAT": "محادثة مباشرة" },
     "historyActions": { "TICKET_CREATED": "تم إنشاء التذكرة", "STATUS_CHANGED": "تم تغيير الحالة", "PRIORITY_CHANGED": "تم تغيير الأولوية", "ASSIGNMENT_CHANGED": "تم تغيير الموظف المسؤول", "CATEGORY_CHANGED": "تم تغيير التصنيف", "WHATSAPP_DELIVERY_FAILED": "فشل التسليم عبر واتساب" },

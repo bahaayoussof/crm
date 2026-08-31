@@ -1229,3 +1229,31 @@ Server-side changes (customer email/WhatsApp/portal replies, ticket status/assig
 
 - No schema change, no new dependency, no change to any existing mutation API.
 - **Hosting:** persistent Node hosts support the long-lived SSE response fully. On Vercel serverless the connection is force-closed at `maxDuration` and the client reconnects each cycle — functional but not recommended for production realtime; a persistent Node host, Vercel Fluid Compute, or a managed realtime provider (via the publisher seam) is the production path. No hosting migration was done in this task; the limitation is documented, not hidden. Production readiness for realtime is not claimed until the API runs on a long-lived-response host.
+
+---
+
+# ADR-046: Ticket Workflow Simplification — Removal of `NEW` Status and Making `OPEN` Canonical Default
+
+**Status:** Accepted (implemented and verified; uncommitted)
+
+## Context
+
+The previous ticket lifecycle included a redundant `NEW` status that created unnecessary workflow complexity (`NEW → OPEN → IN_PROGRESS ...`). Across the internal CRM, Customer Portal, WhatsApp, and Email integrations, incoming tickets were initially `NEW` before being manually or automatically transitioned to `OPEN`.
+
+## Decision
+
+- **Lifecycle Streamlining:** Eliminate `NEW` completely from the system. `OPEN` becomes the initial, default ticket status across all channels (Internal CRM, Customer Portal, WhatsApp, Email).
+- **Simplified Transitions:**
+  - `OPEN → IN_PROGRESS`, `OPEN → RESOLVED`, `OPEN → ESCALATED`
+  - `IN_PROGRESS → WAITING_CUSTOMER`, `IN_PROGRESS → RESOLVED`, `IN_PROGRESS → ESCALATED`
+  - `WAITING_CUSTOMER → IN_PROGRESS`, `WAITING_CUSTOMER → RESOLVED`, `WAITING_CUSTOMER → ESCALATED`
+  - `RESOLVED → CLOSED`, `RESOLVED → IN_PROGRESS` (when reopening)
+  - `CLOSED → []`
+  - `ESCALATED → IN_PROGRESS`
+- **Database Migration:** Data migration safely converts any existing `Ticket` records with `status = 'NEW'` to `'OPEN'` before dropping and recreating the PostgreSQL `TicketStatus` enum without `NEW`.
+- **Frontend & UI:** Removed `NEW` from filter dropdowns, table badges, status themes, charts, translations, and sidebar transition selectors.
+
+## Consequences
+
+- No breaking change to external ticket APIs besides rejecting `NEW` as a valid status value.
+- Simplified operational model for agents and managers without triage overhead between `NEW` and `OPEN`.

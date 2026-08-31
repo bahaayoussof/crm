@@ -14,7 +14,6 @@ import type { DashboardOverview } from "../dashboard.types";
 
 /** Statuses that represent live, in-flight work — the donut only ever charts these. */
 const ACTIVE_STATUSES: readonly TicketStatus[] = [
-  "NEW",
   "OPEN",
   "IN_PROGRESS",
   "WAITING_CUSTOMER",

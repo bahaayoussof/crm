@@ -191,7 +191,7 @@
       "roles": { "ADMIN": "Admin", "MANAGER": "Manager", "AGENT": "Agent", "CUSTOMER": "Customer" }
     },
     "columns": { "id": "ID", "ticket": "Ticket" },
-    "status": { "NEW": "New", "OPEN": "Open", "IN_PROGRESS": "In progress", "WAITING_CUSTOMER": "Waiting for customer", "RESOLVED": "Resolved", "CLOSED": "Closed", "ESCALATED": "Escalated" },
+    "status": { "OPEN": "Open", "IN_PROGRESS": "In progress", "WAITING_CUSTOMER": "Waiting for customer", "RESOLVED": "Resolved", "CLOSED": "Closed", "ESCALATED": "Escalated" },
     "priority": { "LOW": "Low", "MEDIUM": "Medium", "HIGH": "High", "URGENT": "Urgent" },
     "channel": { "WEB": "Web", "EMAIL": "Email", "WHATSAPP": "WhatsApp", "SMS": "SMS", "LIVE_CHAT": "Live chat" },
     "historyActions": { "TICKET_CREATED": "Ticket created", "STATUS_CHANGED": "Status changed", "PRIORITY_CHANGED": "Priority changed", "ASSIGNMENT_CHANGED": "Assignment changed", "CATEGORY_CHANGED": "Category changed", "WHATSAPP_DELIVERY_FAILED": "WhatsApp delivery failed" },

@@ -538,7 +538,7 @@ function DescriptionBody({ description }: { description: string }) {
 }
 
 function displayValue(value: string, t: TFunction) {
-  if (["NEW", "OPEN", "IN_PROGRESS", "WAITING_CUSTOMER", "RESOLVED", "CLOSED", "ESCALATED"].includes(value))
+  if (["OPEN", "IN_PROGRESS", "WAITING_CUSTOMER", "RESOLVED", "CLOSED", "ESCALATED"].includes(value))
     return t(`tickets.status.${value}`);
   if (["LOW", "MEDIUM", "HIGH", "URGENT"].includes(value)) return t(`tickets.priority.${value}`);
   return value;

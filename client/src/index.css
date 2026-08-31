@@ -99,6 +99,7 @@
   --icon-active: #171717;
 
   /* Semantic Feedback (Light) */
+
   --success: #16A34A;
   --success-hover: #15803D;
   --success-foreground: #15803D;
@@ -245,6 +246,7 @@
   --icon-active: #FFFFFF;
 
   /* Semantic Feedback (Dark) */
+
   --success: #16A34A;
   --success-hover: #22C55E;
   --success-foreground: #4ADE80;
@@ -379,6 +381,7 @@
   --color-icon: var(--icon);
   --color-icon-muted: var(--icon-muted);
   --color-icon-active: var(--icon-active);
+
 
   --color-success: var(--success);
   --color-success-hover: var(--success-hover);

@@ -569,12 +569,11 @@ export async function seedTestData() {
 
     // Status distribution
     let status: TicketStatus;
-    if (i % 7 === 0) status = TicketStatus.NEW;
-    else if (i % 7 === 1) status = TicketStatus.OPEN;
-    else if (i % 7 === 2) status = TicketStatus.IN_PROGRESS;
-    else if (i % 7 === 3) status = TicketStatus.WAITING_CUSTOMER;
-    else if (i % 7 === 4) status = TicketStatus.RESOLVED;
-    else if (i % 7 === 5) status = TicketStatus.CLOSED;
+    if (i % 6 === 0) status = TicketStatus.OPEN;
+    else if (i % 6 === 1) status = TicketStatus.IN_PROGRESS;
+    else if (i % 6 === 2) status = TicketStatus.WAITING_CUSTOMER;
+    else if (i % 6 === 3) status = TicketStatus.RESOLVED;
+    else if (i % 6 === 4) status = TicketStatus.CLOSED;
     else status = TicketStatus.ESCALATED;
 
     // Priority distribution
@@ -593,7 +592,7 @@ export async function seedTestData() {
 
     // Assignment distribution
     let assignedAgentId: string | null = null;
-    if (status !== TicketStatus.NEW) {
+    if (status !== TicketStatus.OPEN) {
       if (i % 8 === 0) {
         assignedAgentId = null; // Unassigned in progress/open
       } else if (i % 5 === 0) {
@@ -621,7 +620,7 @@ export async function seedTestData() {
     let resolvedAt: Date | null = null;
     let closedAt: Date | null = null;
 
-    if (status !== TicketStatus.NEW) {
+    if (status !== TicketStatus.OPEN) {
       firstRespondedAt = new Date(createdAt.getTime() + Math.min(firstResponseMins * 0.5, 45) * 60_000);
     }
     if (status === TicketStatus.RESOLVED || status === TicketStatus.CLOSED) {

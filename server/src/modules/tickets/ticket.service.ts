@@ -33,11 +33,10 @@ const ticketSummarySelect = {
 } satisfies Prisma.TicketSelect;
 
 const transitions: Record<TicketStatus, TicketStatus[]> = {
-  NEW: [TicketStatus.OPEN, TicketStatus.ESCALATED],
-  OPEN: [TicketStatus.IN_PROGRESS, TicketStatus.ESCALATED],
+  OPEN: [TicketStatus.IN_PROGRESS, TicketStatus.RESOLVED, TicketStatus.ESCALATED],
   IN_PROGRESS: [TicketStatus.WAITING_CUSTOMER, TicketStatus.RESOLVED, TicketStatus.ESCALATED],
   WAITING_CUSTOMER: [TicketStatus.IN_PROGRESS, TicketStatus.RESOLVED, TicketStatus.ESCALATED],
-  RESOLVED: [TicketStatus.CLOSED],
+  RESOLVED: [TicketStatus.CLOSED, TicketStatus.IN_PROGRESS],
   CLOSED: [],
   ESCALATED: [TicketStatus.IN_PROGRESS],
 };
@@ -241,7 +240,7 @@ export async function createTicket(input: CreateTicketInput, actor: Actor, reque
       },
       select: ticketSummarySelect,
     });
-    await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorUserId: actor.userId, action: "TICKET_CREATED", newValue: TicketStatus.NEW } });
+    await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorUserId: actor.userId, action: "TICKET_CREATED", newValue: TicketStatus.OPEN } });
     await createAuditLog({ actorId: actor.userId, action: AUDIT_ACTIONS.TICKET_CREATED, entityType: AUDIT_ENTITY_TYPES.TICKET, entityId: ticket.id, changes: { status: { to: ticket.status }, priority: { to: ticket.priority }, categoryId: { to: creationInput.categoryId ?? null }, assignedAgentId: { to: creationInput.assignedAgentId ?? null } }, requestContext }, tx);
     if (creationInput.assignedAgentId) await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorUserId: actor.userId, action: "ASSIGNMENT_CHANGED", newValue: relations.agent?.name ?? creationInput.assignedAgentId } });
     if (creationInput.categoryId) await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorUserId: actor.userId, action: "CATEGORY_CHANGED", newValue: relations.category?.name ?? creationInput.categoryId } });

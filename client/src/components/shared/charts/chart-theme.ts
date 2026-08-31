@@ -20,7 +20,6 @@ export const CANONICAL_PRIORITY_ORDER: readonly TicketPriority[] = [
  * Semantic CSS variable mappings matching ticket badges and app alerts.
  */
 export const STATUS_CHART_COLORS: Record<TicketStatus, string> = {
-  NEW: "#06B6D4",
   OPEN: "var(--info)",
   IN_PROGRESS: "var(--progress)",
   WAITING_CUSTOMER: "var(--warning)",

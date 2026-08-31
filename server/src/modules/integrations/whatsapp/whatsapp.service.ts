@@ -25,7 +25,6 @@ import { normalizePhoneNumber } from "../../../shared/utils/phone.js";
 
 // Non-terminal statuses — an incoming message joins one of these, otherwise a new ticket opens.
 const ACTIVE_TICKET_STATUSES = [
-  TicketStatus.NEW,
   TicketStatus.OPEN,
   TicketStatus.IN_PROGRESS,
   TicketStatus.WAITING_CUSTOMER,
@@ -128,7 +127,7 @@ async function createWhatsappTicket(
       subject: deriveSubject(firstText),
       description: firstText,
       customerId,
-      status: TicketStatus.NEW,
+      status: TicketStatus.OPEN,
       priority: TicketPriority.MEDIUM,
       channel: Channel.WHATSAPP,
       assignedAgentId: null,
@@ -139,7 +138,7 @@ async function createWhatsappTicket(
     select: { id: true, status: true, subject: true, assignedAgentId: true },
   });
   await tx.ticketHistory.create({
-    data: { ticketId: ticket.id, actorUserId: null, action: "TICKET_CREATED", newValue: TicketStatus.NEW },
+    data: { ticketId: ticket.id, actorUserId: null, action: "TICKET_CREATED", newValue: TicketStatus.OPEN },
   });
   return ticket;
 }

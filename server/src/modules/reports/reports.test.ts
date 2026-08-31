@@ -41,7 +41,7 @@ const t1 = ticket({ id: "t1", status: TicketStatus.RESOLVED, priority: TicketPri
 const t2 = ticket({ id: "t2", status: TicketStatus.OPEN, priority: TicketPriority.HIGH, assignedAgentId: "a1", categoryId: "c1",
   createdAt: d("2026-08-10T00:00:00.000Z"), firstResponseDueAt: d("2026-08-10T01:00:00.000Z"), firstRespondedAt: d("2026-08-10T02:00:00.000Z"),
   resolutionDueAt: d("2026-08-11T00:00:00.000Z") });
-const t3 = ticket({ id: "t3", status: TicketStatus.NEW, priority: TicketPriority.LOW, assignedAgentId: "a2", categoryId: null,
+const t3 = ticket({ id: "t3", status: TicketStatus.IN_PROGRESS, priority: TicketPriority.LOW, assignedAgentId: "a2", categoryId: null,
   createdAt: d("2026-08-20T00:00:00.000Z"), firstResponseDueAt: d("2026-08-27T18:00:00.000Z"),
   resolutionDueAt: d("2026-08-28T00:00:00.000Z") });
 const t4 = ticket({ id: "t4", status: TicketStatus.CLOSED, priority: TicketPriority.URGENT, assignedAgentId: "a2", categoryId: "c1",
@@ -114,7 +114,7 @@ describe("reports overview", () => {
       { rating: 1, count: 0 }, { rating: 2, count: 1 }, { rating: 3, count: 0 }, { rating: 4, count: 2 }, { rating: 5, count: 1 },
     ]);
     expect(result.statusDistribution).toEqual([
-      { status: "NEW", count: 1 }, { status: "OPEN", count: 1 }, { status: "RESOLVED", count: 1 },
+      { status: "IN_PROGRESS", count: 1 }, { status: "OPEN", count: 1 }, { status: "RESOLVED", count: 1 },
     ]);
   });
 

@@ -7,11 +7,10 @@ import { useAgents, useCategories, useUpdateTicket } from "./ticket-hooks";
 import type { SlaState, TicketDetail, TicketPriority, TicketStatus } from "./ticket.types";
 
 const normalTransitions: Record<TicketStatus, TicketStatus[]> = {
-  NEW: ["OPEN"],
-  OPEN: ["IN_PROGRESS"],
+  OPEN: ["IN_PROGRESS", "RESOLVED"],
   IN_PROGRESS: ["WAITING_CUSTOMER", "RESOLVED"],
   WAITING_CUSTOMER: ["IN_PROGRESS", "RESOLVED"],
-  RESOLVED: [],
+  RESOLVED: ["CLOSED", "IN_PROGRESS"],
   CLOSED: [],
   ESCALATED: [],
 };
@@ -82,7 +81,7 @@ function PropertiesSection({
 
   const availableStatuses = [
     ...normalTransitions[record.status],
-    ...(canManage && ["NEW", "OPEN", "IN_PROGRESS", "WAITING_CUSTOMER"].includes(record.status)
+    ...(canManage && ["OPEN", "IN_PROGRESS", "WAITING_CUSTOMER"].includes(record.status)
       ? ["ESCALATED" as TicketStatus]
       : []),
     ...(canManage && record.status === "ESCALATED" ? ["IN_PROGRESS" as TicketStatus] : []),

@@ -3,7 +3,7 @@ import { prisma } from "../../config/prisma.js";
 import { deriveSla, SLA_WARNING_MINUTES } from "../../shared/sla/derive-sla.js";
 import { ticketVisibilityWhere, type TicketActor } from "../tickets/ticket-visibility.js";
 
-export const ACTIVE_STATUSES = [TicketStatus.NEW, TicketStatus.OPEN, TicketStatus.IN_PROGRESS, TicketStatus.WAITING_CUSTOMER, TicketStatus.ESCALATED] as const;
+export const ACTIVE_STATUSES = [TicketStatus.OPEN, TicketStatus.IN_PROGRESS, TicketStatus.WAITING_CUSTOMER, TicketStatus.ESCALATED] as const;
 
 /** Rolling window (inclusive of today) for the dashboard opened/resolved activity series. */
 export const ACTIVITY_WINDOW_DAYS = 30;

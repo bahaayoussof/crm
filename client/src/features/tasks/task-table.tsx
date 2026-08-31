@@ -104,14 +104,6 @@ export function TaskTable({
             >
               {row.original.title}
             </Link>
-            {row.original.ticket && (
-              <Link
-                className="mt-0.5 inline-block text-xs text-muted-foreground hover:underline"
-                to={`/tickets/${row.original.ticket.id}`}
-              >
-                {t("tasks.linkedTicket")}: {row.original.ticket.subject}
-              </Link>
-            )}
           </div>
         ),
       },

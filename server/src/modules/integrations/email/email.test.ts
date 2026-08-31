@@ -118,7 +118,7 @@ describe("Resend email integration", () => {
     mocks.ticketFindFirst.mockResolvedValue(null);
     mocks.ticketFindMany.mockResolvedValue([]);
     mocks.ticketCreate.mockResolvedValue({
-      id: "ticket-1", status: "NEW", subject: "Need help", assignedAgentId: null, emailThreadToken: "token-1",
+      id: "ticket-1", status: "OPEN", subject: "Need help", assignedAgentId: null, emailThreadToken: "token-1",
     });
     mocks.ticketUpdate.mockResolvedValue({});
     mocks.slaFindFirst.mockResolvedValue(null);

@@ -16,7 +16,7 @@ import { TicketFiltersPopover } from "./ticket-filters-popover";
 import type { TicketPriority, TicketStatus } from "./ticket.types";
 import { TicketPage, TicketState } from "./ticket-ui";
 
-const statuses: TicketStatus[] = ["NEW", "OPEN", "IN_PROGRESS", "WAITING_CUSTOMER", "RESOLVED", "CLOSED", "ESCALATED"];
+const statuses: TicketStatus[] = ["OPEN", "IN_PROGRESS", "WAITING_CUSTOMER", "RESOLVED", "CLOSED", "ESCALATED"];
 const priorities: TicketPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 
 export function TicketListPage() {

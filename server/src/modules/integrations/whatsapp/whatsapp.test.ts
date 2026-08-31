@@ -137,7 +137,7 @@ describe("WhatsApp integration", () => {
     mocks.customerFindUnique.mockResolvedValue(null);
     mocks.customerCreate.mockResolvedValue({ id: "cust-new" });
     mocks.ticketFindFirst.mockResolvedValue(null);
-    mocks.ticketCreate.mockResolvedValue({ id: "cd3448751688c18a75abee51f", status: "NEW", subject: "WhatsApp: Hello", assignedAgentId: null });
+    mocks.ticketCreate.mockResolvedValue({ id: "cd3448751688c18a75abee51f", status: "OPEN", subject: "WhatsApp: Hello", assignedAgentId: null });
     mocks.ticketUpdate.mockResolvedValue({ id: "c737ce60fccf9da889f4605c0" });
     mocks.historyCreate.mockResolvedValue({});
     mocks.slaFindFirst.mockResolvedValue({ firstResponseMinutes: 60, resolutionMinutes: 1440 });

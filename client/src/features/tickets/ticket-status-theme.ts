@@ -4,7 +4,6 @@ import type { TicketStatus } from "@/features/tickets/ticket.types";
  * Single canonical status order across all ticket tables, details, filters, and charts.
  */
 export const CANONICAL_STATUS_ORDER: readonly TicketStatus[] = [
-  "NEW",
   "OPEN",
   "IN_PROGRESS",
   "WAITING_CUSTOMER",
@@ -17,7 +16,6 @@ export const CANONICAL_STATUS_ORDER: readonly TicketStatus[] = [
  * Canonical visual representation for each ticket status.
  *
  * Distinct roles:
- * - NEW: Incoming fresh ticket (Cyan / Sky) - distinctly active and visible, not neutral/closed
  * - OPEN: Triage / queued (Blue / Info)
  * - IN_PROGRESS: Working (Purple / Progress)
  * - WAITING_CUSTOMER: Pending customer response (Amber / Warning)
@@ -33,12 +31,6 @@ export interface StatusThemeConfig {
 }
 
 export const CANONICAL_STATUS_THEME: Record<TicketStatus, StatusThemeConfig> = {
-  NEW: {
-    badgeVariant: "info",
-    badgeCustomClass: "border-cyan-500/25 bg-cyan-50 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300 dark:border-cyan-500/30",
-    chartColor: "#06B6D4", // Cyan-500
-    dotColor: "bg-cyan-500",
-  },
   OPEN: {
     badgeVariant: "info",
     chartColor: "var(--info)",

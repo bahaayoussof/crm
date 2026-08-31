@@ -6,7 +6,6 @@ const DAY_MS = 86_400_000;
 
 /** Statuses that still count as unresolved work. */
 const ACTIVE_STATUSES: TicketStatus[] = [
-  TicketStatus.NEW,
   TicketStatus.OPEN,
   TicketStatus.IN_PROGRESS,
   TicketStatus.WAITING_CUSTOMER,

@@ -15,7 +15,6 @@ enum Role {
 }
 
 enum TicketStatus {
-  NEW
   OPEN
   IN_PROGRESS
   WAITING_CUSTOMER
@@ -106,7 +105,7 @@ model Ticket {
   id                 String         @id @default(cuid())
   subject            String
   description        String
-  status             TicketStatus   @default(NEW)
+  status             TicketStatus   @default(OPEN)
   priority           TicketPriority @default(MEDIUM)
   channel            Channel        @default(WEB)
   customerId         String

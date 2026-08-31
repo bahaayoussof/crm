@@ -18,7 +18,6 @@ import type { EmailDeliveryResult, InboundEmailEvent, ReceivedEmail } from "./em
 const SYSTEM_USER_EMAIL = "email-inbound@system.invalid";
 const SYSTEM_USER_NAME = "Email Customer";
 const ACTIVE_STATUSES = [
-  TicketStatus.NEW,
   TicketStatus.OPEN,
   TicketStatus.IN_PROGRESS,
   TicketStatus.WAITING_CUSTOMER,
@@ -112,7 +111,7 @@ async function createEmailTicket(
       customerId,
       channel: Channel.EMAIL,
       priority: TicketPriority.MEDIUM,
-      status: TicketStatus.NEW,
+      status: TicketStatus.OPEN,
       emailThreadToken: randomBytes(18).toString("base64url"),
       createdAt: now,
       firstResponseDueAt: sla ? addMinutes(now, sla.firstResponseMinutes) : null,
@@ -121,7 +120,7 @@ async function createEmailTicket(
     select: { id: true, status: true, subject: true, assignedAgentId: true, emailThreadToken: true },
   });
   await tx.ticketHistory.create({
-    data: { ticketId: ticket.id, actorUserId: null, action: "TICKET_CREATED", newValue: TicketStatus.NEW },
+    data: { ticketId: ticket.id, actorUserId: null, action: "TICKET_CREATED", newValue: TicketStatus.OPEN },
   });
   return ticket;
 }

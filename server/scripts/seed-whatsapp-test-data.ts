@@ -188,13 +188,20 @@ async function seedTicket(spec: SeedTicket, ctx: { systemUserId: string; agent: 
   });
 
   const history: { action: string; oldValue: string | null; newValue: string | null; actorUserId: string | null; createdAt: Date }[] = [
-    { action: "TICKET_CREATED", oldValue: null, newValue: TicketStatus.NEW, actorUserId: null, createdAt },
+    { action: "TICKET_CREATED", oldValue: null, newValue: TicketStatus.OPEN, actorUserId: null, createdAt },
   ];
   if (spec.assignAgent) {
     history.push({ action: "ASSIGNMENT_CHANGED", oldValue: null, newValue: ctx.agent.name, actorUserId: ctx.agent.id, createdAt: minutesAfter(createdAt, 1) });
   }
-  if (spec.status !== TicketStatus.NEW) {
-    history.push({ action: "STATUS_CHANGED", oldValue: TicketStatus.NEW, newValue: spec.status, actorUserId: spec.assignAgent ? ctx.agent.id : null, createdAt: minutesAfter(createdAt, 2) });
+  // If the target status is not OPEN, record the transition in history
+  if (spec.status !== TicketStatus.OPEN) {
+    history.push({
+      action: "STATUS_CHANGED",
+      oldValue: TicketStatus.OPEN,
+      newValue: spec.status,
+      actorUserId: spec.assignAgent ? ctx.agent.id : null,
+      createdAt: minutesAfter(createdAt, 2),
+    });
   }
   await prisma.ticketHistory.createMany({ data: history.map((h) => ({ ...h, ticketId: ticket.id })) });
 

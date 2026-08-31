@@ -60,11 +60,11 @@ const otherAgent = { id: "cc3544aa158a89417843d45b3", role: Role.AGENT };
 const auth = (identity = admin) => ({ Authorization: `Bearer ${createAccessToken(identity)}` });
 const now = new Date("2026-08-25T08:00:00.000Z");
 const summary = {
-  id: "c737ce60fccf9da889f4605c0", subject: "Payment failed", status: TicketStatus.NEW, priority: TicketPriority.HIGH, channel: "WEB",
+  id: "c737ce60fccf9da889f4605c0", subject: "Payment failed", status: TicketStatus.OPEN, priority: TicketPriority.HIGH, channel: "WEB",
   firstResponseDueAt: null, firstRespondedAt: null, resolutionDueAt: null, createdAt: now, updatedAt: now,
   customer: { id: "ce83f10dcd2c68747c3f3ba14", name: "Ahmed", email: "ahmed@example.com" }, assignedAgent: null, category: null,
 };
-const current = { id: summary.id, subject: summary.subject, description: "Issue", status: TicketStatus.NEW, priority: TicketPriority.HIGH, categoryId: null, assignedAgentId: null, departmentId: null, branchId: null, firstRespondedAt: null, category: null, assignedAgent: null };
+const current = { id: summary.id, subject: summary.subject, description: "Issue", status: TicketStatus.OPEN, priority: TicketPriority.HIGH, categoryId: null, assignedAgentId: null, departmentId: null, branchId: null, firstRespondedAt: null, category: null, assignedAgent: null };
 
 describe("ticket API", () => {
   beforeEach(() => {
@@ -106,10 +106,10 @@ describe("ticket API", () => {
 
   it("lists with pagination, search, status, and priority filters", async () => {
     mocks.ticketFindMany.mockResolvedValue([summary]); mocks.ticketCount.mockResolvedValue(1);
-    const response = await request(app).get("/api/tickets?page=2&limit=10&search=payment&status=NEW&priority=HIGH").set(auth());
+    const response = await request(app).get("/api/tickets?page=2&limit=10&search=payment&status=OPEN&priority=HIGH").set(auth());
     expect(response.status).toBe(200);
     expect(response.body.meta).toEqual({ page: 2, limit: 10, total: 1, totalPages: 1 });
-    expect(mocks.ticketFindMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 10, take: 10, where: expect.objectContaining({ status: "NEW", priority: "HIGH", AND: expect.any(Array) }) }));
+    expect(mocks.ticketFindMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 10, take: 10, where: expect.objectContaining({ status: "OPEN", priority: "HIGH", AND: expect.any(Array) }) }));
   });
 
   it("searches by the full ticket ID while retaining subject and customer fields", async () => {
@@ -509,10 +509,26 @@ describe("ticket API", () => {
 
   it("rejects invalid transitions and agent workflow changes on unassigned tickets", async () => {
     mocks.ticketFindFirst.mockResolvedValue(current);
-    const invalid = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth()).send({ status: "RESOLVED" });
+    const invalid = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth()).send({ status: "CLOSED" });
     expect(invalid.status).toBe(409); expect(invalid.body.error.code).toBe("INVALID_STATUS_TRANSITION");
     const forbidden = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(agent)).send({ priority: "URGENT" });
     expect(forbidden.status).toBe(403);
+  });
+
+  it("supports OPEN to RESOLVED and RESOLVED to IN_PROGRESS transitions", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({ ...current, status: TicketStatus.OPEN, assignedAgentId: agent.id });
+    const resolved = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(agent)).send({ status: "RESOLVED" });
+    expect(resolved.status).toBe(200);
+
+    mocks.ticketFindFirst.mockResolvedValue({ ...current, status: TicketStatus.RESOLVED, assignedAgentId: agent.id });
+    const reopened = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(agent)).send({ status: "IN_PROGRESS" });
+    expect(reopened.status).toBe(200);
+  });
+
+  it("rejects NEW status as invalid value", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({ ...current, assignedAgentId: agent.id });
+    const response = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(agent)).send({ status: "NEW" });
+    expect(response.status).toBe(400);
   });
 
   it("allows managers to escalate but prevents agents from assigning", async () => {

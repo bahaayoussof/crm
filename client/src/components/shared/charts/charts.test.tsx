@@ -16,7 +16,6 @@ import {
 describe("Chart Theme System", () => {
   it("exports canonical status and priority orders", () => {
     expect(CANONICAL_STATUS_ORDER).toEqual([
-      "NEW",
       "OPEN",
       "IN_PROGRESS",
       "WAITING_CUSTOMER",
@@ -28,7 +27,6 @@ describe("Chart Theme System", () => {
   });
 
   it("resolves semantic CSS variables for statuses", () => {
-    expect(getStatusChartColor("NEW")).toBe("#06B6D4");
     expect(getStatusChartColor("OPEN")).toBe("var(--info)");
     expect(getStatusChartColor("IN_PROGRESS")).toBe("var(--progress)");
     expect(getStatusChartColor("WAITING_CUSTOMER")).toBe("var(--warning)");

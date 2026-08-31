@@ -37,15 +37,16 @@ vi.mock("./task-hooks", () => ({
 import { TaskDetailPage } from "./task-detail-page";
 import { TaskFormPage } from "./task-form-page";
 import { TaskListPage } from "./task-list-page";
+import type { Task } from "./task.types";
 
 const PAST = "2026-08-20T10:00:00.000Z";
 const FUTURE = "2999-01-01T10:00:00.000Z";
 
-const baseTask = {
+const baseTask: Task = {
   id: "task-1",
   title: "Follow up with customer",
   description: "Call them about the refund.",
-  status: "OPEN" as const,
+  status: "OPEN",
   dueAt: FUTURE,
   remindedAt: null,
   ticketId: null,
@@ -118,6 +119,22 @@ describe("tasks workspace", () => {
     mocks.useTasks.mockReturnValue(listResult([{ ...baseTask, dueAt: PAST }]));
     renderAt("/tasks", <Route path="/tasks" element={<TaskListPage />} />);
     expect(screen.getAllByText("Overdue").length).toBeGreaterThan(0);
+  });
+
+  it("renders only the task title in the task column without secondary ticket reference text", () => {
+    mocks.useTasks.mockReturnValue(
+      listResult([
+        {
+          ...baseTask,
+          ticketId: "ticket-123",
+          ticket: { id: "ticket-123", subject: "Server connection issue" },
+        },
+      ]),
+    );
+    renderAt("/tasks", <Route path="/tasks" element={<TaskListPage />} />);
+    expect(screen.getAllByRole("link", { name: "Follow up with customer" }).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Linked ticket/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Server connection issue/i)).not.toBeInTheDocument();
   });
 
   it("passes the status filter into the query and URL", async () => {

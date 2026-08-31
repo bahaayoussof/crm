@@ -73,7 +73,7 @@ describe("customer API", () => {
     mocks.findCustomer.mockResolvedValue({ id: customer.id });
     mocks.findTickets.mockResolvedValue([
       { id: "c737ce60fccf9da889f4605c0", subject: "Assigned", status: "OPEN", priority: "HIGH", createdAt: now, updatedAt: now, assignedAgentId: "agent-1", category: null, assignedAgent: { id: "agent-1", name: "Agent" } },
-      { id: "ticket-2", subject: "Other", status: "NEW", priority: "LOW", createdAt: now, updatedAt: now, assignedAgentId: "cc3544aa158a89417843d45b3", category: null, assignedAgent: { id: "cc3544aa158a89417843d45b3", name: "Other Agent" } },
+      { id: "ticket-2", subject: "Other", status: "WAITING_CUSTOMER", priority: "LOW", createdAt: now, updatedAt: now, assignedAgentId: "cc3544aa158a89417843d45b3", category: null, assignedAgent: { id: "cc3544aa158a89417843d45b3", name: "Other Agent" } },
     ]);
     mocks.countTickets.mockResolvedValue(2);
     const response = await request(app).get(`/api/customers/${customer.id}/tickets?page=1&limit=20`).set(auth(token));
@@ -86,7 +86,7 @@ describe("customer API", () => {
     mocks.findCustomer.mockResolvedValue({ id: customer.id });
     mocks.findTickets.mockResolvedValue([
       { id: "c737ce60fccf9da889f4605c0", subject: "Mine", status: "OPEN", priority: "HIGH", createdAt: now, updatedAt: now, assignedAgentId: "agent-1", category: { id: "category-1", name: "Billing" }, assignedAgent: { id: "agent-1", name: "Agent" } },
-      { id: "ticket-2", subject: "Unassigned", status: "NEW", priority: "MEDIUM", createdAt: now, updatedAt: now, assignedAgentId: null, category: null, assignedAgent: null },
+      { id: "ticket-2", subject: "Unassigned", status: "WAITING_CUSTOMER", priority: "MEDIUM", createdAt: now, updatedAt: now, assignedAgentId: null, category: null, assignedAgent: null },
       { id: "ticket-3", subject: "Other agent", status: "IN_PROGRESS", priority: "LOW", createdAt: now, updatedAt: now, assignedAgentId: "cc3544aa158a89417843d45b3", category: null, assignedAgent: { id: "cc3544aa158a89417843d45b3", name: "Other Agent" } },
     ]);
     mocks.countTickets.mockResolvedValue(23);

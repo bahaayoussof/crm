@@ -6,7 +6,6 @@ import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../audit-logs/audit-log.const
 import { createAuditLog } from "../audit-logs/audit-log.service.js";
 
 const ACTIVE_STATUSES = [
-  TicketStatus.NEW,
   TicketStatus.OPEN,
   TicketStatus.IN_PROGRESS,
   TicketStatus.WAITING_CUSTOMER,
