@@ -71,10 +71,10 @@ const textPayload = (overrides: Partial<{ id: string; from: string; body: string
           value: {
             messaging_product: "whatsapp",
             metadata: { display_phone_number: "15550001111", phone_number_id: "pnid-1" },
-            contacts: [{ profile: { name: overrides.name ?? "Sara Ali" }, wa_id: overrides.from ?? "15557654321" }],
+            contacts: [{ profile: { name: overrides.name ?? "Sara Ali" }, wa_id: overrides.from ?? "14155552671" }],
             messages: [
               {
-                from: overrides.from ?? "15557654321",
+                from: overrides.from ?? "14155552671",
                 id: overrides.id ?? "wamid.ABC123",
                 timestamp: "1724840000",
                 type: overrides.type ?? "text",
@@ -119,17 +119,17 @@ describe("WhatsApp integration", () => {
         : Promise.all(arg as Promise<unknown>[]),
     );
     mocks.messageFindUnique.mockResolvedValue(null);
-    mocks.messageCreate.mockResolvedValue({ id: "msg-1" });
-    mocks.messageUpdate.mockResolvedValue({ id: "msg-1" });
+    mocks.messageCreate.mockResolvedValue({ id: "c3a0de37932e8b19746f20b22" });
+    mocks.messageUpdate.mockResolvedValue({ id: "c3a0de37932e8b19746f20b22" });
     mocks.userFindFirst.mockResolvedValue({ id: "wa-system" }); // system author exists
     mocks.userCreate.mockResolvedValue({ id: "wa-system" });
-    mocks.userFindMany.mockResolvedValue([{ id: "admin-1" }]);
+    mocks.userFindMany.mockResolvedValue([{ id: "c90b1b286043f1b7612e423c7" }]);
     mocks.customerFindMany.mockResolvedValue([]);
     mocks.customerFindUnique.mockResolvedValue(null);
     mocks.customerCreate.mockResolvedValue({ id: "cust-new" });
     mocks.ticketFindFirst.mockResolvedValue(null);
-    mocks.ticketCreate.mockResolvedValue({ id: "ticket-new", status: "NEW", subject: "WhatsApp: Hello", assignedAgentId: null });
-    mocks.ticketUpdate.mockResolvedValue({ id: "ticket-1" });
+    mocks.ticketCreate.mockResolvedValue({ id: "cd3448751688c18a75abee51f", status: "NEW", subject: "WhatsApp: Hello", assignedAgentId: null });
+    mocks.ticketUpdate.mockResolvedValue({ id: "c737ce60fccf9da889f4605c0" });
     mocks.historyCreate.mockResolvedValue({});
     mocks.slaFindFirst.mockResolvedValue({ firstResponseMinutes: 60, resolutionMinutes: 1440 });
     mocks.notificationCreateMany.mockResolvedValue({ count: 1 });
@@ -217,31 +217,40 @@ describe("WhatsApp integration", () => {
       expect(res.status).toBe(200);
       expect(res.body).toMatchObject({ received: true, processed: 1 });
       expect(mocks.customerCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ phone: "+15557654321", name: "Sara Ali" }) }),
+        expect.objectContaining({ data: expect.objectContaining({ phone: "+14155552671", name: "Sara Ali" }) }),
       );
       expect(mocks.ticketCreate).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ channel: "WHATSAPP", customerId: "cust-new" }) }),
       );
       expect(mocks.messageCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ externalId: "wamid.ABC123", authorUserId: "wa-system", ticketId: "ticket-new" }),
+          data: expect.objectContaining({ externalId: "wamid.ABC123", authorUserId: "wa-system", ticketId: "cd3448751688c18a75abee51f" }),
         }),
       );
       expect(mocks.notificationCreateMany).toHaveBeenCalled();
     });
 
+    it("ignores invalid extracted sender data before persistence", async () => {
+      const res = await send(textPayload({ from: "12345" }));
+
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ received: true, processed: 0 });
+      expect(mocks.customerCreate).not.toHaveBeenCalled();
+      expect(mocks.messageCreate).not.toHaveBeenCalled();
+    });
+
     it("matches an existing customer by phone number", async () => {
-      mocks.customerFindMany.mockResolvedValue([{ id: "cust-existing" }]);
+      mocks.customerFindMany.mockResolvedValue([{ id: "c5961965bf33677e0488514c4" }]);
       const res = await send(textPayload());
       expect(res.status).toBe(200);
       expect(mocks.customerCreate).not.toHaveBeenCalled();
       expect(mocks.ticketCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ customerId: "cust-existing" }) }),
+        expect.objectContaining({ data: expect.objectContaining({ customerId: "c5961965bf33677e0488514c4" }) }),
       );
     });
 
     it("appends to an existing active WhatsApp ticket instead of creating one", async () => {
-      mocks.customerFindMany.mockResolvedValue([{ id: "cust-existing" }]);
+      mocks.customerFindMany.mockResolvedValue([{ id: "c5961965bf33677e0488514c4" }]);
       mocks.ticketFindFirst.mockResolvedValue({ id: "ticket-open", status: "OPEN", subject: "WhatsApp: earlier", assignedAgentId: "agent-1" });
       const res = await send(textPayload({ id: "wamid.SECOND" }));
       expect(res.status).toBe(200);
@@ -252,11 +261,11 @@ describe("WhatsApp integration", () => {
     });
 
     it("moves a WAITING_CUSTOMER ticket back to IN_PROGRESS", async () => {
-      mocks.customerFindMany.mockResolvedValue([{ id: "cust-existing" }]);
-      mocks.ticketFindFirst.mockResolvedValue({ id: "ticket-wait", status: "WAITING_CUSTOMER", subject: "WhatsApp: q", assignedAgentId: null });
+      mocks.customerFindMany.mockResolvedValue([{ id: "c5961965bf33677e0488514c4" }]);
+      mocks.ticketFindFirst.mockResolvedValue({ id: "cece3d39ca305e1160ea0960b", status: "WAITING_CUSTOMER", subject: "WhatsApp: q", assignedAgentId: null });
       await send(textPayload({ id: "wamid.THIRD" }));
       expect(mocks.ticketUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: "ticket-wait" }, data: { status: "IN_PROGRESS" } }),
+        expect.objectContaining({ where: { id: "cece3d39ca305e1160ea0960b" }, data: { status: "IN_PROGRESS" } }),
       );
       expect(mocks.historyCreate).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ action: "STATUS_CHANGED", newValue: "IN_PROGRESS" }) }),
@@ -264,7 +273,7 @@ describe("WhatsApp integration", () => {
     });
 
     it("is idempotent — a repeated webhook event creates no duplicate message", async () => {
-      mocks.messageFindUnique.mockResolvedValue({ id: "msg-existing" });
+      mocks.messageFindUnique.mockResolvedValue({ id: "c14238cb47316bc8f9e7fe9b7" });
       const res = await send(textPayload());
       expect(res.status).toBe(200);
       expect(res.body).toMatchObject({ received: true, processed: 0 });
@@ -319,8 +328,8 @@ describe("WhatsApp integration", () => {
   // ---------------------------------------------------------------------------
   describe("deliverOutboundReply", () => {
     it("sends via the WhatsApp client and stores the provider id on success", async () => {
-      const result = await deliverOutboundReply({ ticketId: "t1", messageId: "m1", to: "+15557654321", text: "On it" });
-      expect(mocks.sendTextMessage).toHaveBeenCalledWith({ to: "+15557654321", text: "On it" });
+      const result = await deliverOutboundReply({ ticketId: "t1", messageId: "m1", to: "+14155552671", text: "On it" });
+      expect(mocks.sendTextMessage).toHaveBeenCalledWith({ to: "+14155552671", text: "On it" });
       expect(result).toMatchObject({ channel: "WHATSAPP", status: "SENT", externalId: "wamid.OUT1" });
       expect(mocks.messageUpdate).toHaveBeenCalledWith({ where: { id: "m1" }, data: { externalId: "wamid.OUT1" } });
     });

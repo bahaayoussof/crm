@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { databaseIdSchema } from "../../shared/validation/common.schema.js";
 
 const DAY_MS = 86_400_000;
 export const DEFAULT_RANGE_DAYS = 30;
@@ -12,8 +13,8 @@ export const reportsRangeQuerySchema = z
   .object({
     from: z.coerce.date().optional(),
     to: z.coerce.date().optional(),
-    departmentId: z.string().trim().min(1).optional(),
-    branchId: z.string().trim().min(1).optional(),
+    departmentId: databaseIdSchema.optional(),
+    branchId: databaseIdSchema.optional(),
   })
   .strict()
   .transform((value, ctx) => {

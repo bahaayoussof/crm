@@ -18,7 +18,7 @@ export const unreadCount: RequestHandler = async (request, response) => {
 };
 
 export const markRead: RequestHandler = async (request, response) => {
-  const id = request.params["id"] as string;
+  const id = (response.locals.validatedParams as { id: string }).id;
   response.json({ data: await service.markRead(userId(request), id) });
 };
 

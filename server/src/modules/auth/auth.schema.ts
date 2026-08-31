@@ -1,15 +1,13 @@
 import { z } from "zod";
-import { optionalPhoneSchema } from "../../shared/utils/phone.js";
+import { emailSchema, hasAtLeastOneField, passwordSchema } from "../../shared/validation/common.schema.js";
+import { optionalPhoneSchema } from "../../shared/validation/phone.schema.js";
 
-export const normalizedEmail = z.string().trim().max(254).email().transform((value) => value.toLowerCase());
-
-/** Single source of truth for password strength on the server. */
-export const passwordSchema = z.string().min(8).max(128);
+export { emailSchema as normalizedEmail, passwordSchema } from "../../shared/validation/common.schema.js";
 
 export const registerSchema = z
   .object({
     name: z.string().trim().min(2).max(100),
-    email: normalizedEmail,
+    email: emailSchema,
     password: passwordSchema,
     phone: optionalPhoneSchema,
   })
@@ -17,14 +15,14 @@ export const registerSchema = z
 
 export const loginSchema = z
   .object({
-    email: normalizedEmail,
+    email: emailSchema,
     password: z.string().min(1).max(128),
   })
   .strict();
 
 export const forgotPasswordSchema = z
   .object({
-    email: normalizedEmail,
+    email: emailSchema,
   })
   .strict();
 
@@ -64,11 +62,11 @@ export const changePasswordSchema = z
 export const selfProfileUpdateSchema = z
   .object({
     name: z.string().trim().min(2).max(100).optional(),
-    email: normalizedEmail.optional(),
+    email: emailSchema.optional(),
     phone: optionalPhoneSchema,
   })
   .strict()
-  .refine((data) => Object.keys(data).length > 0, {
+  .refine(hasAtLeastOneField, {
     message: "At least one field must be provided",
   });
 

@@ -1,11 +1,12 @@
 import { TicketPriority } from "@prisma/client";
 import { z } from "zod";
+import { databaseIdSchema, hasAtLeastOneField } from "../../shared/validation/common.schema.js";
 
 const description = z.string().trim().max(500);
 export const settingsCategoryQuerySchema = z.object({ search: z.string().trim().max(100).default("") }).strict();
-export const settingsIdSchema = z.object({ id: z.string().trim().min(1) }).strict();
+export const settingsIdSchema = z.object({ id: databaseIdSchema }).strict();
 export const createSettingsCategorySchema = z.object({ name: z.string().trim().min(2).max(100), description: description.optional() }).strict();
-export const updateSettingsCategorySchema = z.object({ name: z.string().trim().min(2).max(100).optional(), description: description.optional(), isActive: z.boolean().optional() }).strict().refine((v) => Object.keys(v).length > 0, "At least one field is required");
+export const updateSettingsCategorySchema = z.object({ name: z.string().trim().min(2).max(100).optional(), description: description.optional(), isActive: z.boolean().optional() }).strict().refine(hasAtLeastOneField, "At least one field is required");
 export const slaPrioritySchema = z.object({ priority: z.nativeEnum(TicketPriority) }).strict();
 export const upsertSlaRuleSchema = z.object({
   firstResponseMinutes: z.number().int().min(1).max(525_600),

@@ -22,15 +22,15 @@ import { app } from "../../app.js";
 import { createAccessToken } from "../auth/auth-token.js";
 
 const token = (id: string, role: Role) => createAccessToken({ id, role });
-const adminToken = token("admin-1", Role.ADMIN);
-const managerToken = token("manager-1", Role.MANAGER);
+const adminToken = token("c90b1b286043f1b7612e423c7", Role.ADMIN);
+const managerToken = token("c6fd0a01a46ed4545f0a5e774", Role.MANAGER);
 const agentToken = token("agent-1", Role.AGENT);
-const customerToken = token("customer-1", Role.CUSTOMER);
+const customerToken = token("ce83f10dcd2c68747c3f3ba14", Role.CUSTOMER);
 const auth = (value: string) => ({ Authorization: `Bearer ${value}` });
 const now = new Date("2026-08-26T12:00:00.000Z");
 
-const author = { id: "admin-1", name: "Admin User", role: Role.ADMIN };
-const greetingRow = { id: "qr-greeting", title: "Greeting", body: "Hello, thanks for contacting support.", createdAt: now, updatedAt: now, createdBy: author };
+const author = { id: "c90b1b286043f1b7612e423c7", name: "Admin User", role: Role.ADMIN };
+const greetingRow = { id: "c836302c0fbd491226544d598", title: "Greeting", body: "Hello, thanks for contacting support.", createdAt: now, updatedAt: now, createdBy: author };
 const refundRow = { id: "qr-refund", title: "Refund steps", body: "Here is how a refund is processed.", createdAt: now, updatedAt: now, createdBy: author };
 
 describe("quick replies API", () => {
@@ -42,18 +42,18 @@ describe("quick replies API", () => {
 
   it("rejects unauthenticated requests on every route", async () => {
     expect((await request(app).get("/api/quick-replies")).status).toBe(401);
-    expect((await request(app).get("/api/quick-replies/x")).status).toBe(401);
+    expect((await request(app).get("/api/quick-replies/c2d711642b726b04401627ca9")).status).toBe(401);
     expect((await request(app).post("/api/quick-replies").send({ title: "Hello", body: "Body" })).status).toBe(401);
-    expect((await request(app).patch("/api/quick-replies/x").send({ title: "Hello" })).status).toBe(401);
-    expect((await request(app).delete("/api/quick-replies/x")).status).toBe(401);
+    expect((await request(app).patch("/api/quick-replies/c2d711642b726b04401627ca9").send({ title: "Hello" })).status).toBe(401);
+    expect((await request(app).delete("/api/quick-replies/c2d711642b726b04401627ca9")).status).toBe(401);
   });
 
   it("rejects CUSTOMER from every quick reply route", async () => {
     expect((await request(app).get("/api/quick-replies").set(auth(customerToken))).status).toBe(403);
-    expect((await request(app).get("/api/quick-replies/x").set(auth(customerToken))).status).toBe(403);
+    expect((await request(app).get("/api/quick-replies/c2d711642b726b04401627ca9").set(auth(customerToken))).status).toBe(403);
     expect((await request(app).post("/api/quick-replies").set(auth(customerToken)).send({ title: "Hello", body: "Body" })).status).toBe(403);
-    expect((await request(app).patch("/api/quick-replies/x").set(auth(customerToken)).send({ title: "Hello" })).status).toBe(403);
-    expect((await request(app).delete("/api/quick-replies/x").set(auth(customerToken))).status).toBe(403);
+    expect((await request(app).patch("/api/quick-replies/c2d711642b726b04401627ca9").set(auth(customerToken)).send({ title: "Hello" })).status).toBe(403);
+    expect((await request(app).delete("/api/quick-replies/c2d711642b726b04401627ca9").set(auth(customerToken))).status).toBe(403);
   });
 
   it.each([["ADMIN", adminToken], ["MANAGER", managerToken], ["AGENT", agentToken]] as const)(
@@ -63,15 +63,15 @@ describe("quick replies API", () => {
       const response = await request(app).get("/api/quick-replies").set(auth(value));
       expect(response.status).toBe(200);
       expect(response.body.data).toHaveLength(2);
-      expect(response.body.data[0]).toMatchObject({ id: "qr-greeting", title: "Greeting", body: "Hello, thanks for contacting support." });
-      expect(response.body.data[0].createdBy).toEqual({ id: "admin-1", name: "Admin User", role: "ADMIN" });
+      expect(response.body.data[0]).toMatchObject({ id: "c836302c0fbd491226544d598", title: "Greeting", body: "Hello, thanks for contacting support." });
+      expect(response.body.data[0].createdBy).toEqual({ id: "c90b1b286043f1b7612e423c7", name: "Admin User", role: "ADMIN" });
       expect(response.body.data[0].createdBy).not.toHaveProperty("email");
     });
 
   it.each([["ADMIN", adminToken], ["MANAGER", managerToken], ["AGENT", agentToken]] as const)(
     "allows %s to read a single quick reply", async (_role, value) => {
       mocks.findUnique.mockResolvedValue(greetingRow);
-      const response = await request(app).get("/api/quick-replies/qr-greeting").set(auth(value));
+      const response = await request(app).get("/api/quick-replies/c836302c0fbd491226544d598").set(auth(value));
       expect(response.status).toBe(200);
       expect(response.body.data.body).toBe("Hello, thanks for contacting support.");
     });
@@ -118,7 +118,7 @@ describe("quick replies API", () => {
 
   it("returns a structured 404 for a missing quick reply", async () => {
     mocks.findUnique.mockResolvedValue(null);
-    const response = await request(app).get("/api/quick-replies/missing").set(auth(adminToken));
+    const response = await request(app).get("/api/quick-replies/cffa63583dfa6706b87d284b8").set(auth(adminToken));
     expect(response.status).toBe(404);
     expect(response.body.error.code).toBe("QUICK_REPLY_NOT_FOUND");
   });
@@ -137,15 +137,15 @@ describe("quick replies API", () => {
       const response = await request(app).post("/api/quick-replies").set(auth(value))
         .send({ title: "Greeting", body: "Hello, thanks for contacting support." });
       expect(response.status).toBe(201);
-      expect(response.body.data.id).toBe("qr-greeting");
+      expect(response.body.data.id).toBe("c836302c0fbd491226544d598");
       const createArgs = mocks.create.mock.calls[0]?.[0];
-      expect(createArgs.data).toEqual({ title: "Greeting", body: "Hello, thanks for contacting support.", createdById: value === adminToken ? "admin-1" : "manager-1" });
+      expect(createArgs.data).toEqual({ title: "Greeting", body: "Hello, thanks for contacting support.", createdById: value === adminToken ? "c90b1b286043f1b7612e423c7" : "c6fd0a01a46ed4545f0a5e774" });
     });
 
   it("rejects AGENT create, update, and delete", async () => {
     expect((await request(app).post("/api/quick-replies").set(auth(agentToken)).send({ title: "Greeting", body: "Body" })).status).toBe(403);
-    expect((await request(app).patch("/api/quick-replies/qr-greeting").set(auth(agentToken)).send({ title: "New" })).status).toBe(403);
-    expect((await request(app).delete("/api/quick-replies/qr-greeting").set(auth(agentToken))).status).toBe(403);
+    expect((await request(app).patch("/api/quick-replies/c836302c0fbd491226544d598").set(auth(agentToken)).send({ title: "New" })).status).toBe(403);
+    expect((await request(app).delete("/api/quick-replies/c836302c0fbd491226544d598").set(auth(agentToken))).status).toBe(403);
   });
 
   it("validates create input length", async () => {
@@ -155,33 +155,33 @@ describe("quick replies API", () => {
   });
 
   it("updates an existing quick reply with only the provided fields", async () => {
-    mocks.findUnique.mockResolvedValue({ id: "qr-greeting" });
+    mocks.findUnique.mockResolvedValue({ id: "c836302c0fbd491226544d598" });
     mocks.update.mockResolvedValue({ ...greetingRow, title: "Warm greeting" });
-    const response = await request(app).patch("/api/quick-replies/qr-greeting").set(auth(managerToken)).send({ title: "Warm greeting" });
+    const response = await request(app).patch("/api/quick-replies/c836302c0fbd491226544d598").set(auth(managerToken)).send({ title: "Warm greeting" });
     expect(response.status).toBe(200);
-    expect(mocks.update.mock.calls[0]?.[0]).toMatchObject({ where: { id: "qr-greeting" }, data: { title: "Warm greeting" } });
+    expect(mocks.update.mock.calls[0]?.[0]).toMatchObject({ where: { id: "c836302c0fbd491226544d598" }, data: { title: "Warm greeting" } });
     expect(mocks.update.mock.calls[0]?.[0].data).not.toHaveProperty("body");
   });
 
   it("rejects an empty update body", async () => {
-    expect((await request(app).patch("/api/quick-replies/qr-greeting").set(auth(adminToken)).send({})).status).toBe(400);
+    expect((await request(app).patch("/api/quick-replies/c836302c0fbd491226544d598").set(auth(adminToken)).send({})).status).toBe(400);
   });
 
   it("rejects updating an unknown field", async () => {
-    expect((await request(app).patch("/api/quick-replies/qr-greeting").set(auth(adminToken)).send({ createdById: "x" })).status).toBe(400);
+    expect((await request(app).patch("/api/quick-replies/c836302c0fbd491226544d598").set(auth(adminToken)).send({ createdById: "c2d711642b726b04401627ca9" })).status).toBe(400);
   });
 
   it("returns 404 when updating or deleting a missing quick reply", async () => {
     mocks.findUnique.mockResolvedValue(null);
-    expect((await request(app).patch("/api/quick-replies/missing").set(auth(adminToken)).send({ title: "New title" })).status).toBe(404);
-    expect((await request(app).delete("/api/quick-replies/missing").set(auth(adminToken))).status).toBe(404);
+    expect((await request(app).patch("/api/quick-replies/cffa63583dfa6706b87d284b8").set(auth(adminToken)).send({ title: "New title" })).status).toBe(404);
+    expect((await request(app).delete("/api/quick-replies/cffa63583dfa6706b87d284b8").set(auth(adminToken))).status).toBe(404);
   });
 
   it("deletes an existing quick reply", async () => {
-    mocks.findUnique.mockResolvedValue({ id: "qr-greeting" });
-    mocks.remove.mockResolvedValue({ id: "qr-greeting" });
-    const response = await request(app).delete("/api/quick-replies/qr-greeting").set(auth(adminToken));
+    mocks.findUnique.mockResolvedValue({ id: "c836302c0fbd491226544d598" });
+    mocks.remove.mockResolvedValue({ id: "c836302c0fbd491226544d598" });
+    const response = await request(app).delete("/api/quick-replies/c836302c0fbd491226544d598").set(auth(adminToken));
     expect(response.status).toBe(204);
-    expect(mocks.remove).toHaveBeenCalledWith({ where: { id: "qr-greeting" } });
+    expect(mocks.remove).toHaveBeenCalledWith({ where: { id: "c836302c0fbd491226544d598" } });
   });
 });

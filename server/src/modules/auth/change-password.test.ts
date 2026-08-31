@@ -24,19 +24,19 @@ vi.mock("bcrypt", () => ({
 import { app } from "../../app.js";
 import { createAccessToken } from "./auth-token.js";
 
-const token = createAccessToken({ id: "user-1", role: "CUSTOMER" as never });
+const token = createAccessToken({ id: "cc6c289e49e9c05b214586038", role: "CUSTOMER" as never });
 const authed = (body: unknown) =>
   request(app).patch("/api/auth/change-password").set("Authorization", `Bearer ${token}`).send(body);
 
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.userFindUnique.mockResolvedValue({
-    id: "user-1",
+    id: "cc6c289e49e9c05b214586038",
     role: "CUSTOMER",
     isActive: true,
     passwordHash: "hashed:currentpass1",
   });
-  mocks.userUpdate.mockResolvedValue({ id: "user-1" });
+  mocks.userUpdate.mockResolvedValue({ id: "cc6c289e49e9c05b214586038" });
   mocks.auditCreate.mockResolvedValue({ id: "audit-1" });
 });
 

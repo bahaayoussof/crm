@@ -1,9 +1,9 @@
 import { Role } from "@prisma/client";
 import { Router } from "express";
 import { requireAuth, requireRole } from "../../middleware/auth.js";
-import { validateQuery } from "../../middleware/validate.js";
+import { validateParams, validateQuery } from "../../middleware/validate.js";
 import { listNotifications, markAllRead, markRead, unreadCount } from "./notification.controller.js";
-import { notificationQuerySchema } from "./notification.schema.js";
+import { notificationParamsSchema, notificationQuerySchema } from "./notification.schema.js";
 
 export const notificationRouter = Router();
 
@@ -15,4 +15,4 @@ notificationRouter.get("/unread-count", unreadCount);
 notificationRouter.patch("/read-all", markAllRead);
 
 notificationRouter.get("/", validateQuery(notificationQuerySchema), listNotifications);
-notificationRouter.patch("/:id/read", markRead);
+notificationRouter.patch("/:id/read", validateParams(notificationParamsSchema), markRead);

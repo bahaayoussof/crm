@@ -28,16 +28,16 @@ vi.mock("bcrypt", () => ({
 import { app } from "../../app.js";
 
 const customerUser = {
-  id: "user-1",
+  id: "cc6c289e49e9c05b214586038",
   name: "Ahmed Mohamed",
   email: "ahmed@example.com",
   role: "CUSTOMER" as const,
   isActive: true,
   customerProfile: {
-    id: "customer-1",
+    id: "ce83f10dcd2c68747c3f3ba14",
     name: "Ahmed Mohamed",
     email: "ahmed@example.com",
-    phone: "+201000000000",
+    phone: "+14155552671",
   },
 };
 
@@ -62,14 +62,14 @@ describe("authentication API", () => {
       name: "  Ahmed Mohamed  ",
       email: "  Ahmed@Example.com ",
       password: "password123",
-      phone: "+201000000000",
+      phone: "+14155552671",
     });
 
     expect(response.status).toBe(201);
     expect(response.body.data.user).toMatchObject({
       email: "ahmed@example.com",
       role: "CUSTOMER",
-      customer: { id: "customer-1" },
+      customer: { id: "ce83f10dcd2c68747c3f3ba14" },
     });
     expect(response.body.data.token).toEqual(expect.any(String));
     expect(mocks.transaction).toHaveBeenCalledOnce();
@@ -83,7 +83,7 @@ describe("authentication API", () => {
       }),
     );
     expect(mocks.createCustomer).toHaveBeenCalledWith({
-      data: expect.objectContaining({ userId: "user-1", email: "ahmed@example.com" }),
+      data: expect.objectContaining({ userId: "cc6c289e49e9c05b214586038", email: "ahmed@example.com" }),
     });
     expect(response.body.data.user).not.toHaveProperty("passwordHash");
   });
@@ -197,7 +197,7 @@ describe("authentication API", () => {
       .set("Authorization", `Bearer ${loginResponse.body.data.token}`);
 
     expect(response.status).toBe(200);
-    expect(response.body.data.user).toMatchObject({ id: "user-1", role: "CUSTOMER" });
+    expect(response.body.data.user).toMatchObject({ id: "cc6c289e49e9c05b214586038", role: "CUSTOMER" });
     expect(response.body.data.user).not.toHaveProperty("passwordHash");
   });
 });

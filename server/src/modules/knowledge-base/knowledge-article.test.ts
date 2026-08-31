@@ -22,16 +22,16 @@ import { app } from "../../app.js";
 import { createAccessToken } from "../auth/auth-token.js";
 
 const token = (id: string, role: Role) => createAccessToken({ id, role });
-const adminToken = token("admin-1", Role.ADMIN);
-const managerToken = token("manager-1", Role.MANAGER);
+const adminToken = token("c90b1b286043f1b7612e423c7", Role.ADMIN);
+const managerToken = token("c6fd0a01a46ed4545f0a5e774", Role.MANAGER);
 const agentToken = token("agent-1", Role.AGENT);
-const customerToken = token("customer-1", Role.CUSTOMER);
+const customerToken = token("ce83f10dcd2c68747c3f3ba14", Role.CUSTOMER);
 const auth = (value: string) => ({ Authorization: `Bearer ${value}` });
 const now = new Date("2026-08-26T12:00:00.000Z");
 
-const author = { id: "admin-1", name: "Admin User", role: Role.ADMIN };
-const draftRow = { id: "article-draft", title: "Reset a password", category: "Accounts", status: KnowledgeArticleStatus.DRAFT, createdAt: now, updatedAt: now, createdBy: author };
-const publishedRow = { id: "article-pub", title: "Billing FAQ", category: "Billing", status: KnowledgeArticleStatus.PUBLISHED, createdAt: now, updatedAt: now, createdBy: author };
+const author = { id: "c90b1b286043f1b7612e423c7", name: "Admin User", role: Role.ADMIN };
+const draftRow = { id: "c529719cff715afea0ab75878", title: "Reset a password", category: "Accounts", status: KnowledgeArticleStatus.DRAFT, createdAt: now, updatedAt: now, createdBy: author };
+const publishedRow = { id: "c4fdccb99802ca0574c1ecf12", title: "Billing FAQ", category: "Billing", status: KnowledgeArticleStatus.PUBLISHED, createdAt: now, updatedAt: now, createdBy: author };
 const detailRow = { ...draftRow, content: "Full article content for internal readers." };
 
 describe("internal knowledge base API", () => {
@@ -47,10 +47,10 @@ describe("internal knowledge base API", () => {
 
   it("rejects CUSTOMER from every internal knowledge base route", async () => {
     expect((await request(app).get("/api/knowledge-articles").set(auth(customerToken))).status).toBe(403);
-    expect((await request(app).get("/api/knowledge-articles/x").set(auth(customerToken))).status).toBe(403);
+    expect((await request(app).get("/api/knowledge-articles/c2d711642b726b04401627ca9").set(auth(customerToken))).status).toBe(403);
     expect((await request(app).post("/api/knowledge-articles").set(auth(customerToken)).send({ title: "A valid title", content: "Body" })).status).toBe(403);
-    expect((await request(app).patch("/api/knowledge-articles/x").set(auth(customerToken)).send({ title: "A valid title" })).status).toBe(403);
-    expect((await request(app).delete("/api/knowledge-articles/x").set(auth(customerToken))).status).toBe(403);
+    expect((await request(app).patch("/api/knowledge-articles/c2d711642b726b04401627ca9").set(auth(customerToken)).send({ title: "A valid title" })).status).toBe(403);
+    expect((await request(app).delete("/api/knowledge-articles/c2d711642b726b04401627ca9").set(auth(customerToken))).status).toBe(403);
   });
 
   it.each([["ADMIN", adminToken], ["MANAGER", managerToken], ["AGENT", agentToken]] as const)(
@@ -115,7 +115,7 @@ describe("internal knowledge base API", () => {
 
   it("returns a structured 404 for a missing internal article", async () => {
     mocks.findUnique.mockResolvedValue(null);
-    const response = await request(app).get("/api/knowledge-articles/missing").set(auth(adminToken));
+    const response = await request(app).get("/api/knowledge-articles/cffa63583dfa6706b87d284b8").set(auth(adminToken));
     expect(response.status).toBe(404);
     expect(response.body.error.code).toBe("KNOWLEDGE_ARTICLE_NOT_FOUND");
   });
@@ -130,7 +130,7 @@ describe("internal knowledge base API", () => {
     expect(response.status).toBe(201);
     const data = mocks.create.mock.calls[0]?.[0].data;
     expect(data.status).toBe(expectedStatus);
-    expect(data.createdById).toBe(value === adminToken ? "admin-1" : "manager-1");
+    expect(data.createdById).toBe(value === adminToken ? "c90b1b286043f1b7612e423c7" : "c6fd0a01a46ed4545f0a5e774");
   });
 
   it("trims textual input and defaults status to DRAFT", async () => {
@@ -142,7 +142,7 @@ describe("internal knowledge base API", () => {
   it("rejects a client-provided createdById and unknown creation fields", async () => {
     const withCreator = await request(app).post("/api/knowledge-articles").set(auth(adminToken)).send({ title: "A valid title", content: "Body", createdById: "someone-else" });
     expect(withCreator.status).toBe(400);
-    const withUnknown = await request(app).post("/api/knowledge-articles").set(auth(adminToken)).send({ title: "A valid title", content: "Body", slug: "x" });
+    const withUnknown = await request(app).post("/api/knowledge-articles").set(auth(adminToken)).send({ title: "A valid title", content: "Body", slug: "c2d711642b726b04401627ca9" });
     expect(withUnknown.status).toBe(400);
     expect(mocks.create).not.toHaveBeenCalled();
   });
@@ -160,7 +160,7 @@ describe("internal knowledge base API", () => {
     for (const body of [
       { title: "no", content: "Body" },
       { title: "A valid title", content: "" },
-      { title: "x".repeat(201), content: "Body" },
+      { title: "c2d711642b726b04401627ca9".repeat(201), content: "Body" },
       { title: "A valid title", content: "y".repeat(50_001) },
       { title: "A valid title", content: "Body", category: "c".repeat(101) },
     ]) {
@@ -170,9 +170,9 @@ describe("internal knowledge base API", () => {
   });
 
   it.each([["ADMIN", adminToken], ["MANAGER", managerToken]])("lets %s update allowed fields", async (_role, value) => {
-    mocks.findUnique.mockResolvedValue({ id: "article-draft" });
+    mocks.findUnique.mockResolvedValue({ id: "c529719cff715afea0ab75878" });
     mocks.update.mockResolvedValue({ ...detailRow, title: "Updated title" });
-    const response = await request(app).patch("/api/knowledge-articles/article-draft").set(auth(value)).send({ title: "Updated title", category: "Accounts" });
+    const response = await request(app).patch("/api/knowledge-articles/c529719cff715afea0ab75878").set(auth(value)).send({ title: "Updated title", category: "Accounts" });
     expect(response.status).toBe(200);
     expect(mocks.update.mock.calls[0]?.[0].data).toEqual({ title: "Updated title", category: "Accounts" });
   });
@@ -181,9 +181,9 @@ describe("internal knowledge base API", () => {
     ["publishes a draft", "PUBLISHED"],
     ["returns a published article to draft", "DRAFT"],
   ])("%s and never replaces the creator", async (_label, status) => {
-    mocks.findUnique.mockResolvedValue({ id: "article-draft" });
+    mocks.findUnique.mockResolvedValue({ id: "c529719cff715afea0ab75878" });
     mocks.update.mockResolvedValue({ ...detailRow, status });
-    const response = await request(app).patch("/api/knowledge-articles/article-draft").set(auth(adminToken)).send({ status });
+    const response = await request(app).patch("/api/knowledge-articles/c529719cff715afea0ab75878").set(auth(adminToken)).send({ status });
     expect(response.status).toBe(200);
     const data = mocks.update.mock.calls[0]?.[0].data;
     expect(data).toEqual({ status });
@@ -191,40 +191,40 @@ describe("internal knowledge base API", () => {
   });
 
   it("rejects an empty PATCH and forbidden or unknown update fields", async () => {
-    expect((await request(app).patch("/api/knowledge-articles/article-draft").set(auth(adminToken)).send({})).status).toBe(400);
-    expect((await request(app).patch("/api/knowledge-articles/article-draft").set(auth(adminToken)).send({ createdById: "x" })).status).toBe(400);
-    expect((await request(app).patch("/api/knowledge-articles/article-draft").set(auth(adminToken)).send({ id: "x" })).status).toBe(400);
-    expect((await request(app).patch("/api/knowledge-articles/article-draft").set(auth(adminToken)).send({ createdAt: "2020-01-01" })).status).toBe(400);
+    expect((await request(app).patch("/api/knowledge-articles/c529719cff715afea0ab75878").set(auth(adminToken)).send({})).status).toBe(400);
+    expect((await request(app).patch("/api/knowledge-articles/c529719cff715afea0ab75878").set(auth(adminToken)).send({ createdById: "c2d711642b726b04401627ca9" })).status).toBe(400);
+    expect((await request(app).patch("/api/knowledge-articles/c529719cff715afea0ab75878").set(auth(adminToken)).send({ id: "c2d711642b726b04401627ca9" })).status).toBe(400);
+    expect((await request(app).patch("/api/knowledge-articles/c529719cff715afea0ab75878").set(auth(adminToken)).send({ createdAt: "2020-01-01" })).status).toBe(400);
     expect(mocks.update).not.toHaveBeenCalled();
   });
 
   it("returns 403 when AGENT updates an article", async () => {
-    const response = await request(app).patch("/api/knowledge-articles/article-draft").set(auth(agentToken)).send({ title: "A valid title" });
+    const response = await request(app).patch("/api/knowledge-articles/c529719cff715afea0ab75878").set(auth(agentToken)).send({ title: "A valid title" });
     expect(response.status).toBe(403);
   });
 
   it("returns 404 when the update target is missing", async () => {
     mocks.findUnique.mockResolvedValue(null);
-    const response = await request(app).patch("/api/knowledge-articles/missing").set(auth(adminToken)).send({ title: "A valid title" });
+    const response = await request(app).patch("/api/knowledge-articles/cffa63583dfa6706b87d284b8").set(auth(adminToken)).send({ title: "A valid title" });
     expect(response.status).toBe(404);
     expect(response.body.error.code).toBe("KNOWLEDGE_ARTICLE_NOT_FOUND");
   });
 
   it.each([["ADMIN", adminToken], ["MANAGER", managerToken]])("lets %s delete an article", async (_role, value) => {
-    mocks.findUnique.mockResolvedValue({ id: "article-draft" });
-    mocks.remove.mockResolvedValue({ id: "article-draft" });
-    const response = await request(app).delete("/api/knowledge-articles/article-draft").set(auth(value));
+    mocks.findUnique.mockResolvedValue({ id: "c529719cff715afea0ab75878" });
+    mocks.remove.mockResolvedValue({ id: "c529719cff715afea0ab75878" });
+    const response = await request(app).delete("/api/knowledge-articles/c529719cff715afea0ab75878").set(auth(value));
     expect(response.status).toBe(204);
-    expect(mocks.remove).toHaveBeenCalledWith({ where: { id: "article-draft" } });
+    expect(mocks.remove).toHaveBeenCalledWith({ where: { id: "c529719cff715afea0ab75878" } });
   });
 
   it("returns 403 when AGENT deletes an article", async () => {
-    expect((await request(app).delete("/api/knowledge-articles/article-draft").set(auth(agentToken))).status).toBe(403);
+    expect((await request(app).delete("/api/knowledge-articles/c529719cff715afea0ab75878").set(auth(agentToken))).status).toBe(403);
   });
 
   it("returns 404 when the delete target is missing", async () => {
     mocks.findUnique.mockResolvedValue(null);
-    const response = await request(app).delete("/api/knowledge-articles/missing").set(auth(adminToken));
+    const response = await request(app).delete("/api/knowledge-articles/cffa63583dfa6706b87d284b8").set(auth(adminToken));
     expect(response.status).toBe(404);
     expect(response.body.error.code).toBe("KNOWLEDGE_ARTICLE_NOT_FOUND");
   });

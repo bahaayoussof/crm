@@ -1,29 +1,29 @@
 import { TicketPriority } from "@prisma/client";
 import { z } from "zod";
-import { normalizedEmail } from "../auth/auth.schema.js";
-import { optionalPhoneSchema } from "../../shared/utils/phone.js";
+import { databaseIdSchema, emailSchema } from "../../shared/validation/common.schema.js";
+import { paginationFields } from "../../shared/validation/pagination.schema.js";
+import { optionalPhoneSchema } from "../../shared/validation/phone.schema.js";
 
 export const portalStatuses = ["OPEN", "IN_PROGRESS", "WAITING_FOR_YOU", "RESOLVED", "CLOSED"] as const;
-export const portalTicketParamsSchema = z.object({ id: z.string().trim().min(1) }).strict();
+export const portalTicketParamsSchema = z.object({ id: databaseIdSchema }).strict();
 export const portalTicketListSchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
+  ...paginationFields(),
   search: z.string().trim().max(100).default(""),
   status: z.enum(portalStatuses).optional(),
   priority: z.nativeEnum(TicketPriority).optional(),
-  categoryId: z.string().trim().min(1).optional(),
+  categoryId: databaseIdSchema.optional(),
 }).strict();
 export const portalCreateTicketSchema = z.object({
   subject: z.string().trim().min(3).max(200),
   description: z.string().trim().min(1).max(20_000),
-  categoryId: z.string().trim().min(1).nullable().optional(),
+  categoryId: databaseIdSchema.nullable().optional(),
 }).strict();
 export const portalReplySchema = z.object({ body: z.string().trim().min(1).max(20_000) }).strict();
 
 // Customer self-service profile edit. Explicit whitelist — name / email / phone only.
 export const portalProfileUpdateSchema = z.object({
   name: z.string().trim().min(2).max(100),
-  email: normalizedEmail,
+  email: emailSchema,
   phone: optionalPhoneSchema,
 }).strict();
 

@@ -1,32 +1,27 @@
 import { z } from "zod";
-
-const normalizedEmail = z.string().trim().email().transform((value) => value.toLowerCase());
-const optionalPhone = z.preprocess(
-  (value) => typeof value === "string" && value.trim() === "" ? null : value,
-  z.string().trim().min(5).max(30).nullable().optional(),
-);
+import { databaseIdSchema, emailSchema, hasAtLeastOneField } from "../../shared/validation/common.schema.js";
+import { paginationFields } from "../../shared/validation/pagination.schema.js";
+import { optionalPhoneSchema } from "../../shared/validation/phone.schema.js";
 
 export const customerListQuerySchema = z.object({
   search: z.string().trim().max(100).default(""),
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
+  ...paginationFields(),
 }).strict();
 
-export const customerParamsSchema = z.object({ id: z.string().trim().min(1) }).strict();
+export const customerParamsSchema = z.object({ id: databaseIdSchema }).strict();
 
 export const customerTicketListQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
+  ...paginationFields(),
 }).strict();
 
 export const createCustomerSchema = z.object({
   name: z.string().trim().min(2).max(100),
-  email: normalizedEmail,
-  phone: optionalPhone,
+  email: emailSchema,
+  phone: optionalPhoneSchema,
 }).strict();
 
 export const updateCustomerSchema = createCustomerSchema.partial().refine(
-  (value) => Object.keys(value).length > 0,
+  hasAtLeastOneField,
   { message: "At least one customer field is required" },
 );
 

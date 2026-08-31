@@ -14,8 +14,8 @@ testApp.use(errorHandler);
 
 describe("authorization middleware", () => {
   it("allows an accepted role and rejects another authenticated role", async () => {
-    const adminToken = createAccessToken({ id: "admin-1", role: Role.ADMIN });
-    const customerToken = createAccessToken({ id: "customer-1", role: Role.CUSTOMER });
+    const adminToken = createAccessToken({ id: "c90b1b286043f1b7612e423c7", role: Role.ADMIN });
+    const customerToken = createAccessToken({ id: "ce83f10dcd2c68747c3f3ba14", role: Role.CUSTOMER });
 
     const allowed = await request(testApp).get("/admin").set("Authorization", `Bearer ${adminToken}`);
     const forbidden = await request(testApp).get("/admin").set("Authorization", `Bearer ${customerToken}`);

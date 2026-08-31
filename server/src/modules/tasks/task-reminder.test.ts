@@ -89,7 +89,7 @@ describe("task reminders", () => {
   it("notifies the assignee once and stamps remindedAt for each due task", async () => {
     const now = new Date("2026-08-28T12:00:00.000Z");
     mocks.taskFindMany.mockResolvedValue([
-      { id: "task-1", title: "Call the customer back", assigneeId: "agent-1" },
+      { id: "c7afaa346b4bf92bf9dc21e9a", title: "Call the customer back", assigneeId: "c6ff3b3bd11c44cac620c43d5" },
       { id: "task-2", title: "Escalate refund", assigneeId: "agent-2" },
     ]);
 
@@ -97,16 +97,16 @@ describe("task reminders", () => {
 
     expect(result).toMatchObject({ inspected: 2, reminded: 2 });
     expect(mocks.taskUpdateMany).toHaveBeenNthCalledWith(1, {
-      where: { id: "task-1", status: TaskStatus.OPEN, remindedAt: null },
+      where: { id: "c7afaa346b4bf92bf9dc21e9a", status: TaskStatus.OPEN, remindedAt: null },
       data: { remindedAt: now },
     });
     expect(mocks.notificationCreateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: [
           expect.objectContaining({
-            userId: "agent-1",
+            userId: "c6ff3b3bd11c44cac620c43d5",
             type: "TASK_REMINDER",
-            taskId: "task-1",
+            taskId: "c7afaa346b4bf92bf9dc21e9a",
             ticketId: null,
           }),
         ],
@@ -115,7 +115,7 @@ describe("task reminders", () => {
   });
 
   it("does not notify when the guarded update loses a race", async () => {
-    mocks.taskFindMany.mockResolvedValue([{ id: "task-1", title: "Stale", assigneeId: "agent-1" }]);
+    mocks.taskFindMany.mockResolvedValue([{ id: "c7afaa346b4bf92bf9dc21e9a", title: "Stale", assigneeId: "c6ff3b3bd11c44cac620c43d5" }]);
     mocks.taskUpdateMany.mockResolvedValue({ count: 0 });
 
     const result = await runTaskReminders(new Date("2026-08-28T12:00:00.000Z"));

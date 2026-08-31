@@ -1,6 +1,8 @@
 import { Role } from "@prisma/client";
 import { z } from "zod";
-import { optionalPhoneSchema } from "../../shared/utils/phone.js";
+import { databaseIdSchema, emailSchema, hasAtLeastOneField, nullableDatabaseIdSchema, passwordSchema } from "../../shared/validation/common.schema.js";
+import { paginationFields } from "../../shared/validation/pagination.schema.js";
+import { optionalPhoneSchema } from "../../shared/validation/phone.schema.js";
 
 // Internal users only — CUSTOMER identities are managed through registration and
 // the Customer module, never this administrative surface.
@@ -8,31 +10,22 @@ export const manageableRoleSchema = z.nativeEnum(Role).refine((role) => role !==
   message: "Role must be ADMIN, MANAGER, or AGENT",
 });
 
-const normalizedEmail = z.string().trim().email().transform((value) => value.toLowerCase());
-
-// Absent key -> undefined (leave unchanged). Empty string / null -> null (clear).
-const orgId = z.preprocess(
-  (value) => (value === "" ? null : value),
-  z.string().trim().min(1).nullable().optional(),
-);
-
 export const userListQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
+  ...paginationFields(),
   search: z.string().trim().max(100).default(""),
   role: manageableRoleSchema.optional(),
   status: z.enum(["active", "inactive"]).optional(),
 }).strict();
 
-export const userParamsSchema = z.object({ id: z.string().trim().min(1) }).strict();
+export const userParamsSchema = z.object({ id: databaseIdSchema }).strict();
 
 export const createUserSchema = z.object({
   name: z.string().trim().min(2).max(100),
-  email: normalizedEmail,
-  password: z.string().min(8).max(128),
+  email: emailSchema,
+  password: passwordSchema,
   role: manageableRoleSchema,
-  departmentId: orgId,
-  branchId: orgId,
+  departmentId: nullableDatabaseIdSchema,
+  branchId: nullableDatabaseIdSchema,
 }).strict();
 
 // One safe update payload for the ADMIN-only user-management surface. Every field
@@ -42,13 +35,13 @@ export const createUserSchema = z.object({
 // (same normalization/validation as the profile endpoints) — no duplicate.
 export const updateUserSchema = z.object({
   name: z.string().trim().min(2).max(100).optional(),
-  email: normalizedEmail.optional(),
+  email: emailSchema.optional(),
   phone: optionalPhoneSchema,
   role: manageableRoleSchema.optional(),
   isActive: z.boolean().optional(),
-  departmentId: orgId,
-  branchId: orgId,
-}).strict().refine((value) => Object.keys(value).length > 0, { message: "At least one user field is required" });
+  departmentId: nullableDatabaseIdSchema,
+  branchId: nullableDatabaseIdSchema,
+}).strict().refine(hasAtLeastOneField, { message: "At least one user field is required" });
 
 export type UserListQuery = z.infer<typeof userListQuerySchema>;
 export type UserParams = z.infer<typeof userParamsSchema>;

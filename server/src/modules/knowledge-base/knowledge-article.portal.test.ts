@@ -16,10 +16,10 @@ import { app } from "../../app.js";
 import { createAccessToken } from "../auth/auth-token.js";
 
 const token = (id: string, role: Role) => createAccessToken({ id, role });
-const customerToken = token("customer-1", Role.CUSTOMER);
+const customerToken = token("ce83f10dcd2c68747c3f3ba14", Role.CUSTOMER);
 const auth = (value: string) => ({ Authorization: `Bearer ${value}` });
 const now = new Date("2026-08-26T12:00:00.000Z");
-const publishedRow = { id: "article-pub", title: "Billing FAQ", category: "Billing", content: "  How billing   works in detail.  ", updatedAt: now };
+const publishedRow = { id: "c4fdccb99802ca0574c1ecf12", title: "Billing FAQ", category: "Billing", content: "  How billing   works in detail.  ", updatedAt: now };
 
 describe("customer portal knowledge base API", () => {
   beforeEach(() => {
@@ -33,7 +33,7 @@ describe("customer portal knowledge base API", () => {
     mocks.count.mockResolvedValue(1);
     const response = await request(app).get("/api/portal/knowledge-articles").set(auth(customerToken));
     expect(response.status).toBe(200);
-    expect(response.body.data[0]).toEqual({ id: "article-pub", title: "Billing FAQ", category: "Billing", updatedAt: now.toISOString(), excerpt: "How billing works in detail." });
+    expect(response.body.data[0]).toEqual({ id: "c4fdccb99802ca0574c1ecf12", title: "Billing FAQ", category: "Billing", updatedAt: now.toISOString(), excerpt: "How billing works in detail." });
     expect(response.body.meta).toEqual({ page: 1, limit: 20, total: 1, totalPages: 1 });
   });
 
@@ -58,18 +58,18 @@ describe("customer portal knowledge base API", () => {
   });
 
   it("returns a published portal article with a status-free author-free projection", async () => {
-    mocks.findFirst.mockResolvedValue({ id: "article-pub", title: "Billing FAQ", content: "Body", category: "Billing", updatedAt: now });
-    const response = await request(app).get("/api/portal/knowledge-articles/article-pub").set(auth(customerToken));
+    mocks.findFirst.mockResolvedValue({ id: "c4fdccb99802ca0574c1ecf12", title: "Billing FAQ", content: "Body", category: "Billing", updatedAt: now });
+    const response = await request(app).get("/api/portal/knowledge-articles/c4fdccb99802ca0574c1ecf12").set(auth(customerToken));
     expect(response.status).toBe(200);
-    expect(response.body.data).toEqual({ id: "article-pub", title: "Billing FAQ", content: "Body", category: "Billing", updatedAt: now.toISOString() });
-    expect(mocks.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "article-pub", status: KnowledgeArticleStatus.PUBLISHED } }));
+    expect(response.body.data).toEqual({ id: "c4fdccb99802ca0574c1ecf12", title: "Billing FAQ", content: "Body", category: "Billing", updatedAt: now.toISOString() });
+    expect(mocks.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "c4fdccb99802ca0574c1ecf12", status: KnowledgeArticleStatus.PUBLISHED } }));
     for (const field of ["status", "createdBy", "author", "createdById", "createdAt"]) expect(response.body.data).not.toHaveProperty(field);
   });
 
   it("returns the same structured 404 for a draft and for a missing portal article", async () => {
     mocks.findFirst.mockResolvedValue(null);
-    const draft = await request(app).get("/api/portal/knowledge-articles/article-draft").set(auth(customerToken));
-    const missing = await request(app).get("/api/portal/knowledge-articles/does-not-exist").set(auth(customerToken));
+    const draft = await request(app).get("/api/portal/knowledge-articles/c529719cff715afea0ab75878").set(auth(customerToken));
+    const missing = await request(app).get("/api/portal/knowledge-articles/cf039b7c4aebe19ce9b2c79b4").set(auth(customerToken));
     expect(draft.status).toBe(404);
     expect(missing.status).toBe(404);
     expect(draft.body).toEqual(missing.body);
@@ -80,7 +80,7 @@ describe("customer portal knowledge base API", () => {
     expect((await request(app).get("/api/portal/knowledge-articles")).status).toBe(401);
     for (const role of [Role.ADMIN, Role.MANAGER, Role.AGENT]) {
       expect((await request(app).get("/api/portal/knowledge-articles").set(auth(token("staff", role)))).status).toBe(403);
-      expect((await request(app).get("/api/portal/knowledge-articles/article-pub").set(auth(token("staff", role)))).status).toBe(403);
+      expect((await request(app).get("/api/portal/knowledge-articles/c4fdccb99802ca0574c1ecf12").set(auth(token("staff", role)))).status).toBe(403);
     }
   });
 });

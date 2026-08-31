@@ -34,15 +34,15 @@ import { app } from "../../app.js";
 import { createAccessToken } from "../auth/auth-token.js";
 
 const token = (id: string, role: Role) => createAccessToken({ id, role });
-const adminToken = token("admin-1", Role.ADMIN);
-const managerToken = token("manager-1", Role.MANAGER);
+const adminToken = token("c90b1b286043f1b7612e423c7", Role.ADMIN);
+const managerToken = token("c6fd0a01a46ed4545f0a5e774", Role.MANAGER);
 const agentToken = token("agent-1", Role.AGENT);
-const customerToken = token("customer-1", Role.CUSTOMER);
+const customerToken = token("ce83f10dcd2c68747c3f3ba14", Role.CUSTOMER);
 const auth = (value: string) => ({ Authorization: `Bearer ${value}` });
 const now = new Date("2026-08-27T12:00:00.000Z");
 
-const adminRow = { id: "admin-1", name: "Admin User", email: "admin@example.com", role: Role.ADMIN, isActive: true, createdAt: now, updatedAt: now };
-const agentRow = { id: "agent-9", name: "Agent Nine", email: "agent9@example.com", role: Role.AGENT, isActive: true, createdAt: now, updatedAt: now };
+const adminRow = { id: "c90b1b286043f1b7612e423c7", name: "Admin User", email: "admin@example.com", role: Role.ADMIN, isActive: true, createdAt: now, updatedAt: now };
+const agentRow = { id: "c52904c0e5ca009722ff46b3e", name: "Agent Nine", email: "agent9@example.com", role: Role.AGENT, isActive: true, createdAt: now, updatedAt: now };
 
 // `requireActiveUser` resolves the caller via `prisma.user.findUnique`; the
 // administration services use `findFirst`/`count`. Default the caller to an
@@ -61,22 +61,22 @@ describe("users administration API", () => {
 
   it("rejects unauthenticated requests on every admin route", async () => {
     expect((await request(app).get("/api/users")).status).toBe(401);
-    expect((await request(app).get("/api/users/x")).status).toBe(401);
+    expect((await request(app).get("/api/users/c2d711642b726b04401627ca9")).status).toBe(401);
     expect((await request(app).post("/api/users").send({})).status).toBe(401);
-    expect((await request(app).patch("/api/users/x").send({ name: "New" })).status).toBe(401);
+    expect((await request(app).patch("/api/users/c2d711642b726b04401627ca9").send({ name: "New" })).status).toBe(401);
   });
 
   it.each([["MANAGER", managerToken], ["AGENT", agentToken], ["CUSTOMER", customerToken]] as const)(
     "rejects %s from every admin user route", async (role, value) => {
       mocks.findUnique.mockResolvedValue({ role: Role[role], isActive: true });
       expect((await request(app).get("/api/users").set(auth(value))).status).toBe(403);
-      expect((await request(app).get("/api/users/x").set(auth(value))).status).toBe(403);
+      expect((await request(app).get("/api/users/c2d711642b726b04401627ca9").set(auth(value))).status).toBe(403);
       expect((await request(app).post("/api/users").set(auth(value)).send({ name: "New User", email: "n@example.com", password: "password123", role: "AGENT" })).status).toBe(403);
-      expect((await request(app).patch("/api/users/x").set(auth(value)).send({ name: "New" })).status).toBe(403);
+      expect((await request(app).patch("/api/users/c2d711642b726b04401627ca9").set(auth(value)).send({ name: "New" })).status).toBe(403);
     });
 
   it("keeps the agents lookup open to every internal role and filters to active agents", async () => {
-    mocks.findMany.mockResolvedValue([{ id: "agent-9", name: "Agent Nine", email: "agent9@example.com" }]);
+    mocks.findMany.mockResolvedValue([{ id: "c52904c0e5ca009722ff46b3e", name: "Agent Nine", email: "agent9@example.com" }]);
     const response = await request(app).get("/api/users/agents").set(auth(agentToken));
     expect(response.status).toBe(200);
     expect(mocks.findMany.mock.calls[0]?.[0].where).toEqual({ role: Role.AGENT, isActive: true });
@@ -134,10 +134,10 @@ describe("users administration API", () => {
 
   it("returns 404 for a missing or CUSTOMER user id", async () => {
     mocks.findFirst.mockResolvedValue(null);
-    const response = await request(app).get("/api/users/missing").set(auth(adminToken));
+    const response = await request(app).get("/api/users/cffa63583dfa6706b87d284b8").set(auth(adminToken));
     expect(response.status).toBe(404);
     expect(response.body.error.code).toBe("USER_NOT_FOUND");
-    expect(mocks.findFirst.mock.calls[0]?.[0].where).toEqual({ id: "missing", role: { in: [Role.ADMIN, Role.MANAGER, Role.AGENT] } });
+    expect(mocks.findFirst.mock.calls[0]?.[0].where).toEqual({ id: "cffa63583dfa6706b87d284b8", role: { in: [Role.ADMIN, Role.MANAGER, Role.AGENT] } });
   });
 
   it("creates a user with a hashed password and a server-trusted role", async () => {
@@ -153,105 +153,105 @@ describe("users administration API", () => {
 
   it("assigns a department and branch on create after validating both", async () => {
     mocks.findFirst.mockResolvedValue(null);
-    mocks.deptFindUnique.mockResolvedValue({ id: "dep-1", isActive: true, branchId: "br-1" });
-    mocks.branchFindUnique.mockResolvedValue({ id: "br-1", isActive: true });
-    mocks.create.mockResolvedValue({ ...agentRow, departmentId: "dep-1", branchId: "br-1" });
+    mocks.deptFindUnique.mockResolvedValue({ id: "cee5922638edfee323b605a34", isActive: true, branchId: "c1e48e7f960a7daccd1e40c3d" });
+    mocks.branchFindUnique.mockResolvedValue({ id: "c1e48e7f960a7daccd1e40c3d", isActive: true });
+    mocks.create.mockResolvedValue({ ...agentRow, departmentId: "cee5922638edfee323b605a34", branchId: "c1e48e7f960a7daccd1e40c3d" });
     const response = await request(app).post("/api/users").set(auth(adminToken))
-      .send({ name: "Agent Nine", email: "agent9@example.com", password: "password123", role: "AGENT", departmentId: "dep-1", branchId: "br-1" });
+      .send({ name: "Agent Nine", email: "agent9@example.com", password: "password123", role: "AGENT", departmentId: "cee5922638edfee323b605a34", branchId: "c1e48e7f960a7daccd1e40c3d" });
     expect(response.status).toBe(201);
     expect(mocks.create.mock.calls[0]?.[0].data).toMatchObject({
-      department: { connect: { id: "dep-1" } },
-      branch: { connect: { id: "br-1" } },
+      department: { connect: { id: "cee5922638edfee323b605a34" } },
+      branch: { connect: { id: "c1e48e7f960a7daccd1e40c3d" } },
     });
   });
 
   it("rejects an inactive department assignment", async () => {
     mocks.findFirst.mockResolvedValue(null);
-    mocks.deptFindUnique.mockResolvedValue({ id: "dep-1", isActive: false, branchId: null });
+    mocks.deptFindUnique.mockResolvedValue({ id: "cee5922638edfee323b605a34", isActive: false, branchId: null });
     const response = await request(app).post("/api/users").set(auth(adminToken))
-      .send({ name: "Agent Nine", email: "agent9@example.com", password: "password123", role: "AGENT", departmentId: "dep-1" });
+      .send({ name: "Agent Nine", email: "agent9@example.com", password: "password123", role: "AGENT", departmentId: "cee5922638edfee323b605a34" });
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe("INVALID_DEPARTMENT");
   });
 
   it("rejects a department that does not belong to the chosen branch", async () => {
     mocks.findFirst.mockResolvedValue(null);
-    mocks.deptFindUnique.mockResolvedValue({ id: "dep-1", isActive: true, branchId: "br-9" });
-    mocks.branchFindUnique.mockResolvedValue({ id: "br-1", isActive: true });
+    mocks.deptFindUnique.mockResolvedValue({ id: "cee5922638edfee323b605a34", isActive: true, branchId: "c57b014f58c8912a267809dbd" });
+    mocks.branchFindUnique.mockResolvedValue({ id: "c1e48e7f960a7daccd1e40c3d", isActive: true });
     const response = await request(app).post("/api/users").set(auth(adminToken))
-      .send({ name: "Agent Nine", email: "agent9@example.com", password: "password123", role: "AGENT", departmentId: "dep-1", branchId: "br-1" });
+      .send({ name: "Agent Nine", email: "agent9@example.com", password: "password123", role: "AGENT", departmentId: "cee5922638edfee323b605a34", branchId: "c1e48e7f960a7daccd1e40c3d" });
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe("DEPARTMENT_BRANCH_MISMATCH");
   });
 
   it("clears a user's department when departmentId is null", async () => {
-    mocks.findFirst.mockResolvedValueOnce({ id: "agent-9", role: Role.AGENT, isActive: true, departmentId: "dep-1", branchId: null });
+    mocks.findFirst.mockResolvedValueOnce({ id: "c52904c0e5ca009722ff46b3e", role: Role.AGENT, isActive: true, departmentId: "cee5922638edfee323b605a34", branchId: null });
     mocks.update.mockResolvedValue({ ...agentRow, departmentId: null });
-    const response = await request(app).patch("/api/users/agent-9").set(auth(adminToken)).send({ departmentId: null });
+    const response = await request(app).patch("/api/users/c52904c0e5ca009722ff46b3e").set(auth(adminToken)).send({ departmentId: null });
     expect(response.status).toBe(200);
     expect(mocks.update.mock.calls[0]?.[0].data).toEqual({ department: { disconnect: true } });
   });
 
   it("promotes another internal user to ADMIN", async () => {
-    mocks.findFirst.mockResolvedValueOnce({ id: "agent-9", role: Role.AGENT, isActive: true });
+    mocks.findFirst.mockResolvedValueOnce({ id: "c52904c0e5ca009722ff46b3e", role: Role.AGENT, isActive: true });
     mocks.update.mockResolvedValue({ ...agentRow, role: Role.ADMIN });
-    const response = await request(app).patch("/api/users/agent-9").set(auth(adminToken)).send({ role: "ADMIN" });
+    const response = await request(app).patch("/api/users/c52904c0e5ca009722ff46b3e").set(auth(adminToken)).send({ role: "ADMIN" });
     expect(response.status).toBe(200);
-    expect(mocks.update.mock.calls[0]?.[0]).toMatchObject({ where: { id: "agent-9" }, data: { role: "ADMIN" } });
+    expect(mocks.update.mock.calls[0]?.[0]).toMatchObject({ where: { id: "c52904c0e5ca009722ff46b3e" }, data: { role: "ADMIN" } });
   });
 
   it("lets an ADMIN edit name, email, phone, role, branch, department, and status of another user in one request", async () => {
-    mocks.findFirst.mockResolvedValueOnce({ id: "agent-9", name: "Old Name", email: "old@example.com", phone: null, role: Role.AGENT, isActive: true, departmentId: null, branchId: null });
-    mocks.branchFindUnique.mockResolvedValue({ id: "br-1", isActive: true });
-    mocks.deptFindUnique.mockResolvedValue({ id: "dep-1", isActive: true, branchId: "br-1" });
-    mocks.update.mockResolvedValue({ ...agentRow, name: "New Name", email: "new@example.com", phone: "+442079460958", role: Role.MANAGER, isActive: false, departmentId: "dep-1", branchId: "br-1" });
-    const response = await request(app).patch("/api/users/agent-9").set(auth(adminToken)).send({
-      name: "  New Name  ", email: "New@Example.com", phone: "+44 20 7946 0958", role: "MANAGER", branchId: "br-1", departmentId: "dep-1", isActive: false,
+    mocks.findFirst.mockResolvedValueOnce({ id: "c52904c0e5ca009722ff46b3e", name: "Old Name", email: "old@example.com", phone: null, role: Role.AGENT, isActive: true, departmentId: null, branchId: null });
+    mocks.branchFindUnique.mockResolvedValue({ id: "c1e48e7f960a7daccd1e40c3d", isActive: true });
+    mocks.deptFindUnique.mockResolvedValue({ id: "cee5922638edfee323b605a34", isActive: true, branchId: "c1e48e7f960a7daccd1e40c3d" });
+    mocks.update.mockResolvedValue({ ...agentRow, name: "New Name", email: "new@example.com", phone: "+442079460958", role: Role.MANAGER, isActive: false, departmentId: "cee5922638edfee323b605a34", branchId: "c1e48e7f960a7daccd1e40c3d" });
+    const response = await request(app).patch("/api/users/c52904c0e5ca009722ff46b3e").set(auth(adminToken)).send({
+      name: "  New Name  ", email: "New@Example.com", phone: "+44 20 7946 0958", role: "MANAGER", branchId: "c1e48e7f960a7daccd1e40c3d", departmentId: "cee5922638edfee323b605a34", isActive: false,
     });
     expect(response.status).toBe(200);
     expect(mocks.update.mock.calls[0]?.[0].data).toMatchObject({
       name: "New Name", email: "new@example.com", phone: "+442079460958", role: "MANAGER", isActive: false,
-      branch: { connect: { id: "br-1" } }, department: { connect: { id: "dep-1" } },
+      branch: { connect: { id: "c1e48e7f960a7daccd1e40c3d" } }, department: { connect: { id: "cee5922638edfee323b605a34" } },
     });
   });
 
   it("lets an ADMIN update another user's phone with the shared phone validation", async () => {
-    mocks.findFirst.mockResolvedValue({ id: "agent-9", role: Role.AGENT, isActive: true, phone: null, departmentId: null, branchId: null });
+    mocks.findFirst.mockResolvedValue({ id: "c52904c0e5ca009722ff46b3e", role: Role.AGENT, isActive: true, phone: null, departmentId: null, branchId: null });
     mocks.update.mockResolvedValue({ ...agentRow, phone: "+442079460958" });
-    const ok = await request(app).patch("/api/users/agent-9").set(auth(adminToken)).send({ phone: "+44 20 7946 0958" });
+    const ok = await request(app).patch("/api/users/c52904c0e5ca009722ff46b3e").set(auth(adminToken)).send({ phone: "+44 20 7946 0958" });
     expect(ok.status).toBe(200);
     expect(mocks.update.mock.calls[0]?.[0].data).toEqual({ phone: "+442079460958" });
-    const bad = await request(app).patch("/api/users/agent-9").set(auth(adminToken)).send({ phone: "12" });
+    const bad = await request(app).patch("/api/users/c52904c0e5ca009722ff46b3e").set(auth(adminToken)).send({ phone: "12" });
     expect(bad.status).toBe(400);
   });
 
   it("still rejects an incompatible department/branch combination on update", async () => {
-    mocks.findFirst.mockResolvedValueOnce({ id: "agent-9", role: Role.AGENT, isActive: true, departmentId: null, branchId: null });
-    mocks.branchFindUnique.mockResolvedValue({ id: "br-1", isActive: true });
-    mocks.deptFindUnique.mockResolvedValue({ id: "dep-1", isActive: true, branchId: "br-9" });
-    const response = await request(app).patch("/api/users/agent-9").set(auth(adminToken)).send({ branchId: "br-1", departmentId: "dep-1" });
+    mocks.findFirst.mockResolvedValueOnce({ id: "c52904c0e5ca009722ff46b3e", role: Role.AGENT, isActive: true, departmentId: null, branchId: null });
+    mocks.branchFindUnique.mockResolvedValue({ id: "c1e48e7f960a7daccd1e40c3d", isActive: true });
+    mocks.deptFindUnique.mockResolvedValue({ id: "cee5922638edfee323b605a34", isActive: true, branchId: "c57b014f58c8912a267809dbd" });
+    const response = await request(app).patch("/api/users/c52904c0e5ca009722ff46b3e").set(auth(adminToken)).send({ branchId: "c1e48e7f960a7daccd1e40c3d", departmentId: "cee5922638edfee323b605a34" });
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe("DEPARTMENT_BRANCH_MISMATCH");
   });
 
   it("still rejects an inactive branch or department on update", async () => {
-    mocks.findFirst.mockResolvedValue({ id: "agent-9", role: Role.AGENT, isActive: true, departmentId: null, branchId: null });
-    mocks.branchFindUnique.mockResolvedValue({ id: "br-1", isActive: false });
-    const inactiveBranch = await request(app).patch("/api/users/agent-9").set(auth(adminToken)).send({ branchId: "br-1" });
+    mocks.findFirst.mockResolvedValue({ id: "c52904c0e5ca009722ff46b3e", role: Role.AGENT, isActive: true, departmentId: null, branchId: null });
+    mocks.branchFindUnique.mockResolvedValue({ id: "c1e48e7f960a7daccd1e40c3d", isActive: false });
+    const inactiveBranch = await request(app).patch("/api/users/c52904c0e5ca009722ff46b3e").set(auth(adminToken)).send({ branchId: "c1e48e7f960a7daccd1e40c3d" });
     expect(inactiveBranch.status).toBe(400);
     expect(inactiveBranch.body.error.code).toBe("INVALID_BRANCH");
-    mocks.branchFindUnique.mockResolvedValue({ id: "br-1", isActive: true });
-    mocks.deptFindUnique.mockResolvedValue({ id: "dep-1", isActive: false, branchId: "br-1" });
-    const inactiveDept = await request(app).patch("/api/users/agent-9").set(auth(adminToken)).send({ branchId: "br-1", departmentId: "dep-1" });
+    mocks.branchFindUnique.mockResolvedValue({ id: "c1e48e7f960a7daccd1e40c3d", isActive: true });
+    mocks.deptFindUnique.mockResolvedValue({ id: "cee5922638edfee323b605a34", isActive: false, branchId: "c1e48e7f960a7daccd1e40c3d" });
+    const inactiveDept = await request(app).patch("/api/users/c52904c0e5ca009722ff46b3e").set(auth(adminToken)).send({ branchId: "c1e48e7f960a7daccd1e40c3d", departmentId: "cee5922638edfee323b605a34" });
     expect(inactiveDept.status).toBe(400);
     expect(inactiveDept.body.error.code).toBe("INVALID_DEPARTMENT");
   });
 
   it.each([["AGENT", "MANAGER"], ["MANAGER", "AGENT"]] as const)(
     "changes another user from %s to %s", async (from, to) => {
-      mocks.findFirst.mockResolvedValueOnce({ id: "user-x", role: Role[from], isActive: true });
-      mocks.update.mockResolvedValue({ ...agentRow, id: "user-x", role: Role[to] });
-      const response = await request(app).patch("/api/users/user-x").set(auth(adminToken)).send({ role: to });
+      mocks.findFirst.mockResolvedValueOnce({ id: "c100e513d7cdce8179685d3f1", role: Role[from], isActive: true });
+      mocks.update.mockResolvedValue({ ...agentRow, id: "c100e513d7cdce8179685d3f1", role: Role[to] });
+      const response = await request(app).patch("/api/users/c100e513d7cdce8179685d3f1").set(auth(adminToken)).send({ role: to });
       expect(response.status).toBe(200);
       expect(mocks.update.mock.calls[0]?.[0].data).toEqual({ role: to });
     });
@@ -271,91 +271,91 @@ describe("users administration API", () => {
   });
 
   it("updates only the provided profile fields", async () => {
-    mocks.findFirst.mockResolvedValueOnce({ id: "agent-9", role: Role.AGENT, isActive: true });
+    mocks.findFirst.mockResolvedValueOnce({ id: "c52904c0e5ca009722ff46b3e", role: Role.AGENT, isActive: true });
     mocks.update.mockResolvedValue({ ...agentRow, name: "Agent Nine Updated" });
-    const response = await request(app).patch("/api/users/agent-9").set(auth(adminToken)).send({ name: "Agent Nine Updated" });
+    const response = await request(app).patch("/api/users/c52904c0e5ca009722ff46b3e").set(auth(adminToken)).send({ name: "Agent Nine Updated" });
     expect(response.status).toBe(200);
-    expect(mocks.update.mock.calls[0]?.[0]).toMatchObject({ where: { id: "agent-9" }, data: { name: "Agent Nine Updated" } });
+    expect(mocks.update.mock.calls[0]?.[0]).toMatchObject({ where: { id: "c52904c0e5ca009722ff46b3e" }, data: { name: "Agent Nine Updated" } });
     expect(mocks.update.mock.calls[0]?.[0].data).not.toHaveProperty("isActive");
     expect(mocks.update.mock.calls[0]?.[0].data).not.toHaveProperty("role");
   });
 
   it("rejects an empty or unknown-field update", async () => {
-    expect((await request(app).patch("/api/users/agent-9").set(auth(adminToken)).send({})).status).toBe(400);
-    expect((await request(app).patch("/api/users/agent-9").set(auth(adminToken)).send({ createdAt: now })).status).toBe(400);
-    expect((await request(app).patch("/api/users/agent-9").set(auth(adminToken)).send({ role: "CUSTOMER" })).status).toBe(400);
+    expect((await request(app).patch("/api/users/c52904c0e5ca009722ff46b3e").set(auth(adminToken)).send({})).status).toBe(400);
+    expect((await request(app).patch("/api/users/c52904c0e5ca009722ff46b3e").set(auth(adminToken)).send({ createdAt: now })).status).toBe(400);
+    expect((await request(app).patch("/api/users/c52904c0e5ca009722ff46b3e").set(auth(adminToken)).send({ role: "CUSTOMER" })).status).toBe(400);
   });
 
   it("blocks an admin from changing their own role", async () => {
-    mocks.findFirst.mockResolvedValueOnce({ id: "admin-1", role: Role.ADMIN, isActive: true });
-    const response = await request(app).patch("/api/users/admin-1").set(auth(adminToken)).send({ role: "MANAGER" });
+    mocks.findFirst.mockResolvedValueOnce({ id: "c90b1b286043f1b7612e423c7", role: Role.ADMIN, isActive: true });
+    const response = await request(app).patch("/api/users/c90b1b286043f1b7612e423c7").set(auth(adminToken)).send({ role: "MANAGER" });
     expect(response.status).toBe(409);
     expect(response.body.error.code).toBe("SELF_ROLE_CHANGE_FORBIDDEN");
     expect(mocks.update).not.toHaveBeenCalled();
   });
 
   it("allows an admin to submit their own unchanged role alongside a profile edit", async () => {
-    mocks.findFirst.mockResolvedValueOnce({ id: "admin-1", role: Role.ADMIN, isActive: true });
+    mocks.findFirst.mockResolvedValueOnce({ id: "c90b1b286043f1b7612e423c7", role: Role.ADMIN, isActive: true });
     mocks.update.mockResolvedValue({ ...adminRow, name: "Admin Renamed" });
-    const response = await request(app).patch("/api/users/admin-1").set(auth(adminToken)).send({ name: "Admin Renamed", role: "ADMIN" });
+    const response = await request(app).patch("/api/users/c90b1b286043f1b7612e423c7").set(auth(adminToken)).send({ name: "Admin Renamed", role: "ADMIN" });
     expect(response.status).toBe(200);
   });
 
   it("blocks an admin from deactivating their own account", async () => {
-    mocks.findFirst.mockResolvedValueOnce({ id: "admin-1", role: Role.ADMIN, isActive: true });
-    const response = await request(app).patch("/api/users/admin-1").set(auth(adminToken)).send({ isActive: false });
+    mocks.findFirst.mockResolvedValueOnce({ id: "c90b1b286043f1b7612e423c7", role: Role.ADMIN, isActive: true });
+    const response = await request(app).patch("/api/users/c90b1b286043f1b7612e423c7").set(auth(adminToken)).send({ isActive: false });
     expect(response.status).toBe(409);
     expect(response.body.error.code).toBe("SELF_DEACTIVATION_FORBIDDEN");
     expect(mocks.update).not.toHaveBeenCalled();
   });
 
   it("blocks demoting the last active ADMIN", async () => {
-    mocks.findFirst.mockResolvedValueOnce({ id: "admin-2", role: Role.ADMIN, isActive: true });
+    mocks.findFirst.mockResolvedValueOnce({ id: "cbba86a1e179dc69b2ff4b913", role: Role.ADMIN, isActive: true });
     mocks.count.mockResolvedValue(0);
-    const response = await request(app).patch("/api/users/admin-2").set(auth(adminToken)).send({ role: "MANAGER" });
+    const response = await request(app).patch("/api/users/cbba86a1e179dc69b2ff4b913").set(auth(adminToken)).send({ role: "MANAGER" });
     expect(response.status).toBe(409);
     expect(response.body.error.code).toBe("LAST_ACTIVE_ADMIN_REQUIRED");
-    expect(mocks.count.mock.calls.at(-1)?.[0].where).toEqual({ role: Role.ADMIN, isActive: true, id: { not: "admin-2" } });
+    expect(mocks.count.mock.calls.at(-1)?.[0].where).toEqual({ role: Role.ADMIN, isActive: true, id: { not: "cbba86a1e179dc69b2ff4b913" } });
     expect(mocks.update).not.toHaveBeenCalled();
   });
 
   it("blocks deactivating the last active ADMIN", async () => {
-    mocks.findFirst.mockResolvedValueOnce({ id: "admin-2", role: Role.ADMIN, isActive: true });
+    mocks.findFirst.mockResolvedValueOnce({ id: "cbba86a1e179dc69b2ff4b913", role: Role.ADMIN, isActive: true });
     mocks.count.mockResolvedValue(0);
-    const response = await request(app).patch("/api/users/admin-2").set(auth(adminToken)).send({ isActive: false });
+    const response = await request(app).patch("/api/users/cbba86a1e179dc69b2ff4b913").set(auth(adminToken)).send({ isActive: false });
     expect(response.status).toBe(409);
     expect(response.body.error.code).toBe("LAST_ACTIVE_ADMIN_REQUIRED");
   });
 
   it("allows demoting or deactivating an ADMIN when another active ADMIN remains", async () => {
-    mocks.findFirst.mockResolvedValueOnce({ id: "admin-2", role: Role.ADMIN, isActive: true });
+    mocks.findFirst.mockResolvedValueOnce({ id: "cbba86a1e179dc69b2ff4b913", role: Role.ADMIN, isActive: true });
     mocks.count.mockResolvedValue(1);
-    mocks.update.mockResolvedValue({ ...adminRow, id: "admin-2", role: Role.MANAGER });
-    const response = await request(app).patch("/api/users/admin-2").set(auth(adminToken)).send({ role: "MANAGER" });
+    mocks.update.mockResolvedValue({ ...adminRow, id: "cbba86a1e179dc69b2ff4b913", role: Role.MANAGER });
+    const response = await request(app).patch("/api/users/cbba86a1e179dc69b2ff4b913").set(auth(adminToken)).send({ role: "MANAGER" });
     expect(response.status).toBe(200);
     expect(mocks.update.mock.calls[0]?.[0].data).toEqual({ role: "MANAGER" });
   });
 
   it("does not run the last-admin check when demoting an already-inactive ADMIN", async () => {
-    mocks.findFirst.mockResolvedValueOnce({ id: "admin-3", role: Role.ADMIN, isActive: false });
-    mocks.update.mockResolvedValue({ ...adminRow, id: "admin-3", role: Role.AGENT, isActive: false });
-    const response = await request(app).patch("/api/users/admin-3").set(auth(adminToken)).send({ role: "AGENT" });
+    mocks.findFirst.mockResolvedValueOnce({ id: "c10cdef74485b2f8af66409fd", role: Role.ADMIN, isActive: false });
+    mocks.update.mockResolvedValue({ ...adminRow, id: "c10cdef74485b2f8af66409fd", role: Role.AGENT, isActive: false });
+    const response = await request(app).patch("/api/users/c10cdef74485b2f8af66409fd").set(auth(adminToken)).send({ role: "AGENT" });
     expect(response.status).toBe(200);
     expect(mocks.count).not.toHaveBeenCalled();
   });
 
   it("rejects an email update that collides with another user", async () => {
     mocks.findFirst
-      .mockResolvedValueOnce({ id: "agent-9", role: Role.AGENT, isActive: true })
-      .mockResolvedValueOnce({ id: "admin-1" });
-    const response = await request(app).patch("/api/users/agent-9").set(auth(adminToken)).send({ email: "admin@example.com" });
+      .mockResolvedValueOnce({ id: "c52904c0e5ca009722ff46b3e", role: Role.AGENT, isActive: true })
+      .mockResolvedValueOnce({ id: "c90b1b286043f1b7612e423c7" });
+    const response = await request(app).patch("/api/users/c52904c0e5ca009722ff46b3e").set(auth(adminToken)).send({ email: "admin@example.com" });
     expect(response.status).toBe(409);
     expect(response.body.error.code).toBe("EMAIL_ALREADY_REGISTERED");
   });
 
   it("returns 404 when updating a missing user", async () => {
     mocks.findFirst.mockResolvedValueOnce(null);
-    expect((await request(app).patch("/api/users/missing").set(auth(adminToken)).send({ name: "New name" })).status).toBe(404);
+    expect((await request(app).patch("/api/users/cffa63583dfa6706b87d284b8").set(auth(adminToken)).send({ name: "New name" })).status).toBe(404);
   });
 
   it("rejects a deactivated caller's token on the next request", async () => {
@@ -373,9 +373,9 @@ describe("users administration API", () => {
   });
 
   it("does not leave a partial update when the write fails inside the transaction", async () => {
-    mocks.findFirst.mockResolvedValueOnce({ id: "agent-9", role: Role.AGENT, isActive: true });
+    mocks.findFirst.mockResolvedValueOnce({ id: "c52904c0e5ca009722ff46b3e", role: Role.AGENT, isActive: true });
     mocks.update.mockRejectedValueOnce(new Error("write failed"));
-    const response = await request(app).patch("/api/users/agent-9").set(auth(adminToken)).send({ name: "Half Written" });
+    const response = await request(app).patch("/api/users/c52904c0e5ca009722ff46b3e").set(auth(adminToken)).send({ name: "Half Written" });
     expect(response.status).toBe(500);
   });
 });

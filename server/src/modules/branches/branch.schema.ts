@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { databaseIdSchema, hasAtLeastOneField } from "../../shared/validation/common.schema.js";
+import { paginationFields } from "../../shared/validation/pagination.schema.js";
 
 const name = z.string().trim().min(2).max(100);
 // Absent -> undefined (unchanged). Empty string / null -> null (clear).
@@ -10,14 +12,13 @@ const address = z.string().trim().max(300);
 
 export const branchListQuerySchema = z
   .object({
-    page: z.coerce.number().int().min(1).default(1),
-    limit: z.coerce.number().int().min(1).max(100).default(15),
+    ...paginationFields(15),
     search: z.string().trim().max(100).default(""),
     status: z.enum(["active", "inactive"]).optional(),
   })
   .strict();
 
-export const branchParamsSchema = z.object({ id: z.string().trim().min(1) }).strict();
+export const branchParamsSchema = z.object({ id: databaseIdSchema }).strict();
 
 export const createBranchSchema = z
   .object({ name, code: code.optional(), address: address.optional() })
@@ -31,7 +32,7 @@ export const updateBranchSchema = z
     isActive: z.boolean().optional(),
   })
   .strict()
-  .refine((value) => Object.keys(value).length > 0, {
+  .refine(hasAtLeastOneField, {
     message: "At least one branch field is required",
   });
 

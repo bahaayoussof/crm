@@ -1,33 +1,32 @@
 import { Channel, TicketPriority, TicketStatus } from "@prisma/client";
 import { z } from "zod";
-
-const nullableId = z.preprocess((value) => value === "" ? null : value, z.string().trim().min(1).nullable().optional());
+import { databaseIdSchema, hasAtLeastOneField, nullableDatabaseIdSchema } from "../../shared/validation/common.schema.js";
+import { paginationFields } from "../../shared/validation/pagination.schema.js";
 
 export const ticketListQuerySchema = z.object({
   search: z.string().trim().max(100).default(""),
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
+  ...paginationFields(),
   status: z.nativeEnum(TicketStatus).optional(),
   priority: z.nativeEnum(TicketPriority).optional(),
-  categoryId: z.string().trim().min(1).optional(),
-  assignedAgentId: z.string().trim().min(1).optional(),
-  customerId: z.string().trim().min(1).optional(),
-  departmentId: z.string().trim().min(1).optional(),
-  branchId: z.string().trim().min(1).optional(),
+  categoryId: databaseIdSchema.optional(),
+  assignedAgentId: databaseIdSchema.optional(),
+  customerId: databaseIdSchema.optional(),
+  departmentId: databaseIdSchema.optional(),
+  branchId: databaseIdSchema.optional(),
 }).strict();
 
-export const ticketParamsSchema = z.object({ id: z.string().trim().min(1) }).strict();
+export const ticketParamsSchema = z.object({ id: databaseIdSchema }).strict();
 
 export const createTicketSchema = z.object({
   subject: z.string().trim().min(3).max(200),
   description: z.string().trim().min(1).max(20_000),
-  customerId: z.string().trim().min(1),
+  customerId: databaseIdSchema,
   priority: z.nativeEnum(TicketPriority).default(TicketPriority.MEDIUM),
   channel: z.nativeEnum(Channel).default(Channel.WEB),
-  categoryId: nullableId,
-  assignedAgentId: nullableId,
-  departmentId: nullableId,
-  branchId: nullableId,
+  categoryId: nullableDatabaseIdSchema,
+  assignedAgentId: nullableDatabaseIdSchema,
+  departmentId: nullableDatabaseIdSchema,
+  branchId: nullableDatabaseIdSchema,
 }).strict();
 
 export const updateTicketSchema = z.object({
@@ -35,11 +34,11 @@ export const updateTicketSchema = z.object({
   description: z.string().trim().min(1).max(20_000).optional(),
   priority: z.nativeEnum(TicketPriority).optional(),
   status: z.nativeEnum(TicketStatus).optional(),
-  categoryId: nullableId,
-  assignedAgentId: nullableId,
-  departmentId: nullableId,
-  branchId: nullableId,
-}).strict().refine((value) => Object.keys(value).length > 0, { message: "At least one ticket field is required" });
+  categoryId: nullableDatabaseIdSchema,
+  assignedAgentId: nullableDatabaseIdSchema,
+  departmentId: nullableDatabaseIdSchema,
+  branchId: nullableDatabaseIdSchema,
+}).strict().refine(hasAtLeastOneField, { message: "At least one ticket field is required" });
 
 export const ticketConversationBodySchema = z.object({
   // Public replies arrive as sanitized-on-write HTML from the Lexical composer;

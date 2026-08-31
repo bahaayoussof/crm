@@ -45,7 +45,7 @@ const token = (role: Role, id = role.toLowerCase()) => createAccessToken({ id, r
 const auth = (role: Role) => ({ Authorization: `Bearer ${token(role)}` });
 
 const row = {
-  id: "b1",
+  id: "c7dc96f776c8423e57a278548",
   name: "Head Office",
   code: "HQ",
   address: null,
@@ -77,7 +77,7 @@ describe("branches API", () => {
 
   it.each([Role.MANAGER, Role.AGENT, Role.CUSTOMER])("rejects %s from admin CRUD", async (role) => {
     expect((await request(app).get("/api/settings/branches").set(auth(role))).status).toBe(403);
-    expect((await request(app).delete("/api/settings/branches/b1").set(auth(role))).status).toBe(403);
+    expect((await request(app).delete("/api/settings/branches/c7dc96f776c8423e57a278548").set(auth(role))).status).toBe(403);
   });
 
   it("lists branches with a name/code search for ADMIN", async () => {
@@ -85,7 +85,7 @@ describe("branches API", () => {
     mocks.count.mockResolvedValue(1);
     const response = await request(app).get("/api/settings/branches?search=hq").set(auth(Role.ADMIN));
     expect(response.status).toBe(200);
-    expect(response.body.data[0]).toMatchObject({ id: "b1", departmentCount: 0, userCount: 0, ticketCount: 0 });
+    expect(response.body.data[0]).toMatchObject({ id: "c7dc96f776c8423e57a278548", departmentCount: 0, userCount: 0, ticketCount: 0 });
     expect(mocks.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
@@ -127,14 +127,14 @@ describe("branches API", () => {
 
   it("returns 404 when updating a missing branch", async () => {
     mocks.findUnique.mockResolvedValue(null);
-    const response = await request(app).patch("/api/settings/branches/missing").set(auth(Role.ADMIN)).send({ name: "New" });
+    const response = await request(app).patch("/api/settings/branches/cffa63583dfa6706b87d284b8").set(auth(Role.ADMIN)).send({ name: "New" });
     expect(response.status).toBe(404);
   });
 
   it("deactivates a branch without deleting it", async () => {
-    mocks.findUnique.mockResolvedValue({ id: "b1", name: "Head Office", code: "HQ", address: null, isActive: true });
+    mocks.findUnique.mockResolvedValue({ id: "c7dc96f776c8423e57a278548", name: "Head Office", code: "HQ", address: null, isActive: true });
     mocks.update.mockResolvedValue({ ...row, isActive: false });
-    const response = await request(app).patch("/api/settings/branches/b1").set(auth(Role.ADMIN)).send({ isActive: false });
+    const response = await request(app).patch("/api/settings/branches/c7dc96f776c8423e57a278548").set(auth(Role.ADMIN)).send({ isActive: false });
     expect(response.status).toBe(200);
     expect(mocks.auditCreate).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ action: "BRANCH_DEACTIVATED" }) }),
@@ -142,8 +142,8 @@ describe("branches API", () => {
   });
 
   it("blocks deletion while the branch is still referenced (409 CONFLICT)", async () => {
-    mocks.findUnique.mockResolvedValue({ id: "b1", name: "Head Office", _count: { departments: 2, users: 1, tickets: 0 } });
-    const response = await request(app).delete("/api/settings/branches/b1").set(auth(Role.ADMIN));
+    mocks.findUnique.mockResolvedValue({ id: "c7dc96f776c8423e57a278548", name: "Head Office", _count: { departments: 2, users: 1, tickets: 0 } });
+    const response = await request(app).delete("/api/settings/branches/c7dc96f776c8423e57a278548").set(auth(Role.ADMIN));
     expect(response.status).toBe(409);
     expect(response.body.error.code).toBe("BRANCH_IN_USE");
     expect(response.body.error.details).toMatchObject({ departments: 2, users: 1, tickets: 0 });
@@ -151,14 +151,14 @@ describe("branches API", () => {
   });
 
   it("deletes an unreferenced branch", async () => {
-    mocks.findUnique.mockResolvedValue({ id: "b1", name: "Head Office", _count: { departments: 0, users: 0, tickets: 0 } });
-    const response = await request(app).delete("/api/settings/branches/b1").set(auth(Role.ADMIN));
+    mocks.findUnique.mockResolvedValue({ id: "c7dc96f776c8423e57a278548", name: "Head Office", _count: { departments: 0, users: 0, tickets: 0 } });
+    const response = await request(app).delete("/api/settings/branches/c7dc96f776c8423e57a278548").set(auth(Role.ADMIN));
     expect(response.status).toBe(204);
-    expect(mocks.remove).toHaveBeenCalledWith({ where: { id: "b1" } });
+    expect(mocks.remove).toHaveBeenCalledWith({ where: { id: "c7dc96f776c8423e57a278548" } });
   });
 
   it("exposes an active-only lookup to every internal role", async () => {
-    mocks.findMany.mockResolvedValue([{ id: "b1", name: "Head Office", code: "HQ" }]);
+    mocks.findMany.mockResolvedValue([{ id: "c7dc96f776c8423e57a278548", name: "Head Office", code: "HQ" }]);
     for (const role of [Role.ADMIN, Role.MANAGER, Role.AGENT]) {
       expect((await request(app).get("/api/branches").set(auth(role))).status).toBe(200);
     }

@@ -24,7 +24,7 @@ describe("dashboard overview", () => {
 
   it("rejects unauthenticated and CUSTOMER access", async () => {
     expect((await request(app).get("/api/dashboard/overview")).status).toBe(401);
-    expect((await request(app).get("/api/dashboard/overview").set(auth("customer-1", Role.CUSTOMER))).status).toBe(403);
+    expect((await request(app).get("/api/dashboard/overview").set(auth("ce83f10dcd2c68747c3f3ba14", Role.CUSTOMER))).status).toBe(403);
   });
 
   it.each([Role.ADMIN, Role.MANAGER])("keeps the %s primary queue as system-wide Needs Attention", async (role) => {
@@ -35,10 +35,10 @@ describe("dashboard overview", () => {
   });
 
   it("applies assigned-or-unassigned visibility to every AGENT query", async () => {
-    await request(app).get("/api/dashboard/overview").set(auth("agent-1", Role.AGENT));
+    await request(app).get("/api/dashboard/overview").set(auth("c6ff3b3bd11c44cac620c43d5", Role.AGENT));
     const serialized = JSON.stringify([...mocks.count.mock.calls, ...mocks.findMany.mock.calls, ...mocks.groupBy.mock.calls]);
     expect(serialized).not.toContain("agent-2");
-    expect(serialized.match(/agent-1/g)?.length).toBeGreaterThan(10);
+    expect(serialized.match(/c6ff3b3bd11c44cac620c43d5/g)?.length).toBeGreaterThan(10);
   });
 
   it("uses UTC day boundaries for resolved today", async () => {
@@ -70,7 +70,7 @@ describe("dashboard overview", () => {
   });
 
   it("builds an AGENT primary queue from active assigned tickets only and orders it deterministically", async () => {
-    const agent = { id: "agent-1", name: "Agent" };
+    const agent = { id: "c6ff3b3bd11c44cac620c43d5", name: "Agent" };
     const breached = { ...base, id: "breached", assignedAgent: agent, firstResponseDueAt: new Date(now.getTime() - 1) };
     const risk = { ...base, id: "risk", assignedAgent: agent, firstResponseDueAt: new Date(now.getTime() + 30 * 60_000) };
     const urgent = { ...base, id: "urgent", assignedAgent: agent, priority: TicketPriority.URGENT };
@@ -78,11 +78,11 @@ describe("dashboard overview", () => {
     const mediumOld = { ...base, id: "medium-a", assignedAgent: agent, updatedAt: new Date("2026-08-24T10:00:00.000Z") };
     const mediumTie = { ...base, id: "medium-b", assignedAgent: agent, updatedAt: mediumOld.updatedAt };
     mocks.findMany.mockReset().mockResolvedValueOnce([breached]).mockResolvedValueOnce([risk]).mockResolvedValueOnce([urgent]).mockResolvedValueOnce([high]).mockResolvedValueOnce([mediumTie, mediumOld]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-    const data = await getDashboardOverview({ userId: "agent-1", role: Role.AGENT }, now);
+    const data = await getDashboardOverview({ userId: "c6ff3b3bd11c44cac620c43d5", role: Role.AGENT }, now);
     expect(data.primaryQueueType).toBe("MY_ASSIGNED_TICKETS");
     expect(data.primaryTickets.map((item) => item.id)).toEqual(["breached", "risk", "urgent", "high", "medium-a", "medium-b"]);
     for (const call of mocks.findMany.mock.calls.slice(0, 6)) {
-      expect(JSON.stringify(call[0].where)).toContain('"assignedAgentId":"agent-1"');
+      expect(JSON.stringify(call[0].where)).toContain('"assignedAgentId":"c6ff3b3bd11c44cac620c43d5"');
       expect(JSON.stringify(call[0].where)).toContain('"status":{"in"');
       expect(call[0].take).toBe(10);
     }
@@ -90,9 +90,9 @@ describe("dashboard overview", () => {
 
   it("excludes primary IDs before fetching up to eight deterministic recent tickets", async () => {
     mocks.findMany.mockResolvedValue([]);
-    await getDashboardOverview({ userId: "agent-1", role: Role.AGENT }, now);
+    await getDashboardOverview({ userId: "c6ff3b3bd11c44cac620c43d5", role: Role.AGENT }, now);
     expect(mocks.findMany.mock.calls.at(-1)?.[0]).toMatchObject({ take: 8, orderBy: [{ updatedAt: "desc" }, { id: "asc" }] });
-    expect(mocks.groupBy.mock.calls[0][0]).toMatchObject({ by: ["status"], where: { OR: [{ assignedAgentId: "agent-1" }, { assignedAgentId: null }] } });
+    expect(mocks.groupBy.mock.calls[0][0]).toMatchObject({ by: ["status"], where: { OR: [{ assignedAgentId: "c6ff3b3bd11c44cac620c43d5" }, { assignedAgentId: null }] } });
   });
 
   it("returns a 30-day zero-filled opened/resolved activity series bucketed by UTC day", async () => {
@@ -120,10 +120,10 @@ describe("dashboard overview", () => {
   });
 
   it("preserves AGENT assigned-or-unassigned visibility in Recent Tickets and excludes primary IDs", async () => {
-    const assigned = { ...base, id: "primary", assignedAgent: { id: "agent-1", name: "Agent" } };
+    const assigned = { ...base, id: "primary", assignedAgent: { id: "c6ff3b3bd11c44cac620c43d5", name: "Agent" } };
     mocks.findMany.mockReset().mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([assigned]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-    await getDashboardOverview({ userId: "agent-1", role: Role.AGENT }, now);
+    await getDashboardOverview({ userId: "c6ff3b3bd11c44cac620c43d5", role: Role.AGENT }, now);
     const recentWhere = mocks.findMany.mock.calls.at(-1)?.[0].where;
-    expect(recentWhere).toEqual({ AND: [{ OR: [{ assignedAgentId: "agent-1" }, { assignedAgentId: null }] }, { id: { notIn: ["primary"] } }] });
+    expect(recentWhere).toEqual({ AND: [{ OR: [{ assignedAgentId: "c6ff3b3bd11c44cac620c43d5" }, { assignedAgentId: null }] }, { id: { notIn: ["primary"] } }] });
   });
 });

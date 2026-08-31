@@ -41,7 +41,7 @@ const auth = (role: Role, id = role.toLowerCase()) => ({
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.userFindMany.mockResolvedValue([]);
-  mocks.ticketFindFirst.mockResolvedValue({ id: "ticket-1" });
+  mocks.ticketFindFirst.mockResolvedValue({ id: "c737ce60fccf9da889f4605c0" });
   mocks.watcherFindMany.mockResolvedValue([]);
   mocks.watcherCreateMany.mockResolvedValue({ count: 1 });
   mocks.watcherDeleteMany.mockResolvedValue({ count: 1 });
@@ -135,9 +135,9 @@ describe("GET /api/users/mentionable", () => {
 describe("ticket watcher endpoints", () => {
   it("rejects CUSTOMER on every watcher route", async () => {
     for (const call of [
-      request(app).get("/api/tickets/ticket-1/watchers"),
-      request(app).post("/api/tickets/ticket-1/watchers"),
-      request(app).delete("/api/tickets/ticket-1/watchers/me"),
+      request(app).get("/api/tickets/c737ce60fccf9da889f4605c0/watchers"),
+      request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/watchers"),
+      request(app).delete("/api/tickets/c737ce60fccf9da889f4605c0/watchers/me"),
     ]) {
       expect((await call.set(auth(Role.CUSTOMER))).status).toBe(403);
     }
@@ -145,16 +145,16 @@ describe("ticket watcher endpoints", () => {
 
   it("returns 404 when the ticket is not visible to the caller", async () => {
     mocks.ticketFindFirst.mockResolvedValue(null);
-    expect((await request(app).get("/api/tickets/hidden/watchers").set(auth(Role.AGENT))).status).toBe(404);
-    expect((await request(app).post("/api/tickets/hidden/watchers").set(auth(Role.AGENT))).status).toBe(404);
-    expect((await request(app).delete("/api/tickets/hidden/watchers/me").set(auth(Role.AGENT))).status).toBe(404);
+    expect((await request(app).get("/api/tickets/ce564b4081d7a9ea4b00dada5/watchers").set(auth(Role.AGENT))).status).toBe(404);
+    expect((await request(app).post("/api/tickets/ce564b4081d7a9ea4b00dada5/watchers").set(auth(Role.AGENT))).status).toBe(404);
+    expect((await request(app).delete("/api/tickets/ce564b4081d7a9ea4b00dada5/watchers/me").set(auth(Role.AGENT))).status).toBe(404);
   });
 
   it("scopes the visibility check to AGENT assigned-or-unassigned tickets", async () => {
-    await request(app).get("/api/tickets/ticket-1/watchers").set(auth(Role.AGENT, "agent-1"));
+    await request(app).get("/api/tickets/c737ce60fccf9da889f4605c0/watchers").set(auth(Role.AGENT, "agent-1"));
     expect(mocks.ticketFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: "ticket-1", OR: [{ assignedAgentId: "agent-1" }, { assignedAgentId: null }] },
+        where: { id: "c737ce60fccf9da889f4605c0", OR: [{ assignedAgentId: "agent-1" }, { assignedAgentId: null }] },
       }),
     );
   });
@@ -163,22 +163,22 @@ describe("ticket watcher endpoints", () => {
     mocks.watcherFindMany.mockResolvedValue([
       { id: "w1", createdAt: new Date(), user: { id: "u1", name: "Ann", email: "ann@x.com" } },
     ]);
-    const response = await request(app).get("/api/tickets/ticket-1/watchers").set(auth(Role.MANAGER));
+    const response = await request(app).get("/api/tickets/c737ce60fccf9da889f4605c0/watchers").set(auth(Role.MANAGER));
     expect(response.status).toBe(200);
     expect(response.body.data[0].user).toEqual({ id: "u1", name: "Ann", email: "ann@x.com" });
     expect(mocks.watcherFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { ticketId: "ticket-1" }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] }),
+      expect.objectContaining({ where: { ticketId: "c737ce60fccf9da889f4605c0" }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] }),
     );
   });
 
   it("self-watch is idempotent (skipDuplicates) and reports the current state", async () => {
     mocks.watcherCount.mockResolvedValue(3);
     mocks.watcherFindFirst.mockResolvedValue({ id: "w1" });
-    const response = await request(app).post("/api/tickets/ticket-1/watchers").set(auth(Role.AGENT, "agent-7"));
+    const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/watchers").set(auth(Role.AGENT, "ccfad431af89dd48c0fe73ace"));
     expect(response.status).toBe(200);
     expect(response.body.data).toEqual({ watching: true, watcherCount: 3 });
     expect(mocks.watcherCreateMany).toHaveBeenCalledWith({
-      data: [{ ticketId: "ticket-1", userId: "agent-7" }],
+      data: [{ ticketId: "c737ce60fccf9da889f4605c0", userId: "ccfad431af89dd48c0fe73ace" }],
       skipDuplicates: true,
     });
   });
@@ -186,10 +186,10 @@ describe("ticket watcher endpoints", () => {
   it("self-unwatch succeeds even when no watcher row exists", async () => {
     mocks.watcherDeleteMany.mockResolvedValue({ count: 0 });
     mocks.watcherCount.mockResolvedValue(0);
-    const response = await request(app).delete("/api/tickets/ticket-1/watchers/me").set(auth(Role.AGENT, "agent-7"));
+    const response = await request(app).delete("/api/tickets/c737ce60fccf9da889f4605c0/watchers/me").set(auth(Role.AGENT, "ccfad431af89dd48c0fe73ace"));
     expect(response.status).toBe(200);
     expect(response.body.data).toEqual({ watching: false, watcherCount: 0 });
-    expect(mocks.watcherDeleteMany).toHaveBeenCalledWith({ where: { ticketId: "ticket-1", userId: "agent-7" } });
+    expect(mocks.watcherDeleteMany).toHaveBeenCalledWith({ where: { ticketId: "c737ce60fccf9da889f4605c0", userId: "ccfad431af89dd48c0fe73ace" } });
   });
 });
 
@@ -210,8 +210,8 @@ function fakeTx() {
 
 describe("applyNoteMentions", () => {
   const baseInput = {
-    ticketId: "ticket-1",
-    noteId: "note-1",
+    ticketId: "c737ce60fccf9da889f4605c0",
+    noteId: "cea503d892f34f0298079b79d",
     authorUserId: "author-1",
     authorName: "Sara",
     ticketSubject: "Login broken",
@@ -237,24 +237,24 @@ describe("applyNoteMentions", () => {
     );
     expect(tx.ticketMention.createMany).toHaveBeenCalledWith({
       data: [
-        { noteId: "note-1", mentionedUserId: "u1", ticketId: "ticket-1" },
-        { noteId: "note-1", mentionedUserId: "u2", ticketId: "ticket-1" },
+        { noteId: "cea503d892f34f0298079b79d", mentionedUserId: "u1", ticketId: "c737ce60fccf9da889f4605c0" },
+        { noteId: "cea503d892f34f0298079b79d", mentionedUserId: "u2", ticketId: "c737ce60fccf9da889f4605c0" },
       ],
       skipDuplicates: true,
     });
     // author + mentioned users are auto-watched
     expect(tx.ticketWatcher.createMany).toHaveBeenCalledWith({
       data: [
-        { ticketId: "ticket-1", userId: "author-1" },
-        { ticketId: "ticket-1", userId: "u1" },
-        { ticketId: "ticket-1", userId: "u2" },
+        { ticketId: "c737ce60fccf9da889f4605c0", userId: "author-1" },
+        { ticketId: "c737ce60fccf9da889f4605c0", userId: "u1" },
+        { ticketId: "c737ce60fccf9da889f4605c0", userId: "u2" },
       ],
       skipDuplicates: true,
     });
     expect(tx.notification.createMany).toHaveBeenCalledTimes(1);
     const notifyArg = tx.notification.createMany.mock.calls[0][0];
     expect(notifyArg.data).toHaveLength(2);
-    expect(notifyArg.data[0]).toMatchObject({ userId: "u1", type: "TICKET_MENTION", ticketId: "ticket-1" });
+    expect(notifyArg.data[0]).toMatchObject({ userId: "u1", type: "TICKET_MENTION", ticketId: "c737ce60fccf9da889f4605c0" });
   });
 
   it("still auto-watches the author when there are no mentions and writes nothing else", async () => {
@@ -265,7 +265,7 @@ describe("applyNoteMentions", () => {
     expect(tx.ticketMention.createMany).not.toHaveBeenCalled();
     expect(tx.notification.createMany).not.toHaveBeenCalled();
     expect(tx.ticketWatcher.createMany).toHaveBeenCalledWith({
-      data: [{ ticketId: "ticket-1", userId: "author-1" }],
+      data: [{ ticketId: "c737ce60fccf9da889f4605c0", userId: "author-1" }],
       skipDuplicates: true,
     });
   });
@@ -281,7 +281,7 @@ describe("notifyWatchers", () => {
       { userId: "w1" },
     ]);
     await notifyWatchers(tx as never, {
-      ticketId: "ticket-1",
+      ticketId: "c737ce60fccf9da889f4605c0",
       actorUserId: "actor",
       type: "TICKET_WATCH_ACTIVITY",
       title: "t",
@@ -297,7 +297,7 @@ describe("notifyWatchers", () => {
     const tx = fakeTx();
     tx.ticketWatcher.findMany.mockResolvedValue([{ userId: "actor" }]);
     await notifyWatchers(tx as never, {
-      ticketId: "ticket-1",
+      ticketId: "c737ce60fccf9da889f4605c0",
       actorUserId: "actor",
       type: "TICKET_WATCH_ACTIVITY",
       title: "t",

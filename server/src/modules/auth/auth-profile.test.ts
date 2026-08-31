@@ -38,7 +38,7 @@ const internalUser = (role: Role) => ({
   id: `user-${role.toLowerCase()}`,
   name: `${role} User`,
   email: `${role.toLowerCase()}@example.com`,
-  phone: "+201000000000",
+  phone: "+14155552671",
   role,
   isActive: true,
   createdAt,
@@ -56,7 +56,7 @@ beforeEach(() => {
   mocks.userFindFirst.mockResolvedValue(null);
   mocks.customerFindFirst.mockResolvedValue(null);
   mocks.userUpdate.mockResolvedValue({ id: "updated" });
-  mocks.customerUpdate.mockResolvedValue({ id: "customer-1" });
+  mocks.customerUpdate.mockResolvedValue({ id: "ce83f10dcd2c68747c3f3ba14" });
   mocks.auditCreate.mockResolvedValue({ id: "audit-1" });
   mocks.bcryptCompare.mockImplementation(async (password: string, hash: string) => hash === `hashed:${password}`);
   mocks.bcryptHash.mockImplementation(async (password: string) => `hashed:${password}`);
@@ -71,10 +71,10 @@ describe("self profile API", () => {
       const user = internalUser(role);
       if (role === Role.CUSTOMER) {
         user.customerProfile = {
-          id: "customer-1",
+          id: "ce83f10dcd2c68747c3f3ba14",
           name: "Customer Name",
           email: "customer@example.com",
-          phone: "+201111111111",
+          phone: "+14155552672",
         } as never;
       }
       mocks.userFindUnique.mockResolvedValue(user);
@@ -94,12 +94,12 @@ describe("self profile API", () => {
       const response = await request(app)
         .patch("/api/auth/profile")
         .set(authFor(admin))
-        .send({ name: "Updated Admin", email: "updated-admin@example.com", phone: "+202222222222" });
+        .send({ name: "Updated Admin", email: "updated-admin@example.com", phone: "+14155552673" });
 
       expect(response.status).toBe(200);
       expect(mocks.userUpdate).toHaveBeenCalledWith({
         where: { id: admin.id },
-        data: { name: "Updated Admin", email: "updated-admin@example.com", phone: "+202222222222" },
+        data: { name: "Updated Admin", email: "updated-admin@example.com", phone: "+14155552673" },
       });
       expect(mocks.auditCreate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -108,7 +108,7 @@ describe("self profile API", () => {
               changes: {
                 name: { from: admin.name, to: "Updated Admin" },
                 email: { from: admin.email, to: "updated-admin@example.com" },
-                phone: { from: admin.phone, to: "+202222222222" },
+                phone: { from: admin.phone, to: "+14155552673" },
               },
             }),
           }),
@@ -121,13 +121,13 @@ describe("self profile API", () => {
     it("can update name, email, and phone and synchronizes User and Customer rows", async () => {
       const customer = {
         ...internalUser(Role.CUSTOMER),
-        customerProfile: { id: "customer-1", name: "Old Cust", email: "old@example.com", phone: null },
+        customerProfile: { id: "ce83f10dcd2c68747c3f3ba14", name: "Old Cust", email: "old@example.com", phone: null },
       };
       mocks.userFindUnique.mockResolvedValue(customer);
       const response = await request(app)
         .patch("/api/auth/profile")
         .set(authFor(customer))
-        .send({ name: "New Cust", email: "new@example.com", phone: "+203333333333" });
+        .send({ name: "New Cust", email: "new@example.com", phone: "+14155552674" });
 
       expect(response.status).toBe(200);
       expect(mocks.userUpdate).toHaveBeenCalledOnce();
@@ -139,7 +139,7 @@ describe("self profile API", () => {
               changes: {
                 name: { from: "Old Cust", to: "New Cust" },
                 email: { from: "old@example.com", to: "new@example.com" },
-                phone: { from: null, to: "+203333333333" },
+                phone: { from: null, to: "+14155552674" },
               },
             }),
           }),

@@ -1,12 +1,13 @@
 import { z } from "zod";
+import { databaseIdSchema, hasAtLeastOneField } from "../../shared/validation/common.schema.js";
+import { paginationFields } from "../../shared/validation/pagination.schema.js";
 
 export const quickReplyListQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(15),
+  ...paginationFields(15),
   search: z.string().trim().max(100).default(""),
 }).strict();
 
-export const quickReplyParamsSchema = z.object({ id: z.string().trim().min(1) }).strict();
+export const quickReplyParamsSchema = z.object({ id: databaseIdSchema }).strict();
 
 export const createQuickReplySchema = z.object({
   title: z.string().trim().min(2).max(120),
@@ -16,7 +17,7 @@ export const createQuickReplySchema = z.object({
 export const updateQuickReplySchema = z.object({
   title: z.string().trim().min(2).max(120).optional(),
   body: z.string().trim().min(1).max(5_000).optional(),
-}).strict().refine((value) => Object.keys(value).length > 0, { message: "At least one quick reply field is required" });
+}).strict().refine(hasAtLeastOneField, { message: "At least one quick reply field is required" });
 
 export type QuickReplyListQuery = z.infer<typeof quickReplyListQuerySchema>;
 export type QuickReplyParams = z.infer<typeof quickReplyParamsSchema>;

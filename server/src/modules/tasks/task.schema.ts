@@ -1,9 +1,10 @@
 import { z } from "zod";
+import { databaseIdSchema, hasAtLeastOneField } from "../../shared/validation/common.schema.js";
+import { paginationFields } from "../../shared/validation/pagination.schema.js";
 
 // ---------------------------------------------------------------------------
 // Shared
 // ---------------------------------------------------------------------------
-const idSchema = z.string().trim().min(1);
 
 // ---------------------------------------------------------------------------
 // Create
@@ -21,8 +22,8 @@ export const createTaskSchema = z
       .max(2000, "Description must be 2,000 characters or fewer")
       .optional(),
     dueAt: z.iso.datetime({ message: "dueAt must be a valid ISO datetime" }).optional(),
-    assigneeId: idSchema.optional(),
-    ticketId: idSchema.optional(),
+    assigneeId: databaseIdSchema.optional(),
+    ticketId: databaseIdSchema.optional(),
   })
   .strict();
 
@@ -50,11 +51,11 @@ export const updateTaskSchema = z
       .datetime({ message: "dueAt must be a valid ISO datetime" })
       .nullable()
       .optional(),
-    assigneeId: idSchema.optional(),
-    ticketId: idSchema.nullable().optional(),
+    assigneeId: databaseIdSchema.optional(),
+    ticketId: databaseIdSchema.nullable().optional(),
   })
   .strict()
-  .refine((data) => Object.keys(data).length > 0, {
+  .refine(hasAtLeastOneField, {
     message: "At least one field must be provided",
   });
 
@@ -66,11 +67,10 @@ export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 export const listTasksQuerySchema = z
   .object({
     status: z.enum(["OPEN", "DONE"]).optional(),
-    assigneeId: idSchema.optional(),
-    ticketId: idSchema.optional(),
+    assigneeId: databaseIdSchema.optional(),
+    ticketId: databaseIdSchema.optional(),
     search: z.string().trim().max(200).optional(),
-    page: z.coerce.number().int().min(1).default(1),
-    limit: z.coerce.number().int().min(1).max(50).default(15),
+    ...paginationFields(15, 50),
   })
   .strict();
 
@@ -79,5 +79,5 @@ export type ListTasksQuery = z.infer<typeof listTasksQuerySchema>;
 // ---------------------------------------------------------------------------
 // ID param
 // ---------------------------------------------------------------------------
-export const taskIdParamSchema = z.object({ id: idSchema }).strict();
+export const taskIdParamSchema = z.object({ id: databaseIdSchema }).strict();
 export type TaskIdParam = z.infer<typeof taskIdParamSchema>;

@@ -1,14 +1,9 @@
-import type { Request, RequestHandler } from "express";
+import type { RequestHandler } from "express";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { getAppSecret, getVerifyToken } from "./whatsapp.config.js";
 import { safeEqual, verifySignature } from "./whatsapp.signature.js";
-import { extractInboundTextMessages, whatsappWebhookSchema } from "./whatsapp.schema.js";
+import { extractInboundTextMessages, whatsappVerificationQuerySchema, whatsappWebhookSchema } from "./whatsapp.schema.js";
 import { processInboundTextMessage } from "./whatsapp.service.js";
-
-function queryString(request: Request, key: string): string {
-  const value = request.query[key];
-  return typeof value === "string" ? value : "";
-}
 
 /**
  * GET /api/integrations/whatsapp/webhook
@@ -21,9 +16,14 @@ export const verifyWebhook: RequestHandler = (request, response, next) => {
     next(new AppError(503, "WHATSAPP_NOT_CONFIGURED", "WhatsApp webhook verification is not configured"));
     return;
   }
-  const mode = queryString(request, "hub.mode");
-  const challenge = queryString(request, "hub.challenge");
-  if (mode === "subscribe" && challenge && safeEqual(queryString(request, "hub.verify_token"), verifyToken)) {
+  const query = whatsappVerificationQuerySchema.safeParse(request.query);
+  if (!query.success) {
+    next(new AppError(403, "WHATSAPP_VERIFICATION_FAILED", "WhatsApp webhook verification failed"));
+    return;
+  }
+  const mode = query.data["hub.mode"] ?? "";
+  const challenge = query.data["hub.challenge"] ?? "";
+  if (mode === "subscribe" && challenge && safeEqual(query.data["hub.verify_token"] ?? "", verifyToken)) {
     response.status(200).type("text/plain").send(challenge);
     return;
   }

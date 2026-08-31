@@ -92,14 +92,14 @@ describe("SLA automation", () => {
   it("assigns oldest eligible tickets to the least-loaded matching active agent with id tie-breaking", async () => {
     mocks.ticketFindMany
       .mockResolvedValueOnce([
-        { id: "ticket-1", subject: "First", departmentId: "dept-1", branchId: "branch-1" },
+        { id: "c737ce60fccf9da889f4605c0", subject: "First", departmentId: "dept-1", branchId: "branch-1" },
         { id: "ticket-2", subject: "Second", departmentId: "dept-1", branchId: "branch-1" },
       ])
       .mockResolvedValueOnce([]);
     mocks.userFindMany.mockResolvedValueOnce([
       agent("agent-b", 1, { departmentId: "dept-1", branchId: "branch-1" }),
       agent("agent-a", 1, { departmentId: "dept-1", branchId: "branch-1" }),
-      agent("agent-other", 0, { departmentId: "dept-2", branchId: "branch-1" }),
+      agent("ccca392cf3cad3050adad420d", 0, { departmentId: "dept-2", branchId: "branch-1" }),
     ]);
 
     const result = await runSlaMonitor(new Date("2026-08-27T12:00:00.000Z"));
@@ -118,13 +118,13 @@ describe("SLA automation", () => {
     expect(mocks.ticketUpdateMany).toHaveBeenNthCalledWith(2, expect.objectContaining({ data: { assignedAgentId: "agent-b" } }));
     expect(mocks.historyCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ actorUserId: null, action: "AUTO_ASSIGNMENT" }) }));
     expect(mocks.notificationCreateMany).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.arrayContaining([expect.objectContaining({ type: "TICKET_AUTO_ASSIGNED", userId: "agent-a", ticketId: "ticket-1" })]),
+      data: expect.arrayContaining([expect.objectContaining({ type: "TICKET_AUTO_ASSIGNED", userId: "agent-a", ticketId: "c737ce60fccf9da889f4605c0" })]),
     }));
   });
 
   it("leaves unmatched tickets unassigned and never opens a mutation transaction", async () => {
     mocks.ticketFindMany
-      .mockResolvedValueOnce([{ id: "ticket-1", subject: "Scoped", departmentId: "dept-1", branchId: null }])
+      .mockResolvedValueOnce([{ id: "c737ce60fccf9da889f4605c0", subject: "Scoped", departmentId: "dept-1", branchId: null }])
       .mockResolvedValueOnce([]);
     mocks.userFindMany.mockResolvedValueOnce([agent("agent-1", 0, { departmentId: "dept-2" })]);
 
@@ -139,7 +139,7 @@ describe("SLA automation", () => {
       .mockResolvedValueOnce([{ id: "ticket-9", subject: "Breached", status: TicketStatus.IN_PROGRESS }]);
     mocks.userFindMany
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([{ id: "admin-1" }, { id: "manager-1" }]);
+      .mockResolvedValueOnce([{ id: "c90b1b286043f1b7612e423c7" }, { id: "c6fd0a01a46ed4545f0a5e774" }]);
 
     const result = await runSlaMonitor(now);
 
@@ -161,15 +161,15 @@ describe("SLA automation", () => {
     }));
     expect(mocks.notificationCreateMany).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.arrayContaining([
-        expect.objectContaining({ userId: "admin-1", type: "SLA_BREACH_ESCALATION" }),
-        expect.objectContaining({ userId: "manager-1", type: "SLA_BREACH_ESCALATION" }),
+        expect.objectContaining({ userId: "c90b1b286043f1b7612e423c7", type: "SLA_BREACH_ESCALATION" }),
+        expect.objectContaining({ userId: "c6fd0a01a46ed4545f0a5e774", type: "SLA_BREACH_ESCALATION" }),
       ]),
     }));
   });
 
   it("creates no history or notification when a concurrent or repeated run loses the guarded update", async () => {
     mocks.ticketFindMany
-      .mockResolvedValueOnce([{ id: "ticket-1", subject: "Already assigned", departmentId: null, branchId: null }])
+      .mockResolvedValueOnce([{ id: "c737ce60fccf9da889f4605c0", subject: "Already assigned", departmentId: null, branchId: null }])
       .mockResolvedValueOnce([{ id: "ticket-2", subject: "Already escalated", status: TicketStatus.OPEN }]);
     mocks.userFindMany.mockResolvedValueOnce([agent("agent-1", 0)]);
     mocks.ticketUpdateMany.mockResolvedValue({ count: 0 });

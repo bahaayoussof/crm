@@ -1,6 +1,7 @@
 import { z } from "zod";
+import { databaseIdSchema } from "../../shared/validation/common.schema.js";
 
-export const feedbackParamsSchema = z.object({ id: z.string().trim().min(1) }).strict();
+export const feedbackParamsSchema = z.object({ id: databaseIdSchema }).strict();
 
 export const submitFeedbackSchema = z
   .object({

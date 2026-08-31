@@ -64,8 +64,8 @@ vi.mock("../config/prisma.js", () => ({
 import { app } from "../app.js";
 import { createAccessToken } from "./auth/auth-token.js";
 
-const adminToken = createAccessToken({ id: "admin-1", role: Role.ADMIN });
-const managerToken = createAccessToken({ id: "manager-1", role: Role.MANAGER });
+const adminToken = createAccessToken({ id: "c90b1b286043f1b7612e423c7", role: Role.ADMIN });
+const managerToken = createAccessToken({ id: "c6fd0a01a46ed4545f0a5e774", role: Role.MANAGER });
 const agentToken = createAccessToken({ id: "agent-1", role: Role.AGENT });
 const portalToken = createAccessToken({ id: "portal-cust-1", role: Role.CUSTOMER });
 
@@ -74,7 +74,7 @@ const auth = (token = adminToken) => ({ Authorization: `Bearer ${token}` });
 describe("Pagination & Table Query Contracts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.userFindUnique.mockResolvedValue({ id: "admin-1", isActive: true, role: Role.ADMIN });
+    mocks.userFindUnique.mockResolvedValue({ id: "c90b1b286043f1b7612e423c7", isActive: true, role: Role.ADMIN });
     mocks.transaction.mockImplementation(async (queries: Promise<unknown>[]) =>
       Promise.all(queries)
     );
@@ -255,13 +255,13 @@ describe("Pagination & Table Query Contracts", () => {
       mocks.ticketCount.mockResolvedValue(12);
 
       await request(app)
-        .get("/api/tickets?status=OPEN&priority=HIGH&categoryId=cat-1")
+        .get("/api/tickets?status=OPEN&priority=HIGH&categoryId=cde7c6d191109f42b807f0280")
         .set(auth(adminToken));
 
       const expectedWhere = expect.objectContaining({
         status: TicketStatus.OPEN,
         priority: TicketPriority.HIGH,
-        categoryId: "cat-1",
+        categoryId: "cde7c6d191109f42b807f0280",
       });
 
       expect(mocks.ticketFindMany).toHaveBeenCalledWith(
@@ -322,13 +322,13 @@ describe("Pagination & Table Query Contracts", () => {
 
   describe("Customer Portal Tickets Pagination (/api/portal/tickets)", () => {
     it("enforces customer profile ownership on both queries and calculates multi-page meta", async () => {
-      mocks.customerFindUnique.mockResolvedValue({ id: "cust-profile-1" });
+      mocks.customerFindUnique.mockResolvedValue({ id: "cbac151a6bd891ca446ab356d" });
       mocks.ticketFindMany.mockResolvedValue([
         {
           id: "t-1",
           subject: "Portal request",
           status: TicketStatus.OPEN,
-          category: { id: "cat-1", name: "Billing" },
+          category: { id: "cde7c6d191109f42b807f0280", name: "Billing" },
           priority: TicketPriority.HIGH,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -345,12 +345,12 @@ describe("Pagination & Table Query Contracts", () => {
         expect.objectContaining({
           skip: 20,
           take: 20,
-          where: expect.objectContaining({ customerId: "cust-profile-1" }),
+          where: expect.objectContaining({ customerId: "cbac151a6bd891ca446ab356d" }),
         })
       );
       expect(mocks.ticketCount).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ customerId: "cust-profile-1" }),
+          where: expect.objectContaining({ customerId: "cbac151a6bd891ca446ab356d" }),
         })
       );
       expect(response.body.meta).toEqual({

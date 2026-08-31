@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { databaseIdSchema } from "../../shared/validation/common.schema.js";
 
 export const AI_ACTIONS = ["SUMMARY", "SUGGEST_REPLY", "CLASSIFY", "KB_SUGGESTIONS"] as const;
 
@@ -40,7 +41,7 @@ export const aiSuggestedReplySchema = z.object({
 export type AiSuggestedReply = z.infer<typeof aiSuggestedReplySchema>;
 
 export const aiClassificationSchema = z.object({
-  categoryId: z.string().trim().min(1),
+  categoryId: databaseIdSchema,
   categoryName: z.string().trim().min(1).max(200),
   confidence: z.number().min(0).max(1),
   reason: z.string().trim().max(1000),
@@ -51,7 +52,7 @@ export const aiKbSuggestionsSchema = z.object({
   articles: z
     .array(
       z.object({
-        id: z.string().trim().min(1),
+        id: databaseIdSchema,
         relevance: z.number().min(0).max(1),
         reason: z.string().trim().max(1000),
       }),

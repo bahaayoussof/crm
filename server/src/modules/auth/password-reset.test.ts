@@ -59,7 +59,7 @@ beforeEach(() => {
   mocks.tokenDeleteMany.mockResolvedValue({ count: 0 });
   mocks.tokenCreate.mockResolvedValue({ id: "prt-1" });
   mocks.tokenUpdateMany.mockResolvedValue({ count: 1 });
-  mocks.userUpdate.mockResolvedValue({ id: "user-1" });
+  mocks.userUpdate.mockResolvedValue({ id: "cc6c289e49e9c05b214586038" });
   mocks.auditCreate.mockResolvedValue({ id: "audit-1" });
 });
 
@@ -90,7 +90,7 @@ describe("forgot password", () => {
   });
 
   it("persists only the SHA-256 hash of the token, never the raw token", async () => {
-    mocks.userFindUnique.mockResolvedValue({ id: "user-1", name: "A", email: "a@example.com" });
+    mocks.userFindUnique.mockResolvedValue({ id: "cc6c289e49e9c05b214586038", name: "A", email: "a@example.com" });
     await request(app).post("/api/auth/forgot-password").send({ email: "a@example.com" });
     const created = mocks.tokenCreate.mock.calls.at(-1)![0].data as { tokenHash: string };
     expect(created.tokenHash).toMatch(/^[a-f0-9]{64}$/);
@@ -101,9 +101,9 @@ describe("forgot password", () => {
   });
 
   it("deletes prior unused tokens before issuing a new one", async () => {
-    mocks.userFindUnique.mockResolvedValue({ id: "user-1", name: "A", email: "a@example.com" });
+    mocks.userFindUnique.mockResolvedValue({ id: "cc6c289e49e9c05b214586038", name: "A", email: "a@example.com" });
     await request(app).post("/api/auth/forgot-password").send({ email: "a@example.com" });
-    expect(mocks.tokenDeleteMany).toHaveBeenCalledWith({ where: { userId: "user-1", usedAt: null } });
+    expect(mocks.tokenDeleteMany).toHaveBeenCalledWith({ where: { userId: "cc6c289e49e9c05b214586038", usedAt: null } });
   });
 });
 
@@ -112,7 +112,7 @@ describe("reset password", () => {
   const past = () => new Date(Date.now() - 60_000);
 
   it("resets the password for a valid token", async () => {
-    mocks.tokenFindUnique.mockResolvedValue({ id: "prt-1", userId: "user-1", usedAt: null, expiresAt: future() });
+    mocks.tokenFindUnique.mockResolvedValue({ id: "prt-1", userId: "cc6c289e49e9c05b214586038", usedAt: null, expiresAt: future() });
     const response = await request(app)
       .post("/api/auth/reset-password")
       .send({ token: "raw-token", password: "newpassword1", confirmPassword: "newpassword1" });
@@ -125,7 +125,7 @@ describe("reset password", () => {
   });
 
   it("rejects an expired token", async () => {
-    mocks.tokenFindUnique.mockResolvedValue({ id: "prt-1", userId: "user-1", usedAt: null, expiresAt: past() });
+    mocks.tokenFindUnique.mockResolvedValue({ id: "prt-1", userId: "cc6c289e49e9c05b214586038", usedAt: null, expiresAt: past() });
     const response = await request(app)
       .post("/api/auth/reset-password")
       .send({ token: "raw-token", password: "newpassword1", confirmPassword: "newpassword1" });
@@ -144,7 +144,7 @@ describe("reset password", () => {
   });
 
   it("rejects an already-used token", async () => {
-    mocks.tokenFindUnique.mockResolvedValue({ id: "prt-1", userId: "user-1", usedAt: new Date(), expiresAt: future() });
+    mocks.tokenFindUnique.mockResolvedValue({ id: "prt-1", userId: "cc6c289e49e9c05b214586038", usedAt: new Date(), expiresAt: future() });
     const response = await request(app)
       .post("/api/auth/reset-password")
       .send({ token: "raw-token", password: "newpassword1", confirmPassword: "newpassword1" });
@@ -161,7 +161,7 @@ describe("reset password", () => {
   });
 
   it("allows only one of two concurrent consumers of the same token", async () => {
-    mocks.tokenFindUnique.mockResolvedValue({ id: "prt-1", userId: "user-1", usedAt: null, expiresAt: future() });
+    mocks.tokenFindUnique.mockResolvedValue({ id: "prt-1", userId: "cc6c289e49e9c05b214586038", usedAt: null, expiresAt: future() });
     let claimed = false;
     mocks.tokenUpdateMany.mockImplementation(async () => {
       if (claimed) return { count: 0 };
@@ -171,8 +171,8 @@ describe("reset password", () => {
     // After the first claim, a re-read inside the losing transaction sees it used.
     mocks.tokenFindUnique.mockImplementation(async () =>
       claimed
-        ? { id: "prt-1", userId: "user-1", usedAt: new Date(), expiresAt: future() }
-        : { id: "prt-1", userId: "user-1", usedAt: null, expiresAt: future() },
+        ? { id: "prt-1", userId: "cc6c289e49e9c05b214586038", usedAt: new Date(), expiresAt: future() }
+        : { id: "prt-1", userId: "cc6c289e49e9c05b214586038", usedAt: null, expiresAt: future() },
     );
 
     const results = await Promise.allSettled([

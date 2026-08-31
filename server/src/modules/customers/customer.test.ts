@@ -25,12 +25,12 @@ import { app } from "../../app.js";
 import { createAccessToken } from "../auth/auth-token.js";
 
 const adminToken = createAccessToken({ id: "admin-1", role: Role.ADMIN });
-const managerToken = createAccessToken({ id: "manager-1", role: Role.MANAGER });
+const managerToken = createAccessToken({ id: "c6fd0a01a46ed4545f0a5e774", role: Role.MANAGER });
 const agentToken = createAccessToken({ id: "agent-1", role: Role.AGENT });
 const customerToken = createAccessToken({ id: "portal-1", role: Role.CUSTOMER });
 const auth = (token = adminToken) => ({ Authorization: `Bearer ${token}` });
 const now = new Date("2026-08-24T12:00:00.000Z");
-const customer = { id: "customer-1", name: "Ahmed Mohamed", email: "ahmed@example.com", phone: "+201000000000", createdAt: now, updatedAt: now };
+const customer = { id: "ce83f10dcd2c68747c3f3ba14", name: "Ahmed Mohamed", email: "ahmed@example.com", phone: "+14155552671", createdAt: now, updatedAt: now };
 
 describe("customer API", () => {
   beforeEach(() => {
@@ -61,7 +61,7 @@ describe("customer API", () => {
 
   it("allows AGENT to view customer details and existing notes", async () => {
     mocks.findCustomer.mockResolvedValue({ ...customer, user: null, attachments: [], tickets: [], _count: { tickets: 0 } });
-    mocks.findNotes.mockResolvedValue([{ id: "note-1", body: "Existing note", createdAt: now, author: { id: "admin-1", name: "Admin", role: Role.ADMIN } }]);
+    mocks.findNotes.mockResolvedValue([{ id: "cea503d892f34f0298079b79d", body: "Existing note", createdAt: now, author: { id: "admin-1", name: "Admin", role: Role.ADMIN } }]);
     const detailResponse = await request(app).get(`/api/customers/${customer.id}`).set(auth(agentToken));
     const notesResponse = await request(app).get(`/api/customers/${customer.id}/notes`).set(auth(agentToken));
     expect(detailResponse.status).toBe(200);
@@ -72,8 +72,8 @@ describe("customer API", () => {
   it.each([["ADMIN", adminToken], ["MANAGER", managerToken]])("returns all safe customer ticket summaries with FULL access for %s", async (_role, token) => {
     mocks.findCustomer.mockResolvedValue({ id: customer.id });
     mocks.findTickets.mockResolvedValue([
-      { id: "ticket-1", subject: "Assigned", status: "OPEN", priority: "HIGH", createdAt: now, updatedAt: now, assignedAgentId: "agent-1", category: null, assignedAgent: { id: "agent-1", name: "Agent" } },
-      { id: "ticket-2", subject: "Other", status: "NEW", priority: "LOW", createdAt: now, updatedAt: now, assignedAgentId: "agent-2", category: null, assignedAgent: { id: "agent-2", name: "Other Agent" } },
+      { id: "c737ce60fccf9da889f4605c0", subject: "Assigned", status: "OPEN", priority: "HIGH", createdAt: now, updatedAt: now, assignedAgentId: "agent-1", category: null, assignedAgent: { id: "agent-1", name: "Agent" } },
+      { id: "ticket-2", subject: "Other", status: "NEW", priority: "LOW", createdAt: now, updatedAt: now, assignedAgentId: "cc3544aa158a89417843d45b3", category: null, assignedAgent: { id: "cc3544aa158a89417843d45b3", name: "Other Agent" } },
     ]);
     mocks.countTickets.mockResolvedValue(2);
     const response = await request(app).get(`/api/customers/${customer.id}/tickets?page=1&limit=20`).set(auth(token));
@@ -85,16 +85,16 @@ describe("customer API", () => {
   it("returns complete safe history to AGENT with server-derived access and pagination", async () => {
     mocks.findCustomer.mockResolvedValue({ id: customer.id });
     mocks.findTickets.mockResolvedValue([
-      { id: "ticket-1", subject: "Mine", status: "OPEN", priority: "HIGH", createdAt: now, updatedAt: now, assignedAgentId: "agent-1", category: { id: "category-1", name: "Billing" }, assignedAgent: { id: "agent-1", name: "Agent" } },
+      { id: "c737ce60fccf9da889f4605c0", subject: "Mine", status: "OPEN", priority: "HIGH", createdAt: now, updatedAt: now, assignedAgentId: "agent-1", category: { id: "category-1", name: "Billing" }, assignedAgent: { id: "agent-1", name: "Agent" } },
       { id: "ticket-2", subject: "Unassigned", status: "NEW", priority: "MEDIUM", createdAt: now, updatedAt: now, assignedAgentId: null, category: null, assignedAgent: null },
-      { id: "ticket-3", subject: "Other agent", status: "IN_PROGRESS", priority: "LOW", createdAt: now, updatedAt: now, assignedAgentId: "agent-2", category: null, assignedAgent: { id: "agent-2", name: "Other Agent" } },
+      { id: "ticket-3", subject: "Other agent", status: "IN_PROGRESS", priority: "LOW", createdAt: now, updatedAt: now, assignedAgentId: "cc3544aa158a89417843d45b3", category: null, assignedAgent: { id: "cc3544aa158a89417843d45b3", name: "Other Agent" } },
     ]);
     mocks.countTickets.mockResolvedValue(23);
     const response = await request(app).get(`/api/customers/${customer.id}/tickets?page=2&limit=10`).set(auth(agentToken));
     expect(response.status).toBe(200);
     expect(response.body.meta).toEqual({ page: 2, limit: 10, total: 23, totalPages: 3 });
     expect(response.body.data.map((ticket: { access: string }) => ticket.access)).toEqual(["FULL", "FULL", "SUMMARY_ONLY"]);
-    expect(response.body.data[2]).toEqual({ id: "ticket-3", subject: "Other agent", status: "IN_PROGRESS", priority: "LOW", createdAt: now.toISOString(), updatedAt: now.toISOString(), category: null, assignedAgent: { id: "agent-2", name: "Other Agent" }, access: "SUMMARY_ONLY" });
+    expect(response.body.data[2]).toEqual({ id: "ticket-3", subject: "Other agent", status: "IN_PROGRESS", priority: "LOW", createdAt: now.toISOString(), updatedAt: now.toISOString(), category: null, assignedAgent: { id: "cc3544aa158a89417843d45b3", name: "Other Agent" }, access: "SUMMARY_ONLY" });
     expect(response.body.data[2]).not.toHaveProperty("assignedAgentId");
   });
 
@@ -102,7 +102,7 @@ describe("customer API", () => {
     expect((await request(app).get(`/api/customers/${customer.id}/tickets`)).status).toBe(401);
     expect((await request(app).get(`/api/customers/${customer.id}/tickets`).set(auth(customerToken))).status).toBe(403);
     mocks.findCustomer.mockResolvedValue(null);
-    const missing = await request(app).get("/api/customers/missing/tickets").set(auth(agentToken));
+    const missing = await request(app).get("/api/customers/cffa63583dfa6706b87d284b8/tickets").set(auth(agentToken));
     expect(missing.status).toBe(404);
     expect(missing.body.error.code).toBe("CUSTOMER_NOT_FOUND");
   });
@@ -145,11 +145,11 @@ describe("customer API", () => {
     mocks.findCustomer.mockResolvedValue(null);
     mocks.createCustomer.mockResolvedValue(customer);
     const response = await request(app).post("/api/customers").set(auth()).send({
-      name: "  Ahmed Mohamed ", email: " AHMED@Example.com ", phone: "+201000000000",
+      name: "  Ahmed Mohamed ", email: " AHMED@Example.com ", phone: "+14155552671",
     });
     expect(response.status).toBe(201);
     expect(mocks.createCustomer).toHaveBeenCalledWith(expect.objectContaining({
-      data: { name: "Ahmed Mohamed", email: "ahmed@example.com", phone: "+201000000000", userId: null },
+      data: { name: "Ahmed Mohamed", email: "ahmed@example.com", phone: "+14155552671", userId: null },
     }));
   });
 
@@ -172,7 +172,7 @@ describe("customer API", () => {
 
   it("returns not found for a missing customer", async () => {
     mocks.findCustomer.mockResolvedValue(null);
-    const response = await request(app).get("/api/customers/missing").set(auth());
+    const response = await request(app).get("/api/customers/cffa63583dfa6706b87d284b8").set(auth());
     expect(response.status).toBe(404);
     expect(response.body.error.code).toBe("CUSTOMER_NOT_FOUND");
   });
@@ -190,7 +190,7 @@ describe("customer API", () => {
 
   it("creates an internal note using the authenticated user as author", async () => {
     mocks.findCustomer.mockResolvedValue({ id: customer.id });
-    mocks.createNote.mockResolvedValue({ id: "note-1", body: "Prefers phone", createdAt: now, author: { id: "admin-1", name: "Admin", role: "ADMIN" } });
+    mocks.createNote.mockResolvedValue({ id: "cea503d892f34f0298079b79d", body: "Prefers phone", createdAt: now, author: { id: "admin-1", name: "Admin", role: "ADMIN" } });
     const response = await request(app).post(`/api/customers/${customer.id}/notes`).set(auth()).send({ body: " Prefers phone " });
     expect(response.status).toBe(201);
     expect(mocks.createNote).toHaveBeenCalledWith(expect.objectContaining({ data: { customerId: customer.id, authorUserId: "admin-1", body: "Prefers phone" } }));

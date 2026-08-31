@@ -658,3 +658,16 @@ Summary: Completed **Tasks & Reminders** end to end on uncommitted `feature/task
 | — | users.test.tsx rewritten for new behavior + branch-dependent dept tests; orgHooks hoisted mutable mock | client/src/features/users/users.test.tsx | 671/671 | 12k |
 | — | i18n users.selectBranchFirst EN/AR | locales/{en,ar}/translation.json | parity 1189 | 2k |
 | — | Docs: 05, 17 (ADR-043 follow-up), 19; STATUS/memory/cerebrum/anatomy | docs/*, .wolf/* | updated | 5k |
+
+## Session: 2026-08-31 10:22 — refactor/backend-validation (Codex + continuation)
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| — | (Codex) New shared validation layer: databaseId (z.cuid), nullableDatabaseId, email, password, hasAtLeastOneField, trimmedNonEmptyString | server/src/shared/validation/common.schema.ts (new) | — | — |
+| — | (Codex) Shared paginationFields(defaultLimit, maxLimit) + shared phone schema (required/optional, normalize, format) moved out of shared/utils/phone.ts (now re-export) | shared/validation/{pagination,phone}.schema.ts (new), shared/utils/phone.ts | — | — |
+| — | (Codex) Migrated ~19 module schemas to shared validators; removed local normalizedEmail/passwordSchema/orgId/nullableId/idSchema + inline page/limit dups | server/src/modules/**/*.schema.ts | — | — |
+| — | (Codex) Hardened WhatsApp webhook (digit-bounded wa_id/from/timestamp, length caps, entry/changes .max(100)) + new whatsappVerificationQuerySchema; controller validates query → 403 | modules/integrations/whatsapp/{whatsapp.schema,whatsapp.controller}.ts | — | — |
+| — | (Codex) Added notificationParamsSchema + validateParams on PATCH /:id/read; controller reads validatedParams | modules/notifications/{notification.schema,notification.controller,notification.routes}.ts | — | — |
+| — | (Codex) Added common.schema.test.ts (4) + updated module tests to cuid-shaped IDs | shared/validation/common.schema.test.ts (new), modules/**/*.test.ts | — | — |
+| — | (continuation) Reviewed full diff, ran checks — no code changes needed | — | server tsc clean; vitest 618/618 (36 files); lint clean (1 pre-existing warn); build = tsc half clean, prisma generate EPERM (env) | 6k |
+| — | (continuation) Removed unused `trimmedNonEmptyString` (zero consumers); added `nullableDatabaseIdSchema` test (CUID / ""→null / null / undefined / malformed) | shared/validation/common.schema.{ts,test.ts} | server tsc clean; vitest 619/619 (+1) | 3k |
