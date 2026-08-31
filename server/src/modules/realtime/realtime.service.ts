@@ -50,8 +50,13 @@ function writeRaw(subscriber: RealtimeSubscriber, chunk: string) {
   }
 }
 
-export function addSubscriber(userId: string, role: Role, response: Response): RealtimeSubscriber {
-  const subscriber: RealtimeSubscriber = { id: randomUUID(), userId, role, response };
+export function addSubscriber(
+  userId: string,
+  role: Role,
+  response: Response,
+  customerId: string | null = null,
+): RealtimeSubscriber {
+  const subscriber: RealtimeSubscriber = { id: randomUUID(), userId, role, customerId, response };
   subscribers.set(subscriber.id, subscriber);
   startHeartbeat();
   return subscriber;
@@ -62,18 +67,38 @@ export function removeSubscriber(id: string) {
   stopHeartbeat();
 }
 
-/** Does this connected subscriber get to know the event happened? */
-export function canReceive(subscriber: Pick<RealtimeSubscriber, "userId" | "role">, audience: RealtimeAudience): boolean {
+/**
+ * Does this connected subscriber get to know the event happened?
+ *
+ * Role-aware by design (§6): internal visibility mirrors `ticket-visibility.ts`
+ * unchanged; CUSTOMER has its own path — portal ticket ownership + public events
+ * only. The two never share a code branch.
+ */
+export function canReceive(
+  subscriber: Pick<RealtimeSubscriber, "userId" | "role" | "customerId">,
+  audience: RealtimeAudience,
+): boolean {
   if (audience.scope === "user") {
+    // User-scoped events are internal CRM notifications. The Customer Portal has
+    // no notification system, so a CUSTOMER connection never receives these even
+    // if a user id somehow collided.
+    if (subscriber.role === Role.CUSTOMER) return false;
     return subscriber.userId === audience.userId;
   }
-  // scope === "ticket": internal RBAC mirrors ticket-visibility.ts.
+
+  // scope === "ticket"
+  if (subscriber.role === Role.CUSTOMER) {
+    // Portal realtime: own ticket only, public conversation only. Internal notes
+    // (and any future internal-only ticket signal) are never routed to a customer.
+    if (audience.visibility === "internal") return false;
+    return subscriber.customerId !== null && subscriber.customerId === audience.customerId;
+  }
+
+  // Internal RBAC mirrors ticket-visibility.ts.
   if (subscriber.role === Role.ADMIN || subscriber.role === Role.MANAGER) return true;
   if (subscriber.role === Role.AGENT) {
     return audience.assignedAgentId === null || audience.assignedAgentId === subscriber.userId;
   }
-  // CUSTOMER connections are not accepted by the endpoint today (see docs). If
-  // customer SSE is added later, portal ticket ownership is checked here.
   return false;
 }
 

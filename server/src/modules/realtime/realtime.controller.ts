@@ -1,4 +1,6 @@
+import { Role } from "@prisma/client";
 import type { RequestHandler } from "express";
+import { prisma } from "../../config/prisma.js";
 import { addSubscriber, removeSubscriber, RECONNECT_ADVICE_MS } from "./realtime.service.js";
 
 /**
@@ -8,6 +10,11 @@ import { addSubscriber, removeSubscriber, RECONNECT_ADVICE_MS } from "./realtime
  * native `EventSource`) specifically so the existing `Authorization: Bearer
  * <jwt>` header rides along unchanged — no token in the URL, no cookie, no
  * second auth path. `requireAuth` on the route has already validated the JWT.
+ *
+ * All authenticated roles connect (ADMIN/MANAGER/AGENT and CUSTOMER). A CUSTOMER
+ * connection is scoped server-side: its linked `Customer.id` is resolved once
+ * here, and `canReceive` then routes only that customer's own public ticket
+ * events to it.
  */
 export const streamRealtimeEvents: RequestHandler = (request, response) => {
   const auth = request.auth;
@@ -33,6 +40,20 @@ export const streamRealtimeEvents: RequestHandler = (request, response) => {
   response.write(": connected\n\n");
 
   const subscriber = addSubscriber(auth.userId, auth.role, response);
+
+  if (auth.role === Role.CUSTOMER) {
+    // Resolve the portal customer account ONCE per connection (never per event).
+    // Patched in place on the registered subscriber; until it resolves the
+    // customer simply receives no ticket events (realtime is an enhancement).
+    void prisma.customer
+      .findUnique({ where: { userId: auth.userId }, select: { id: true } })
+      .then((customer) => {
+        subscriber.customerId = customer?.id ?? null;
+      })
+      .catch(() => {
+        subscriber.customerId = null;
+      });
+  }
 
   const cleanup = () => {
     removeSubscriber(subscriber.id);

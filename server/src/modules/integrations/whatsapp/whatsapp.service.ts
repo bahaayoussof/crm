@@ -174,12 +174,12 @@ async function fanOutInboundNotification(
  */
 export async function processInboundTextMessage(message: InboundTextMessage): Promise<InboundResult> {
   return withRealtimeOutbox(async () => {
-   const { outcome, assignedAgentId } = await prisma.$transaction(async (tx) => {
+   const { outcome, assignedAgentId, customerId } = await prisma.$transaction(async (tx) => {
     const duplicate = await tx.ticketMessage.findUnique({
       where: { externalId: message.externalId },
       select: { id: true },
     });
-    if (duplicate) return { outcome: { status: "DUPLICATE" } as InboundResult, assignedAgentId: null };
+    if (duplicate) return { outcome: { status: "DUPLICATE" } as InboundResult, assignedAgentId: null, customerId: null };
 
     const author = await ensureSystemUser(tx);
     const customer = await matchOrCreateCustomer(tx, message.from, message.profileName);
@@ -207,7 +207,7 @@ export async function processInboundTextMessage(message: InboundTextMessage): Pr
         select: { id: true },
       });
     } catch (error) {
-      if (isUniqueConstraintError(error)) return { outcome: { status: "DUPLICATE" } as InboundResult, assignedAgentId: ticket.assignedAgentId };
+      if (isUniqueConstraintError(error)) return { outcome: { status: "DUPLICATE" } as InboundResult, assignedAgentId: ticket.assignedAgentId, customerId: customer.id };
       throw error;
     }
 
@@ -236,6 +236,7 @@ export async function processInboundTextMessage(message: InboundTextMessage): Pr
         messageId: record.id,
       } as InboundResult,
       assignedAgentId: ticket.assignedAgentId,
+      customerId: customer.id,
     };
    });
 
@@ -244,6 +245,7 @@ export async function processInboundTextMessage(message: InboundTextMessage): Pr
        ticketId: outcome.ticketId,
        messageId: outcome.messageId,
        assignedAgentId,
+       customerId,
        visibility: "public",
      });
    }

@@ -49,7 +49,7 @@ async function assignUnassignedTickets() {
       where: { assignedAgentId: null, status: { in: [...ACTIVE_STATUSES] } },
       take: SLA_MONITOR_BATCH_SIZE,
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-      select: { id: true, subject: true, departmentId: true, branchId: true },
+      select: { id: true, subject: true, departmentId: true, branchId: true, customerId: true },
     }),
     prisma.user.findMany({
       where: { role: Role.AGENT, isActive: true },
@@ -108,7 +108,7 @@ async function assignUnassignedTickets() {
     if (assigned) {
       updated += 1;
       agent.activeTicketCount += 1;
-      emitTicketUpdated({ ticketId: ticket.id, assignedAgentId: agent.id });
+      emitTicketUpdated({ ticketId: ticket.id, assignedAgentId: agent.id, customerId: ticket.customerId });
     }
   }
   return { inspected: tickets.length, updated };
@@ -124,7 +124,7 @@ async function escalateBreachedTickets(now: Date) {
     },
     take: SLA_MONITOR_BATCH_SIZE,
     orderBy: [{ resolutionDueAt: "asc" }, { id: "asc" }],
-    select: { id: true, subject: true, status: true, assignedAgentId: true },
+    select: { id: true, subject: true, status: true, assignedAgentId: true, customerId: true },
   });
   let updated = 0;
 
@@ -168,7 +168,7 @@ async function escalateBreachedTickets(now: Date) {
     });
     if (escalated) {
       updated += 1;
-      emitTicketUpdated({ ticketId: ticket.id, assignedAgentId: ticket.assignedAgentId });
+      emitTicketUpdated({ ticketId: ticket.id, assignedAgentId: ticket.assignedAgentId, customerId: ticket.customerId });
     }
   }
   return { inspected: tickets.length, updated };

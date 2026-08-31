@@ -235,13 +235,47 @@ window reload.
 
 ## 9. Customer portal
 
-**Intentionally deferred.** The SSE endpoint rejects `CUSTOMER` (403). The
-server transport and audience model are already customer-capable (a
-`{ scope: "ticket" }` audience could check portal ticket ownership), but the
-portal frontend has different query keys and a conversation view that excludes
-internal notes, so wiring a customer connection safely is follow-up work. No
-customer ticket isolation was weakened. Customers still see replies on the next
-REST refetch (navigation / focus).
+**Implemented.** An authenticated `CUSTOMER` opens the same single
+application-level SSE connection as internal roles (`RealtimeProvider` now gates
+on `user` alone, not `role !== "CUSTOMER"`). What a customer connection receives
+is scoped entirely server-side:
+
+- **Endpoint auth** — `realtime.routes.ts` `requireRole` now also lists
+  `CUSTOMER`. Unauthenticated is still `401`. Nothing about the JWT check
+  changed.
+- **Ticket ownership** — when the stream is established, `realtime.controller.ts`
+  resolves the caller's linked `Customer.id` **once** (`prisma.customer
+  .findUnique({ where: { userId } })`) and stores it on the subscriber. No
+  per-event query. `ticketId` from the client is never trusted — routing is
+  `subscriber.customerId === audience.customerId`, where `audience.customerId` is
+  the ticket's owner captured at emit time.
+- **Audience metadata** — the `{ scope: "ticket" }` audience now carries
+  `customerId` (owning portal account) and, for `ticket.message.created`,
+  `visibility`. This is server-side authorization context only — it is **not**
+  added to the SSE wire payload, which stays `{ type, ticketId, messageId?,
+  visibility }`.
+- **Public messages only** — `canReceive` returns `false` for a `CUSTOMER`
+  subscriber whenever `audience.visibility === "internal"`. Internal notes never
+  produce a customer-visible realtime event. The client handler drops an
+  internal-visibility `ticket.message.created` for a `CUSTOMER` session as
+  defence in depth.
+- **`ticket.updated`** — delivered to the owning customer (no `visibility`
+  field); it only triggers a REST refetch, and portal REST authorization remains
+  the source of truth. No internal-only state is added to the payload.
+- **Notifications** — user-scoped `notification.created` / `notification.read`
+  are never routed to a `CUSTOMER` connection (`canReceive` short-circuits) and
+  the client handler ignores them for a `CUSTOMER` session. The portal has no
+  notification centre; scope was not broadened.
+- **Query invalidation** — `handleRealtimeEvent(queryClient, event, role)`: for a
+  `CUSTOMER` it invalidates `portalKeys.ticket(id)` + `portalKeys.tickets()`
+  (message) and additionally `portalKeys.overview` (update). Internal
+  `ticketKeys` / `notificationKeys` are untouched for that role. Refetch
+  preserves composer text, scroll and selected ticket — TanStack Query only
+  refreshes server state.
+
+Internal (`ADMIN` / `MANAGER` / `AGENT`) visibility and notification targeting
+are unchanged — the customer path is a separate branch in `canReceive`, never
+folded into `ticket-visibility.ts`.
 
 ---
 
@@ -312,5 +346,6 @@ host that supports long-lived responses.
 
 If a true live-chat feature is built later: add presence / typing / read-receipt
 events to the same contract, likely swap SSE for WebSocket via the
-`realtime.publisher` seam, and add a customer-scoped connection. None of that
-changes ticket / email / WhatsApp / notification business logic.
+`realtime.publisher` seam. The customer-scoped connection already exists
+(section 9). None of that changes ticket / email / WhatsApp / notification
+business logic.

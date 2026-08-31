@@ -50,6 +50,8 @@ export function emitTicketMessageCreated(params: {
   ticketId: string;
   messageId: string;
   assignedAgentId: string | null;
+  /** Owning portal customer — server-side audience context only, never on the wire. */
+  customerId: string | null;
   visibility: "public" | "internal";
 }) {
   enqueue({
@@ -59,14 +61,30 @@ export function emitTicketMessageCreated(params: {
       messageId: params.messageId,
       visibility: params.visibility,
     },
-    audience: { scope: "ticket", ticketId: params.ticketId, assignedAgentId: params.assignedAgentId },
+    audience: {
+      scope: "ticket",
+      ticketId: params.ticketId,
+      assignedAgentId: params.assignedAgentId,
+      customerId: params.customerId,
+      visibility: params.visibility,
+    },
   });
 }
 
-export function emitTicketUpdated(params: { ticketId: string; assignedAgentId: string | null }) {
+export function emitTicketUpdated(params: {
+  ticketId: string;
+  assignedAgentId: string | null;
+  /** Owning portal customer — server-side audience context only, never on the wire. */
+  customerId: string | null;
+}) {
   enqueue({
     event: { type: "ticket.updated", ticketId: params.ticketId },
-    audience: { scope: "ticket", ticketId: params.ticketId, assignedAgentId: params.assignedAgentId },
+    audience: {
+      scope: "ticket",
+      ticketId: params.ticketId,
+      assignedAgentId: params.assignedAgentId,
+      customerId: params.customerId,
+    },
   });
 }
 

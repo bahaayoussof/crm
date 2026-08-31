@@ -107,7 +107,7 @@ export async function addTicketMessage(ticketId: string, input: TicketConversati
   // support-reply allowlist here — this is the trust boundary, not the client.
   const body = sanitizeReplyHtml(input.body);
   if (!body) throw new AppError(422, "EMPTY_MESSAGE", "Message body is required");
-  const { message, channel, customerPhone, emailExternalId, assignedAgentId } = await prisma.$transaction(async (tx) => {
+  const { message, channel, customerPhone, emailExternalId, assignedAgentId, customerId } = await prisma.$transaction(async (tx) => {
     const ticket = await requireConversationMutationAccess(tx, ticketId, actor);
     let emailExternalId: string | null = null;
     if (ticket.channel === Channel.EMAIL) {
@@ -153,12 +153,13 @@ export async function addTicketMessage(ticketId: string, input: TicketConversati
       customerPhone: ticket.customer?.phone ?? null,
       emailExternalId,
       assignedAgentId: ticket.assignedAgentId,
+      customerId: ticket.customerId,
     };
   });
 
   // Persistence committed — signal connected clients (transaction-safe: buffered
   // by withRealtimeOutbox, flushed when this function resolves).
-  emitTicketMessageCreated({ ticketId, messageId: message.id, assignedAgentId, visibility: "public" });
+  emitTicketMessageCreated({ ticketId, messageId: message.id, assignedAgentId, customerId, visibility: "public" });
 
   // Outbound transport for WhatsApp-originated tickets. The message is already
   // committed above, so a delivery failure never corrupts the conversation — it
@@ -211,12 +212,13 @@ export async function addTicketNote(ticketId: string, input: TicketConversationI
       message: `${note.author.name} added an internal note on ticket #${ticketId}: ${ticket.subject}`,
       excludeUserIds: mentionedIds,
     });
-    return { note: { ...note, kind: "INTERNAL_NOTE" as const }, assignedAgentId: ticket.assignedAgentId };
+    return { note: { ...note, kind: "INTERNAL_NOTE" as const }, assignedAgentId: ticket.assignedAgentId, customerId: ticket.customerId };
    });
    emitTicketMessageCreated({
      ticketId,
      messageId: result.note.id,
      assignedAgentId: result.assignedAgentId,
+     customerId: result.customerId,
      visibility: "internal",
    });
    return result.note;
@@ -252,7 +254,7 @@ export async function createTicket(input: CreateTicketInput, actor: Actor, reque
     }
     return ticket;
    });
-   emitTicketUpdated({ ticketId: ticket.id, assignedAgentId: ticket.assignedAgent?.id ?? null });
+   emitTicketUpdated({ ticketId: ticket.id, assignedAgentId: ticket.assignedAgent?.id ?? null, customerId: ticket.customer?.id ?? null });
    return ticket;
   });
 }
@@ -364,7 +366,7 @@ export async function updateTicket(ticketId: string, input: UpdateTicketInput, a
     return { updated, changed };
    });
    // Only signal when visible ticket state actually changed — a no-op PATCH stays quiet.
-   if (changed) emitTicketUpdated({ ticketId, assignedAgentId: updated.assignedAgent?.id ?? null });
+   if (changed) emitTicketUpdated({ ticketId, assignedAgentId: updated.assignedAgent?.id ?? null, customerId: updated.customer?.id ?? null });
    return updated;
   });
 }
@@ -381,6 +383,7 @@ async function requireConversationMutationAccess(tx: Prisma.TransactionClient, t
       id: true,
       subject: true,
       assignedAgentId: true,
+      customerId: true,
       channel: true,
       emailThreadToken: true,
       customer: { select: { phone: true, email: true } },

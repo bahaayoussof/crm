@@ -144,7 +144,7 @@ export async function reply(id: string, input: PortalReplyInput, userId: string)
       assignedAgentId: ticket.assignedAgentId,
     };
    });
-   emitTicketMessageCreated({ ticketId: id, messageId: result.id, assignedAgentId, visibility: "public" });
+   emitTicketMessageCreated({ ticketId: id, messageId: result.id, assignedAgentId, customerId, visibility: "public" });
    return result;
   });
 }

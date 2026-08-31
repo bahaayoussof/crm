@@ -5,8 +5,10 @@ import { streamRealtimeEvents } from "./realtime.controller.js";
 
 export const realtimeRouter = Router();
 
-// Internal roles only for the first implementation. CUSTOMER (portal) realtime is
-// a documented follow-up — see docs/22-realtime-events.md.
-realtimeRouter.use(requireAuth, requireRole(Role.ADMIN, Role.MANAGER, Role.AGENT));
+// Every authenticated role connects. CUSTOMER (portal) connections are scoped
+// server-side by `canReceive` (own public ticket events only) — see
+// docs/22-realtime-events.md. `requireRole` is kept explicit so a future role is
+// not granted realtime by accident.
+realtimeRouter.use(requireAuth, requireRole(Role.ADMIN, Role.MANAGER, Role.AGENT, Role.CUSTOMER));
 
 realtimeRouter.get("/events", streamRealtimeEvents);

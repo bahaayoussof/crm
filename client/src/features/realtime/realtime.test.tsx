@@ -48,14 +48,48 @@ describe("handleRealtimeEvent", () => {
     handleRealtimeEvent(client, { type: "ticket.updated", ticketId: "t7" });
     expect(keys(spy).some((k) => k.includes("notifications"))).toBe(false);
   });
+
+  // --- CUSTOMER (Customer Portal) routing --------------------------------
+  it("CUSTOMER ticket.message.created invalidates only the portal conversation + portal ticket list", () => {
+    const { client, spy } = setup();
+    handleRealtimeEvent(client, { type: "ticket.message.created", ticketId: "t7", messageId: "m1", visibility: "public" }, "CUSTOMER");
+    expect(keys(spy)).toEqual([
+      JSON.stringify(["portal", "tickets", "t7"]),
+      JSON.stringify(["portal", "tickets"]),
+    ]);
+    expect(keys(spy).some((k) => k.includes('"tickets","detail"') || k.includes("notifications"))).toBe(false);
+  });
+
+  it("CUSTOMER ticket.updated invalidates the portal ticket + list + overview", () => {
+    const { client, spy } = setup();
+    handleRealtimeEvent(client, { type: "ticket.updated", ticketId: "t7" }, "CUSTOMER");
+    expect(keys(spy)).toEqual([
+      JSON.stringify(["portal", "tickets", "t7"]),
+      JSON.stringify(["portal", "tickets"]),
+      JSON.stringify(["portal", "overview"]),
+    ]);
+  });
+
+  it("CUSTOMER internal-note event causes no portal invalidation", () => {
+    const { client, spy } = setup();
+    handleRealtimeEvent(client, { type: "ticket.message.created", ticketId: "t7", messageId: "n1", visibility: "internal" }, "CUSTOMER");
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("CUSTOMER never reacts to internal notification events", () => {
+    const { client, spy } = setup();
+    handleRealtimeEvent(client, { type: "notification.created", notificationId: null }, "CUSTOMER");
+    handleRealtimeEvent(client, { type: "notification.read", notificationId: "n1" }, "CUSTOMER");
+    expect(spy).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
 // provider — one connection, lifecycle
 // ---------------------------------------------------------------------------
 const closeSpy = vi.fn();
-const createClientSpy = vi.fn((_opts?: unknown) => ({ close: closeSpy }));
-vi.mock("./realtime-client", () => ({ createRealtimeClient: (opts: unknown) => createClientSpy(opts) }));
+const createClientSpy = vi.fn((): { close: () => void } => ({ close: closeSpy }));
+vi.mock("./realtime-client", () => ({ createRealtimeClient: () => createClientSpy() }));
 
 let mockUser: { id: string; role: string } | null = null;
 vi.mock("@/features/auth/auth-state", () => ({
@@ -92,10 +126,10 @@ describe("RealtimeProvider", () => {
     expect(createClientSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("does not connect for a CUSTOMER (portal) session", () => {
+  it("opens exactly one connection for an authenticated CUSTOMER (portal) session", () => {
     mockUser = { id: "c1", role: "CUSTOMER" };
     renderProvider();
-    expect(createClientSpy).not.toHaveBeenCalled();
+    expect(createClientSpy).toHaveBeenCalledTimes(1);
   });
 
   it("does not connect when logged out", () => {

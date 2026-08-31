@@ -698,3 +698,9 @@ Summary: Completed **Tasks & Reminders** end to end on uncommitted `feature/task
 | — | Verification | — | server tsc/lint/660 ✓; client tsc/lint/690 ✓ build ✓; git diff --check ✓ (users.test.tsx flaked once under concurrency, green isolated) | 3k |
 
 Session summary: Implemented the full realtime event layer per the spec. REST unchanged; SSE `GET /api/realtime/events` (internal roles only) + `fetch`+`ReadableStream` client (JWT in Authorization header, not EventSource). Events `ticket.message.created` / `ticket.updated` / `notification.created` (+ `notification.read`) emitted from centralized services after commit via `withRealtimeOutbox` (AsyncLocalStorage buffer). Authorization mirrors `ticket-visibility.ts`; notifications targeted per-user. Frontend maps events to targeted TanStack Query invalidations reusing existing key factories; one `RealtimeProvider` connection in `app-router.tsx`. Customer portal realtime deferred (endpoint 403s CUSTOMER). No schema change, no new dependency. Hosting caveat documented: Vercel serverless force-closes SSE at `maxDuration` — persistent Node host / Fluid Compute / managed provider is the production path. Not committed. Live Resend/WhatsApp/browser QA outstanding.
+
+## Session: 2026-08-31 20:18
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 20:35 | Complete Customer Portal realtime: allow CUSTOMER SSE, add server-only `customerId`+`visibility` to ticket audience, per-connection customer-id resolve, role-aware `canReceive` + `handleRealtimeEvent`, provider connects for CUSTOMER | server/src/modules/realtime/{types,service,controller,routes,publisher}.ts, ticket.service.ts, portal.service.ts, email.service.ts, whatsapp.service.ts, sla-automation.service.ts, client realtime-provider.tsx + realtime-event-handler.ts, both realtime test files, docs/22 | server 666/666, client 693/694 (1 known flake), tsc/lint/build clean | ~60k |

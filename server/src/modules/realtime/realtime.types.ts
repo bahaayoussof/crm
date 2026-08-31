@@ -34,7 +34,10 @@ export type RealtimeEvent =
 
 /**
  * Who is allowed to know an event happened. Resolved against the connected
- * subscribers by `realtime.service.ts` — never serialized to the wire.
+ * subscribers by `realtime.service.ts` — never serialized to the wire. This is
+ * server-side authorization context: it may carry more than the SSE payload
+ * (owning customer, visibility) precisely so per-event routing needs no extra
+ * database query.
  */
 export type RealtimeAudience =
   | {
@@ -42,6 +45,18 @@ export type RealtimeAudience =
       ticketId: string;
       /** Snapshot at emit time — drives AGENT visibility (assigned-or-unassigned). */
       assignedAgentId: string | null;
+      /**
+       * Owning portal customer (`Ticket.customerId`) at emit time. Drives CUSTOMER
+       * portal-ownership routing — a customer is told about a ticket event only
+       * when this matches their linked customer account. Never sent on the wire.
+       */
+      customerId: string | null;
+      /**
+       * Present for `ticket.message.created`. CUSTOMER subscribers receive the
+       * event only when this is `"public"`; internal notes are never routed to a
+       * customer connection.
+       */
+      visibility?: "public" | "internal";
     }
   | {
       scope: "user";
@@ -57,5 +72,12 @@ export interface RealtimeSubscriber {
   id: string;
   userId: string;
   role: Role;
+  /**
+   * For a CUSTOMER connection: the linked `Customer.id`, resolved once when the
+   * stream is established (never per event). `null` until resolved, or when the
+   * user has no linked customer profile — such a connection receives no ticket
+   * events. Unused for internal roles.
+   */
+  customerId: string | null;
   response: Response;
 }

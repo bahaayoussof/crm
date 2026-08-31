@@ -2,8 +2,13 @@ import { Role } from "@prisma/client";
 import type { Request, Response } from "express";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const customerFindUnique = vi.fn<[unknown], Promise<{ id: string } | null>>();
+vi.mock("../../config/prisma.js", () => ({
+  prisma: { customer: { findUnique: (args: unknown) => customerFindUnique(args) } },
+}));
+
 import { app } from "../../app.js";
-import { createAccessToken } from "../auth/auth-token.js";
 import { streamRealtimeEvents } from "./realtime.controller.js";
 import {
   addSubscriber,
@@ -68,7 +73,11 @@ const dataOf = (frame: string) => {
   return line ? JSON.parse(line.slice("data:".length).trim()) : null;
 };
 
-beforeEach(() => __resetRealtimeForTest());
+beforeEach(() => {
+  __resetRealtimeForTest();
+  customerFindUnique.mockReset();
+  customerFindUnique.mockResolvedValue({ id: "cust-acc-1" });
+});
 afterEach(() => __resetRealtimeForTest());
 
 // --- SSE connection -----------------------------------------------------
@@ -78,10 +87,16 @@ describe("realtime SSE endpoint", () => {
     expect(response.status).toBe(401);
   });
 
-  it("rejects a CUSTOMER connection (internal-only in this scope)", async () => {
-    const token = createAccessToken({ id: "cust-1", role: Role.CUSTOMER });
-    const response = await request(app).get("/api/realtime/events").set("Authorization", `Bearer ${token}`);
-    expect(response.status).toBe(403);
+  it("accepts an authenticated CUSTOMER connection and resolves its portal account once", async () => {
+    customerFindUnique.mockResolvedValue({ id: "cust-acc-9" });
+    const { req } = fakeRequest({ userId: "cust-user-1", role: Role.CUSTOMER });
+    const { res } = fakeResponse();
+
+    streamRealtimeEvents(req, res, vi.fn());
+
+    expect(__subscribersForTest()).toHaveLength(1);
+    expect(customerFindUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: "cust-user-1" } }));
+    await vi.waitFor(() => expect(__subscribersForTest()[0]!.customerId).toBe("cust-acc-9"));
   });
 
   it("registers an authenticated connection and writes SSE headers + preamble", () => {
@@ -111,24 +126,55 @@ describe("realtime SSE endpoint", () => {
 
 // --- authorization -----------------------------------------------------
 describe("realtime authorization (canReceive)", () => {
-  const ticketAudience = (assignedAgentId: string | null) =>
-    ({ scope: "ticket", ticketId: "t1", assignedAgentId }) as const;
+  const ticketAudience = (
+    assignedAgentId: string | null,
+    extra: { customerId?: string | null; visibility?: "public" | "internal" } = {},
+  ) => ({ scope: "ticket", ticketId: "t1", assignedAgentId, customerId: extra.customerId ?? null, ...(extra.visibility ? { visibility: extra.visibility } : {}) }) as const;
+  const sub = (userId: string, role: Role, customerId: string | null = null) => ({ userId, role, customerId });
 
   it("ADMIN and MANAGER receive every ticket event", () => {
-    expect(canReceive({ userId: "a", role: Role.ADMIN }, ticketAudience("someone"))).toBe(true);
-    expect(canReceive({ userId: "m", role: Role.MANAGER }, ticketAudience("someone"))).toBe(true);
+    expect(canReceive(sub("a", Role.ADMIN), ticketAudience("someone"))).toBe(true);
+    expect(canReceive(sub("m", Role.MANAGER), ticketAudience("someone"))).toBe(true);
   });
 
   it("AGENT receives ticket events only for assigned or unassigned tickets", () => {
-    expect(canReceive({ userId: "ag", role: Role.AGENT }, ticketAudience("ag"))).toBe(true);
-    expect(canReceive({ userId: "ag", role: Role.AGENT }, ticketAudience(null))).toBe(true);
-    expect(canReceive({ userId: "ag", role: Role.AGENT }, ticketAudience("other"))).toBe(false);
+    expect(canReceive(sub("ag", Role.AGENT), ticketAudience("ag"))).toBe(true);
+    expect(canReceive(sub("ag", Role.AGENT), ticketAudience(null))).toBe(true);
+    expect(canReceive(sub("ag", Role.AGENT), ticketAudience("other"))).toBe(false);
   });
 
   it("notification events reach only the intended user", () => {
     const audience = { scope: "user", userId: "u1" } as const;
-    expect(canReceive({ userId: "u1", role: Role.AGENT }, audience)).toBe(true);
-    expect(canReceive({ userId: "u2", role: Role.ADMIN }, audience)).toBe(false);
+    expect(canReceive(sub("u1", Role.AGENT), audience)).toBe(true);
+    expect(canReceive(sub("u2", Role.ADMIN), audience)).toBe(false);
+  });
+
+  it("CUSTOMER receives a public ticket event only for their own ticket", () => {
+    const own = ticketAudience("agent-x", { customerId: "cust-1", visibility: "public" });
+    const other = ticketAudience("agent-x", { customerId: "cust-2", visibility: "public" });
+    expect(canReceive(sub("cu", Role.CUSTOMER, "cust-1"), own)).toBe(true);
+    expect(canReceive(sub("cu", Role.CUSTOMER, "cust-1"), other)).toBe(false);
+  });
+
+  it("CUSTOMER never receives an internal-note ticket event, even for their own ticket", () => {
+    const internalOnOwn = ticketAudience(null, { customerId: "cust-1", visibility: "internal" });
+    expect(canReceive(sub("cu", Role.CUSTOMER, "cust-1"), internalOnOwn)).toBe(false);
+  });
+
+  it("CUSTOMER with no linked account (customerId null) receives nothing", () => {
+    const audience = ticketAudience(null, { customerId: null, visibility: "public" });
+    expect(canReceive(sub("cu", Role.CUSTOMER, null), audience)).toBe(false);
+  });
+
+  it("CUSTOMER never receives internal user-scoped notification events", () => {
+    const audience = { scope: "user", userId: "cu" } as const;
+    expect(canReceive(sub("cu", Role.CUSTOMER, "cust-1"), audience)).toBe(false);
+  });
+
+  it("CUSTOMER receives a ticket.updated for their own ticket (no visibility field)", () => {
+    const own = ticketAudience("agent-x", { customerId: "cust-1" });
+    expect(canReceive(sub("cu", Role.CUSTOMER, "cust-1"), own)).toBe(true);
+    expect(canReceive(sub("cu", Role.CUSTOMER, "cust-9"), own)).toBe(false);
   });
 
   it("publish routes a ticket event past an unauthorized AGENT", () => {
@@ -141,6 +187,26 @@ describe("realtime authorization (canReceive)", () => {
 
     expect(admin.writes.join("")).toContain("ticket.updated");
     expect(wrongAgent.writes.join("")).toBe("");
+  });
+
+  it("publish delivers a customer's own public message but withholds an internal note and another customer's ticket", () => {
+    const mine = fakeResponse();
+    const other = fakeResponse();
+    const staff = fakeResponse();
+    addSubscriber("cust-user-1", Role.CUSTOMER, mine.res, "cust-1");
+    addSubscriber("cust-user-2", Role.CUSTOMER, other.res, "cust-2");
+    addSubscriber("agent-1", Role.AGENT, staff.res, null);
+
+    // Admin public reply on cust-1's ticket.
+    emitTicketMessageCreated({ ticketId: "t1", messageId: "m1", assignedAgentId: null, customerId: "cust-1", visibility: "public" });
+    expect(mine.writes.join("")).toContain("ticket.message.created");
+    expect(other.writes.join("")).toBe("");
+    expect(staff.writes.join("")).toContain("ticket.message.created");
+
+    // Internal note on the same ticket — the customer must not hear about it.
+    mine.writes.length = 0;
+    emitTicketMessageCreated({ ticketId: "t1", messageId: "n1", assignedAgentId: null, customerId: "cust-1", visibility: "internal" });
+    expect(mine.writes.join("")).toBe("");
   });
 
   it("publish delivers a notification only to its recipient", () => {
@@ -184,7 +250,7 @@ describe("realtime lifecycle", () => {
     addSubscriber("u2", Role.ADMIN, dead.res);
 
     expect(() =>
-      publish({ event: { type: "ticket.updated", ticketId: "t1" }, audience: { scope: "ticket", ticketId: "t1", assignedAgentId: null } }),
+      publish({ event: { type: "ticket.updated", ticketId: "t1" }, audience: { scope: "ticket", ticketId: "t1", assignedAgentId: null, customerId: null } }),
     ).not.toThrow();
 
     expect(good.writes.join("")).toContain("ticket.updated");

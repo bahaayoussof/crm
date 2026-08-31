@@ -316,14 +316,17 @@ export async function processInboundEmail(event: InboundEmailEvent) {
         ticketId: ticket.id,
         messageId,
         assignedAgentId: ticket.assignedAgentId,
+        customerId: customer.id,
       };
     });
-    // Committed — tell connected staff. Rolled-back / duplicate paths never reach here.
+    // Committed — tell connected staff (and the owning portal customer). Rolled-back
+    // / duplicate paths never reach here.
     if (outcome.status === "DUPLICATE") return outcome;
     emitTicketMessageCreated({
       ticketId: outcome.ticketId,
       messageId: outcome.messageId,
       assignedAgentId: outcome.assignedAgentId,
+      customerId: outcome.customerId,
       visibility: "public",
     });
     return { status: outcome.status, ticketId: outcome.ticketId, messageId: outcome.messageId };

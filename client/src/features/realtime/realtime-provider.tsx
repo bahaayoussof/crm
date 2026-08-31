@@ -9,12 +9,14 @@ const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
 const REALTIME_URL = `${API_URL.replace(/\/$/, "")}/realtime/events`;
 
 /**
- * Maintains exactly one application-level SSE connection for authenticated
- * internal users, and routes every event to `handleRealtimeEvent`.
+ * Maintains exactly one application-level SSE connection for any authenticated
+ * user, and routes every event to `handleRealtimeEvent`.
  *
  * - One connection per browser tab (not per ticket page).
- * - CUSTOMER (portal) sessions get no connection — customer realtime is a
- *   documented follow-up.
+ * - Internal roles (ADMIN/MANAGER/AGENT) and CUSTOMER (Customer Portal) all
+ *   connect; the server scopes what each connection receives. The event handler
+ *   maps events onto the right query keys per role.
+ * - No connection when logged out.
  * - Recreated when the signed-in user changes (login / logout / account switch);
  *   torn down on unmount. A failed connection never breaks the app — REST +
  *   TanStack Query keep working.
@@ -23,17 +25,17 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const userId = user?.id ?? null;
-  const isInternal = Boolean(user && user.role !== "CUSTOMER");
+  const role = user?.role ?? null;
 
   useEffect(() => {
-    if (!isInternal || !userId) return;
+    if (!userId || !role) return;
 
     let client: { close: () => void } | null = null;
     try {
       client = createRealtimeClient({
         url: REALTIME_URL,
         getToken: getAuthToken,
-        onEvent: (event) => handleRealtimeEvent(queryClient, event),
+        onEvent: (event) => handleRealtimeEvent(queryClient, event, role),
       });
     } catch (error) {
       // Realtime is an enhancement — never let it break the app shell.
@@ -49,7 +51,7 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
       window.removeEventListener("auth:unauthorized", onUnauthorized);
       client?.close();
     };
-  }, [isInternal, userId, queryClient]);
+  }, [userId, role, queryClient]);
 
   return <>{children}</>;
 }
