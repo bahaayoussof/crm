@@ -26,6 +26,10 @@ export const createUserSchema = z.object({
   role: manageableRoleSchema,
   departmentId: nullableDatabaseIdSchema,
   branchId: nullableDatabaseIdSchema,
+  // Team membership (feature/team-based-manager-scope). For a MANAGER this also
+  // makes them the team's manager (one manager per team); for an AGENT it is
+  // plain membership. ADMIN ignores it.
+  teamId: nullableDatabaseIdSchema,
 }).strict();
 
 // One safe update payload for the ADMIN-only user-management surface. Every field
@@ -41,6 +45,7 @@ export const updateUserSchema = z.object({
   isActive: z.boolean().optional(),
   departmentId: nullableDatabaseIdSchema,
   branchId: nullableDatabaseIdSchema,
+  teamId: nullableDatabaseIdSchema,
 }).strict().refine(hasAtLeastOneField, { message: "At least one user field is required" });
 
 export type UserListQuery = z.infer<typeof userListQuerySchema>;

@@ -3,6 +3,7 @@ import { Prisma, Role, TicketStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import { ticketVisibilityWhere } from "../tickets/ticket-visibility.js";
+import { resolveActorTeamScope } from "../../shared/team/team-scope.js";
 import { MAX_ATTACHMENT_BYTES } from "./attachment.constants.js";
 import { detectFileType } from "./detect-file-type.js";
 import { sanitizeFileName } from "./file-name.js";
@@ -92,8 +93,11 @@ async function customerIdForUser(userId: string): Promise<string> {
 }
 
 async function requireVisibleTicket(ticketId: string, actor: Actor) {
+  // Team-scoped (feature/team-based-manager-scope): a MANAGER cannot list/upload
+  // attachments on another team's ticket by id.
+  const team = await resolveActorTeamScope(actor);
   const ticket = await prisma.ticket.findFirst({
-    where: { id: ticketId, ...ticketVisibilityWhere(actor) },
+    where: { id: ticketId, ...ticketVisibilityWhere(actor, team) },
     select: { id: true, status: true, assignedAgentId: true },
   });
   if (!ticket) throw ticketNotFound();
@@ -275,8 +279,9 @@ export async function resolveInternalDownload(attachmentId: string, actor: Actor
   if (!row) throw attachmentNotFound();
 
   if (row.ticketId) {
+    const team = await resolveActorTeamScope(actor);
     const ticket = await prisma.ticket.findFirst({
-      where: { id: row.ticketId, ...ticketVisibilityWhere(actor) },
+      where: { id: row.ticketId, ...ticketVisibilityWhere(actor, team) },
       select: { id: true },
     });
     if (!ticket) throw attachmentNotFound();

@@ -66,6 +66,10 @@ async function loadTickets(range: ReportsRange): Promise<ReportTicket[]> {
       // Optional organizational scoping — ANDed with the date window by Prisma.
       ...(range.departmentId ? { departmentId: range.departmentId } : {}),
       ...(range.branchId ? { branchId: range.branchId } : {}),
+      // Team scope (feature/team-based-manager-scope): the controller injects the
+      // MANAGER's own team id here (or a sentinel that matches nothing when the
+      // manager has no team). ADMIN leaves it undefined → organization-wide.
+      ...(range.teamId ? { teamId: range.teamId } : {}),
     },
     select: reportTicketSelect,
     orderBy: { createdAt: "asc" },
@@ -228,7 +232,11 @@ export async function getTicketReports(range: ReportsRange, now = new Date()) {
 export async function getAgentReports(query: ReportsAgentsQuery | ReportsRange, now = new Date()) {
   const [tickets, agents] = await Promise.all([
     loadTickets(query),
-    prisma.user.findMany({ where: { role: Role.AGENT }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.user.findMany({
+      where: { role: Role.AGENT, ...(query.teamId ? { teamId: query.teamId } : {}) },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   const names = new Map(agents.map((agent) => [agent.id, agent.name]));

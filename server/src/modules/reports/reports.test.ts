@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   ticketFindMany: vi.fn(),
   feedbackFindMany: vi.fn(),
   userFindMany: vi.fn(),
+  userFindUnique: vi.fn(),
   categoryFindMany: vi.fn(),
 }));
 
@@ -13,7 +14,7 @@ vi.mock("../../config/prisma.js", () => ({
   prisma: {
     ticket: { findMany: mocks.ticketFindMany },
     feedback: { findMany: mocks.feedbackFindMany },
-    user: { findMany: mocks.userFindMany },
+    user: { findMany: mocks.userFindMany, findUnique: mocks.userFindUnique },
     category: { findMany: mocks.categoryFindMany },
   },
 }));
@@ -24,7 +25,7 @@ import { getAgentReports, getReportsOverview, getSlaReports, getTicketReports } 
 
 const auth = (id: string, role: Role) => ({ Authorization: `Bearer ${createAccessToken({ id, role })}` });
 
-const range = { start: new Date("2026-08-01T00:00:00.000Z"), end: new Date("2026-08-31T23:59:59.999Z") };
+const range = { start: new Date("2026-08-01T00:00:00.000Z"), end: new Date("2026-08-31T23:59:59.999Z"), departmentId: undefined, branchId: undefined, teamId: undefined };
 const now = new Date("2026-08-27T12:00:00.000Z");
 
 const d = (iso: string) => new Date(iso);
@@ -56,6 +57,9 @@ beforeEach(() => {
   mocks.feedbackFindMany.mockResolvedValue([{ rating: 5 }, { rating: 4 }, { rating: 4 }, { rating: 2 }]);
   mocks.userFindMany.mockResolvedValue([{ id: "a1", name: "Alice" }, { id: "a2", name: "Bob" }]);
   mocks.categoryFindMany.mockResolvedValue([{ id: "c1", name: "Billing" }]);
+  // feature/team-based-manager-scope: the reports controller resolves a MANAGER's
+  // team via user.findUnique before scoping the query.
+  mocks.userFindUnique.mockResolvedValue({ teamId: "team-1", managedTeam: { id: "team-1" } });
 });
 
 describe("reports authorization", () => {
@@ -209,6 +213,26 @@ describe("reports sla", () => {
     expect(result.byPriority.find((row) => row.priority === "HIGH")).toEqual({
       priority: "HIGH", firstResponseMet: 0, firstResponseBreached: 1, resolutionMet: 0, resolutionBreached: 1, compliancePct: 0,
     });
+  });
+});
+
+// feature/team-based-manager-scope — reports are team-scoped server-side for MANAGER
+describe("reports team scope", () => {
+  it("injects the MANAGER's own team id into every report query (tickets + agent roster)", async () => {
+    await request(app).get("/api/reports/agents").set(auth("staff", Role.MANAGER));
+    expect(mocks.ticketFindMany.mock.calls[0][0].where).toMatchObject({ teamId: "team-1" });
+    expect(mocks.userFindMany.mock.calls[0][0].where).toMatchObject({ role: Role.AGENT, teamId: "team-1" });
+  });
+
+  it("uses a match-nothing sentinel for a MANAGER with no team (never org-wide)", async () => {
+    mocks.userFindUnique.mockResolvedValue({ teamId: null, managedTeam: null });
+    await request(app).get("/api/reports/overview").set(auth("staff", Role.MANAGER));
+    expect(mocks.ticketFindMany.mock.calls[0][0].where.teamId).toBe("__no_team__");
+  });
+
+  it("does NOT scope ADMIN reports", async () => {
+    await request(app).get("/api/reports/overview").set(auth("staff", Role.ADMIN));
+    expect(mocks.ticketFindMany.mock.calls[0][0].where).not.toHaveProperty("teamId");
   });
 });
 

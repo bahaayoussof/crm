@@ -55,8 +55,9 @@ export function addSubscriber(
   role: Role,
   response: Response,
   customerId: string | null = null,
+  teamId: string | null = null,
 ): RealtimeSubscriber {
-  const subscriber: RealtimeSubscriber = { id: randomUUID(), userId, role, customerId, response };
+  const subscriber: RealtimeSubscriber = { id: randomUUID(), userId, role, customerId, teamId, response };
   subscribers.set(subscriber.id, subscriber);
   startHeartbeat();
   return subscriber;
@@ -75,7 +76,7 @@ export function removeSubscriber(id: string) {
  * only. The two never share a code branch.
  */
 export function canReceive(
-  subscriber: Pick<RealtimeSubscriber, "userId" | "role" | "customerId">,
+  subscriber: Pick<RealtimeSubscriber, "userId" | "role" | "customerId" | "teamId">,
   audience: RealtimeAudience,
 ): boolean {
   if (audience.scope === "user") {
@@ -94,10 +95,21 @@ export function canReceive(
     return subscriber.customerId !== null && subscriber.customerId === audience.customerId;
   }
 
-  // Internal RBAC mirrors ticket-visibility.ts.
-  if (subscriber.role === Role.ADMIN || subscriber.role === Role.MANAGER) return true;
+  // Internal RBAC mirrors ticket-visibility.ts INCLUDING team scope
+  // (feature/team-based-manager-scope).
+  if (subscriber.role === Role.ADMIN) return true;
+  if (subscriber.role === Role.MANAGER) {
+    // Own team only. Unrouted ticket (audience.teamId null) → not delivered.
+    return subscriber.teamId !== null && subscriber.teamId === audience.teamId;
+  }
   if (subscriber.role === Role.AGENT) {
-    return audience.assignedAgentId === null || audience.assignedAgentId === subscriber.userId;
+    if (audience.assignedAgentId === subscriber.userId) return true;
+    // Unassigned queue: own team only.
+    return (
+      audience.assignedAgentId === null &&
+      subscriber.teamId !== null &&
+      subscriber.teamId === audience.teamId
+    );
   }
   return false;
 }

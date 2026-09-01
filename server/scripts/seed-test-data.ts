@@ -207,6 +207,23 @@ export async function seedTestData() {
   }
   console.log(`  ✓ ${categories.length} Categories ready.`);
 
+  // SLA rules — one active rule per priority (used by ticket creation / SLA
+  // automation). Idempotent on the unique `priority`.
+  const slaDefs = [
+    { priority: TicketPriority.URGENT, firstResponseMinutes: 15, resolutionMinutes: 240 },
+    { priority: TicketPriority.HIGH, firstResponseMinutes: 60, resolutionMinutes: 1440 },
+    { priority: TicketPriority.MEDIUM, firstResponseMinutes: 120, resolutionMinutes: 2880 },
+    { priority: TicketPriority.LOW, firstResponseMinutes: 240, resolutionMinutes: 5760 },
+  ];
+  for (const def of slaDefs) {
+    await prisma.slaRule.upsert({
+      where: { priority: def.priority },
+      create: { ...def, isActive: true },
+      update: { firstResponseMinutes: def.firstResponseMinutes, resolutionMinutes: def.resolutionMinutes, isActive: true },
+    });
+  }
+  console.log(`  ✓ ${slaDefs.length} SLA rules ready.`);
+
   // -------------------------------------------------------------------------
   // STEP 1b: Branches & Departments (organizational entities). Idempotent by
   // name; not tied to seed-user ids, so they persist across re-seeds and their
@@ -481,22 +498,65 @@ export async function seedTestData() {
 
   const allStaffUsers = [...adminUsers, ...managerUsers, ...agentUsers];
 
-  // Assign a department + its branch to most staff users (deterministic, and
-  // internally consistent so SLA auto-assignment eligibility keeps matching).
-  // Every 7th staff user is left unassigned to exercise the "no department /
-  // no branch" path.
-  const staffOrg = new Map<string, { departmentId: string; branchId: string | null }>();
-  for (let i = 0; i < allStaffUsers.length; i++) {
-    if (i % 7 === 6) continue;
-    const dept = departments[i % departments.length];
-    await prisma.user.update({
-      where: { id: allStaffUsers[i].id },
-      data: { departmentId: dept.id, branchId: dept.branchId },
+  // -------------------------------------------------------------------------
+  // STEP 3b: Teams (feature/team-based-manager-scope)
+  //
+  //   Department ─▶ Team ─▶ { Manager, Agents, Tickets }
+  //
+  // V1 invariants: exactly one Team per Manager, one Team per Agent. Every agent
+  // (active and inactive) is placed in a team; every manager both belongs to and
+  // manages exactly one team. "Customer Support" deliberately holds TWO teams so
+  // cross-team isolation can be verified inside a single department
+  // (Billing Support vs Technical Support).
+  // -------------------------------------------------------------------------
+  const deptByName = new Map(departments.map((d) => [d.name, d]));
+  const teamPlan: { name: string; department: string; manager: { id: string; name: string } }[] = [
+    { name: "Billing Support", department: "Customer Support", manager: managerUsers[0] },
+    { name: "Technical Support", department: "Customer Support", manager: managerUsers[1] },
+    { name: "Field Operations", department: "Field Services", manager: managerUsers[2] },
+    { name: "Onboarding Squad", department: "Onboarding", manager: managerUsers[3] },
+    { name: "Payments Desk", department: "Billing Operations", manager: managerUsers[4] },
+  ];
+
+  const teams: { id: string; name: string; departmentId: string; branchId: string | null; managerId: string }[] = [];
+  for (const plan of teamPlan) {
+    const dept = deptByName.get(plan.department)!;
+    const team = await prisma.team.create({
+      data: { name: plan.name, departmentId: dept.id, managerId: plan.manager.id, isActive: true },
+      select: { id: true, name: true, departmentId: true },
     });
-    staffOrg.set(allStaffUsers[i].id, { departmentId: dept.id, branchId: dept.branchId });
+    teams.push({ ...team, branchId: dept.branchId, managerId: plan.manager.id });
   }
+
+  // staffOrg / teamOfUser: department + branch + team for every manager and agent,
+  // always internally consistent (the team's department, that department's branch)
+  // so SLA auto-assignment eligibility and the ticket/team/department checks match.
+  const staffOrg = new Map<string, { departmentId: string; branchId: string | null }>();
+  const teamOfUser = new Map<string, { teamId: string; departmentId: string; branchId: string | null }>();
+
+  for (let m = 0; m < managerUsers.length; m++) {
+    const team = teams[m];
+    await prisma.user.update({
+      where: { id: managerUsers[m].id },
+      data: { teamId: team.id, departmentId: team.departmentId, branchId: team.branchId },
+    });
+    staffOrg.set(managerUsers[m].id, { departmentId: team.departmentId, branchId: team.branchId });
+    teamOfUser.set(managerUsers[m].id, { teamId: team.id, departmentId: team.departmentId, branchId: team.branchId });
+  }
+
+  const AGENTS_PER_TEAM = Math.ceil(agentUsers.length / teams.length);
+  for (let a = 0; a < agentUsers.length; a++) {
+    const team = teams[Math.min(Math.floor(a / AGENTS_PER_TEAM), teams.length - 1)];
+    await prisma.user.update({
+      where: { id: agentUsers[a].id },
+      data: { teamId: team.id, departmentId: team.departmentId, branchId: team.branchId },
+    });
+    staffOrg.set(agentUsers[a].id, { departmentId: team.departmentId, branchId: team.branchId });
+    teamOfUser.set(agentUsers[a].id, { teamId: team.id, departmentId: team.departmentId, branchId: team.branchId });
+  }
+
   console.log(`  ✓ Seeded ${allStaffUsers.length} staff users (3 Admins, 5 Managers, 35 Agents [33 active, 2 inactive]) and 5 Portal Customer users.`);
-  console.log(`  ✓ Assigned departments/branches to ${staffOrg.size} of ${allStaffUsers.length} staff users.`);
+  console.log(`  ✓ Created ${teams.length} Teams; every Manager and Agent has an explicit team.`);
 
   // -------------------------------------------------------------------------
   // STEP 4: Seed Customers (185 records)
@@ -632,21 +692,28 @@ export async function seedTestData() {
 
     const updatedAt = closedAt ?? resolvedAt ?? firstRespondedAt ?? createdAt;
 
-    // Organizational context: prefer the assigned agent's department/branch;
-    // otherwise round-robin a department for coverage. Every 4th ticket is left
-    // with no department/branch to exercise the unfiltered path.
+    // Team ownership (feature/team-based-manager-scope) — EXPLICIT, never inferred
+    // from the assigned agent at read time:
+    //   - assigned ticket   → the assignee's team (so ticket.teamId === agent.teamId,
+    //                          the invariant the assignment API enforces)
+    //   - unassigned ticket → round-robin a team, so every manager has an own-team
+    //                          unassigned queue to work
+    //   - every 13th unassigned ticket stays unrouted (teamId = null) to exercise
+    //                          the ADMIN-only "not yet routed to a team" path
+    // department/branch always follow the owning team for consistency.
+    let ticketTeamId: string | null = null;
     let ticketDepartmentId: string | null = null;
     let ticketBranchId: string | null = null;
-    if (i % 4 !== 0) {
-      const agentOrg = assignedAgentId ? staffOrg.get(assignedAgentId) : undefined;
-      if (agentOrg) {
-        ticketDepartmentId = agentOrg.departmentId;
-        ticketBranchId = agentOrg.branchId;
-      } else {
-        const dept = departments[i % departments.length];
-        ticketDepartmentId = dept.id;
-        ticketBranchId = dept.branchId;
-      }
+    const assigneeTeam = assignedAgentId ? teamOfUser.get(assignedAgentId) : undefined;
+    if (assigneeTeam) {
+      ticketTeamId = assigneeTeam.teamId;
+      ticketDepartmentId = assigneeTeam.departmentId;
+      ticketBranchId = assigneeTeam.branchId;
+    } else if (i % 13 !== 0) {
+      const team = teams[i % teams.length];
+      ticketTeamId = team.id;
+      ticketDepartmentId = team.departmentId;
+      ticketBranchId = team.branchId;
     }
 
     const ticket = await prisma.ticket.create({
@@ -661,6 +728,7 @@ export async function seedTestData() {
         categoryId: category.id,
         departmentId: ticketDepartmentId,
         branchId: ticketBranchId,
+        teamId: ticketTeamId,
         firstResponseDueAt,
         firstRespondedAt,
         resolutionDueAt,
@@ -1024,6 +1092,7 @@ export async function seedTestData() {
   console.log(`Categories:         ${await prisma.category.count()}`);
   console.log(`Branches:           ${await prisma.branch.count()}`);
   console.log(`Departments:        ${await prisma.department.count()}`);
+  console.log(`Teams:              ${await prisma.team.count()}`);
   console.log(`Tasks:              ${await prisma.task.count()}`);
   console.log(`Knowledge Articles: ${await prisma.knowledgeArticle.count()}`);
   console.log(`Quick Replies:      ${await prisma.quickReply.count()}`);
@@ -1033,9 +1102,11 @@ export async function seedTestData() {
   console.log("-------------------------------------------------------");
   console.log("\nTest Credentials (password for all: password123):");
   console.log("-------------------------------------------------------");
-  console.log(`ADMIN:     admin1@${SEED_EMAIL_DOMAIN}  (Sarah Connor)`);
-  console.log(`MANAGER:   manager1@${SEED_EMAIL_DOMAIN}  (Marcus Vance)`);
-  console.log(`AGENT:     agent1@${SEED_EMAIL_DOMAIN}  (Alex Rivera - 45 assigned tickets)`);
+  console.log(`ADMIN:     admin1@${SEED_EMAIL_DOMAIN}  (Sarah Connor — organization-wide)`);
+  console.log(`MANAGER:   manager1@${SEED_EMAIL_DOMAIN}  (Marcus Vance — manages "Billing Support")`);
+  console.log(`MANAGER2:  manager2@${SEED_EMAIL_DOMAIN}  (Maya Lin — manages "Technical Support")`);
+  console.log(`AGENT:     agent1@${SEED_EMAIL_DOMAIN}  (member of "Billing Support")`);
+  console.log(`AGENT-B:   agent8@${SEED_EMAIL_DOMAIN}  (member of "Technical Support")`);
   console.log(`CUSTOMER:  portal.customer@${SEED_EMAIL_DOMAIN}  (Layla Hassan - 27 tickets)`);
   console.log(`CUSTOMER2: portal.customer2@${SEED_EMAIL_DOMAIN}  (Jonathan Miller - 23 tickets)`);
   console.log("=======================================================\n");

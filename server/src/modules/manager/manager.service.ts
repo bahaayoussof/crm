@@ -9,35 +9,25 @@ import {
   minutesBetween,
 } from "../../shared/sla/sla-outcomes.js";
 import type { TicketActor } from "../tickets/ticket-visibility.js";
+import {
+  resolveActorTeamId,
+  teamScopedAgentWhere,
+  teamScopedTicketWhere,
+} from "../../shared/team/team-scope.js";
 import type { ManagerTeamQuery, TeamSortField } from "./manager.schema.js";
 
 /**
- * ⚠️ AUTHORIZATION SCOPE — READ BEFORE CHANGING.
+ * AUTHORIZATION SCOPE (feature/team-based-manager-scope).
  *
- * Managers currently have ORGANIZATION-WIDE visibility over tickets, agents and
- * reports — identical to what MANAGER already had before the Manager Work
- * Console existed. `managerTicketScopeWhere` returns an EMPTY predicate ON
- * PURPOSE. It is NOT department/team scoping: the schema has no
- * `Manager -> Department/Team` ownership relation yet (see
- * `docs/06-auth-rbac.md` and the Manager Work Console ADR in
- * `docs/17-decisions-log.md`).
+ *   ADMIN   → organization-wide
+ *   MANAGER → their own Team only (Team.managerId === userId)
  *
- * This single function is the seam where real scoping is added later. When a
- * managed-department relation exists, narrow the `where` here using `actor`; the
- * three read paths below (`getManagerOverview`, `getManagerTeam`,
- * `getManagerAgentDetail`) already route every ticket/agent query through it.
+ * Every ticket/agent query below is routed through `shared/team/team-scope.ts`.
+ * The actor's team id is resolved ONCE per request and threaded into the pure
+ * `where`-builders — do not add role checks inline here.
  */
-export const MANAGER_VISIBILITY = "ORGANIZATION_WIDE" as const;
-
-export function managerTicketScopeWhere(actor: TicketActor): Prisma.TicketWhereInput {
-  if (actor.role === Role.ADMIN || actor.role === Role.MANAGER) return {};
-  return {};
-}
-
-/** The agents a Manager supervises. Org-wide today; the scoping seam's twin. */
-function managerAgentWhere(actor: TicketActor): Prisma.UserWhereInput {
-  if (actor.role === Role.ADMIN || actor.role === Role.MANAGER) return { role: Role.AGENT, isActive: true };
-  return { role: Role.AGENT, isActive: true };
+function visibilityFor(actor: TicketActor): "TEAM" | "ORGANIZATION_WIDE" {
+  return actor.role === Role.MANAGER ? "TEAM" : "ORGANIZATION_WIDE";
 }
 
 const ACTIVE_STATUSES = [
@@ -131,7 +121,8 @@ function summarizePerformance(tickets: PerfRecord[], windowStart: Date, now: Dat
 // ---------------------------------------------------------------------------
 
 export async function getManagerOverview(actor: TicketActor, now = new Date()) {
-  const scope = managerTicketScopeWhere(actor);
+  const teamId = await resolveActorTeamId(actor);
+  const scope = teamScopedTicketWhere(actor, teamId);
   const active: Prisma.TicketWhereInput = { ...scope, status: { in: [...ACTIVE_STATUSES] } };
   const todayStart = utcDayStart(now);
   const tomorrowStart = new Date(todayStart.getTime() + DAY_MS);
@@ -171,7 +162,7 @@ export async function getManagerOverview(actor: TicketActor, now = new Date()) {
       },
       select: perfSelect,
     }),
-    prisma.user.findMany({ where: managerAgentWhere(actor), select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.user.findMany({ where: teamScopedAgentWhere(actor, teamId), select: { id: true, name: true }, orderBy: { name: "asc" } }),
     prisma.ticket.groupBy({
       by: ["assignedAgentId", "status"],
       where: { ...scope, assignedAgentId: { not: null }, status: { in: [...ACTIVE_STATUSES] } },
@@ -205,7 +196,7 @@ export async function getManagerOverview(actor: TicketActor, now = new Date()) {
   const teamWorkload = buildTeamWorkload(agents, activeByAgent, resolvedTodayByAgent, activeAssignedRows, now);
 
   return {
-    meta: { visibility: MANAGER_VISIBILITY },
+    meta: { visibility: visibilityFor(actor) },
     needsAttention: [
       { key: "slaBreached", count: slaBreached, ticketFilter: "sla=breached" },
       { key: "slaAtRisk", count: slaAtRisk, ticketFilter: "sla=at_risk" },
@@ -291,12 +282,13 @@ function buildTeamWorkload(
 // ---------------------------------------------------------------------------
 
 export async function getManagerTeam(actor: TicketActor, query: ManagerTeamQuery, now = new Date()) {
-  const scope = managerTicketScopeWhere(actor);
+  const teamId = await resolveActorTeamId(actor);
+  const scope = teamScopedTicketWhere(actor, teamId);
   const todayStart = utcDayStart(now);
   const windowStart = new Date(todayStart.getTime() - (PERFORMANCE_WINDOW_DAYS - 1) * DAY_MS);
 
   const [agents, activeByAgent, activeAssignedRows, perfTickets] = await Promise.all([
-    prisma.user.findMany({ where: managerAgentWhere(actor), select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.user.findMany({ where: teamScopedAgentWhere(actor, teamId), select: { id: true, name: true }, orderBy: { name: "asc" } }),
     prisma.ticket.groupBy({
       by: ["assignedAgentId", "status"],
       where: { ...scope, assignedAgentId: { not: null }, status: { in: [...ACTIVE_STATUSES] } },
@@ -362,7 +354,7 @@ export async function getManagerTeam(actor: TicketActor, query: ManagerTeamQuery
   const startIndex = (query.page - 1) * query.limit;
 
   return {
-    meta: { visibility: MANAGER_VISIBILITY },
+    meta: { visibility: visibilityFor(actor) },
     data: rows.slice(startIndex, startIndex + query.limit),
     pagination: { page: query.page, limit: query.limit, total, totalPages },
     generatedAt: now.toISOString(),
@@ -422,13 +414,18 @@ function comparator(sortBy: TeamSortField | undefined, sortOrder: "asc" | "desc"
 // ---------------------------------------------------------------------------
 
 export async function getManagerAgentDetail(actor: TicketActor, agentId: string, now = new Date()) {
-  const agent = await prisma.user.findFirst({
+  const teamId = await resolveActorTeamId(actor);
+  const agentRow = await prisma.user.findFirst({
     where: { id: agentId, role: Role.AGENT },
-    select: { id: true, name: true, email: true },
+    select: { id: true, name: true, email: true, teamId: true },
   });
-  if (!agent) return null;
+  if (!agentRow) return null;
+  // A MANAGER may only inspect an agent on their own team (404, never 403 — do
+  // not leak another team's roster).
+  if (actor.role === Role.MANAGER && (!teamId || agentRow.teamId !== teamId)) return null;
+  const agent = { id: agentRow.id, name: agentRow.name, email: agentRow.email };
 
-  const scope = managerTicketScopeWhere(actor);
+  const scope = teamScopedTicketWhere(actor, teamId);
   const assigned: Prisma.TicketWhereInput = { ...scope, assignedAgentId: agentId };
   const active: Prisma.TicketWhereInput = { ...assigned, status: { in: [...ACTIVE_STATUSES] } };
   const todayStart = utcDayStart(now);
@@ -489,7 +486,7 @@ export async function getManagerAgentDetail(actor: TicketActor, agentId: string,
     : null;
 
   return {
-    meta: { visibility: MANAGER_VISIBILITY },
+    meta: { visibility: visibilityFor(actor) },
     agent,
     workload: {
       openAssigned: [...ACTIVE_STATUSES].reduce((sum, status) => sum + statusCount(status), 0),

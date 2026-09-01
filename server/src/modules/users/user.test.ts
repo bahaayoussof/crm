@@ -6,11 +6,15 @@ const mocks = vi.hoisted(() => ({
   findMany: vi.fn(), count: vi.fn(), findUnique: vi.fn(), findFirst: vi.fn(),
   create: vi.fn(), update: vi.fn(), auditCreate: vi.fn(),
   deptFindUnique: vi.fn(), branchFindUnique: vi.fn(),
+  // feature/team-based-manager-scope
+  teamFindUnique: vi.fn(), teamUpdate: vi.fn(), teamUpdateMany: vi.fn(), ticketCount: vi.fn(),
 }));
 
 vi.mock("../../config/prisma.js", () => {
   const department = { findUnique: mocks.deptFindUnique };
   const branch = { findUnique: mocks.branchFindUnique };
+  const team = { findUnique: mocks.teamFindUnique, update: mocks.teamUpdate, updateMany: mocks.teamUpdateMany };
+  const ticket = { count: mocks.ticketCount };
   return {
     prisma: {
       user: {
@@ -19,9 +23,18 @@ vi.mock("../../config/prisma.js", () => {
       },
       department,
       branch,
+      team,
+      ticket,
       $transaction: vi.fn(async (value: unknown) =>
         typeof value === "function"
-          ? (value as (tx: { user: typeof mocks; department: typeof department; branch: typeof branch; auditLog: { create: typeof mocks.auditCreate } }) => unknown)({ user: mocks, department, branch, auditLog: { create: mocks.auditCreate } })
+          ? (value as (tx: {
+              user: typeof mocks;
+              department: typeof department;
+              branch: typeof branch;
+              team: typeof team;
+              ticket: typeof ticket;
+              auditLog: { create: typeof mocks.auditCreate };
+            }) => unknown)({ user: mocks, department, branch, team, ticket, auditLog: { create: mocks.auditCreate } })
           : Promise.all(value as Promise<unknown>[])),
     },
   };
@@ -57,6 +70,10 @@ describe("users administration API", () => {
     actorIsActiveAdmin();
     mocks.findMany.mockResolvedValue([]);
     mocks.count.mockResolvedValue(0);
+    mocks.teamFindUnique.mockResolvedValue(null);
+    mocks.teamUpdate.mockResolvedValue({});
+    mocks.teamUpdateMany.mockResolvedValue({ count: 0 });
+    mocks.ticketCount.mockResolvedValue(0);
   });
 
   it("rejects unauthenticated requests on every admin route", async () => {
@@ -95,9 +112,10 @@ describe("users administration API", () => {
     expect(call.orderBy).toEqual([{ createdAt: "desc" }, { id: "asc" }]);
     expect(call.select).toEqual({
       id: true, name: true, email: true, role: true, isActive: true, phone: true,
-      departmentId: true, branchId: true,
+      departmentId: true, branchId: true, teamId: true,
       department: { select: { id: true, name: true } },
       branch: { select: { id: true, name: true } },
+      team: { select: { id: true, name: true, departmentId: true } },
       createdAt: true, updatedAt: true,
     });
   });

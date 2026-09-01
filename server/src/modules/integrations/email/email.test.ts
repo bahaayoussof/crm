@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
   messageFindUnique: vi.fn(), messageFindFirst: vi.fn(), messageCreate: vi.fn(),
   userFindUnique: vi.fn(), userCreate: vi.fn(), userFindMany: vi.fn(),
   customerFindFirst: vi.fn(), customerCreate: vi.fn(),
-  ticketFindFirst: vi.fn(), ticketFindMany: vi.fn(), ticketCreate: vi.fn(), ticketUpdate: vi.fn(),
+  ticketFindFirst: vi.fn(), ticketFindMany: vi.fn(), ticketFindUnique: vi.fn(), ticketCreate: vi.fn(), ticketUpdate: vi.fn(),
   slaFindFirst: vi.fn(), historyCreate: vi.fn(), notificationCreateMany: vi.fn(), attachmentCreateMany: vi.fn(),
   transaction: vi.fn(), storagePut: vi.fn(), storageRemove: vi.fn(),
 }));
@@ -16,7 +16,7 @@ vi.mock("../../../config/prisma.js", () => {
     ticketMessage: { findUnique: mocks.messageFindUnique, findFirst: mocks.messageFindFirst, create: mocks.messageCreate },
     user: { findUnique: mocks.userFindUnique, create: mocks.userCreate, findMany: mocks.userFindMany },
     customer: { findFirst: mocks.customerFindFirst, create: mocks.customerCreate },
-    ticket: { findFirst: mocks.ticketFindFirst, findMany: mocks.ticketFindMany, create: mocks.ticketCreate, update: mocks.ticketUpdate },
+    ticket: { findFirst: mocks.ticketFindFirst, findMany: mocks.ticketFindMany, findUnique: mocks.ticketFindUnique, create: mocks.ticketCreate, update: mocks.ticketUpdate },
     slaRule: { findFirst: mocks.slaFindFirst },
     ticketHistory: { create: mocks.historyCreate },
     notification: { createMany: mocks.notificationCreateMany },
@@ -117,6 +117,7 @@ describe("Resend email integration", () => {
     mocks.messageFindFirst.mockResolvedValue(null);
     mocks.ticketFindFirst.mockResolvedValue(null);
     mocks.ticketFindMany.mockResolvedValue([]);
+    mocks.ticketFindUnique.mockResolvedValue({ teamId: null });
     mocks.ticketCreate.mockResolvedValue({
       id: "ticket-1", status: "OPEN", subject: "Need help", assignedAgentId: null, emailThreadToken: "token-1",
     });
@@ -132,7 +133,7 @@ describe("Resend email integration", () => {
       ticketMessage: { findUnique: mocks.messageFindUnique, findFirst: mocks.messageFindFirst, create: mocks.messageCreate },
       user: { findUnique: mocks.userFindUnique, create: mocks.userCreate, findMany: mocks.userFindMany },
       customer: { findFirst: mocks.customerFindFirst, create: mocks.customerCreate },
-      ticket: { findFirst: mocks.ticketFindFirst, findMany: mocks.ticketFindMany, create: mocks.ticketCreate, update: mocks.ticketUpdate },
+      ticket: { findFirst: mocks.ticketFindFirst, findMany: mocks.ticketFindMany, findUnique: mocks.ticketFindUnique, create: mocks.ticketCreate, update: mocks.ticketUpdate },
       slaRule: { findFirst: mocks.slaFindFirst },
       ticketHistory: { create: mocks.historyCreate },
       notification: { createMany: mocks.notificationCreateMany },

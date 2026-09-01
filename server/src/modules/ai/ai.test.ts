@@ -6,6 +6,7 @@ import type { StructuredRequest } from "./ai.types.js";
 
 const h = vi.hoisted(() => ({
   ticketFindFirst: vi.fn(),
+  userFindUnique: vi.fn(),
   categoryFindMany: vi.fn(),
   knowledgeArticleFindMany: vi.fn(),
   handler: null as null | ((request: StructuredRequest) => unknown),
@@ -16,6 +17,7 @@ const h = vi.hoisted(() => ({
 vi.mock("../../config/prisma.js", () => ({
   prisma: {
     ticket: { findFirst: h.ticketFindFirst },
+    user: { findUnique: h.userFindUnique },
     category: { findMany: h.categoryFindMany },
     knowledgeArticle: { findMany: h.knowledgeArticleFindMany },
     $transaction: vi.fn(async (value: unknown) =>
@@ -91,6 +93,7 @@ beforeEach(() => {
   h.throws = null;
   h.lastRequest = null;
   h.ticketFindFirst.mockResolvedValue(ticketRow);
+  h.userFindUnique.mockResolvedValue({ teamId: null, managedTeam: null });
   h.categoryFindMany.mockResolvedValue([
     { id: "cbaf36a99dee0890e0a01d66a", name: "Authentication" },
     { id: "c8e7fe750166138af6456ceb5", name: "Billing" },
@@ -123,13 +126,16 @@ describe("POST /api/tickets/:id/ai — access control", () => {
     expect(response.body.error.code).toBe("TICKET_NOT_FOUND");
   });
 
-  it("scopes the context query with the agent visibility predicate", async () => {
+  it("scopes the context query with the agent visibility predicate (own-team unassigned)", async () => {
+    // feature/team-based-manager-scope: the AGENT's unassigned reach is narrowed
+    // to their own team.
+    h.userFindUnique.mockResolvedValue({ teamId: "team-1", managedTeam: null });
     await post("c737ce60fccf9da889f4605c0", { action: "SUMMARY" }, agentToken);
     const where = h.ticketFindFirst.mock.calls[0][0].where;
     expect(where.id).toBe("c737ce60fccf9da889f4605c0");
     expect(where.OR).toEqual([
       { assignedAgentId: "c6ff3b3bd11c44cac620c43d5" },
-      { assignedAgentId: null },
+      { assignedAgentId: null, teamId: "team-1" },
     ]);
   });
 
@@ -137,6 +143,15 @@ describe("POST /api/tickets/:id/ai — access control", () => {
     await post("c737ce60fccf9da889f4605c0", { action: "SUMMARY" }, adminToken);
     const where = h.ticketFindFirst.mock.calls[0][0].where;
     expect(where).toEqual({ id: "c737ce60fccf9da889f4605c0" });
+  });
+
+  it("team-scopes the AI context read for a MANAGER (404 on another team's ticket)", async () => {
+    // feature/team-based-manager-scope
+    h.userFindUnique.mockResolvedValue({ teamId: "team-1", managedTeam: { id: "team-1" } });
+    h.ticketFindFirst.mockResolvedValue(null);
+    const response = await post("c737ce60fccf9da889f4605c0", { action: "SUMMARY" }, token("mgr-1", Role.MANAGER));
+    expect(response.status).toBe(404);
+    expect(h.ticketFindFirst.mock.calls[0][0].where).toMatchObject({ id: "c737ce60fccf9da889f4605c0", teamId: "team-1" });
   });
 });
 

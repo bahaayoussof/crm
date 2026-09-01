@@ -9,6 +9,7 @@ import {
   resolutionOutcome,
 } from "../../shared/sla/sla-outcomes.js";
 import { ticketVisibilityWhere, type TicketActor } from "../tickets/ticket-visibility.js";
+import { resolveActorTeamId } from "../../shared/team/team-scope.js";
 
 export const ACTIVE_STATUSES = [TicketStatus.OPEN, TicketStatus.IN_PROGRESS, TicketStatus.WAITING_CUSTOMER, TicketStatus.ESCALATED] as const;
 
@@ -27,10 +28,13 @@ export type PrimaryQueueType = "NEEDS_ATTENTION" | "MY_ASSIGNED_TICKETS";
 
 export async function getDashboardOverview(actor: TicketActor, now = new Date()) {
   const isAgent = actor.role === "AGENT";
-  const visible = ticketVisibilityWhere(actor);
+  // Team scope (feature/team-based-manager-scope): ADMIN → org-wide; MANAGER →
+  // own team; AGENT → own team (bounds the unassigned queue).
+  const team = actor.role === "ADMIN" ? undefined : { teamId: await resolveActorTeamId(actor) };
+  const visible = ticketVisibilityWhere(actor, team);
   // Every agent-facing number is scoped to the agent's OWN tickets — the agent
   // dashboard is a personal work console, never an organization-wide view. For
-  // ADMIN/MANAGER `scoped` === `visible` (everything).
+  // ADMIN `scoped` === `visible` (everything); for MANAGER it is their team.
   const scoped = isAgent ? { assignedAgentId: actor.userId } satisfies Prisma.TicketWhereInput : visible;
   const active = { ...visible, status: { in: [...ACTIVE_STATUSES] } } satisfies Prisma.TicketWhereInput;
   const activeScoped = { ...scoped, status: { in: [...ACTIVE_STATUSES] } } satisfies Prisma.TicketWhereInput;

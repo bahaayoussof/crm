@@ -52,6 +52,13 @@ export type RealtimeAudience =
        */
       customerId: string | null;
       /**
+       * Owning `Ticket.teamId` at emit time (feature/team-based-manager-scope).
+       * Drives MANAGER team scope and the AGENT unassigned-queue team narrowing.
+       * `null` for an unrouted ticket → only ADMIN internal subscribers receive it.
+       * Never sent on the wire.
+       */
+      teamId: string | null;
+      /**
        * Present for `ticket.message.created`. CUSTOMER subscribers receive the
        * event only when this is `"public"`; internal notes are never routed to a
        * customer connection.
@@ -79,5 +86,12 @@ export interface RealtimeSubscriber {
    * events. Unused for internal roles.
    */
   customerId: string | null;
+  /**
+   * For a MANAGER / AGENT connection: the actor's team id, resolved once when
+   * the stream is established (never per event). MANAGER receives ticket events
+   * only for this team; AGENT's unassigned-queue events are narrowed to it.
+   * `null` for ADMIN (org-wide) or a mis-provisioned user with no team.
+   */
+  teamId: string | null;
   response: Response;
 }

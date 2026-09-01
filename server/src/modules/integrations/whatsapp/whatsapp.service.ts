@@ -4,6 +4,7 @@ import { Channel, Prisma, Role, TicketPriority, TicketStatus } from "@prisma/cli
 import { prisma } from "../../../config/prisma.js";
 import { createNotifications } from "../../notifications/notification.service.js";
 import { emitTicketMessageCreated, withRealtimeOutbox } from "../../realtime/realtime.publisher.js";
+import { ticketOperationalRecipientIds } from "../../../shared/team/team-scope.js";
 import { getSendConfig } from "./whatsapp.config.js";
 import { whatsappClient, WhatsappApiError } from "./whatsapp.client.js";
 import type {
@@ -147,16 +148,13 @@ async function fanOutInboundNotification(
   tx: Prisma.TransactionClient,
   ticket: { id: string; subject: string; assignedAgentId: string | null },
 ) {
-  const recipientIds: string[] = [];
-  if (ticket.assignedAgentId) {
-    const agent = await tx.user.findFirst({ where: { id: ticket.assignedAgentId, isActive: true }, select: { id: true } });
-    if (agent) recipientIds.push(agent.id);
-  }
-  const adminsManagers = await tx.user.findMany({
-    where: { role: { in: [Role.ADMIN, Role.MANAGER] }, isActive: true },
-    select: { id: true },
+  // Team-aware recipients (feature/team-based-manager-scope): ADMINs + this
+  // ticket's team manager only + the assigned agent.
+  const teamRow = await tx.ticket.findUnique({ where: { id: ticket.id }, select: { teamId: true } });
+  const recipientIds = await ticketOperationalRecipientIds(tx, {
+    teamId: teamRow?.teamId ?? null,
+    assignedAgentId: ticket.assignedAgentId,
   });
-  for (const user of adminsManagers) recipientIds.push(user.id);
   await createNotifications(
     tx,
     recipientIds,

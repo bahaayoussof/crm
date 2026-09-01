@@ -37,6 +37,9 @@ export const createTicketSchema = z.object({
   assignedAgentId: nullableDatabaseIdSchema,
   departmentId: nullableDatabaseIdSchema,
   branchId: nullableDatabaseIdSchema,
+  // Owning team (feature/team-based-manager-scope). Optional at the API — when
+  // omitted and an assignee is given, the ticket adopts the assignee's team.
+  teamId: nullableDatabaseIdSchema,
 }).strict();
 
 export const updateTicketSchema = z.object({
@@ -48,6 +51,7 @@ export const updateTicketSchema = z.object({
   assignedAgentId: nullableDatabaseIdSchema,
   departmentId: nullableDatabaseIdSchema,
   branchId: nullableDatabaseIdSchema,
+  teamId: nullableDatabaseIdSchema,
 }).strict().refine(hasAtLeastOneField, { message: "At least one ticket field is required" });
 
 export const ticketConversationBodySchema = z.object({

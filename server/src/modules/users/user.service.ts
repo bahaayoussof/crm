@@ -12,9 +12,10 @@ const internalRoles: Role[] = [Role.ADMIN, Role.MANAGER, Role.AGENT];
 
 const userSelect = {
   id: true, name: true, email: true, role: true, isActive: true, phone: true,
-  departmentId: true, branchId: true,
+  departmentId: true, branchId: true, teamId: true,
   department: { select: { id: true, name: true } },
   branch: { select: { id: true, name: true } },
+  team: { select: { id: true, name: true, departmentId: true } },
   createdAt: true, updatedAt: true,
 } satisfies Prisma.UserSelect;
 
@@ -52,6 +53,73 @@ async function assertOrgAssignment(
 function orgConnect(id: string | null | undefined) {
   if (id === undefined) return undefined;
   return id ? { connect: { id } } : { disconnect: true };
+}
+
+/**
+ * Validates a team assignment for an internal user and, for a MANAGER, keeps
+ * `Team.managerId` in sync (V1: one manager per team, one team per manager).
+ * Call inside the same transaction as the user write; the caller still sets
+ * `user.teamId` via `data.team`. `effectiveDepartmentId` is the department the
+ * user will have after this update.
+ */
+async function assertTeamAssignment(
+  tx: Prisma.TransactionClient,
+  target: { id: string; role: Role },
+  teamId: string,
+  effectiveDepartmentId: string | null,
+) {
+  const team = await tx.team.findUnique({
+    where: { id: teamId },
+    select: { id: true, isActive: true, departmentId: true, managerId: true },
+  });
+  if (!team || !team.isActive) throw new AppError(400, "INVALID_TEAM", "Team is invalid or inactive");
+  if (effectiveDepartmentId && team.departmentId !== effectiveDepartmentId) {
+    throw new AppError(400, "TEAM_DEPARTMENT_MISMATCH", "Team does not belong to the user's department");
+  }
+  if (target.role === Role.MANAGER) {
+    if (team.managerId && team.managerId !== target.id) {
+      throw new AppError(409, "TEAM_ALREADY_HAS_MANAGER", "This team already has a manager");
+    }
+    // Free any team this manager previously led, then take this one.
+    await tx.team.updateMany({ where: { managerId: target.id, id: { not: teamId } }, data: { managerId: null } });
+    if (team.managerId !== target.id) {
+      await tx.team.update({ where: { id: teamId }, data: { managerId: target.id } });
+    }
+  }
+}
+
+/** Clearing a MANAGER's team also vacates the team they led. */
+async function releaseManagedTeam(tx: Prisma.TransactionClient, target: { id: string; role: Role }) {
+  if (target.role !== Role.MANAGER) return;
+  await tx.team.updateMany({ where: { managerId: target.id }, data: { managerId: null } });
+}
+
+/**
+ * Blocks moving an AGENT between teams while they still hold active tickets on
+ * their current team — never silently orphans a ticket/assignee cross-team pair.
+ */
+async function assertAgentTeamMoveSafe(
+  tx: Prisma.TransactionClient,
+  target: { id: string; role: Role; teamId: string | null },
+  nextTeamId: string | null,
+) {
+  if (target.role !== Role.AGENT) return;
+  if (nextTeamId === target.teamId) return;
+  const activeOnOldTeam = await tx.ticket.count({
+    where: {
+      assignedAgentId: target.id,
+      teamId: target.teamId,
+      status: { in: ["OPEN", "IN_PROGRESS", "WAITING_CUSTOMER", "ESCALATED"] },
+    },
+  });
+  if (activeOnOldTeam > 0) {
+    throw new AppError(
+      409,
+      "AGENT_HAS_ACTIVE_TICKETS",
+      "Reassign this agent's active tickets before moving them to another team",
+      { activeTickets: activeOnOldTeam },
+    );
+  }
 }
 
 function emailTaken() {
@@ -96,19 +164,26 @@ export async function createUser(input: CreateUserInput, actorId: string, reques
   const passwordHash = await bcrypt.hash(input.password, 12);
   const departmentId = input.departmentId ?? null;
   const branchId = input.branchId ?? null;
+  const teamId = input.teamId ?? null;
 
   try {
     return await prisma.$transaction(async (tx) => {
       await assertOrgAssignment(tx, { departmentId, branchId });
-      const user = await tx.user.create({
+      const created = await tx.user.create({
         data: {
           name: input.name, email: input.email, passwordHash, role: input.role,
           ...(departmentId ? { department: { connect: { id: departmentId } } } : {}),
           ...(branchId ? { branch: { connect: { id: branchId } } } : {}),
+          ...(teamId ? { team: { connect: { id: teamId } } } : {}),
         },
         select: userSelect,
       });
-      await createAuditLog({ actorId, action: AUDIT_ACTIONS.USER_CREATED, entityType: AUDIT_ENTITY_TYPES.USER, entityId: user.id, changes: { name: { to: user.name }, email: { to: user.email }, role: { to: user.role }, isActive: { to: user.isActive }, departmentId: { to: user.departmentId }, branchId: { to: user.branchId } }, requestContext }, tx);
+      let user = created;
+      if (teamId) {
+        await assertTeamAssignment(tx, { id: created.id, role: created.role }, teamId, departmentId);
+        user = await tx.user.findUniqueOrThrow({ where: { id: created.id }, select: userSelect });
+      }
+      await createAuditLog({ actorId, action: AUDIT_ACTIONS.USER_CREATED, entityType: AUDIT_ENTITY_TYPES.USER, entityId: user.id, changes: { name: { to: user.name }, email: { to: user.email }, role: { to: user.role }, isActive: { to: user.isActive }, departmentId: { to: user.departmentId }, branchId: { to: user.branchId }, teamId: { to: user.teamId } }, requestContext }, tx);
       return user;
     });
   } catch (error) {
@@ -126,7 +201,7 @@ export async function updateUser(id: string, input: UpdateUserInput, actor: { us
   return prisma.$transaction(async (tx) => {
     const target = await tx.user.findFirst({
       where: { id, role: { in: internalRoles } },
-      select: { id: true, name: true, email: true, phone: true, role: true, isActive: true, departmentId: true, branchId: true },
+      select: { id: true, name: true, email: true, phone: true, role: true, isActive: true, departmentId: true, branchId: true, teamId: true },
     });
     if (!target) throw notFound();
 
@@ -169,6 +244,22 @@ export async function updateUser(id: string, input: UpdateUserInput, actor: { us
       });
     }
 
+    const nextRole = input.role ?? target.role;
+
+    // Team membership (feature/team-based-manager-scope).
+    if (input.teamId !== undefined) {
+      const effectiveDepartmentId = input.departmentId !== undefined ? input.departmentId : target.departmentId;
+      await assertAgentTeamMoveSafe(tx, { id, role: target.role, teamId: target.teamId }, input.teamId);
+      if (input.teamId) {
+        await assertTeamAssignment(tx, { id, role: nextRole }, input.teamId, effectiveDepartmentId);
+      } else {
+        await releaseManagedTeam(tx, { id, role: nextRole });
+      }
+    } else if (roleChanges && input.role !== Role.MANAGER && target.role === Role.MANAGER) {
+      // Demoted out of MANAGER without an explicit team change — vacate any team led.
+      await releaseManagedTeam(tx, { id, role: Role.MANAGER });
+    }
+
     const data: Prisma.UserUpdateInput = {};
     if (input.name !== undefined) data.name = input.name;
     if (input.email !== undefined) data.email = input.email;
@@ -177,10 +268,11 @@ export async function updateUser(id: string, input: UpdateUserInput, actor: { us
     if (input.isActive !== undefined) data.isActive = input.isActive;
     if (input.departmentId !== undefined) data.department = orgConnect(input.departmentId);
     if (input.branchId !== undefined) data.branch = orgConnect(input.branchId);
+    if (input.teamId !== undefined) data.team = orgConnect(input.teamId);
 
     try {
       const updated = await tx.user.update({ where: { id }, data, select: userSelect });
-      const changes = changedFields(target, updated, ["name", "email", "phone", "role", "isActive", "departmentId", "branchId"]);
+      const changes = changedFields(target, updated, ["name", "email", "phone", "role", "isActive", "departmentId", "branchId", "teamId"]);
       const action = changes.role ? AUDIT_ACTIONS.USER_ROLE_CHANGED : changes.isActive ? (updated.isActive ? AUDIT_ACTIONS.USER_ACTIVATED : AUDIT_ACTIONS.USER_DEACTIVATED) : AUDIT_ACTIONS.USER_UPDATED;
       if (Object.keys(changes).length) await createAuditLog({ actorId: actor.userId, action, entityType: AUDIT_ENTITY_TYPES.USER, entityId: id, changes, requestContext }, tx);
       return updated;

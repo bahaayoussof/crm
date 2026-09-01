@@ -8,13 +8,14 @@ const mocks = vi.hoisted(() => ({
   ticketGroupBy: vi.fn(),
   userFindMany: vi.fn(),
   userFindFirst: vi.fn(),
+  userFindUnique: vi.fn(),
   feedbackFindMany: vi.fn(),
 }));
 
 vi.mock("../../config/prisma.js", () => ({
   prisma: {
     ticket: { count: mocks.ticketCount, findMany: mocks.ticketFindMany, groupBy: mocks.ticketGroupBy },
-    user: { findMany: mocks.userFindMany, findFirst: mocks.userFindFirst },
+    user: { findMany: mocks.userFindMany, findFirst: mocks.userFindFirst, findUnique: mocks.userFindUnique },
     feedback: { findMany: mocks.feedbackFindMany },
     $transaction: vi.fn(),
   },
@@ -28,6 +29,7 @@ const now = new Date("2026-09-01T12:00:00.000Z");
 const auth = (id: string, role: Role) => ({ Authorization: `Bearer ${createAccessToken({ id, role })}` });
 const AGENT_ID = "c6ff3b3bd11c44cac620c43d5";
 const MANAGER = { userId: "mgr00000000000000000000001", role: Role.MANAGER } as const;
+const MGR_TEAM = "cmgrteammgrteammgrteam0001";
 
 const summaryTicket = (over: Record<string, unknown> = {}) => ({
   id: "t1",
@@ -51,7 +53,9 @@ beforeEach(() => {
   mocks.ticketFindMany.mockResolvedValue([]);
   mocks.ticketGroupBy.mockResolvedValue([]);
   mocks.userFindMany.mockResolvedValue([]);
-  mocks.userFindFirst.mockResolvedValue({ id: AGENT_ID, name: "Sara", email: "sara@example.com" });
+  mocks.userFindFirst.mockResolvedValue({ id: AGENT_ID, name: "Sara", email: "sara@example.com", teamId: MGR_TEAM });
+  // feature/team-based-manager-scope: resolveActorTeamId() -> user.findUnique
+  mocks.userFindUnique.mockResolvedValue({ teamId: MGR_TEAM, managedTeam: { id: MGR_TEAM } });
   mocks.feedbackFindMany.mockResolvedValue([]);
 });
 
@@ -75,7 +79,7 @@ describe("manager console authorization", () => {
 });
 
 describe("getManagerOverview", () => {
-  it("returns organization-wide visibility, actionable needs-attention items, KPIs and team workload", async () => {
+  it("returns TEAM visibility, actionable needs-attention items, KPIs and team workload", async () => {
     mocks.ticketCount
       .mockResolvedValueOnce(2) // slaBreached
       .mockResolvedValueOnce(3) // slaAtRisk
@@ -102,7 +106,9 @@ describe("getManagerOverview", () => {
 
     const data = await getManagerOverview(MANAGER, now);
 
-    expect(data.meta.visibility).toBe("ORGANIZATION_WIDE");
+    expect(data.meta.visibility).toBe("TEAM");
+    // every ticket query is scoped to the manager's own team
+    expect(mocks.ticketCount.mock.calls.every((c) => JSON.stringify(c[0]).includes(MGR_TEAM))).toBe(true);
     expect(data.needsAttention).toEqual([
       { key: "slaBreached", count: 2, ticketFilter: "sla=breached" },
       { key: "slaAtRisk", count: 3, ticketFilter: "sla=at_risk" },
@@ -167,7 +173,7 @@ describe("getManagerAgentDetail", () => {
   });
 
   it("summarizes workload, SLA risk and 30-day performance for an agent", async () => {
-    mocks.userFindFirst.mockResolvedValueOnce({ id: AGENT_ID, name: "Sara", email: "sara@example.com" });
+    mocks.userFindFirst.mockResolvedValueOnce({ id: AGENT_ID, name: "Sara", email: "sara@example.com", teamId: MGR_TEAM });
     mocks.ticketGroupBy.mockResolvedValueOnce([
       { status: TicketStatus.OPEN, _count: { _all: 2 } },
       { status: TicketStatus.IN_PROGRESS, _count: { _all: 1 } },
@@ -190,5 +196,35 @@ describe("getManagerAgentDetail", () => {
       .set(auth("staff00000000000000000001x", Role.MANAGER));
     expect(response.status).toBe(404);
     expect(JSON.stringify(response.body)).toContain("AGENT_NOT_FOUND");
+  });
+
+  // feature/team-based-manager-scope — cross-team isolation
+  it("404s an agent who belongs to a DIFFERENT team (no roster leak)", async () => {
+    mocks.userFindFirst.mockResolvedValueOnce({ id: AGENT_ID, name: "Sara", email: "s@x.com", teamId: "cotherteamotherteamother01" });
+    expect(await getManagerAgentDetail(MANAGER, AGENT_ID, now)).toBeNull();
+  });
+
+  it("404s every agent for a MANAGER with no team", async () => {
+    mocks.userFindUnique.mockResolvedValue({ teamId: null, managedTeam: null });
+    mocks.userFindFirst.mockResolvedValueOnce({ id: AGENT_ID, name: "Sara", email: "s@x.com", teamId: "cany" });
+    expect(await getManagerAgentDetail(MANAGER, AGENT_ID, now)).toBeNull();
+  });
+});
+
+describe("getManagerOverview — team scope", () => {
+  it("scopes every ticket query to the manager's own team and reports TEAM visibility", async () => {
+    const data = await getManagerOverview(MANAGER, now);
+    expect(data.meta.visibility).toBe("TEAM");
+    for (const call of mocks.ticketCount.mock.calls) {
+      expect(JSON.stringify(call[0])).toContain(MGR_TEAM);
+    }
+    // agent roster is team-scoped too
+    expect(mocks.userFindMany.mock.calls[0][0].where).toMatchObject({ role: Role.AGENT, isActive: true, teamId: MGR_TEAM });
+  });
+
+  it("matches nothing for a MANAGER with no team", async () => {
+    mocks.userFindUnique.mockResolvedValue({ teamId: null, managedTeam: null });
+    await getManagerOverview(MANAGER, now);
+    expect(mocks.userFindMany.mock.calls[0][0].where).toMatchObject({ id: { in: [] } });
   });
 });

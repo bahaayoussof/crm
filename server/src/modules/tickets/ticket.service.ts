@@ -19,19 +19,23 @@ import {
   withRealtimeOutbox,
 } from "../realtime/realtime.publisher.js";
 import type { CreateTicketInput, TicketConversationInput, TicketListQuery, UpdateTicketInput } from "./ticket.schema.js";
-import { ticketListVisibilityWhere, ticketVisibilityWhere, type TicketActor as Actor } from "./ticket-visibility.js";
+import { ticketListVisibilityWhere, ticketVisibilityWhere, type TeamScope, type TicketActor as Actor } from "./ticket-visibility.js";
+import { assertAgentAssignableToTicket, resolveActorTeamId, resolveActorTeamScope, ticketOperationalRecipientIds } from "../../shared/team/team-scope.js";
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../audit-logs/audit-log.constants.js";
 import { createAuditLog } from "../audit-logs/audit-log.service.js";
 import type { AuditRequestContext } from "../audit-logs/audit-request-context.js";
 
 const ticketSummarySelect = {
-  id: true, subject: true, status: true, priority: true, channel: true,
+  id: true, subject: true, status: true, priority: true, channel: true, teamId: true,
   firstResponseDueAt: true, firstRespondedAt: true, resolutionDueAt: true,
   createdAt: true, updatedAt: true,
   customer: { select: { id: true, name: true, email: true } },
   assignedAgent: { select: { id: true, name: true, email: true } },
   category: { select: { id: true, name: true } },
 } satisfies Prisma.TicketSelect;
+
+/** Local alias for the shared team-scope resolver (see shared/team/team-scope.ts). */
+const teamScopeFor = (actor: Actor): Promise<TeamScope | undefined> => resolveActorTeamScope(actor);
 
 const transitions: Record<TicketStatus, TicketStatus[]> = {
   OPEN: [TicketStatus.IN_PROGRESS, TicketStatus.RESOLVED, TicketStatus.ESCALATED],
@@ -62,8 +66,9 @@ export async function listTickets(query: TicketListQuery, actor: Actor) {
     ] });
   }
   if (query.sla) conditions.push(slaFilterWhere(query.sla, new Date()));
+  const team = await teamScopeFor(actor);
   const where: Prisma.TicketWhereInput = {
-    ...ticketListVisibilityWhere(actor, query.scope),
+    ...ticketListVisibilityWhere(actor, query.scope, team),
     ...(query.status && { status: query.status }),
     ...(query.priority && { priority: query.priority }),
     ...(query.categoryId && { categoryId: query.categoryId }),
@@ -83,8 +88,9 @@ export async function listTickets(query: TicketListQuery, actor: Actor) {
 }
 
 export async function getTicket(ticketId: string, actor: Actor, now = new Date()) {
+  const team = await teamScopeFor(actor);
   const ticket = await prisma.ticket.findFirst({
-    where: { id: ticketId, ...ticketVisibilityWhere(actor) },
+    where: { id: ticketId, ...ticketVisibilityWhere(actor, team) },
     select: {
       ...ticketSummarySelect, description: true, resolvedAt: true, closedAt: true,
       department: { select: { id: true, name: true } }, branch: { select: { id: true, name: true } },
@@ -121,7 +127,7 @@ export async function addTicketMessage(ticketId: string, input: TicketConversati
   // support-reply allowlist here — this is the trust boundary, not the client.
   const body = sanitizeReplyHtml(input.body);
   if (!body) throw new AppError(422, "EMPTY_MESSAGE", "Message body is required");
-  const { message, channel, customerPhone, emailExternalId, assignedAgentId, customerId } = await prisma.$transaction(async (tx) => {
+  const { message, channel, customerPhone, emailExternalId, assignedAgentId, customerId, teamId } = await prisma.$transaction(async (tx) => {
     const ticket = await requireConversationMutationAccess(tx, ticketId, actor);
     let emailExternalId: string | null = null;
     if (ticket.channel === Channel.EMAIL) {
@@ -168,12 +174,13 @@ export async function addTicketMessage(ticketId: string, input: TicketConversati
       emailExternalId,
       assignedAgentId: ticket.assignedAgentId,
       customerId: ticket.customerId,
+      teamId: ticket.teamId,
     };
   });
 
   // Persistence committed — signal connected clients (transaction-safe: buffered
   // by withRealtimeOutbox, flushed when this function resolves).
-  emitTicketMessageCreated({ ticketId, messageId: message.id, assignedAgentId, customerId, visibility: "public" });
+  emitTicketMessageCreated({ ticketId, messageId: message.id, assignedAgentId, customerId, teamId, visibility: "public" });
 
   // Outbound transport for WhatsApp-originated tickets. The message is already
   // committed above, so a delivery failure never corrupts the conversation — it
@@ -226,13 +233,14 @@ export async function addTicketNote(ticketId: string, input: TicketConversationI
       message: `${note.author.name} added an internal note on ticket #${ticketId}: ${ticket.subject}`,
       excludeUserIds: mentionedIds,
     });
-    return { note: { ...note, kind: "INTERNAL_NOTE" as const }, assignedAgentId: ticket.assignedAgentId, customerId: ticket.customerId };
+    return { note: { ...note, kind: "INTERNAL_NOTE" as const }, assignedAgentId: ticket.assignedAgentId, customerId: ticket.customerId, teamId: ticket.teamId };
    });
    emitTicketMessageCreated({
      ticketId,
      messageId: result.note.id,
      assignedAgentId: result.assignedAgentId,
      customerId: result.customerId,
+     teamId: result.teamId,
      visibility: "internal",
    });
    return result.note;
@@ -243,13 +251,27 @@ export async function createTicket(input: CreateTicketInput, actor: Actor, reque
   if (actor.role === Role.AGENT && input.assignedAgentId !== undefined) throw forbidden("Agents cannot choose a ticket assignee");
   const creationInput: CreateTicketInput = actor.role === Role.AGENT ? { ...input, assignedAgentId: actor.userId } : input;
   const now = new Date();
+  // Team scope for the creator (feature/team-based-manager-scope): a MANAGER may
+  // only create tickets for their own team; an AGENT's ticket belongs to the
+  // AGENT's team. ADMIN is unrestricted.
+  const creatorTeamId = actor.role === Role.ADMIN ? null : await resolveActorTeamId(actor);
+  if (actor.role === Role.MANAGER && creationInput.teamId && creationInput.teamId !== creatorTeamId) {
+    throw forbidden("Managers can only create tickets for their own team");
+  }
   return withRealtimeOutbox(async () => {
    const ticket = await prisma.$transaction(async (tx) => {
     const relations = await validateRelations(tx, creationInput);
+    if (creationInput.assignedAgentId) {
+      assertAgentAssignableToTicket(creationInput.teamId ?? null, relations.agent?.teamId ?? null);
+    }
+    // Effective owning team: explicit → assignee's team → creator's team (MANAGER
+    // / AGENT) → null (ADMIN with no routing info; ticket stays unrouted).
+    const effectiveTeamId =
+      creationInput.teamId ?? relations.agent?.teamId ?? creatorTeamId ?? null;
     const sla = await tx.slaRule.findFirst({ where: { priority: creationInput.priority, isActive: true } });
     const ticket = await tx.ticket.create({
       data: {
-        ...creationInput, createdAt: now,
+        ...creationInput, teamId: effectiveTeamId, createdAt: now,
         firstResponseDueAt: sla ? addMinutes(now, sla.firstResponseMinutes) : null,
         resolutionDueAt: sla ? addMinutes(now, sla.resolutionMinutes) : null,
       },
@@ -268,7 +290,7 @@ export async function createTicket(input: CreateTicketInput, actor: Actor, reque
     }
     return ticket;
    });
-   emitTicketUpdated({ ticketId: ticket.id, assignedAgentId: ticket.assignedAgent?.id ?? null, customerId: ticket.customer?.id ?? null });
+   emitTicketUpdated({ ticketId: ticket.id, assignedAgentId: ticket.assignedAgent?.id ?? null, customerId: ticket.customer?.id ?? null, teamId: ticket.teamId });
    return ticket;
   });
 }
@@ -280,17 +302,36 @@ export async function updateTicket(ticketId: string, input: UpdateTicketInput, a
   if (actor.role === Role.AGENT && input.assignedAgentId !== undefined) {
     return selfAssignTicket(ticketId, input, actor, requestContext);
   }
+  const team = await teamScopeFor(actor);
   return withRealtimeOutbox(async () => {
    const { updated, changed } = await prisma.$transaction(async (tx) => {
     const current = await tx.ticket.findFirst({
-      where: { id: ticketId, ...ticketVisibilityWhere(actor) },
-      select: { id: true, subject: true, description: true, status: true, priority: true, categoryId: true, assignedAgentId: true, departmentId: true, branchId: true, firstRespondedAt: true, category: { select: { name: true } }, assignedAgent: { select: { name: true } } },
+      where: { id: ticketId, ...ticketVisibilityWhere(actor, team) },
+      select: { id: true, subject: true, description: true, status: true, priority: true, categoryId: true, assignedAgentId: true, departmentId: true, branchId: true, teamId: true, firstRespondedAt: true, category: { select: { name: true } }, assignedAgent: { select: { name: true } } },
     });
     if (!current) throw new AppError(404, "TICKET_NOT_FOUND", "Ticket not found");
 
     enforceMutationPermissions(current, input, actor);
-    const relations = await validateRelations(tx, input, { departmentId: input.departmentId ?? current.departmentId, branchId: input.branchId ?? current.branchId });
+    const relations = await validateRelations(tx, input, {
+      departmentId: input.departmentId ?? current.departmentId,
+      branchId: input.branchId ?? current.branchId,
+      teamId: input.teamId !== undefined ? input.teamId : current.teamId,
+    });
     if (input.status && input.status !== current.status) validateTransition(current.status, input.status, actor.role);
+
+    // Team assignment invariant (Phase 10): assigning an agent requires the agent
+    // to be on the ticket's team. A ticket with no team yet ADOPTS the agent's
+    // team. Never silently move the agent or an already-teamed ticket.
+    const assigningAgent =
+      input.assignedAgentId !== undefined &&
+      input.assignedAgentId !== null &&
+      input.assignedAgentId !== current.assignedAgentId;
+    let adoptTeamId: string | null = null;
+    if (assigningAgent) {
+      const targetTeamId = input.teamId !== undefined ? input.teamId : current.teamId;
+      assertAgentAssignableToTicket(targetTeamId, relations.agent?.teamId ?? null);
+      if (targetTeamId === null && relations.agent?.teamId) adoptTeamId = relations.agent.teamId;
+    }
 
     const data: Prisma.TicketUpdateInput = {};
     if (input.subject !== undefined) data.subject = input.subject;
@@ -301,6 +342,8 @@ export async function updateTicket(ticketId: string, input: UpdateTicketInput, a
     if (input.assignedAgentId !== undefined) data.assignedAgent = input.assignedAgentId ? { connect: { id: input.assignedAgentId } } : { disconnect: true };
     if (input.departmentId !== undefined) data.department = input.departmentId ? { connect: { id: input.departmentId } } : { disconnect: true };
     if (input.branchId !== undefined) data.branch = input.branchId ? { connect: { id: input.branchId } } : { disconnect: true };
+    if (input.teamId !== undefined) data.team = input.teamId ? { connect: { id: input.teamId } } : { disconnect: true };
+    else if (adoptTeamId) data.team = { connect: { id: adoptTeamId } };
     if (input.status === TicketStatus.RESOLVED && current.status !== TicketStatus.RESOLVED) data.resolvedAt = now;
     if (input.status === TicketStatus.CLOSED && current.status !== TicketStatus.CLOSED) data.closedAt = now;
 
@@ -338,11 +381,14 @@ export async function updateTicket(ticketId: string, input: UpdateTicketInput, a
     const escalated = input.status === TicketStatus.ESCALATED && current.status !== TicketStatus.ESCALATED;
     let escalationRecipientIds: string[] = [];
     if (escalated) {
-      const adminsManagers = await tx.user.findMany({
-        where: { role: { in: [Role.ADMIN, Role.MANAGER] }, isActive: true, id: { not: actor.userId } },
-        select: { id: true },
+      // Team-aware fan-out (feature/team-based-manager-scope): every active ADMIN,
+      // plus ONLY the manager of this ticket's team. An UNROUTED ticket (teamId
+      // null) reaches ADMINs only — never every manager.
+      const escalatedTeamId = input.teamId !== undefined ? input.teamId : current.teamId;
+      escalationRecipientIds = await ticketOperationalRecipientIds(tx, {
+        teamId: escalatedTeamId,
+        excludeUserId: actor.userId,
       });
-      escalationRecipientIds = adminsManagers.map((u) => u.id);
       if (escalationRecipientIds.length > 0) {
         await createNotifications(tx, escalationRecipientIds, "TICKET_ESCALATED", "Ticket escalated", `Ticket #${ticketId}: ${current.subject} has been escalated`, ticketId);
       }
@@ -385,7 +431,7 @@ export async function updateTicket(ticketId: string, input: UpdateTicketInput, a
     return { updated, changed };
    });
    // Only signal when visible ticket state actually changed — a no-op PATCH stays quiet.
-   if (changed) emitTicketUpdated({ ticketId, assignedAgentId: updated.assignedAgent?.id ?? null, customerId: updated.customer?.id ?? null });
+   if (changed) emitTicketUpdated({ ticketId, assignedAgentId: updated.assignedAgent?.id ?? null, customerId: updated.customer?.id ?? null, teamId: updated.teamId });
    return updated;
   });
 }
@@ -404,11 +450,13 @@ async function selfAssignTicket(ticketId: string, input: UpdateTicketInput, acto
   }
   if (input.assignedAgentId !== actor.userId) throw forbidden("Agents cannot choose a ticket assignee");
 
+  const team = await teamScopeFor(actor);
   return withRealtimeOutbox(async () => {
     const result = await prisma.$transaction(async (tx) => {
-      // Reachable by this agent at all? (assigned-to-self or unassigned) → else 404.
+      // Reachable by this agent at all? (assigned-to-self, or unassigned within
+      // the agent's own team) → else 404.
       const current = await tx.ticket.findFirst({
-        where: { id: ticketId, ...ticketVisibilityWhere(actor) },
+        where: { id: ticketId, ...ticketVisibilityWhere(actor, team) },
         select: { id: true, assignedAgentId: true },
       });
       if (!current) throw new AppError(404, "TICKET_NOT_FOUND", "Ticket not found");
@@ -437,7 +485,7 @@ async function selfAssignTicket(ticketId: string, input: UpdateTicketInput, acto
     });
 
     if (result.changed) {
-      emitTicketUpdated({ ticketId, assignedAgentId: actor.userId, customerId: result.ticket.customer?.id ?? null });
+      emitTicketUpdated({ ticketId, assignedAgentId: actor.userId, customerId: result.ticket.customer?.id ?? null, teamId: result.ticket.teamId });
     }
     return result.ticket;
   });
@@ -449,13 +497,15 @@ const conversationSelect = {
 } satisfies Prisma.TicketMessageSelect & Prisma.TicketNoteSelect;
 
 async function requireConversationMutationAccess(tx: Prisma.TransactionClient, ticketId: string, actor: Actor) {
+  const team = await teamScopeFor(actor);
   const ticket = await tx.ticket.findFirst({
-    where: { id: ticketId, ...ticketVisibilityWhere(actor) },
+    where: { id: ticketId, ...ticketVisibilityWhere(actor, team) },
     select: {
       id: true,
       subject: true,
       assignedAgentId: true,
       customerId: true,
+      teamId: true,
       channel: true,
       emailThreadToken: true,
       customer: { select: { phone: true, email: true } },
@@ -482,10 +532,10 @@ function validateTransition(from: TicketStatus, to: TicketStatus, role: Role) {
   if ((from === TicketStatus.ESCALATED || to === TicketStatus.ESCALATED) && role === Role.AGENT) throw forbidden("Agents cannot change escalation status");
 }
 
-async function validateRelations(tx: Prisma.TransactionClient, input: Partial<CreateTicketInput & UpdateTicketInput>, organization?: { departmentId?: string | null; branchId?: string | null }) {
+async function validateRelations(tx: Prisma.TransactionClient, input: Partial<CreateTicketInput & UpdateTicketInput>, organization?: { departmentId?: string | null; branchId?: string | null; teamId?: string | null }) {
   const customer = input.customerId ? await tx.customer.findUnique({ where: { id: input.customerId }, select: { id: true } }) : null;
   if (input.customerId && !customer) throw new AppError(404, "CUSTOMER_NOT_FOUND", "Customer not found");
-  const agent = input.assignedAgentId ? await tx.user.findFirst({ where: { id: input.assignedAgentId, role: Role.AGENT }, select: { id: true, name: true } }) : null;
+  const agent = input.assignedAgentId ? await tx.user.findFirst({ where: { id: input.assignedAgentId, role: Role.AGENT }, select: { id: true, name: true, teamId: true } }) : null;
   if (input.assignedAgentId && !agent) throw new AppError(400, "INVALID_ASSIGNED_AGENT", "Assigned user must be an agent");
   const category = input.categoryId ? await tx.category.findFirst({ where: { id: input.categoryId, isActive: true }, select: { id: true, name: true } }) : null;
   if (input.categoryId && !category) throw new AppError(404, "CATEGORY_NOT_FOUND", "Category not found");
@@ -496,7 +546,16 @@ async function validateRelations(tx: Prisma.TransactionClient, input: Partial<Cr
   const branch = branchId ? await tx.branch.findUnique({ where: { id: branchId }, select: { id: true } }) : null;
   if (branchId && !branch) throw new AppError(404, "BRANCH_NOT_FOUND", "Branch not found");
   if (department && branchId && department.branchId !== branchId) throw new AppError(400, "DEPARTMENT_BRANCH_MISMATCH", "Department does not belong to the selected branch");
-  return { agent, category };
+  // Team consistency (feature/team-based-manager-scope): the team must exist, be
+  // active, and belong to the ticket's (effective) department.
+  const teamId = organization?.teamId ?? input.teamId;
+  const team = teamId ? await tx.team.findUnique({ where: { id: teamId }, select: { id: true, name: true, isActive: true, departmentId: true } }) : null;
+  if (teamId && (!team || !team.isActive)) throw new AppError(400, "INVALID_TEAM", "Team is invalid or inactive");
+  const effectiveDepartmentId = departmentId ?? null;
+  if (team && effectiveDepartmentId && team.departmentId !== effectiveDepartmentId) {
+    throw new AppError(400, "TEAM_DEPARTMENT_MISMATCH", "Team does not belong to the ticket's department");
+  }
+  return { agent, category, team };
 }
 
 function history(ticketId: string, actorUserId: string, action: string, oldValue: string | null, newValue: string | null): Prisma.TicketHistoryCreateManyInput {

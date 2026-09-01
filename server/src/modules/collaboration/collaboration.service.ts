@@ -3,6 +3,7 @@ import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import { createNotifications } from "../notifications/notification.service.js";
 import { ticketVisibilityWhere, type TicketActor } from "../tickets/ticket-visibility.js";
+import { resolveActorTeamScope } from "../../shared/team/team-scope.js";
 import type { MentionableQuery } from "./collaboration.schema.js";
 
 // feature/team-collaboration (ADR-032) — internal-only mentions + watchers.
@@ -206,8 +207,11 @@ export async function applyNoteMentions(
 // ---------------------------------------------------------------------------
 
 async function assertTicketVisible(ticketId: string, actor: TicketActor) {
+  // Team-scoped: a MANAGER cannot watch/unwatch or reach watchers of another
+  // team's ticket by id.
+  const team = await resolveActorTeamScope(actor);
   const ticket = await prisma.ticket.findFirst({
-    where: { id: ticketId, ...ticketVisibilityWhere(actor) },
+    where: { id: ticketId, ...ticketVisibilityWhere(actor, team) },
     select: { id: true },
   });
   if (!ticket) throw new AppError(404, "TICKET_NOT_FOUND", "Ticket not found");

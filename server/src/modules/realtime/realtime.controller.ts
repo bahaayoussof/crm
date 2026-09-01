@@ -1,6 +1,7 @@
 import { Role } from "@prisma/client";
 import type { RequestHandler } from "express";
 import { prisma } from "../../config/prisma.js";
+import { resolveActorTeamId } from "../../shared/team/team-scope.js";
 import { addSubscriber, removeSubscriber, RECONNECT_ADVICE_MS } from "./realtime.service.js";
 
 /**
@@ -52,6 +53,16 @@ export const streamRealtimeEvents: RequestHandler = (request, response) => {
       })
       .catch(() => {
         subscriber.customerId = null;
+      });
+  } else if (auth.role === Role.MANAGER || auth.role === Role.AGENT) {
+    // Resolve the actor's team ONCE per connection (feature/team-based-manager-scope).
+    // Until it resolves the connection receives no team-scoped ticket events.
+    void resolveActorTeamId({ userId: auth.userId, role: auth.role })
+      .then((teamId) => {
+        subscriber.teamId = teamId;
+      })
+      .catch(() => {
+        subscriber.teamId = null;
       });
   }
 

@@ -128,19 +128,25 @@ describe("realtime SSE endpoint", () => {
 describe("realtime authorization (canReceive)", () => {
   const ticketAudience = (
     assignedAgentId: string | null,
-    extra: { customerId?: string | null; visibility?: "public" | "internal" } = {},
-  ) => ({ scope: "ticket", ticketId: "t1", assignedAgentId, customerId: extra.customerId ?? null, ...(extra.visibility ? { visibility: extra.visibility } : {}) }) as const;
-  const sub = (userId: string, role: Role, customerId: string | null = null) => ({ userId, role, customerId });
+    extra: { customerId?: string | null; visibility?: "public" | "internal"; teamId?: string | null } = {},
+  ) => ({ scope: "ticket", ticketId: "t1", assignedAgentId, customerId: extra.customerId ?? null, teamId: extra.teamId ?? null, ...(extra.visibility ? { visibility: extra.visibility } : {}) }) as const;
+  const sub = (userId: string, role: Role, customerId: string | null = null, teamId: string | null = null) => ({ userId, role, customerId, teamId });
 
-  it("ADMIN and MANAGER receive every ticket event", () => {
-    expect(canReceive(sub("a", Role.ADMIN), ticketAudience("someone"))).toBe(true);
-    expect(canReceive(sub("m", Role.MANAGER), ticketAudience("someone"))).toBe(true);
+  it("ADMIN receives every ticket event; MANAGER only their own team's", () => {
+    expect(canReceive(sub("a", Role.ADMIN), ticketAudience("someone", { teamId: "team-b" }))).toBe(true);
+    // feature/team-based-manager-scope: MANAGER of team-a
+    expect(canReceive(sub("m", Role.MANAGER, null, "team-a"), ticketAudience("someone", { teamId: "team-a" }))).toBe(true);
+    expect(canReceive(sub("m", Role.MANAGER, null, "team-a"), ticketAudience("someone", { teamId: "team-b" }))).toBe(false);
+    // MANAGER with no team, or an unrouted ticket → nothing.
+    expect(canReceive(sub("m", Role.MANAGER, null, null), ticketAudience("someone", { teamId: "team-a" }))).toBe(false);
+    expect(canReceive(sub("m", Role.MANAGER, null, "team-a"), ticketAudience("someone", { teamId: null }))).toBe(false);
   });
 
-  it("AGENT receives ticket events only for assigned or unassigned tickets", () => {
-    expect(canReceive(sub("ag", Role.AGENT), ticketAudience("ag"))).toBe(true);
-    expect(canReceive(sub("ag", Role.AGENT), ticketAudience(null))).toBe(true);
-    expect(canReceive(sub("ag", Role.AGENT), ticketAudience("other"))).toBe(false);
+  it("AGENT receives assigned-to-self events, plus own-team unassigned events", () => {
+    expect(canReceive(sub("ag", Role.AGENT, null, "team-a"), ticketAudience("ag", { teamId: "team-b" }))).toBe(true);
+    expect(canReceive(sub("ag", Role.AGENT, null, "team-a"), ticketAudience(null, { teamId: "team-a" }))).toBe(true);
+    expect(canReceive(sub("ag", Role.AGENT, null, "team-a"), ticketAudience(null, { teamId: "team-b" }))).toBe(false);
+    expect(canReceive(sub("ag", Role.AGENT, null, "team-a"), ticketAudience("other", { teamId: "team-a" }))).toBe(false);
   });
 
   it("notification events reach only the intended user", () => {
@@ -195,7 +201,8 @@ describe("realtime authorization (canReceive)", () => {
     const staff = fakeResponse();
     addSubscriber("cust-user-1", Role.CUSTOMER, mine.res, "cust-1");
     addSubscriber("cust-user-2", Role.CUSTOMER, other.res, "cust-2");
-    addSubscriber("agent-1", Role.AGENT, staff.res, null);
+    // ADMIN: always receives internal ticket events regardless of team scope.
+    addSubscriber("admin-9", Role.ADMIN, staff.res, null);
 
     // Admin public reply on cust-1's ticket.
     emitTicketMessageCreated({ ticketId: "t1", messageId: "m1", assignedAgentId: null, customerId: "cust-1", visibility: "public" });

@@ -761,3 +761,10 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
 | 13:20 | Fix Admin Edit User empty-Role bug everywhere: added canonical mapUserToEditFormValues() in user.schemas.ts; page EditUserFormLoaded + modal now both seed useForm via it; modal restructured to key={user.id} child mounted only when open (no useEffect reset dance) | user.schemas.ts, user-form-page.tsx, user-edit-modal.tsx, users.test.tsx | 46/46 users.test pass, tsc -b clean; +6 regression tests (page AGENT/MANAGER, modal AGENT/MANAGER, modal reopen A->B, direct URL) | ~45k |
+
+## Session: 2026-09-01 13:24
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 14:19 | Team-based manager scope: schema+migration+DB reset+seed+shared team-scope module+manager/ticket/dashboard/reports/user/teams backend | server/src/shared/team/, server/src/modules/teams/, ticket.service.ts, manager.service.ts, seed-test-data.ts, schema.prisma | backend impl + server tsc clean; 66 server tests + all FE + i18n + docs outstanding | ~180k |
+| 15:23 | Team-scope backend hardening: closed direct-ID gaps (attachments/ai/collaboration/tasks), team-aware notifications+realtime, fixed 66 tests + added 25-test team-scope.test.ts + cross-team isolation blocks | shared/team/team-scope.ts, ai-context/attachment/collaboration/task/portal/email/whatsapp/sla-automation/realtime services + 10 test files | server tsc+eslint+vitest(41f/745t) all green; frontend/i18n/docs pending | ~250k |

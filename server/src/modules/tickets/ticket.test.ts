@@ -5,10 +5,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   ticketFindMany: vi.fn(), ticketCount: vi.fn(), ticketFindFirst: vi.fn(), ticketCreate: vi.fn(), ticketUpdate: vi.fn(),
   ticketUpdateMany: vi.fn(), messageCreate: vi.fn(), messageFindMany: vi.fn(), noteCreate: vi.fn(),
-  historyCreate: vi.fn(), historyCreateMany: vi.fn(), customerFind: vi.fn(), userFindFirst: vi.fn(), userFindMany: vi.fn(),
+  historyCreate: vi.fn(), historyCreateMany: vi.fn(), customerFind: vi.fn(), userFindFirst: vi.fn(), userFindMany: vi.fn(), userFindUnique: vi.fn(),
   categoryFindFirst: vi.fn(), categoryFindMany: vi.fn(), departmentFind: vi.fn(), branchFind: vi.fn(), slaFind: vi.fn(), transaction: vi.fn(),
   watcherCreateMany: vi.fn(), watcherFindMany: vi.fn(), watcherDeleteMany: vi.fn(), watcherCount: vi.fn(), watcherFindFirst: vi.fn(),
-  mentionCreateMany: vi.fn(), notificationCreateMany: vi.fn(), auditCreate: vi.fn(),
+  mentionCreateMany: vi.fn(), notificationCreateMany: vi.fn(), auditCreate: vi.fn(), teamFindUnique: vi.fn(),
 }));
 
 vi.mock("../../config/prisma.js", () => {
@@ -18,9 +18,9 @@ vi.mock("../../config/prisma.js", () => {
     ticketHistory: { create: mocks.historyCreate, createMany: mocks.historyCreateMany },
     ticketWatcher: { createMany: mocks.watcherCreateMany, findMany: mocks.watcherFindMany, deleteMany: mocks.watcherDeleteMany, count: mocks.watcherCount, findFirst: mocks.watcherFindFirst },
     ticketMention: { createMany: mocks.mentionCreateMany },
-    customer: { findUnique: mocks.customerFind }, user: { findFirst: mocks.userFindFirst, findMany: mocks.userFindMany },
+    customer: { findUnique: mocks.customerFind }, user: { findFirst: mocks.userFindFirst, findMany: mocks.userFindMany, findUnique: mocks.userFindUnique },
     category: { findFirst: mocks.categoryFindFirst, findMany: mocks.categoryFindMany }, department: { findUnique: mocks.departmentFind },
-    branch: { findUnique: mocks.branchFind }, slaRule: { findFirst: mocks.slaFind },
+    branch: { findUnique: mocks.branchFind }, team: { findUnique: mocks.teamFindUnique }, slaRule: { findFirst: mocks.slaFind },
     notification: { createMany: mocks.notificationCreateMany },
     auditLog: { create: mocks.auditCreate },
     $transaction: mocks.transaction,
@@ -53,18 +53,30 @@ const deliverEmailReplyMock = vi.mocked(deliverEmailReply);
 const emitMessageMock = vi.mocked(emitTicketMessageCreated);
 const emitUpdatedMock = vi.mocked(emitTicketUpdated);
 
+// feature/team-based-manager-scope — the MANAGER/AGENT actors below all belong to
+// TEAM_A, and the default ticket fixtures are owned by TEAM_A, so the existing
+// assertions still describe a MANAGER who CAN see the ticket. Team-isolation
+// negative cases mock `userFindUnique` with a different team explicitly.
+const TEAM_A = "cteamaaaaaaaaaaaaaaaaaaaa1";
 const admin = { id: "admin-1", role: Role.ADMIN };
 const manager = { id: "c6fd0a01a46ed4545f0a5e774", role: Role.MANAGER };
 const agent = { id: "c6ff3b3bd11c44cac620c43d5", role: Role.AGENT };
 const otherAgent = { id: "cc3544aa158a89417843d45b3", role: Role.AGENT };
 const auth = (identity = admin) => ({ Authorization: `Bearer ${createAccessToken(identity)}` });
 const now = new Date("2026-08-25T08:00:00.000Z");
+/** Default team resolution: manager LEADS team A; both agents are MEMBERS of team A. */
+const teamOf = (id: string) =>
+  id === manager.id
+    ? { teamId: TEAM_A, managedTeam: { id: TEAM_A } }
+    : id === agent.id || id === otherAgent.id
+      ? { teamId: TEAM_A, managedTeam: null }
+      : { teamId: null, managedTeam: null };
 const summary = {
-  id: "c737ce60fccf9da889f4605c0", subject: "Payment failed", status: TicketStatus.OPEN, priority: TicketPriority.HIGH, channel: "WEB",
+  id: "c737ce60fccf9da889f4605c0", subject: "Payment failed", status: TicketStatus.OPEN, priority: TicketPriority.HIGH, channel: "WEB", teamId: TEAM_A,
   firstResponseDueAt: null, firstRespondedAt: null, resolutionDueAt: null, createdAt: now, updatedAt: now,
   customer: { id: "ce83f10dcd2c68747c3f3ba14", name: "Ahmed", email: "ahmed@example.com" }, assignedAgent: null, category: null,
 };
-const current = { id: summary.id, subject: summary.subject, description: "Issue", status: TicketStatus.OPEN, priority: TicketPriority.HIGH, categoryId: null, assignedAgentId: null, departmentId: null, branchId: null, firstRespondedAt: null, category: null, assignedAgent: null };
+const current = { id: summary.id, subject: summary.subject, description: "Issue", status: TicketStatus.OPEN, priority: TicketPriority.HIGH, categoryId: null, assignedAgentId: null, departmentId: null, branchId: null, teamId: TEAM_A, firstRespondedAt: null, category: null, assignedAgent: null };
 
 describe("ticket API", () => {
   beforeEach(() => {
@@ -76,13 +88,13 @@ describe("ticket API", () => {
       ticketHistory: { create: mocks.historyCreate, createMany: mocks.historyCreateMany }, customer: { findUnique: mocks.customerFind },
       ticketWatcher: { createMany: mocks.watcherCreateMany, findMany: mocks.watcherFindMany, deleteMany: mocks.watcherDeleteMany, count: mocks.watcherCount, findFirst: mocks.watcherFindFirst },
       ticketMention: { createMany: mocks.mentionCreateMany },
-      user: { findFirst: mocks.userFindFirst, findMany: mocks.userFindMany },
+      user: { findFirst: mocks.userFindFirst, findMany: mocks.userFindMany, findUnique: mocks.userFindUnique },
       category: { findFirst: mocks.categoryFindFirst }, department: { findUnique: mocks.departmentFind },
-      branch: { findUnique: mocks.branchFind }, slaRule: { findFirst: mocks.slaFind },
+      branch: { findUnique: mocks.branchFind }, team: { findUnique: mocks.teamFindUnique }, slaRule: { findFirst: mocks.slaFind },
       notification: { createMany: mocks.notificationCreateMany },
       auditLog: { create: mocks.auditCreate },
     }) : Promise.all(value as Promise<unknown>[]));
-    mocks.customerFind.mockResolvedValue({ id: "ce83f10dcd2c68747c3f3ba14" }); mocks.userFindFirst.mockResolvedValue({ id: "c6ff3b3bd11c44cac620c43d5", name: "Assigned Agent" });
+    mocks.customerFind.mockResolvedValue({ id: "ce83f10dcd2c68747c3f3ba14" }); mocks.userFindFirst.mockResolvedValue({ id: "c6ff3b3bd11c44cac620c43d5", name: "Assigned Agent", teamId: TEAM_A });
     mocks.categoryFindFirst.mockResolvedValue({ id: "cbbea6ce8290afd75d03495dd", name: "Billing" }); mocks.departmentFind.mockResolvedValue(null);
     mocks.branchFind.mockResolvedValue(null); mocks.slaFind.mockResolvedValue(null); mocks.historyCreate.mockResolvedValue({});
     mocks.historyCreateMany.mockResolvedValue({ count: 1 }); mocks.ticketCreate.mockResolvedValue(summary); mocks.ticketUpdate.mockResolvedValue(summary);
@@ -95,6 +107,9 @@ describe("ticket API", () => {
     mocks.watcherFindFirst.mockResolvedValue(null); mocks.mentionCreateMany.mockResolvedValue({ count: 0 });
     mocks.notificationCreateMany.mockResolvedValue({ count: 0 });
     mocks.messageFindMany.mockResolvedValue([]);
+    // feature/team-based-manager-scope: resolveActorTeamId() does one user.findUnique.
+    mocks.userFindUnique.mockImplementation(async (args: { where: { id: string } }) => teamOf(args.where.id));
+    mocks.teamFindUnique.mockResolvedValue({ id: TEAM_A, name: "Team A", isActive: true, departmentId: null });
     deliverEmailReplyMock.mockResolvedValue({ channel: "EMAIL", status: "SENT", externalId: "resend:email-out-1" });
   });
 
@@ -224,7 +239,7 @@ describe("ticket API", () => {
   });
 
   it("auto-assigns agent-created tickets and records assignment history", async () => {
-    mocks.userFindFirst.mockResolvedValue({ id: agent.id, name: "Assigned Agent" });
+    mocks.userFindFirst.mockResolvedValue({ id: agent.id, name: "Assigned Agent", teamId: TEAM_A });
     mocks.ticketCreate.mockResolvedValue({ ...summary, assignedAgent: { id: agent.id, name: "Assigned Agent", email: "agent@example.com" } });
     const response = await request(app).post("/api/tickets").set(auth(agent)).send({ subject: "Phone request", description: "Captured by agent", customerId: "ce83f10dcd2c68747c3f3ba14" });
     expect(response.status).toBe(201);
@@ -650,5 +665,83 @@ describe("ticket API", () => {
     const agents = await request(app).get("/api/users/agents").set(auth());
     expect(categories.status).toBe(200); expect(agents.status).toBe(200);
     expect(agents.body.data[0]).not.toHaveProperty("passwordHash");
+  });
+
+  // -------------------------------------------------------------------------
+  // feature/team-based-manager-scope — cross-team isolation
+  // -------------------------------------------------------------------------
+  describe("team isolation", () => {
+    const TEAM_B = "cteambbbbbbbbbbbbbbbbbbbb2";
+
+    it("scopes a MANAGER ticket list to their own team, server-side", async () => {
+      await request(app).get("/api/tickets").set(auth(manager));
+      const where = mocks.ticketFindMany.mock.calls[0][0].where;
+      expect(where).toMatchObject({ teamId: TEAM_A });
+      expect(where).not.toHaveProperty("OR");
+    });
+
+    it("matches nothing for a MANAGER with no team (never falls back to org-wide)", async () => {
+      mocks.userFindUnique.mockImplementation(async () => ({ teamId: null, managedTeam: null }));
+      await request(app).get("/api/tickets").set(auth(manager));
+      expect(mocks.ticketFindMany.mock.calls[0][0].where).toMatchObject({ id: { in: [] } });
+    });
+
+    it("scopes a MANAGER ticket-detail read to their own team (404 on another team's id)", async () => {
+      mocks.ticketFindFirst.mockResolvedValue(null); // team-scoped where excludes it
+      const response = await request(app).get("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(manager));
+      expect(response.status).toBe(404);
+      expect(mocks.ticketFindFirst.mock.calls[0][0].where).toMatchObject({ teamId: TEAM_A });
+    });
+
+    it("rejects assigning an agent from another team (409 CROSS_TEAM_ASSIGNMENT)", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ ...current, teamId: TEAM_A });
+      mocks.userFindFirst.mockResolvedValue({ id: otherAgent.id, name: "Other Agent", teamId: TEAM_B });
+      const response = await request(app)
+        .patch("/api/tickets/c737ce60fccf9da889f4605c0")
+        .set(auth(manager))
+        .send({ assignedAgentId: otherAgent.id });
+      expect(response.status).toBe(409);
+      expect(response.body.error.code).toBe("CROSS_TEAM_ASSIGNMENT");
+      expect(mocks.ticketUpdate).not.toHaveBeenCalled();
+    });
+
+    it("allows assigning an agent on the same team", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ ...current, teamId: TEAM_A });
+      mocks.userFindFirst.mockResolvedValue({ id: agent.id, name: "Same-team Agent", teamId: TEAM_A });
+      mocks.ticketUpdate.mockResolvedValue({ ...summary, assignedAgent: { id: agent.id, name: "Same-team Agent", email: "a@x.com" } });
+      const response = await request(app)
+        .patch("/api/tickets/c737ce60fccf9da889f4605c0")
+        .set(auth(manager))
+        .send({ assignedAgentId: agent.id });
+      expect(response.status).toBe(200);
+      expect(mocks.ticketUpdate).toHaveBeenCalled();
+    });
+
+    it("an unrouted ticket ADOPTS the assignee's team (never silently moves a teamed ticket)", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ ...current, teamId: null });
+      mocks.userFindFirst.mockResolvedValue({ id: agent.id, name: "Agent", teamId: TEAM_A });
+      mocks.ticketUpdate.mockResolvedValue(summary);
+      const response = await request(app)
+        .patch("/api/tickets/c737ce60fccf9da889f4605c0")
+        .set(auth(manager))
+        .send({ assignedAgentId: agent.id });
+      expect(response.status).toBe(200);
+      expect(mocks.ticketUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ team: { connect: { id: TEAM_A } } }) }),
+      );
+    });
+
+    it("keeps ADMIN organization-wide (no team predicate)", async () => {
+      await request(app).get("/api/tickets").set(auth(admin));
+      const where = mocks.ticketFindMany.mock.calls[0][0].where;
+      expect(where).not.toHaveProperty("teamId");
+      expect(where).not.toHaveProperty("OR");
+    });
+
+    it("narrows an AGENT's Unassigned queue to their own team", async () => {
+      await request(app).get("/api/tickets?scope=unassigned").set(auth(agent));
+      const where = mocks.ticketFindMany.mock.calls[0][0].where;
+      expect(where).toMatchObject({ assignedAgentId: null, teamId: TEAM_A });
+    });
   });
 });

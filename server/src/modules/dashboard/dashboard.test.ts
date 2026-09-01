@@ -2,9 +2,9 @@ import { Role, TicketPriority, TicketStatus } from "@prisma/client";
 import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ count: vi.fn(), groupBy: vi.fn(), findMany: vi.fn(), feedbackFindMany: vi.fn() }));
+const mocks = vi.hoisted(() => ({ count: vi.fn(), groupBy: vi.fn(), findMany: vi.fn(), feedbackFindMany: vi.fn(), userFindUnique: vi.fn() }));
 vi.mock("../../config/prisma.js", () => ({
-  prisma: { ticket: { count: mocks.count, groupBy: mocks.groupBy, findMany: mocks.findMany }, feedback: { findMany: mocks.feedbackFindMany }, $transaction: vi.fn() },
+  prisma: { ticket: { count: mocks.count, groupBy: mocks.groupBy, findMany: mocks.findMany }, feedback: { findMany: mocks.feedbackFindMany }, user: { findUnique: mocks.userFindUnique }, $transaction: vi.fn() },
 }));
 
 import { app } from "../../app.js";
@@ -23,6 +23,8 @@ describe("dashboard overview", () => {
     mocks.groupBy.mockResolvedValue([{ status: TicketStatus.OPEN, _count: { _all: 5 } }]);
     mocks.findMany.mockResolvedValue([]);
     mocks.feedbackFindMany.mockResolvedValue([]);
+    // feature/team-based-manager-scope: getDashboardOverview resolves the actor's team.
+    mocks.userFindUnique.mockResolvedValue({ teamId: null, managedTeam: null });
   });
 
   it("rejects unauthenticated and CUSTOMER access", async () => {
@@ -147,5 +149,27 @@ describe("dashboard overview", () => {
     await getDashboardOverview({ userId: "c6ff3b3bd11c44cac620c43d5", role: Role.AGENT }, now);
     const recentCall = mocks.findMany.mock.calls.find((call) => call[0]?.take === 8);
     expect(recentCall?.[0].where).toEqual({ AND: [{ assignedAgentId: "c6ff3b3bd11c44cac620c43d5" }, { id: { notIn: ["primary"] } }] });
+  });
+
+  // feature/team-based-manager-scope — MANAGER dashboard is own-team only
+  it("scopes every MANAGER dashboard aggregate to their own team", async () => {
+    mocks.userFindUnique.mockResolvedValue({ teamId: "team-1", managedTeam: { id: "team-1" } });
+    await request(app).get("/api/dashboard/overview").set(auth("mgr-1", Role.MANAGER));
+    expect(mocks.count.mock.calls[0][0].where).toMatchObject({ teamId: "team-1" });
+    expect(mocks.count.mock.calls[0][0].where).not.toHaveProperty("OR");
+    // status-distribution groupBy is team-scoped as well
+    expect(JSON.stringify(mocks.groupBy.mock.calls[0][0].where)).toContain("team-1");
+  });
+
+  it("matches nothing for a MANAGER with no team (never org-wide)", async () => {
+    mocks.userFindUnique.mockResolvedValue({ teamId: null, managedTeam: null });
+    await request(app).get("/api/dashboard/overview").set(auth("mgr-2", Role.MANAGER));
+    expect(mocks.count.mock.calls[0][0].where).toMatchObject({ id: { in: [] } });
+  });
+
+  it("keeps ADMIN dashboard organization-wide", async () => {
+    mocks.userFindUnique.mockResolvedValue({ teamId: null, managedTeam: null });
+    await request(app).get("/api/dashboard/overview").set(auth("adm-1", Role.ADMIN));
+    expect(mocks.count.mock.calls[0][0].where).not.toHaveProperty("teamId");
   });
 });

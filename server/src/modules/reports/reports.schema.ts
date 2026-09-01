@@ -45,7 +45,7 @@ export const reportsRangeQuerySchema = z
       return z.NEVER;
     }
 
-    return { start, end, departmentId: value.departmentId, branchId: value.branchId };
+    return { start, end, departmentId: value.departmentId, branchId: value.branchId, teamId: undefined as string | null | undefined };
   });
 
 export type ReportsRange = z.infer<typeof reportsRangeQuerySchema>;
@@ -85,6 +85,7 @@ export const reportsAgentsQuerySchema = z
       end,
       departmentId: value.departmentId,
       branchId: value.branchId,
+      teamId: undefined as string | null | undefined,
       search: value.search?.length ? value.search : undefined,
       page: value.page,
       limit: value.limit,

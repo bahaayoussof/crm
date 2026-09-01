@@ -4,6 +4,7 @@ import { AppError } from "../../shared/errors/app-error.js";
 import { createNotifications } from "../notifications/notification.service.js";
 import { withRealtimeOutbox } from "../realtime/realtime.publisher.js";
 import { ticketVisibilityWhere } from "../tickets/ticket-visibility.js";
+import { resolveActorTeamId, resolveActorTeamScope } from "../../shared/team/team-scope.js";
 import type { CreateTaskInput, ListTasksQuery, UpdateTaskInput } from "./task.schema.js";
 
 // ---------------------------------------------------------------------------
@@ -44,8 +45,21 @@ export const taskSummarySelect = {
 // ---------------------------------------------------------------------------
 // Visibility predicate
 // ---------------------------------------------------------------------------
-function taskVisibilityWhere(actor: TaskActor): Prisma.TaskWhereInput {
-  if (actor.role === Role.ADMIN || actor.role === Role.MANAGER) return {};
+async function taskVisibilityWhere(actor: TaskActor): Promise<Prisma.TaskWhereInput> {
+  if (actor.role === Role.ADMIN) return {};
+  if (actor.role === Role.MANAGER) {
+    // A MANAGER sees tasks they created/are assigned, unlinked tasks, and tasks
+    // whose linked ticket belongs to THEIR team — never another team's
+    // ticket-linked task (feature/team-based-manager-scope).
+    const teamId = await resolveActorTeamId(actor);
+    const ownership: Prisma.TaskWhereInput[] = [
+      { creatorId: actor.userId },
+      { assigneeId: actor.userId },
+      { ticketId: null },
+    ];
+    if (teamId) ownership.push({ ticket: { teamId } });
+    return { OR: ownership };
+  }
   // AGENT: tasks they created OR tasks assigned to them
   return { OR: [{ creatorId: actor.userId }, { assigneeId: actor.userId }] };
 }
@@ -54,13 +68,24 @@ function taskVisibilityWhere(actor: TaskActor): Prisma.TaskWhereInput {
 // Ticket accessibility check (reuses existing ticket visibility policy)
 // ---------------------------------------------------------------------------
 async function assertTicketAccessible(ticketId: string, actor: TaskActor): Promise<void> {
-  const ticket = await prisma.ticket.findFirst({
-    where: { id: ticketId, ...ticketVisibilityWhere(actor) },
-    select: { id: true },
-  });
-  if (!ticket) {
+  if (!(await ticketAccessibleBy(ticketId, actor))) {
     throw new AppError(404, "TICKET_NOT_FOUND", "Ticket not found");
   }
+}
+
+/**
+ * Whether `actor` may link/see the ticket — reuses the ticket-visibility policy
+ * INCLUDING team scope (feature/team-based-manager-scope), so a MANAGER cannot
+ * link another team's ticket and an AGENT assignee is checked against their own
+ * team.
+ */
+async function ticketAccessibleBy(ticketId: string, actor: TaskActor): Promise<boolean> {
+  const team = await resolveActorTeamScope(actor);
+  const ticket = await prisma.ticket.findFirst({
+    where: { id: ticketId, ...ticketVisibilityWhere(actor, team) },
+    select: { id: true },
+  });
+  return ticket !== null;
 }
 
 // ---------------------------------------------------------------------------
@@ -105,7 +130,7 @@ async function resolveAssigneeId(
 // List tasks
 // ---------------------------------------------------------------------------
 export async function listTasks(actor: TaskActor, query: ListTasksQuery) {
-  const visibilityWhere = taskVisibilityWhere(actor);
+  const visibilityWhere = await taskVisibilityWhere(actor);
   const searchWhere: Prisma.TaskWhereInput = query.search
     ? {
         OR: [
@@ -155,7 +180,7 @@ export async function listTasks(actor: TaskActor, query: ListTasksQuery) {
 // ---------------------------------------------------------------------------
 export async function getTask(actor: TaskActor, taskId: string) {
   const task = await prisma.task.findFirst({
-    where: { id: taskId, ...taskVisibilityWhere(actor) },
+    where: { id: taskId, ...(await taskVisibilityWhere(actor)) },
     select: taskSummarySelect,
   });
   if (!task) throw new AppError(404, "TASK_NOT_FOUND", "Task not found");
@@ -175,11 +200,7 @@ export async function createTask(actor: TaskActor, input: CreateTaskInput) {
     // When assigning to another AGENT, also validate AGENT can access the ticket
     if (assigneeId !== actor.userId) {
       const assigneeActor: TaskActor = { userId: assigneeId, role: Role.AGENT };
-      const ticketAccessible = await prisma.ticket.findFirst({
-        where: { id: input.ticketId, ...ticketVisibilityWhere(assigneeActor) },
-        select: { id: true },
-      });
-      if (!ticketAccessible) {
+      if (!(await ticketAccessibleBy(input.ticketId, assigneeActor))) {
         throw new AppError(
           422,
           "TICKET_NOT_ACCESSIBLE_BY_ASSIGNEE",
@@ -235,7 +256,7 @@ export async function createTask(actor: TaskActor, input: CreateTaskInput) {
 export async function updateTask(actor: TaskActor, taskId: string, input: UpdateTaskInput) {
   // Fetch task with visibility gate first
   const existing = await prisma.task.findFirst({
-    where: { id: taskId, ...taskVisibilityWhere(actor) },
+    where: { id: taskId, ...(await taskVisibilityWhere(actor)) },
     select: { id: true, creatorId: true, assigneeId: true, ticketId: true, status: true, dueAt: true },
   });
   if (!existing) throw new AppError(404, "TASK_NOT_FOUND", "Task not found");
@@ -284,11 +305,7 @@ export async function updateTask(actor: TaskActor, taskId: string, input: Update
     // Validate assignee can also access the new ticket
     const effectiveAssigneeId = newAssigneeId ?? existing.assigneeId;
     const assigneeActor: TaskActor = { userId: effectiveAssigneeId, role: Role.AGENT };
-    const ticketAccessible = await prisma.ticket.findFirst({
-      where: { id: input.ticketId, ...ticketVisibilityWhere(assigneeActor) },
-      select: { id: true },
-    });
-    if (!ticketAccessible) {
+    if (!(await ticketAccessibleBy(input.ticketId, assigneeActor))) {
       throw new AppError(
         422,
         "TICKET_NOT_ACCESSIBLE_BY_ASSIGNEE",
@@ -352,7 +369,7 @@ export async function updateTask(actor: TaskActor, taskId: string, input: Update
 export async function deleteTask(actor: TaskActor, taskId: string) {
   // Visibility gate first
   const existing = await prisma.task.findFirst({
-    where: { id: taskId, ...taskVisibilityWhere(actor) },
+    where: { id: taskId, ...(await taskVisibilityWhere(actor)) },
     select: { id: true, creatorId: true },
   });
   if (!existing) throw new AppError(404, "TASK_NOT_FOUND", "Task not found");

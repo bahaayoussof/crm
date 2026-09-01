@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   userFindMany: vi.fn(),
+  userFindUnique: vi.fn(),
   ticketFindFirst: vi.fn(),
   watcherFindMany: vi.fn(),
   watcherCreateMany: vi.fn(),
@@ -14,7 +15,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../../config/prisma.js", () => ({
   prisma: {
-    user: { findMany: mocks.userFindMany },
+    user: { findMany: mocks.userFindMany, findUnique: mocks.userFindUnique },
     ticket: { findFirst: mocks.ticketFindFirst },
     ticketWatcher: {
       findMany: mocks.watcherFindMany,
@@ -41,6 +42,7 @@ const auth = (role: Role, id = role.toLowerCase()) => ({
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.userFindMany.mockResolvedValue([]);
+  mocks.userFindUnique.mockResolvedValue({ teamId: null, managedTeam: null });
   mocks.ticketFindFirst.mockResolvedValue({ id: "c737ce60fccf9da889f4605c0" });
   mocks.watcherFindMany.mockResolvedValue([]);
   mocks.watcherCreateMany.mockResolvedValue({ count: 1 });
@@ -150,11 +152,17 @@ describe("ticket watcher endpoints", () => {
     expect((await request(app).delete("/api/tickets/ce564b4081d7a9ea4b00dada5/watchers/me").set(auth(Role.AGENT))).status).toBe(404);
   });
 
-  it("scopes the visibility check to AGENT assigned-or-unassigned tickets", async () => {
+  it("scopes the visibility check to AGENT assigned-or-own-team-unassigned tickets", async () => {
+    // feature/team-based-manager-scope: the AGENT's unassigned reach is narrowed
+    // to their own team.
+    mocks.userFindUnique.mockResolvedValue({ teamId: "team-1", managedTeam: null });
     await request(app).get("/api/tickets/c737ce60fccf9da889f4605c0/watchers").set(auth(Role.AGENT, "agent-1"));
     expect(mocks.ticketFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: "c737ce60fccf9da889f4605c0", OR: [{ assignedAgentId: "agent-1" }, { assignedAgentId: null }] },
+        where: {
+          id: "c737ce60fccf9da889f4605c0",
+          OR: [{ assignedAgentId: "agent-1" }, { assignedAgentId: null, teamId: "team-1" }],
+        },
       }),
     );
   });
@@ -190,6 +198,15 @@ describe("ticket watcher endpoints", () => {
     expect(response.status).toBe(200);
     expect(response.body.data).toEqual({ watching: false, watcherCount: 0 });
     expect(mocks.watcherDeleteMany).toHaveBeenCalledWith({ where: { ticketId: "c737ce60fccf9da889f4605c0", userId: "ccfad431af89dd48c0fe73ace" } });
+  });
+
+  // feature/team-based-manager-scope — watchers of another team's ticket are unreachable by direct id
+  it("team-scopes the visibility check for a MANAGER (404 on another team's ticket)", async () => {
+    mocks.userFindUnique.mockResolvedValue({ teamId: "team-1", managedTeam: { id: "team-1" } });
+    mocks.ticketFindFirst.mockResolvedValue(null); // team-scoped where excludes it
+    const response = await request(app).get("/api/tickets/c737ce60fccf9da889f4605c0/watchers").set(auth(Role.MANAGER));
+    expect(response.status).toBe(404);
+    expect(mocks.ticketFindFirst.mock.calls[0][0].where).toMatchObject({ id: "c737ce60fccf9da889f4605c0", teamId: "team-1" });
   });
 });
 

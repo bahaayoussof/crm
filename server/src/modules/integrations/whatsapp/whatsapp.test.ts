@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   customerFindUnique: vi.fn(),
   customerCreate: vi.fn(),
   ticketFindFirst: vi.fn(),
+  ticketFindUnique: vi.fn(),
   ticketCreate: vi.fn(),
   ticketUpdate: vi.fn(),
   historyCreate: vi.fn(),
@@ -28,7 +29,7 @@ vi.mock("../../../config/prisma.js", () => {
     ticketMessage: { findUnique: mocks.messageFindUnique, create: mocks.messageCreate, update: mocks.messageUpdate },
     user: { findFirst: mocks.userFindFirst, create: mocks.userCreate, findMany: mocks.userFindMany },
     customer: { findMany: mocks.customerFindMany, findUnique: mocks.customerFindUnique, create: mocks.customerCreate },
-    ticket: { findFirst: mocks.ticketFindFirst, create: mocks.ticketCreate, update: mocks.ticketUpdate },
+    ticket: { findFirst: mocks.ticketFindFirst, findUnique: mocks.ticketFindUnique, create: mocks.ticketCreate, update: mocks.ticketUpdate },
     ticketHistory: { create: mocks.historyCreate },
     slaRule: { findFirst: mocks.slaFindFirst },
     notification: { createMany: mocks.notificationCreateMany },
@@ -120,7 +121,7 @@ describe("WhatsApp integration", () => {
             ticketMessage: { findUnique: mocks.messageFindUnique, create: mocks.messageCreate, update: mocks.messageUpdate },
             user: { findFirst: mocks.userFindFirst, create: mocks.userCreate, findMany: mocks.userFindMany },
             customer: { findMany: mocks.customerFindMany, findUnique: mocks.customerFindUnique, create: mocks.customerCreate },
-            ticket: { findFirst: mocks.ticketFindFirst, create: mocks.ticketCreate, update: mocks.ticketUpdate },
+            ticket: { findFirst: mocks.ticketFindFirst, findUnique: mocks.ticketFindUnique, create: mocks.ticketCreate, update: mocks.ticketUpdate },
             ticketHistory: { create: mocks.historyCreate },
             slaRule: { findFirst: mocks.slaFindFirst },
             notification: { createMany: mocks.notificationCreateMany },
@@ -137,6 +138,7 @@ describe("WhatsApp integration", () => {
     mocks.customerFindUnique.mockResolvedValue(null);
     mocks.customerCreate.mockResolvedValue({ id: "cust-new" });
     mocks.ticketFindFirst.mockResolvedValue(null);
+    mocks.ticketFindUnique.mockResolvedValue({ teamId: null });
     mocks.ticketCreate.mockResolvedValue({ id: "cd3448751688c18a75abee51f", status: "OPEN", subject: "WhatsApp: Hello", assignedAgentId: null });
     mocks.ticketUpdate.mockResolvedValue({ id: "c737ce60fccf9da889f4605c0" });
     mocks.historyCreate.mockResolvedValue({});

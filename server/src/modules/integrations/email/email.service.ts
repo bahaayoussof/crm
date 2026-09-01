@@ -7,6 +7,7 @@ import { emailSchema } from "../../../shared/validation/common.schema.js";
 import { replyHtmlToPlainText, sanitizeReplyHtml } from "../../../shared/rich-text/reply-html.js";
 import { createNotifications } from "../../notifications/notification.service.js";
 import { emitTicketMessageCreated, withRealtimeOutbox } from "../../realtime/realtime.publisher.js";
+import { ticketOperationalRecipientIds } from "../../../shared/team/team-scope.js";
 import { MAX_ATTACHMENT_BYTES } from "../../attachments/attachment.constants.js";
 import { detectFileType } from "../../attachments/detect-file-type.js";
 import { sanitizeFileName } from "../../attachments/file-name.js";
@@ -180,19 +181,16 @@ async function notifyInbound(
   tx: Prisma.TransactionClient,
   ticket: { id: string; subject: string; assignedAgentId: string | null },
 ) {
-  const users = await tx.user.findMany({
-    where: {
-      isActive: true,
-      OR: [
-        { role: { in: [Role.ADMIN, Role.MANAGER] } },
-        ...(ticket.assignedAgentId ? [{ id: ticket.assignedAgentId }] : []),
-      ],
-    },
-    select: { id: true },
+  // Team-aware recipients (feature/team-based-manager-scope): ADMINs + this
+  // ticket's team manager only + the assigned agent.
+  const teamRow = await tx.ticket.findUnique({ where: { id: ticket.id }, select: { teamId: true } });
+  const recipientIds = await ticketOperationalRecipientIds(tx, {
+    teamId: teamRow?.teamId ?? null,
+    assignedAgentId: ticket.assignedAgentId,
   });
   await createNotifications(
     tx,
-    users.map((user) => user.id),
+    recipientIds,
     "CUSTOMER_REPLY",
     "Customer replied",
     `Customer replied to ticket #${ticket.id}: ${ticket.subject}`,

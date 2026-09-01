@@ -5,6 +5,7 @@ import { createNotifications } from "../notifications/notification.service.js";
 import { notifyWatchers, NOTIFICATION_WATCH_ACTIVITY } from "../collaboration/collaboration.service.js";
 import { sanitizeReplyHtml } from "../../shared/rich-text/reply-html.js";
 import { emitTicketMessageCreated, withRealtimeOutbox } from "../realtime/realtime.publisher.js";
+import { ticketOperationalRecipientIds } from "../../shared/team/team-scope.js";
 import type { PortalCreateTicketInput, PortalReplyInput, PortalStatus, PortalTicketListQuery } from "./portal.schema.js";
 
 const listSelect = { id: true, subject: true, status: true, category: { select: { id: true, name: true } }, createdAt: true, updatedAt: true } satisfies Prisma.TicketSelect;
@@ -96,8 +97,8 @@ export async function createTicket(input: PortalCreateTicketInput, userId: strin
 export async function reply(id: string, input: PortalReplyInput, userId: string) {
   const customerId = await customerIdFor(userId);
   return withRealtimeOutbox(async () => {
-   const { result, assignedAgentId } = await prisma.$transaction(async (tx) => {
-    const ticket = await tx.ticket.findFirst({ where: { id, customerId }, select: { id: true, status: true, subject: true, assignedAgentId: true } });
+   const { result, assignedAgentId, teamId } = await prisma.$transaction(async (tx) => {
+    const ticket = await tx.ticket.findFirst({ where: { id, customerId }, select: { id: true, status: true, subject: true, assignedAgentId: true, teamId: true } });
     if (!ticket) throw new AppError(404, "TICKET_NOT_FOUND", "Ticket not found");
     if (ticket.status === TicketStatus.CLOSED) throw new AppError(409, "TICKET_CLOSED", "Closed tickets do not accept replies");
     // The Portal composer is the shared rich Lexical editor. Sanitize the HTML to
@@ -112,19 +113,14 @@ export async function reply(id: string, input: PortalReplyInput, userId: string)
       await tx.ticketHistory.create({ data: { ticketId: id, actorUserId: userId, action: "STATUS_CHANGED", oldValue: ticket.status, newValue: next } });
     }
 
-    // Fan-out notifications to assigned agent + all active ADMIN/MANAGER
-    const recipientIds: string[] = [];
-    if (ticket.assignedAgentId) {
-      const agent = await tx.user.findFirst({ where: { id: ticket.assignedAgentId, isActive: true }, select: { id: true } });
-      if (agent) recipientIds.push(agent.id);
-    }
-    const adminsManagers = await tx.user.findMany({
-      where: { role: { in: [Role.ADMIN, Role.MANAGER] }, isActive: true },
-      select: { id: true },
+    // Fan-out: assigned agent + every active ADMIN + ONLY this ticket's team
+    // manager (feature/team-based-manager-scope — an unrouted ticket reaches
+    // ADMINs only). The customer author is excluded.
+    const filtered = await ticketOperationalRecipientIds(tx, {
+      teamId: ticket.teamId,
+      assignedAgentId: ticket.assignedAgentId,
+      excludeUserId: userId,
     });
-    for (const u of adminsManagers) recipientIds.push(u.id);
-    // Exclude the customer (userId) from the recipient list — they are the author
-    const filtered = recipientIds.filter((rid) => rid !== userId);
     await createNotifications(tx, filtered, "CUSTOMER_REPLY", "Customer replied", `Customer replied to ticket #${id}: ${ticket.subject}`, id);
 
     // feature/team-collaboration — also notify internal watchers who are not
@@ -142,9 +138,10 @@ export async function reply(id: string, input: PortalReplyInput, userId: string)
     return {
       result: { id: message.id, body: message.body, createdAt: message.createdAt, author: { id: message.author.id, name: message.author.name, kind: "CUSTOMER" as const } },
       assignedAgentId: ticket.assignedAgentId,
+      teamId: ticket.teamId,
     };
    });
-   emitTicketMessageCreated({ ticketId: id, messageId: result.id, assignedAgentId, customerId, visibility: "public" });
+   emitTicketMessageCreated({ ticketId: id, messageId: result.id, assignedAgentId, customerId, teamId, visibility: "public" });
    return result;
   });
 }

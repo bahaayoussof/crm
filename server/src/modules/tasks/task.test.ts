@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   taskUpdate: vi.fn(),
   taskDelete: vi.fn(),
   userFindFirst: vi.fn(),
+  userFindUnique: vi.fn(),
   ticketFindFirst: vi.fn(),
   notificationCreateMany: vi.fn(),
 }));
@@ -27,7 +28,7 @@ vi.mock("../../config/prisma.js", () => {
   return {
     prisma: {
       task,
-      user: { findFirst: mocks.userFindFirst },
+      user: { findFirst: mocks.userFindFirst, findUnique: mocks.userFindUnique },
       ticket: { findFirst: mocks.ticketFindFirst },
       $transaction: vi.fn((arg: unknown) =>
         typeof arg === "function"
@@ -75,6 +76,9 @@ describe("tasks API", () => {
     mocks.taskUpdate.mockResolvedValue(taskRow());
     mocks.taskDelete.mockResolvedValue(taskRow());
     mocks.notificationCreateMany.mockResolvedValue({ count: 1 });
+    // feature/team-based-manager-scope: taskVisibilityWhere() + ticket-link checks
+    // resolve the actor's team via user.findUnique.
+    mocks.userFindUnique.mockResolvedValue({ teamId: null, managedTeam: null });
   });
 
   describe("authorization", () => {
@@ -100,10 +104,23 @@ describe("tasks API", () => {
   });
 
   describe("list", () => {
-    it("does not scope tasks for ADMIN/MANAGER", async () => {
-      await request(app).get("/api/tasks").set(auth(managerToken));
+    it("does not scope tasks for ADMIN", async () => {
+      await request(app).get("/api/tasks").set(auth(adminToken));
       const where = mocks.taskFindMany.mock.calls[0][0].where;
       expect(where.OR).toBeUndefined();
+    });
+
+    it("scopes a MANAGER to own/unlinked tasks and their own team's ticket-linked tasks", async () => {
+      // feature/team-based-manager-scope
+      mocks.userFindUnique.mockResolvedValue({ teamId: "team-1", managedTeam: { id: "team-1" } });
+      await request(app).get("/api/tasks").set(auth(managerToken));
+      const where = mocks.taskFindMany.mock.calls[0][0].where;
+      expect(where.OR).toEqual([
+        { creatorId: "c6fd0a01a46ed4545f0a5e774" },
+        { assigneeId: "c6fd0a01a46ed4545f0a5e774" },
+        { ticketId: null },
+        { ticket: { teamId: "team-1" } },
+      ]);
     });
 
     it("scopes an AGENT to tasks they created or are assigned", async () => {
@@ -257,6 +274,18 @@ describe("tasks API", () => {
         .send({ title: "Investigate", assigneeId: "ccfad431af89dd48c0fe73ace", ticketId: "c737ce60fccf9da889f4605c0" });
       expect(response.status).toBe(422);
       expect(response.body.error.code).toBe("TICKET_NOT_ACCESSIBLE_BY_ASSIGNEE");
+    });
+
+    it("team-scopes the ticket-link check for a MANAGER (cannot link another team's ticket)", async () => {
+      // feature/team-based-manager-scope
+      mocks.userFindUnique.mockResolvedValue({ teamId: "team-1", managedTeam: { id: "team-1" } });
+      mocks.ticketFindFirst.mockResolvedValue(null);
+      const response = await request(app)
+        .post("/api/tasks")
+        .set(auth(managerToken))
+        .send({ title: "Investigate", ticketId: "c737ce60fccf9da889f4605c0" });
+      expect(response.status).toBe(404);
+      expect(mocks.ticketFindFirst.mock.calls[0][0].where).toMatchObject({ id: "c737ce60fccf9da889f4605c0", teamId: "team-1" });
     });
 
     it("rejects a too-short title", async () => {

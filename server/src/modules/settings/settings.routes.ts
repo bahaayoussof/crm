@@ -24,6 +24,13 @@ import {
   createBranchSchema,
   updateBranchSchema,
 } from "../branches/branch.schema.js";
+import { teamCreate, teamList, teamRemove, teamUpdate } from "../teams/team.controller.js";
+import {
+  createTeamSchema,
+  teamListQuerySchema,
+  teamParamsSchema,
+  updateTeamSchema,
+} from "../teams/team.schema.js";
 
 export const settingsRouter = Router();
 settingsRouter.use(requireAuth, requireActiveUser, requireRole(Role.ADMIN));
@@ -43,3 +50,8 @@ settingsRouter.get("/branches", validateQuery(branchListQuerySchema), branchList
 settingsRouter.post("/branches", validateBody(createBranchSchema), branchCreate);
 settingsRouter.patch("/branches/:id", validateParams(branchParamsSchema), validateBody(updateBranchSchema), branchUpdate);
 settingsRouter.delete("/branches/:id", validateParams(branchParamsSchema), branchRemove);
+
+settingsRouter.get("/teams", validateQuery(teamListQuerySchema), teamList);
+settingsRouter.post("/teams", validateBody(createTeamSchema), teamCreate);
+settingsRouter.patch("/teams/:id", validateParams(teamParamsSchema), validateBody(updateTeamSchema), teamUpdate);
+settingsRouter.delete("/teams/:id", validateParams(teamParamsSchema), teamRemove);

@@ -59,11 +59,17 @@ model User {
   passwordChangedAt DateTime?
   departmentId      String?
   branchId          String?
+  teamId            String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
   department          Department?          @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   branch              Branch?              @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  // The team this user belongs to (V1: one team per AGENT / MANAGER).
+  team                Team?                @relation("TeamMembers", fields: [teamId], references: [id], onDelete: SetNull)
+  // The team this user manages (V1: at most one team per MANAGER). Back-relation
+  // of Team.manager; the one-team-per-manager rule is the @unique on Team.managerId.
+  managedTeam         Team?                @relation("TeamManager")
   customerProfile     Customer?
   assignedTickets     Ticket[]             @relation("AssignedAgent")
   ticketMessages      TicketMessage[]
@@ -83,6 +89,7 @@ model User {
   @@index([role])
   @@index([departmentId])
   @@index([branchId])
+  @@index([teamId])
 }
 
 model Customer {
@@ -113,6 +120,11 @@ model Ticket {
   categoryId         String?
   departmentId       String?
   branchId           String?
+  // Explicit owning team. Source of truth for Manager scope — NEVER inferred from
+  // assignedAgent.teamId. Nullable: a ticket may exist before it is routed to a
+  // team (e.g. a fresh customer-created ticket); such tickets are ADMIN-only until
+  // routed. Seed data always sets it.
+  teamId             String?
   firstResponseDueAt DateTime?
   firstRespondedAt   DateTime?
   resolutionDueAt    DateTime?
@@ -127,6 +139,7 @@ model Ticket {
   category      Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   department    Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   branch        Branch?         @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  team          Team?           @relation(fields: [teamId], references: [id], onDelete: SetNull)
   messages      TicketMessage[]
   notes         TicketNote[]
   attachments   Attachment[]
@@ -144,6 +157,7 @@ model Ticket {
   @@index([categoryId])
   @@index([departmentId])
   @@index([branchId])
+  @@index([teamId])
   @@index([createdAt])
 }
 
@@ -411,10 +425,44 @@ model Department {
   branch  Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
   users   User[]
   tickets Ticket[]
+  teams   Team[]
 
   @@unique([branchId, name])
   @@index([isActive])
   @@index([branchId])
+}
+
+// feature/team-based-manager-scope — a Team is the real management unit.
+//
+//   Department -> Team -> { Manager, Agents, Tickets }
+//
+// V1 invariants (enforced in the service layer, not just the schema):
+//   - one Manager per Team          (Team.managerId is @unique, nullable so a team
+//   - one Team per Manager           can be created before a manager is assigned)
+//   - one Team per Agent / Manager  (User.teamId)
+//   - a Ticket belongs to one Team  (Ticket.teamId, nullable until routed)
+//
+// Kept intentionally simple so it can evolve to multiple managers / multi-team
+// membership later without a rewrite (that would become a join table; do not add
+// it now — see AGENTS.md Change Control and docs/17 ADR).
+model Team {
+  id           String   @id @default(cuid())
+  name         String
+  departmentId String
+  managerId    String?  @unique
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  manager    User?      @relation("TeamManager", fields: [managerId], references: [id], onDelete: SetNull)
+  members    User[]     @relation("TeamMembers")
+  tickets    Ticket[]
+
+  @@unique([departmentId, name])
+  @@index([departmentId])
+  @@index([managerId])
+  @@index([isActive])
 }
 
 model Branch {

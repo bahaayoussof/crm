@@ -123,7 +123,7 @@ async function escalateBreachedTickets(now: Date) {
     },
     take: SLA_MONITOR_BATCH_SIZE,
     orderBy: [{ resolutionDueAt: "asc" }, { id: "asc" }],
-    select: { id: true, subject: true, status: true, assignedAgentId: true, customerId: true },
+    select: { id: true, subject: true, status: true, assignedAgentId: true, customerId: true, teamId: true },
   });
   let updated = 0;
 
@@ -151,8 +151,17 @@ async function escalateBreachedTickets(now: Date) {
         },
       });
       await createAuditLog({ actorId: null, action: AUDIT_ACTIONS.TICKET_ESCALATED, entityType: AUDIT_ENTITY_TYPES.TICKET, entityId: ticket.id, changes: { status: { from: ticket.status, to: TicketStatus.ESCALATED } }, metadata: { reason: "sla_breach" } }, tx);
+      // Team-aware recipients (feature/team-based-manager-scope): every active
+      // ADMIN, plus ONLY the manager of this ticket's team. An unrouted ticket
+      // (teamId null) notifies ADMINs only — never every manager.
       const recipients = await tx.user.findMany({
-        where: { role: { in: [Role.ADMIN, Role.MANAGER] }, isActive: true },
+        where: {
+          isActive: true,
+          OR: [
+            { role: Role.ADMIN },
+            ...(ticket.teamId ? [{ role: Role.MANAGER, managedTeam: { id: ticket.teamId } }] : []),
+          ],
+        },
         select: { id: true },
       });
       await createNotifications(

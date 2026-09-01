@@ -155,6 +155,15 @@ describe("internal ticket attachment upload", () => {
     expect(response.body.error.code).toBe("TICKET_NOT_FOUND");
   });
 
+  it("team-scopes attachment listing for a MANAGER (another team's ticket -> 404)", async () => {
+    // feature/team-based-manager-scope
+    mocks.userFindUnique.mockResolvedValue({ passwordChangedAt: null, teamId: "team-1", managedTeam: { id: "team-1" } });
+    mocks.ticketFindFirst.mockResolvedValue(null);
+    const response = await request(app).get("/api/tickets/c737ce60fccf9da889f4605c0/attachments").set(auth(managerToken));
+    expect(response.status).toBe(404);
+    expect(mocks.ticketFindFirst.mock.calls[0][0].where).toMatchObject({ id: "c737ce60fccf9da889f4605c0", teamId: "team-1" });
+  });
+
   it("lists ticket-level and message-level attachments once each", async () => {
     mocks.ticketFindFirst.mockResolvedValue({ id: "c737ce60fccf9da889f4605c0", status: "OPEN", assignedAgentId: null });
     mocks.attachmentFindMany.mockResolvedValue([

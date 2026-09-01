@@ -2,6 +2,7 @@ import { Prisma, Role } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import { ticketVisibilityWhere, type TicketActor } from "../tickets/ticket-visibility.js";
+import { resolveActorTeamScope } from "../../shared/team/team-scope.js";
 import { replyHtmlToPlainText } from "../../shared/rich-text/reply-html.js";
 import type { AiTicketContext } from "./ai.types.js";
 
@@ -63,8 +64,11 @@ export async function buildTicketAiContext(
   const includeNotes = (options?.internalNotes ?? "full") === "full";
   const messageLimit = Math.min(options?.publicMessageLimit ?? MAX_MESSAGES, MAX_MESSAGES);
 
+  // Same visibility predicate as GET /api/tickets/:id, INCLUDING team scope — a
+  // MANAGER cannot run AI actions against another team's ticket by id.
+  const team = await resolveActorTeamScope(actor);
   const ticket = await prisma.ticket.findFirst({
-    where: { id: ticketId, ...ticketVisibilityWhere(actor) },
+    where: { id: ticketId, ...ticketVisibilityWhere(actor, team) },
     select: contextSelect,
   });
   if (!ticket) throw new AppError(404, "TICKET_NOT_FOUND", "Ticket not found");
