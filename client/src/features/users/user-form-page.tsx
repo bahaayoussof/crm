@@ -9,9 +9,9 @@ import { useAuth } from "@/features/auth/auth-state";
 import { getLocalizedUserError, getUserError } from "./user-error";
 import { useCreateUser, useUpdateUser, useUser } from "./user-hooks";
 import { UserBranchDepartmentFields } from "./user-org-fields";
-import { userCreateFormSchema, userEditFormSchema, type UserCreateFormValues, type UserEditFormValues } from "./user.schemas";
+import { mapUserToEditFormValues, userCreateFormSchema, userEditFormSchema, type UserCreateFormValues, type UserEditFormValues } from "./user.schemas";
 import { LoadingRows, PageHeader, StatePanel, UsersPage, YouBadge } from "./users-ui";
-import { MANAGEABLE_ROLES } from "./user.types";
+import { MANAGEABLE_ROLES, type User } from "./user.types";
 
 export function UserFormPage() {
   const { id = "" } = useParams();
@@ -95,27 +95,39 @@ function CreateUserForm() {
 
 function EditUserForm({ id }: { id: string }) {
   const { t } = useTranslation();
-  const { user: currentUser } = useAuth();
   const user = useUser(id);
+
+  if (user.isLoading) return <UsersPage><LoadingRows /></UsersPage>;
+  if (user.isError || !user.data) {
+    const error = getUserError(user.error, t("users.loadError"));
+    return (
+      <UsersPage>
+        <StatePanel>{error.status === 404 ? t("users.notFound") : getLocalizedUserError(user.error, t("users.loadError"), t)}</StatePanel>
+      </UsersPage>
+    );
+  }
+
+  // Mount the form only once the canonical `GET /api/users/:id` payload is
+  // available, keyed on the id, so `useForm` seeds every field — including the
+  // `role` <Controller> select — from real data on first render. This is the
+  // same data source and form state the row-action modal produces; it also
+  // works on a direct visit or browser refresh, when the query is still
+  // pending on the first render.
+  return <EditUserFormLoaded key={id} id={id} user={user.data} />;
+}
+
+function EditUserFormLoaded({ id, user }: { id: string; user: User }) {
+  const { t } = useTranslation();
+  const { user: currentUser } = useAuth();
   const update = useUpdateUser(id);
   const navigate = useNavigate();
   const [apiError, setApiError] = useState<string | null>(null);
 
-  const isSelf = Boolean(user.data && currentUser && user.data.id === currentUser.id);
+  const isSelf = Boolean(currentUser && user.id === currentUser.id);
 
   const { register, control, setValue, handleSubmit, formState: { errors, isSubmitting } } = useForm<UserEditFormValues>({
     resolver: zodResolver(userEditFormSchema),
-    values: user.data
-      ? {
-          name: user.data.name,
-          email: user.data.email,
-          role: user.data.role,
-          phone: user.data.phone ?? "",
-          isActive: user.data.isActive,
-          departmentId: user.data.departmentId ?? "",
-          branchId: user.data.branchId ?? "",
-        }
-      : undefined,
+    defaultValues: mapUserToEditFormValues(user),
   });
 
   const roleOptions = MANAGEABLE_ROLES.map((option) => ({
@@ -140,16 +152,6 @@ function EditUserForm({ id }: { id: string }) {
       setApiError(getLocalizedUserError(error, t("users.saveError"), t));
     }
   });
-
-  if (user.isLoading) return <UsersPage><LoadingRows /></UsersPage>;
-  if (user.isError) {
-    const error = getUserError(user.error, t("users.loadError"));
-    return (
-      <UsersPage>
-        <StatePanel>{error.status === 404 ? t("users.notFound") : getLocalizedUserError(user.error, t("users.loadError"), t)}</StatePanel>
-      </UsersPage>
-    );
-  }
 
   const pending = isSubmitting || update.isPending;
 

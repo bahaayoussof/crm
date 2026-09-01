@@ -749,3 +749,15 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
 | 12:46 | Refactor Manager Team table to shared DataTable system (canonical = reports AgentPerformanceDataTable) | client/src/features/manager/manager-team-page.tsx | tsc clean, 23 tests pass | ~30k |
+
+## Session: 2026-09-01 12:55
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 13:05 | Fix Admin Edit User empty Role select (async RHF `values` prop left lone `role` Controller stale) — split EditUserForm into loader + EditUserFormLoaded(key=id) with synchronous defaultValues from GET /api/users/:id | client/src/features/users/user-form-page.tsx, client/src/features/users/users.test.tsx (+2 regression tests) | 40/40 users.test, full client 721/721, tsc -b clean, eslint clean | ~55k |
+
+## Session: 2026-09-01 13:15
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 13:20 | Fix Admin Edit User empty-Role bug everywhere: added canonical mapUserToEditFormValues() in user.schemas.ts; page EditUserFormLoaded + modal now both seed useForm via it; modal restructured to key={user.id} child mounted only when open (no useEffect reset dance) | user.schemas.ts, user-form-page.tsx, user-edit-modal.tsx, users.test.tsx | 46/46 users.test pass, tsc -b clean; +6 regression tests (page AGENT/MANAGER, modal AGENT/MANAGER, modal reopen A->B, direct URL) | ~45k |

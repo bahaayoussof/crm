@@ -48,6 +48,10 @@ const agent: User = {
   email: "ghali.a.very.long.address.that.should.not.wrap@subdomain.example.com",
   role: "AGENT", isActive: false,
 };
+const manager: User = {
+  ...admin, id: "u-manager", name: "Mona Manager", email: "mona@example.com",
+  role: "MANAGER", isActive: true,
+};
 
 function renderAt(path: string, route: React.ReactNode) {
   return render(<MemoryRouter initialEntries={[path]}><Routes>{route}</Routes></MemoryRouter>);
@@ -492,6 +496,100 @@ describe("users management — forms", () => {
     mocks.useUpdateUser.mockReturnValue({ mutateAsync: mocks.update, isPending: true });
     renderAt("/users/u-admin2/edit", <Route path="/users/:id/edit" element={<UserFormPage />} />);
     await waitFor(() => expect(screen.getByRole("button", { name: "Saving…" })).toBeDisabled());
+  });
+
+  it("shows the same AGENT role when the edit is opened from the row action dropdown", async () => {
+    mocks.useUsers.mockReturnValue(listResult([{ ...agent, isActive: true }]));
+    renderAt("/users", <Route path="/users" element={<UserListPage />} />);
+    const table = screen.getByRole("table");
+    const row = within(table).getAllByRole("row").find((r) => within(r).queryByText("Ghali Agent"))!;
+    fireEvent.click(within(row).getByRole("button", { name: "Actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Edit user" }));
+
+    const dialog = screen.getByRole("dialog", { name: /Edit user/ });
+    expect(within(dialog).getByLabelText(/Role/)).toHaveTextContent("Agent");
+  });
+
+  // --- Edit User: Role field initialization across every entry point ---------
+  // Regression guard for the empty-Role bug. Page and modal both seed React
+  // Hook Form through the single `mapUserToEditFormValues` mapper, so the Role
+  // select always shows the user's real API enum value ("MANAGER" -> "Manager"
+  // label), never blank and never the previous user's value.
+
+  const openModalEditFor = (name: string) => {
+    const table = screen.getByRole("table");
+    const row = within(table).getAllByRole("row").find((r) => within(r).queryByText(name))!;
+    fireEvent.click(within(row).getByRole("button", { name: "Actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Edit user" }));
+    return screen.getByRole("dialog", { name: /Edit user/ });
+  };
+
+  it("Edit page initializes Role to Agent for an AGENT user", async () => {
+    mocks.useUser.mockReturnValue({ isLoading: false, isError: false, data: { ...agent, isActive: true } });
+    renderAt("/users/u-agent/edit", <Route path="/users/:id/edit" element={<UserFormPage />} />);
+    await waitFor(() => expect(screen.getByLabelText(/Name/)).toHaveValue("Ghali Agent"));
+    expect(screen.getByLabelText(/Role/)).toHaveTextContent("Agent");
+  });
+
+  it("Edit page initializes Role to Manager for a MANAGER user", async () => {
+    mocks.useUser.mockReturnValue({ isLoading: false, isError: false, data: manager });
+    renderAt("/users/u-manager/edit", <Route path="/users/:id/edit" element={<UserFormPage />} />);
+    await waitFor(() => expect(screen.getByLabelText(/Name/)).toHaveValue("Mona Manager"));
+    expect(screen.getByLabelText(/Role/)).toHaveTextContent("Manager");
+  });
+
+  it("Edit modal initializes Role to Agent for an AGENT user", () => {
+    mocks.useUsers.mockReturnValue(listResult([{ ...agent, isActive: true }]));
+    renderAt("/users", <Route path="/users" element={<UserListPage />} />);
+    const dialog = openModalEditFor("Ghali Agent");
+    expect(within(dialog).getByLabelText(/Role/)).toHaveTextContent("Agent");
+  });
+
+  it("Edit modal initializes Role to Manager for a MANAGER user", () => {
+    mocks.useUsers.mockReturnValue(listResult([manager]));
+    renderAt("/users", <Route path="/users" element={<UserListPage />} />);
+    const dialog = openModalEditFor("Mona Manager");
+    expect(within(dialog).getByLabelText(/Role/)).toHaveTextContent("Manager");
+  });
+
+  it("Edit modal replaces the Role value when reopened for a different user", async () => {
+    mocks.useUsers.mockReturnValue(listResult([manager, { ...agent, isActive: true }]));
+    renderAt("/users", <Route path="/users" element={<UserListPage />} />);
+
+    const managerDialog = openModalEditFor("Mona Manager");
+    expect(within(managerDialog).getByLabelText(/Role/)).toHaveTextContent("Manager");
+    fireEvent.click(within(managerDialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: /Edit user/ })).not.toBeInTheDocument());
+
+    const agentDialog = openModalEditFor("Ghali Agent");
+    expect(within(agentDialog).getByLabelText(/Role/)).toHaveTextContent("Agent");
+    expect(within(agentDialog).getByLabelText(/Role/)).not.toHaveTextContent("Manager");
+  });
+
+  it("direct /users/:id/edit navigation initializes the correct role", async () => {
+    mocks.useUser.mockReturnValue({ isLoading: false, isError: false, data: manager });
+    renderAt("/users/u-manager/edit", <Route path="/users/:id/edit" element={<UserFormPage />} />);
+    expect(await screen.findByLabelText(/Role/)).toHaveTextContent("Manager");
+  });
+
+  it("populates the Role field after the detail query resolves on a direct /users/:id/edit visit", async () => {
+    // Direct URL / browser refresh: the detail query is still pending on first render.
+    mocks.useUser.mockReturnValue({ isLoading: true, isError: false, data: undefined });
+    const ui = () => (
+      <MemoryRouter initialEntries={["/users/u-agent/edit"]}>
+        <Routes>
+          <Route path="/users/:id/edit" element={<UserFormPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    const { rerender } = render(ui());
+
+    // Query resolves with an AGENT user.
+    mocks.useUser.mockReturnValue({ isLoading: false, isError: false, data: { ...agent, isActive: true } });
+    rerender(ui());
+
+    await waitFor(() => expect(screen.getByLabelText(/Name/)).toHaveValue("Ghali Agent"));
+    expect(screen.getByLabelText(/Role/)).toHaveTextContent("Agent");
   });
 });
 
