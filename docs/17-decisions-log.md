@@ -4,6 +4,25 @@ Use this file for decisions not already fixed by the project documentation.
 
 Do not record trivial implementation details.
 
+### ADR-047: Reports Information Architecture Redesign & Sub-route Analytics
+
+**Date:** 2026-08-31
+
+`feature/reports-redesign`. Redesigned Reports from a single overloaded dashboard with 7 stacked sections into a structured, modular analytics suite composed of focused sub-routes:
+
+- **Information Architecture & Route Structure:**
+  - `/reports`: **Overview** — KPI highlights, Ticket volume trends, Status distribution, Customer satisfaction.
+  - `/reports/sla`: **SLA Performance** — SLA KPI cards, First Response & Resolution donut/progress rings, Priority Breakdown matrix.
+  - `/reports/agents`: **Agent Performance** — Server-side searchable, paginated, and sortable agent analytics DataTable (`AgentPerformanceDataTable`) with desktop table and mobile cards.
+  - `/reports/tickets`: **Ticket Breakdown** — Multidimensional breakdowns by `status`, `priority`, `category`, and `channel` using reusable dimension config (`breakdown-config.ts`), normalized items (`BreakdownItem`), category search, pagination, and top-8 category chart grouping with an dynamic "Other" category bucket.
+- **URL Search Parameters as Single Source of Truth:**
+  - Shared filters (`from`, `to`, `departmentId`, `branchId`) are managed via `useReportsRangeParams` and preserved across report sub-route navigation via `createReportNavTarget`.
+  - Page-specific parameters (`search`, `page`, `sortBy`, `sortOrder`, `dimension`) are isolated to their respective sub-pages and stripped during tab switching to prevent state leakage.
+  - Overview route (`/reports`) uses exact active matching (`end: true`) in sidebar, mobile drawer, and tab bar.
+- **Backend Analytics Extensions:**
+  - `GET /api/reports/agents` supports query validation (`reportsAgentsQuerySchema`), case-insensitive agent search, deterministic sorting with an explicit whitelist (`AGENT_SORT_FIELDS`: `name`, `assigned`, `resolved`, `open`, `slaMetPercentage`, `avgFirstResponse`) with secondary ID/name tie-breakers, and server-side pagination returning `{ agents, data, pagination: { page, limit, total, totalPages } }`.
+  - `GET /api/reports/tickets` returns `byChannel` breakdowns and resolved metrics on `byCategory` and `byStatus`.
+
 ### ADR-044: EMAIL is a Resend transport over Ticket conversation
 
 **Date:** 2026-08-31

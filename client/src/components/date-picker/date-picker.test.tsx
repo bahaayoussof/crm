@@ -59,13 +59,24 @@ describe("date-picker-utils", () => {
     expect(isDisabledDay(new Date(2026, 7, 21), min, max)).toBe(true);
   });
 
-  it("formats a range label", () => {
-    const label = formatDisplayRange(
-      { from: new Date(2026, 7, 20), to: new Date(2026, 7, 28) },
-      "en",
-    );
-    expect(label).toContain("Aug 20, 2026");
-    expect(label).toContain("Aug 28, 2026");
+  it.each([
+    [new Date(2026, 8, 1), new Date(2026, 8, 30), "Sep 1", "30, 2026", 1],
+    [new Date(2026, 7, 25), new Date(2026, 8, 1), "Aug 25", "Sep 1, 2026", 1],
+    [new Date(2025, 11, 31), new Date(2026, 0, 1), "Dec 31, 2025", "Jan 1, 2026", 1],
+  ])("formats compact human-friendly ranges", (from, to, start, end, yearCount) => {
+    const label = formatDisplayRange({ from, to }, "en") ?? "";
+    expect(label).toContain(start);
+    expect(label).toContain(end);
+    expect(label.match(/2026/g)).toHaveLength(yearCount);
+  });
+
+  it("collapses a same-day range to one date", () => {
+    expect(
+      formatDisplayRange(
+        { from: new Date(2026, 8, 1), to: new Date(2026, 8, 1) },
+        "en",
+      ),
+    ).toBe("Sep 1, 2026");
   });
 });
 
@@ -211,7 +222,7 @@ describe("DateRangePicker", () => {
         onChange={onChange}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /aug 20, 2026/i }));
+    fireEvent.click(screen.getByRole("button", { name: /aug 20.*28, 2026/i }));
     const dialog = await screen.findByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: "Clear" }));
     expect(onChange).toHaveBeenCalledWith({});

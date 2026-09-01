@@ -1,7 +1,8 @@
 import { createPortal } from "react-dom";
-import { NavLink } from "react-router-dom";
+import { NavLink, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAnchoredPopover } from "@/components/shared/use-anchored-popover";
+import { createReportNavTarget } from "@/features/reports/hooks/use-reports-range-params";
 import { cn } from "@/lib/utils";
 import type { NavChildItem } from "./sidebar-types";
 
@@ -14,6 +15,7 @@ interface SidebarFlyoutProps {
 
 export function SidebarFlyout({ open, onDismiss, parentLabel, childrenItems }: SidebarFlyoutProps) {
   const { t } = useTranslation();
+  const [searchParams] = useSearchParams();
 
   const { panelRef, style } = useAnchoredPopover<HTMLButtonElement, HTMLDivElement>({
     open,
@@ -44,7 +46,8 @@ export function SidebarFlyout({ open, onDismiss, parentLabel, childrenItems }: S
           return (
             <NavLink
               key={child.to}
-              to={child.to}
+              to={child.to.startsWith("/reports") ? createReportNavTarget(child.to, searchParams) : child.to}
+              end={child.end}
               onClick={onDismiss}
               className={({ isActive }) =>
                 cn(
@@ -70,3 +73,4 @@ export function SidebarFlyout({ open, onDismiss, parentLabel, childrenItems }: S
     document.body
   );
 }
+

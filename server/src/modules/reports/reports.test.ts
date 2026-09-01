@@ -134,7 +134,7 @@ describe("reports overview", () => {
 });
 
 describe("reports tickets", () => {
-  it("breaks volume down by priority and category for the created cohort", async () => {
+  it("breaks volume down by priority, category, and channel for the created cohort", async () => {
     const result = await getTicketReports(range, now);
     expect(result.totals).toEqual({ created: 3, resolved: 2, open: 2 });
     expect(result.byPriority).toEqual([
@@ -144,19 +144,59 @@ describe("reports tickets", () => {
       { priority: "URGENT", created: 0, resolved: 1 },
     ]);
     expect(result.byCategory).toEqual([
-      { categoryId: "c1", categoryName: "Billing", created: 2 },
-      { categoryId: null, categoryName: null, created: 1 },
+      { categoryId: "c1", categoryName: "Billing", created: 2, resolved: 2 },
+      { categoryId: null, categoryName: null, created: 1, resolved: 0 },
     ]);
+    expect(Array.isArray(result.byChannel)).toBe(true);
   });
 });
 
 describe("reports agents", () => {
-  it("aggregates assigned, resolved, open, and SLA figures per agent", async () => {
+  it("aggregates assigned, resolved, open, and SLA figures per agent with pagination", async () => {
     const result = await getAgentReports(range, now);
     expect(result.agents).toEqual([
       { agentId: "a1", agentName: "Alice", assigned: 2, resolved: 1, open: 1, slaMet: 1, slaBreached: 1, slaMetPct: 50, averageFirstResponseMinutes: 75 },
       { agentId: "a2", agentName: "Bob", assigned: 1, resolved: 1, open: 1, slaMet: 0, slaBreached: 0, slaMetPct: null, averageFirstResponseMinutes: null },
     ]);
+    expect(result.pagination).toEqual({ page: 1, limit: 15, total: 2, totalPages: 1 });
+  });
+
+  it("filters agents by search query", async () => {
+    const result = await getAgentReports({ ...range, search: "alice", page: 1, limit: 15, sortOrder: "desc" }, now);
+    expect(result.agents).toHaveLength(1);
+    expect(result.agents[0].agentName).toBe("Alice");
+    expect(result.pagination.total).toBe(1);
+  });
+
+  it("sorts agents deterministically by supported fields", async () => {
+    const byNameAsc = await getAgentReports({ ...range, sortBy: "name", sortOrder: "asc", page: 1, limit: 15 }, now);
+    expect(byNameAsc.agents.map((a) => a.agentName)).toEqual(["Alice", "Bob"]);
+
+    const byNameDesc = await getAgentReports({ ...range, sortBy: "name", sortOrder: "desc", page: 1, limit: 15 }, now);
+    expect(byNameDesc.agents.map((a) => a.agentName)).toEqual(["Bob", "Alice"]);
+
+    const byResolvedDesc = await getAgentReports({ ...range, sortBy: "resolved", sortOrder: "desc", page: 1, limit: 15 }, now);
+    // Both Alice and Bob have resolved=1 -> secondary sort is name asc -> Alice, Bob
+    expect(byResolvedDesc.agents.map((a) => a.agentName)).toEqual(["Alice", "Bob"]);
+  });
+
+  it("paginates agent results correctly", async () => {
+    const page1 = await getAgentReports({ ...range, page: 1, limit: 1, sortOrder: "desc" }, now);
+    expect(page1.agents).toHaveLength(1);
+    expect(page1.agents[0].agentName).toBe("Alice");
+    expect(page1.pagination).toEqual({ page: 1, limit: 1, total: 2, totalPages: 2 });
+
+    const page2 = await getAgentReports({ ...range, page: 2, limit: 1, sortOrder: "desc" }, now);
+    expect(page2.agents).toHaveLength(1);
+    expect(page2.agents[0].agentName).toBe("Bob");
+    expect(page2.pagination).toEqual({ page: 2, limit: 1, total: 2, totalPages: 2 });
+  });
+
+  it("rejects invalid sortBy values via API", async () => {
+    const res = await request(app)
+      .get("/api/reports/agents?sortBy=invalidColumn")
+      .set(auth("staff", Role.ADMIN));
+    expect(res.status).toBe(400);
   });
 });
 
@@ -171,3 +211,4 @@ describe("reports sla", () => {
     });
   });
 });
+

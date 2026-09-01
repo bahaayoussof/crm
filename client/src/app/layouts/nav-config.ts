@@ -73,7 +73,9 @@ export function getNavigationSections(
     ...(user && canViewReports(user.role)
       ? [{ to: "/reports", key: "reports", icon: ReportsNavIcon }]
       : []),
+
     ...(user && canManageQuickReplies(user.role)
+
       ? [{ to: "/quick-replies", key: "quickReplies", icon: QuickRepliesNavIcon }]
       : []),
     ...(user && canManageUsers(user.role)

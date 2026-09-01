@@ -48,8 +48,8 @@ export function TicketStatusDonut({ data }: { data: DashboardOverview }) {
       </CardHeader>
       <CardContent>
         {rows.length ? (
-          <div className="flex flex-col items-center gap-5" data-testid="status-chart">
-            <div className="relative size-40 shrink-0">
+          <div className="flex flex-col items-center gap-3" data-testid="status-chart">
+            <div className="relative size-50 shrink-0">
               <ChartContainer label={t("dashboard.donut.title")}>
                 <PieChart>
                   <Pie

@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { DateRangePicker, type DateRange } from "@/components/date-picker/date-range-picker";
 import { AppSelect } from "@/components/ui/app-select";
+import { Button } from "@/components/ui/button";
 
 interface OrgOption {
   value: string;
@@ -14,7 +15,6 @@ interface ReportToolbarProps {
   onPreset: (days: number) => void;
   rangeValue: DateRange;
   onRangeChange: (next: DateRange) => void;
-  range: { from?: string; to?: string };
   hasCustomRange: boolean;
   onReset: () => void;
   departmentId?: string;
@@ -30,7 +30,6 @@ export function ReportToolbar({
   onPreset,
   rangeValue,
   onRangeChange,
-  range,
   hasCustomRange,
   onReset,
   departmentId,
@@ -43,9 +42,9 @@ export function ReportToolbar({
   const rangeLabel = `${t("reports.filters.from")} – ${t("reports.filters.to")}`;
 
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2" aria-label={t("reports.filters.label")}>
+    <div className="flex flex-wrap items-center gap-3" aria-label={t("reports.filters.label")}>
       <div
-        className="inline-flex rounded-md border border-border bg-surface-subtle p-0.5"
+        className="inline-flex min-h-10 max-w-full items-stretch rounded-md border border-border bg-surface-subtle p-1"
         role="group"
         aria-label={t("reports.filters.presetLabel")}
       >
@@ -56,10 +55,10 @@ export function ReportToolbar({
             aria-pressed={activePreset === days}
             onClick={() => onPreset(days)}
             className={cn(
-              "min-h-7 rounded-[5px] px-2.5 text-xs font-medium transition-colors select-none",
+              "min-w-0 rounded-sm px-2.5 text-xs font-medium text-muted-foreground transition-colors select-none hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 sm:px-3",
               activePreset === days
-                ? "bg-card text-foreground shadow-subtle"
-                : "text-muted-foreground hover:text-foreground",
+                ? "bg-surface text-foreground shadow-xs"
+                : "hover:bg-surface-hover/70",
             )}
           >
             {t("reports.filters.lastDays", { count: days })}
@@ -72,11 +71,10 @@ export function ReportToolbar({
         value={rangeValue}
         onChange={onRangeChange}
         maxDate={new Date()}
-        className="w-60"
-        triggerClassName="h-8 min-h-8 text-xs"
+        className="w-full min-w-0 sm:min-w-56 sm:flex-[1_1_16rem]"
       />
 
-      <div className="w-44">
+      <div className="w-full min-w-0 sm:w-52 sm:flex-none">
         <AppSelect
           ariaLabel={t("reports.filters.department")}
           searchable
@@ -85,11 +83,10 @@ export function ReportToolbar({
           value={departmentId ?? ""}
           onValueChange={(value) => onOrgFilterChange("departmentId", value)}
           options={departmentOptions}
-          triggerClassName="h-8 min-h-8 text-xs"
         />
       </div>
 
-      <div className="w-44">
+      <div className="w-full min-w-0 sm:w-52 sm:flex-none">
         <AppSelect
           ariaLabel={t("reports.filters.branch")}
           searchable
@@ -98,24 +95,14 @@ export function ReportToolbar({
           value={branchId ?? ""}
           onValueChange={(value) => onOrgFilterChange("branchId", value)}
           options={branchOptions}
-          triggerClassName="h-8 min-h-8 text-xs"
         />
       </div>
 
       {hasCustomRange && (
-        <button type="button" className="button-ghost min-h-8 px-2 text-xs" onClick={onReset}>
+        <Button type="button" variant="ghost" className="shrink-0 px-3" onClick={onReset}>
           {t("reports.filters.reset")}
-        </button>
+        </Button>
       )}
-
-      <span
-        className="ms-auto text-xs text-muted-foreground/80 tabular-nums"
-        dir="ltr"
-      >
-        {range.from ? range.from.slice(0, 10) : "—"} → {range.to ? range.to.slice(0, 10) : "—"}
-        <span className="mx-1.5 text-muted-foreground/40" aria-hidden="true">·</span>
-        {t("reports.filters.timezone")}
-      </span>
     </div>
   );
 }

@@ -6,7 +6,9 @@ export interface NavChildItem {
   key: string;
   label?: string;
   badge?: string | number;
+  end?: boolean;
 }
+
 
 export interface NavItemConfig {
   to: string;

@@ -22,7 +22,13 @@ import { KnowledgeArticleManageRoute } from "./knowledge-article-manage-route";
 import { QuickReplyFormPage } from "@/features/quick-replies/quick-reply-form-page";
 import { QuickReplyListPage } from "@/features/quick-replies/quick-reply-list-page";
 import { QuickReplyManageRoute } from "./quick-reply-manage-route";
-import { ReportsPage } from "@/features/reports/reports-page";
+import {
+  ReportsLayout,
+  ReportsOverviewPage,
+  ReportsSlaPage,
+  ReportsAgentsPage,
+  ReportsTicketsPage,
+} from "@/features/reports/reports-page";
 import { ReportsRoute } from "./reports-route";
 import { UserFormPage } from "@/features/users/user-form-page";
 import { UserListPage } from "@/features/users/user-list-page";
@@ -72,8 +78,14 @@ export function AppRouter() {
         <Route path="/quick-replies/:id/edit" element={<QuickReplyFormPage />} />
       </Route>
       <Route element={<ReportsRoute />}>
-        <Route path="/reports" element={<ReportsPage />} />
+        <Route element={<ReportsLayout />}>
+          <Route path="/reports" element={<ReportsOverviewPage />} />
+          <Route path="/reports/sla" element={<ReportsSlaPage />} />
+          <Route path="/reports/agents" element={<ReportsAgentsPage />} />
+          <Route path="/reports/tickets" element={<ReportsTicketsPage />} />
+        </Route>
       </Route>
+
       <Route element={<UserManageRoute />}>
         <Route path="/users" element={<UserListPage />} />
         <Route path="/users/new" element={<UserFormPage />} />

@@ -80,9 +80,10 @@ describe("knowledge base", () => {
 
   it("submits the correct server query for search", async () => {
     renderAt("/knowledge-base", <Route path="/knowledge-base" element={<KnowledgeBaseListPage />} />);
-    fireEvent.change(screen.getByPlaceholderText("Search articles by title, content, or category…"), { target: { value: "refund" } });
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "refund" } });
     await waitFor(() => expect(mocks.useKnowledgeArticles).toHaveBeenLastCalledWith(expect.objectContaining({ search: "refund" })), { timeout: 1000 });
   });
+
 
   it("submits the correct server query for the status filter", async () => {
     renderAt("/knowledge-base", <Route path="/knowledge-base" element={<KnowledgeBaseListPage />} />);

@@ -36,7 +36,7 @@ export function StatusDistributionChart({ distribution }: { distribution: Status
           className="flex h-full flex-col items-center justify-center gap-2"
           data-testid="status-chart"
         >
-          <div className="relative size-45 shrink-0">
+          <div className="relative size-50 shrink-0">
             <ChartContainer label={t("reports.statusTitle")}>
               <PieChart>
                 <Pie

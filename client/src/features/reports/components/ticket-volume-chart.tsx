@@ -13,16 +13,20 @@ import { ReportPanel } from "./report-primitives";
 
 export function TicketVolumeChart({
   points,
+  volume,
   className,
 }: {
-  points: VolumePoint[];
+  points?: VolumePoint[];
+  volume?: VolumePoint[];
   className?: string;
 }) {
   const { t } = useTranslation();
-  const data = useMemo(
-    () => points.map((point) => ({ ...point, label: point.date.slice(5) })),
-    [points],
-  );
+  const data = useMemo(() => {
+    const rawPoints = points ?? volume ?? [];
+    return rawPoints.map((point) => ({ ...point, label: point.date.slice(5) }));
+  }, [points, volume]);
+
+
 
   return (
     <ReportPanel

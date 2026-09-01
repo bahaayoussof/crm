@@ -51,6 +51,9 @@ export const SERIES_CHART_COLORS = [
   "var(--chart-5)",
 ] as const;
 
+export const CHART_PALETTE = SERIES_CHART_COLORS;
+
+
 export const CHART_THEME_TOKENS = {
   grid: "var(--chart-grid)",
   axis: "var(--chart-axis)",

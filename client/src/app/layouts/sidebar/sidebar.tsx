@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useSearchParams } from "react-router-dom";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { AuthUser } from "@/features/auth/auth.types";
 import type { ProtectedAudience } from "@/features/auth/auth-routing";
+import { createReportNavTarget } from "@/features/reports/hooks/use-reports-range-params";
 import { cn } from "@/lib/utils";
 import { CollapseIcon, ExpandIcon } from "../nav-icons";
 import { getFlatNavItems, getNavigationSections, isNavItemShadowed } from "../nav-config";
@@ -21,7 +22,9 @@ interface SidebarProps {
 export function Sidebar({ user, audience, collapsed, onToggleCollapsed, onLogout }: SidebarProps) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
+  const [searchParams] = useSearchParams();
   const [activeFlyoutKey, setActiveFlyoutKey] = useState<string | null>(null);
+
 
   const sections = getNavigationSections(user, audience);
   const flatItems = getFlatNavItems(sections);
@@ -110,7 +113,7 @@ export function Sidebar({ user, audience, collapsed, onToggleCollapsed, onLogout
                     <div key={item.to} className={cn("relative w-full", collapsed && "flex items-center justify-center")}>
                       <Tooltip content={label} enabled={collapsed && activeFlyoutKey !== item.key} side="right" className={collapsed ? "w-full flex justify-center" : undefined}>
                         <NavLink
-                          to={item.to}
+                          to={item.to.startsWith("/reports") ? createReportNavTarget(item.to, searchParams) : item.to}
                           end={item.end || isNavItemShadowed(item, flatItems, pathname)}
                           aria-label={collapsed ? label : undefined}
                           onClick={() => {
@@ -160,7 +163,8 @@ export function Sidebar({ user, audience, collapsed, onToggleCollapsed, onLogout
                             return (
                               <NavLink
                                 key={child.to}
-                                to={child.to}
+                                to={child.to.startsWith("/reports") ? createReportNavTarget(child.to, searchParams) : child.to}
+                                end={child.end}
                                 className={({ isActive }) =>
                                   cn(
                                     "flex h-7 w-full items-center justify-between rounded-md px-2 text-[11px] font-medium transition-colors outline-none",
@@ -177,6 +181,7 @@ export function Sidebar({ user, audience, collapsed, onToggleCollapsed, onLogout
                           })}
                         </div>
                       )}
+
 
                       {/* Collapsed Flyout Submenu */}
                       {collapsed && hasChildren && item.children && (

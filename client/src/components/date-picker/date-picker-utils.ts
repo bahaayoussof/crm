@@ -218,7 +218,15 @@ export function formatDisplayRange(range: DateRange, language: string): string |
   if (from && !to) return formatDisplayDate(from, language);
   if (!from && to) return formatDisplayDate(to, language);
   if (from && to) {
-    return `${formatDisplayDate(from, language)} – ${formatDisplayDate(to, language)}`;
+    if (isSameDay(from, to)) return formatDisplayDate(from, language);
+
+    const formatter = new Intl.DateTimeFormat(localeTag(language), {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+
+    return formatter.formatRange(from, to);
   }
   return null;
 }

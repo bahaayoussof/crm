@@ -1,6 +1,6 @@
 import { Prisma, Role, TicketPriority, TicketStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
-import type { ReportsRange } from "./reports.schema.js";
+import type { ReportsAgentsQuery, ReportsRange } from "./reports.schema.js";
 
 const DAY_MS = 86_400_000;
 
@@ -19,11 +19,14 @@ const PRIORITIES: TicketPriority[] = [
   TicketPriority.URGENT,
 ];
 
+const CHANNELS = ["WEB", "EMAIL", "WHATSAPP", "SMS", "LIVE_CHAT"] as const;
+
 const reportTicketSelect = {
   id: true,
   status: true,
   priority: true,
   categoryId: true,
+  channel: true,
   assignedAgentId: true,
   createdAt: true,
   firstResponseDueAt: true,
@@ -32,6 +35,7 @@ const reportTicketSelect = {
   resolvedAt: true,
   closedAt: true,
 } satisfies Prisma.TicketSelect;
+
 
 type ReportTicket = Prisma.TicketGetPayload<{ select: typeof reportTicketSelect }>;
 type SlaOutcome = "MET" | "BREACHED" | "PENDING" | "NONE";
@@ -205,17 +209,29 @@ export async function getTicketReports(range: ReportsRange, now = new Date()) {
 
   const categories = await prisma.category.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } });
   const categoryName = new Map(categories.map((category) => [category.id, category.name]));
-  const categoryCounts = new Map<string | null, number>();
+  const categoryCreated = new Map<string | null, number>();
+  const categoryResolved = new Map<string | null, number>();
   for (const ticket of cohort) {
-    categoryCounts.set(ticket.categoryId, (categoryCounts.get(ticket.categoryId) ?? 0) + 1);
+    categoryCreated.set(ticket.categoryId, (categoryCreated.get(ticket.categoryId) ?? 0) + 1);
   }
-  const byCategory = [...categoryCounts.entries()]
-    .map(([categoryId, created]) => ({
+  for (const ticket of tickets.filter((t) => resolvedInRange(t, range))) {
+    categoryResolved.set(ticket.categoryId, (categoryResolved.get(ticket.categoryId) ?? 0) + 1);
+  }
+  const allCategoryIds = new Set([...categoryCreated.keys(), ...categoryResolved.keys()]);
+  const byCategory = [...allCategoryIds]
+    .map((categoryId) => ({
       categoryId,
       categoryName: categoryId ? categoryName.get(categoryId) ?? categoryId : null,
-      created,
+      created: categoryCreated.get(categoryId) ?? 0,
+      resolved: categoryResolved.get(categoryId) ?? 0,
     }))
     .sort((a, b) => b.created - a.created || String(a.categoryName).localeCompare(String(b.categoryName)));
+
+  const byChannel = CHANNELS.map((channel) => ({
+    channel,
+    created: cohort.filter((ticket) => ticket.channel === channel).length,
+    resolved: tickets.filter((ticket) => ticket.channel === channel && resolvedInRange(ticket, range)).length,
+  }));
 
   return {
     ...rangeMeta(range),
@@ -225,16 +241,17 @@ export async function getTicketReports(range: ReportsRange, now = new Date()) {
       open: cohort.filter((ticket) => ACTIVE_STATUSES.includes(ticket.status)).length,
     },
     volume: buildVolume(tickets, range),
-    byStatus: distributionByStatus(cohort),
+    byStatus: statusBreakdown(cohort, tickets, range),
     byPriority,
     byCategory,
+    byChannel,
     generatedAt: now.toISOString(),
   };
 }
 
-export async function getAgentReports(range: ReportsRange, now = new Date()) {
+export async function getAgentReports(query: ReportsAgentsQuery | ReportsRange, now = new Date()) {
   const [tickets, agents] = await Promise.all([
-    loadTickets(range),
+    loadTickets(query),
     prisma.user.findMany({ where: { role: Role.AGENT }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
 
@@ -243,10 +260,10 @@ export async function getAgentReports(range: ReportsRange, now = new Date()) {
     if (ticket.assignedAgentId && !names.has(ticket.assignedAgentId)) names.set(ticket.assignedAgentId, ticket.assignedAgentId);
   }
 
-  const rows = [...names.entries()].map(([agentId, agentName]) => {
-    const assignedCohort = tickets.filter((ticket) => ticket.assignedAgentId === agentId && createdInRange(ticket, range));
+  let rows = [...names.entries()].map(([agentId, agentName]) => {
+    const assignedCohort = tickets.filter((ticket) => ticket.assignedAgentId === agentId && createdInRange(ticket, query));
     const resolved = tickets.filter(
-      (ticket) => ticket.assignedAgentId === agentId && resolvedInRange(ticket, range),
+      (ticket) => ticket.assignedAgentId === agentId && resolvedInRange(ticket, query),
     ).length;
     const open = assignedCohort.filter((ticket) => ACTIVE_STATUSES.includes(ticket.status)).length;
 
@@ -273,9 +290,73 @@ export async function getAgentReports(range: ReportsRange, now = new Date()) {
     };
   });
 
-  rows.sort((a, b) => b.assigned - a.assigned || b.resolved - a.resolved || a.agentName.localeCompare(b.agentName));
+  const search = "search" in query && query.search ? query.search.trim().toLowerCase() : undefined;
+  if (search) {
+    rows = rows.filter((row) => row.agentName.toLowerCase().includes(search));
+  }
 
-  return { ...rangeMeta(range), agents: rows, generatedAt: now.toISOString() };
+  const sortBy = "sortBy" in query ? query.sortBy : undefined;
+  const sortOrder = "sortOrder" in query && query.sortOrder ? query.sortOrder : "desc";
+  const multiplier = sortOrder === "asc" ? 1 : -1;
+
+  rows.sort((a, b) => {
+    if (sortBy === "name") {
+      const comp = a.agentName.localeCompare(b.agentName);
+      if (comp !== 0) return comp * multiplier;
+    } else if (sortBy === "assigned") {
+      const diff = a.assigned - b.assigned;
+      if (diff !== 0) return diff * multiplier;
+    } else if (sortBy === "resolved") {
+      const diff = a.resolved - b.resolved;
+      if (diff !== 0) return diff * multiplier;
+    } else if (sortBy === "open") {
+      const diff = a.open - b.open;
+      if (diff !== 0) return diff * multiplier;
+    } else if (sortBy === "slaMetPercentage") {
+      const valA = a.slaMetPct ?? (multiplier === 1 ? Infinity : -Infinity);
+      const valB = b.slaMetPct ?? (multiplier === 1 ? Infinity : -Infinity);
+      const diff = valA - valB;
+      if (diff !== 0) return diff * multiplier;
+    } else if (sortBy === "avgFirstResponse") {
+      const valA = a.averageFirstResponseMinutes ?? (multiplier === 1 ? Infinity : -Infinity);
+      const valB = b.averageFirstResponseMinutes ?? (multiplier === 1 ? Infinity : -Infinity);
+      const diff = valA - valB;
+      if (diff !== 0) return diff * multiplier;
+    } else {
+      const assignedDiff = b.assigned - a.assigned;
+      if (assignedDiff !== 0) return assignedDiff;
+      const resolvedDiff = b.resolved - a.resolved;
+      if (resolvedDiff !== 0) return resolvedDiff;
+    }
+    const nameDiff = a.agentName.localeCompare(b.agentName);
+    if (nameDiff !== 0) return nameDiff;
+    return a.agentId.localeCompare(b.agentId);
+  });
+
+  const total = rows.length;
+  const page = "page" in query && query.page ? query.page : 1;
+  const limit = "limit" in query && query.limit ? query.limit : 15;
+  const totalPages = total === 0 ? 1 : Math.ceil(total / limit);
+  const startIndex = (page - 1) * limit;
+  const paginatedRows = rows.slice(startIndex, startIndex + limit);
+
+
+  return {
+    ...rangeMeta(query),
+    agents: paginatedRows,
+    data: paginatedRows,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages,
+    },
+    total,
+    page,
+    limit,
+    totalPages,
+    generatedAt: now.toISOString(),
+  };
 }
 
 export async function getSlaReports(range: ReportsRange, now = new Date()) {
@@ -329,9 +410,37 @@ function distributionByStatus(tickets: ReportTicket[]) {
     .sort((a, b) => a.status.localeCompare(b.status));
 }
 
+function statusBreakdown(cohort: ReportTicket[], tickets: ReportTicket[], range: ReportsRange) {
+  const counts = new Map<TicketStatus, { created: number; resolved: number }>();
+  for (const status of Object.values(TicketStatus)) {
+    counts.set(status, { created: 0, resolved: 0 });
+  }
+  for (const ticket of cohort) {
+    const curr = counts.get(ticket.status) ?? { created: 0, resolved: 0 };
+    curr.created += 1;
+    counts.set(ticket.status, curr);
+  }
+  for (const ticket of tickets.filter((t) => resolvedInRange(t, range))) {
+    const curr = counts.get(ticket.status) ?? { created: 0, resolved: 0 };
+    curr.resolved += 1;
+    counts.set(ticket.status, curr);
+  }
+  return [...counts.entries()]
+    .map(([status, val]) => ({
+      status,
+      count: val.created,
+      created: val.created,
+      resolved: val.resolved,
+    }))
+    .filter((s) => s.created > 0 || s.resolved > 0)
+    .sort((a, b) => a.status.localeCompare(b.status));
+}
+
 function tally(outcomes: SlaOutcome[]) {
   const met = outcomes.filter((outcome) => outcome === "MET").length;
   const breached = outcomes.filter((outcome) => outcome === "BREACHED").length;
   const pending = outcomes.filter((outcome) => outcome === "PENDING").length;
   return { met, breached, pending, total: met + breached + pending, compliancePct: compliancePct(met, breached) };
 }
+
+

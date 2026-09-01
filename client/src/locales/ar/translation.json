@@ -3,12 +3,13 @@
   "notifications": { "title": "الإشعارات", "bellLabel": "الإشعارات، {{count}} غير مقروءة", "markAllRead": "تحديد الكل كمقروء", "empty": "لا توجد إشعارات جديدة.", "error": "تعذر تحميل الإشعارات.", "unread": "غير مقروء" },
   "theme": { "title": "المظهر", "light": "فاتح", "dark": "داكن", "system": "تلقائي", "mode": "المظهر" },
   "navigation": {
-    "languageSwitcher": "اختيار اللغة", "primary": "التنقل الرئيسي", "dashboard": "لوحة التحكم", "tickets": "التذاكر", "customers": "العملاء", "knowledgeBase": "قاعدة المعرفة", "tasks": "المهام", "reports": "التقارير", "quickReplies": "الردود السريعة", "users": "المستخدمون", "settings": "الإعدادات", "auditLogs": "سجلات التدقيق",
+    "languageSwitcher": "اختيار اللغة", "primary": "التنقل الرئيسي", "dashboard": "لوحة التحكم", "tickets": "التذاكر", "customers": "العملاء", "knowledgeBase": "قاعدة المعرفة", "tasks": "المهام", "reports": "التقارير", "reportsOverview": "نظرة عامة", "reportsSla": "أداء اتفاقية مستوى الخدمة", "reportsAgents": "أداء الوكلاء", "reportsTickets": "تفصيل التذاكر", "quickReplies": "الردود السريعة", "users": "المستخدمون", "settings": "الإعدادات", "auditLogs": "سجلات التدقيق",
     "collapseSidebar": "طي الشريط الجانبي", "expandSidebar": "توسيع الشريط الجانبي",
     "portalHome": "الصفحة الرئيسية للبوابة", "portalContext": "بوابة الدعم", "workspaceContext": "مساحة عمل الدعم", "openCustomers": "فتح سجلات العملاء",
     "portalOverview": "نظرة عامة", "portalRequests": "طلباتي", "portalNewRequest": "طلب جديد", "portalKnowledgeBase": "مركز المساعدة", "portalProfile": "الملف الشخصي",
     "sections": { "main": "الرئيسية", "support": "الدعم", "management": "الإدارة" }
   },
+
   "auditLogs": {
     "title": "سجلات التدقيق",
     "description": "راجع التغييرات الإدارية والأمنية المهمة في نظام إدارة العملاء.",
@@ -121,7 +122,7 @@
   "reports": {
     "title": "التقارير", "description": "تتبّع حجم التذاكر وأداء اتفاقية مستوى الخدمة ونشاط الفريق ضمن نطاق زمني.",
     "loadError": "تعذّر تحميل التقارير.", "sectionError": "تعذّر تحميل هذا القسم.",
-    "kpisLabel": "أبرز مؤشرات التقرير", "uncategorized": "بدون تصنيف", "total": "الإجمالي",
+    "kpisLabel": "أبرز مؤشرات التقرير", "uncategorized": "بدون تصنيف", "total": "الإجمالي", "otherCategories": "أخرى",
     "sections": { "insights": "تحليلات التذاكر", "performance": "الأداء والجودة", "trends": "اتجاهات التذاكر", "trendsDescription": "كيف يتغيّر إنشاء التذاكر وحلّها عبر الزمن.", "operational": "الأداء التشغيلي", "feedback": "آراء العملاء" },
     "filters": { "label": "مرشّحات التقرير", "presetLabel": "نطاقات سريعة", "lastDays": "آخر {{count}} يوم", "from": "من", "to": "إلى", "reset": "إعادة تعيين", "timezone": "الأوقات معروضة بتوقيت UTC", "department": "القسم", "branch": "الفرع", "allDepartments": "كل الأقسام", "allBranches": "كل الفروع" },
     "kpis": { "createdTickets": "التذاكر المُنشأة", "resolvedTickets": "التذاكر المُحلّة", "slaCompliance": "الالتزام باتفاقية الخدمة", "averageResponse": "متوسط أول ردّ", "satisfaction": "رضا العملاء", "satisfactionResponses": "{{count}} ردّ" },
@@ -131,12 +132,15 @@
     "sla": { "firstResponse": "أول ردّ", "resolution": "الحلّ", "avgFirstResponse": "متوسط أول ردّ", "avgResolution": "متوسط الحلّ", "metShort": "مستوفاة", "breachedShort": "متجاوزة", "pendingShort": "معلّقة", "complianceShort": "الالتزام", "priorityBreakdown": "التفصيل حسب الأولوية" },
     "satisfactionTitle": "رضا العملاء", "satisfactionDescription": "التقييمات المُقدّمة عبر بوابة العملاء.", "emptySatisfaction": "لم يُقدَّم أي تقييم في هذا النطاق.", "satisfactionSummary": "متوسط {{rating}} من 5 من {{count}} ردّ.",
     "satisfaction": { "distributionLabel": "توزيع التقييمات" },
-    "agentsTitle": "أداء الوكلاء", "agentsDescription": "أرقام الإسناد والحلّ واتفاقية الخدمة لكل وكيل للتذاكر المُنشأة ضمن النطاق.", "emptyAgents": "لا يوجد نشاط وكلاء في هذا النطاق.",
-    "agents": { "name": "الوكيل", "assigned": "مُسندة", "resolved": "محلولة", "open": "مفتوحة", "slaMet": "نسبة استيفاء الخدمة", "avgResponse": "متوسط الردّ" },
-    "breakdownTitle": "تفصيل التذاكر", "byPriority": "حسب الأولوية", "byCategory": "حسب التصنيف",
+    "agentsTitle": "أداء الوكلاء", "agentsDescription": "أرقام الإسناد والحلّ واتفاقية الخدمة لكل وكيل للتذاكر المُنشأة ضمن النطاق.", "emptyAgents": "لا يوجد نشاط وكلاء في هذا النطاق.", "emptyAgentsMatch": "لا يوجد وكلاء يطابقون «{{search}}».",
+    "agents": { "name": "الوكيل", "assigned": "مُسندة", "resolved": "محلولة", "open": "مفتوحة", "slaMet": "نسبة استيفاء الخدمة", "avgResponse": "متوسط الردّ", "searchPlaceholder": "البحث عن الوكلاء…" },
+    "breakdownTitle": "تفصيل التذاكر", "byPriority": "حسب الأولوية", "byCategory": "حسب التصنيف", "emptyCategoriesMatch": "لا توجد فئات تطابق «{{search}}».",
+    "breakdown": { "overview": "نظرة عامة", "categories": "التصنيفات", "status": "حالة التذاكر", "priority": "الأولوية", "category": "التصنيف", "channel": "القناة" },
+    "categories": { "searchPlaceholder": "البحث عن الفئات…" },
     "legend": { "created": "مُنشأة", "resolved": "محلولة" },
     "duration": { "minutes": "{{count}} دقيقة", "hours": "{{count}} ساعة", "hoursUnit_one": "ساعة", "hoursUnit_two": "ساعتان", "hoursUnit_few": "ساعات", "hoursUnit_many": "ساعة", "hoursUnit_other": "ساعة", "minutesUnit_one": "دقيقة", "minutesUnit_two": "دقيقتان", "minutesUnit_few": "دقائق", "minutesUnit_many": "دقيقة", "minutesUnit_other": "دقيقة" }
   },
+
   "tickets": {
     "title": "التذاكر", "description": "إدارة طلبات دعم العملاء ومتابعتها", "new": "تذكرة جديدة", "create": "إنشاء التذكرة", "createTitle": "إنشاء تذكرة", "editTitle": "تعديل التذكرة", "edit": "تعديل التذكرة",
     "formDescription": "تسجيل المشكلة والتصنيف والمسؤولية التشغيلية.", "ticketDetails": "تفاصيل التذكرة", "classification": "التصنيف", "subject": "الموضوع", "descriptionLabel": "الوصف",

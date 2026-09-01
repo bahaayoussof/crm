@@ -117,8 +117,9 @@ describe("ticket pages", () => {
 
   it("drives backend search and filters from URL state", async () => {
     renderAt("/tickets", <Route path="/tickets" element={<TicketListPage />} />);
-    fireEvent.change(screen.getByPlaceholderText("Search tickets by ID, subject, or customer…"), { target: { value: "ticket-12345678" } });
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "ticket-12345678" } });
     fireEvent.click(screen.getByRole("button", { name: "Filter options" }));
+
     const statusTrigger = screen.getByRole("combobox", { name: "Status" });
     fireEvent.keyDown(statusTrigger, { key: "ArrowDown" });
     await waitFor(() => expect(screen.getByRole("option", { name: "Open" })).toBeInTheDocument());
