@@ -14,8 +14,10 @@ export interface User {
   phone?: string | null;
   departmentId: string | null;
   branchId: string | null;
+  teamId: string | null;
   department: OrgRef | null;
   branch: OrgRef | null;
+  team: (OrgRef & { departmentId: string }) | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -42,6 +44,7 @@ export type UserUpdatePayload = Partial<{
   phone: string | null;
   departmentId: string | null;
   branchId: string | null;
+  teamId: string | null;
 }>;
 
 export const MANAGEABLE_ROLES: ManageableRole[] = ["ADMIN", "MANAGER", "AGENT"];

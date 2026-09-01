@@ -160,9 +160,14 @@ export function ManagerTeamPage() {
     { key: "avgResolution" },
   ];
 
+  const teamName = team.data?.meta.teamName ?? null;
+
   return (
     <main className="page-container space-y-5">
-      <PageHeader title={t("manager.team.title")} description={t("manager.team.subtitle")} />
+      <PageHeader
+        title={t("manager.team.title")}
+        description={teamName ? `${t("manager.teamContext")}: ${teamName}` : t("manager.team.subtitle")}
+      />
 
       <DataTableSurface>
         <DataTableToolbar>

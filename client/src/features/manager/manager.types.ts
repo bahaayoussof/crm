@@ -32,7 +32,7 @@ export interface TeamWorkloadRow {
 }
 
 export interface ManagerOverview {
-  meta: { visibility: "ORGANIZATION_WIDE" };
+  meta: { visibility: "ORGANIZATION_WIDE" | "TEAM"; teamName: string | null };
   needsAttention: NeedsAttentionItem[];
   kpis: {
     openTickets: number;
@@ -79,14 +79,14 @@ export interface TeamMemberRow {
 }
 
 export interface ManagerTeam {
-  meta: { visibility: "ORGANIZATION_WIDE" };
+  meta: { visibility: "ORGANIZATION_WIDE" | "TEAM"; teamName: string | null };
   data: TeamMemberRow[];
   pagination: { page: number; limit: number; total: number; totalPages: number };
   generatedAt: string;
 }
 
 export interface ManagerAgentDetail {
-  meta: { visibility: "ORGANIZATION_WIDE" };
+  meta: { visibility: "ORGANIZATION_WIDE" | "TEAM"; teamName: string | null };
   agent: { id: string; name: string; email: string };
   workload: { openAssigned: number; inProgress: number; waitingCustomer: number; escalated: number };
   slaRisk: { breached: number; atRisk: number };

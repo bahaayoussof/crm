@@ -1315,3 +1315,30 @@ MANAGER had no distinct experience: `/dashboard` rendered the same ADMIN/MANAGER
 - No schema change, no migration, no new dependency, no new mutation capability (every write the console triggers goes through an existing endpoint with its existing RBAC).
 - Follow-up: a real `Manager -> Department/Team` relation + data scoping is a separate branch; `managerTicketScopeWhere` / `managerAgentWhere` are the only places to change.
 - Live multi-role DB verification and EN/AR/RTL/dark browser QA are outstanding (no running DB/browser in this environment).
+
+
+# ADR-050: Team-Based Manager Scope — real `Team` model; MANAGER authorization scoped to their own team
+
+**Status:** Accepted (implemented and verified across backend + frontend; uncommitted, branch `feature/team-based-manager-scope`). **Supersedes the "MANAGER scope stays organization-wide" decision in ADR-049.**
+
+## Context
+
+ADR-049 deferred real Manager scoping because no schema relation tied a `MANAGER` to a department/branch/team. The Manager Work Console therefore showed organization-wide data. The product model requires `Department → Team → { Manager, Agents, Tickets }` with `ADMIN` organization-wide, `MANAGER` own-team, `AGENT` own-team + existing restrictions.
+
+## Decision
+
+- **Schema.** New `Team { id, name, departmentId (required), managerId? @unique, isActive }`, `@@unique([departmentId, name])`. `User += teamId?` (+ `team` / `managedTeam` relations). `Ticket += teamId?` — **authoritative owning team, never inferred from the assigned agent**; nullable = "not yet routed" (ADMIN-only). Migration `20260901103646_add_team_scope` (the 12 prior migrations are kept). The **development database was reset and rebuilt** from scratch around the final schema (dev-only, explicitly approved; the shared Neon dev branch — see `.wolf/cerebrum.md` for the pooler-vs-direct-URL caveat). The seed creates 5 teams (two under one department) with realistic tickets/SLA/escalation coverage so cross-team isolation is verifiable.
+- **Centralized scope.** `server/src/shared/team/team-scope.ts` is the single source of truth: `resolveActorTeamId` / `resolveActorTeamScope`, `teamScopedTicketWhere` / `teamScopedAgentWhere` (match-nothing when a MANAGER has no team — **no org-wide fallback**), `assertManagerTicketAccess` (404, no existence leak), `assertAgentAssignableToTicket`, `ticketOperationalRecipientIds`. `ticketVisibilityWhere` / `ticketListVisibilityWhere` take an optional team-scope argument. No module hand-rolls `ticket.teamId !== actorTeamId`.
+- **Enforced everywhere a ticket or ticket-child resource is reached by id or listed:** tickets (list/detail/update/assign/conversation/watchers), attachments, AI, tasks, manager console, dashboard, reports, `/users/agents`. A MANAGER on another team's resource gets `404`. Reports inject the manager's team id server-side (never client-filtered).
+- **Assignment invariant.** Same-team only (`409 CROSS_TEAM_ASSIGNMENT`); agent with no team → `409 AGENT_HAS_NO_TEAM`; unrouted ticket adopts the assignee's team; a teamed ticket is never silently moved. Moving an AGENT with active tickets on their old team → `409 AGENT_HAS_ACTIVE_TICKETS`.
+- **Notifications & realtime are team-aware.** Operational ticket notifications reach ADMINs + only the ticket-team's manager + the assignee; an **unrouted ticket → ADMINs only**. Realtime `canReceive` scopes MANAGER to their team and narrows the AGENT unassigned queue; the SSE wire payload is unchanged (ids only) and `teamId` is resolved once per connection like `customerId`.
+- **Team Management.** ADMIN CRUD on `/api/settings/teams` (select department, assign manager, activate/deactivate; guards `MANAGER_ALREADY_LEADS_TEAM`, `TEAM_NAME_ALREADY_EXISTS`, `TEAM_IN_USE`, `TEAM_HAS_TICKETS`). Active lookup `GET /api/teams?departmentId=` for all internal roles.
+- **Frontend.** Team Management section in Settings (shared DataTable / dialogs / `AppSelectField`); `UserBranchDepartmentFields` gains a Department→Team dependent select for MANAGER/AGENT; the ADMIN internal ticket form gains Department→Team→Agent dependent selects (MANAGER's team is implicit — the server owns it — and the agent list is server-scoped to their team, so a MANAGER is offered no cross-team options); a MANAGER's team name is shown as page context and a "no team assigned" empty state replaces the console for an unassigned manager. Backend remains authoritative; the frontend only prevents invalid UX. EN + AR translations added; RTL preserved.
+- **`meta.visibility`** on manager-console responses is now `"TEAM"` for a MANAGER (`"ORGANIZATION_WIDE"` for ADMIN), plus `meta.teamName`.
+
+## Consequences
+
+- ADR-049's `managerTicketScopeWhere` / `managerAgentWhere` seam is realized: `manager.service` now routes every query through the shared team-scope helpers.
+- **Intentional exception:** `customers/customer.service.ts` `listCustomerTickets` stays organization-wide (documented SUMMARY_ONLY cross-agent history design). Team-scoping it would diverge AGENT vs MANAGER behavior and needs a product decision — deferred.
+- No new runtime dependency. One additive migration. Dev-only DB reset (never production).
+- Verification: server `tsc` + `eslint` clean, vitest **750/750** (42 files, incl. `shared/team/team-scope.test.ts` + cross-team isolation blocks across ticket/manager/reports/dashboard/collaboration/ai/tasks/attachment/user-agents tests). Client `tsc -b` + `eslint` clean (2 pre-existing Fast-Refresh warnings), vitest **737/737** (63 files), production build green (~2,094 kB / gzip ~600 kB). Live multi-role browser QA (EN/AR/RTL/dark, Admin / Manager A / Manager B / Agent A / Agent B / Customer) is outstanding — no running browser in this environment.

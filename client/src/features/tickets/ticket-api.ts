@@ -6,6 +6,10 @@ export async function getTicket(id: string) { return (await apiClient.get<{ data
 export async function createTicket(values: TicketCreateValues) { return (await apiClient.post<{ data: TicketListItem }>("/tickets", values)).data.data; }
 export async function updateTicket(id: string, values: TicketUpdateValues) { return (await apiClient.patch<{ data: TicketListItem }>(`/tickets/${id}`, values)).data.data; }
 export async function getCategories() { return (await apiClient.get<{ data: TicketCategory[] }>("/categories")).data.data; }
-export async function getAgents() { return (await apiClient.get<{ data: AgentOption[] }>("/users/agents")).data.data; }
+export async function getAgents(teamId?: string) {
+  return (
+    await apiClient.get<{ data: AgentOption[] }>("/users/agents", { params: teamId ? { teamId } : undefined })
+  ).data.data;
+}
 export async function createTicketMessage(id: string, values: TicketConversationValues) { return (await apiClient.post<{ data: TicketMessageResult }>(`/tickets/${id}/messages`, values)).data.data; }
 export async function createTicketNote(id: string, values: TicketConversationValues) { return (await apiClient.post<{ data: TicketConversationItem }>(`/tickets/${id}/notes`, values)).data.data; }

@@ -30,6 +30,13 @@ function visibilityFor(actor: TicketActor): "TEAM" | "ORGANIZATION_WIDE" {
   return actor.role === Role.MANAGER ? "TEAM" : "ORGANIZATION_WIDE";
 }
 
+/** `meta` block shared by every manager-console response. `teamName` is null for
+ *  an ADMIN (org-wide) or a MANAGER not yet assigned to a team. */
+async function metaFor(actor: TicketActor, teamId: string | null) {
+  const team = teamId ? await prisma.team.findUnique({ where: { id: teamId }, select: { name: true } }) : null;
+  return { visibility: visibilityFor(actor), teamName: team?.name ?? null };
+}
+
 const ACTIVE_STATUSES = [
   TicketStatus.OPEN,
   TicketStatus.IN_PROGRESS,
@@ -196,7 +203,7 @@ export async function getManagerOverview(actor: TicketActor, now = new Date()) {
   const teamWorkload = buildTeamWorkload(agents, activeByAgent, resolvedTodayByAgent, activeAssignedRows, now);
 
   return {
-    meta: { visibility: visibilityFor(actor) },
+    meta: await metaFor(actor, teamId),
     needsAttention: [
       { key: "slaBreached", count: slaBreached, ticketFilter: "sla=breached" },
       { key: "slaAtRisk", count: slaAtRisk, ticketFilter: "sla=at_risk" },
@@ -354,7 +361,7 @@ export async function getManagerTeam(actor: TicketActor, query: ManagerTeamQuery
   const startIndex = (query.page - 1) * query.limit;
 
   return {
-    meta: { visibility: visibilityFor(actor) },
+    meta: await metaFor(actor, teamId),
     data: rows.slice(startIndex, startIndex + query.limit),
     pagination: { page: query.page, limit: query.limit, total, totalPages },
     generatedAt: now.toISOString(),
@@ -486,7 +493,7 @@ export async function getManagerAgentDetail(actor: TicketActor, agentId: string,
     : null;
 
   return {
-    meta: { visibility: visibilityFor(actor) },
+    meta: await metaFor(actor, teamId),
     agent,
     workload: {
       openAssigned: [...ACTIVE_STATUSES].reduce((sum, status) => sum + statusCount(status), 0),

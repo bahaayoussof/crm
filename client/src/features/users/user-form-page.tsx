@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { PhoneInput } from "@/components/shared/phone-input";
@@ -27,8 +27,9 @@ function CreateUserForm() {
 
   const { register, control, setValue, handleSubmit, formState: { errors, isSubmitting } } = useForm<UserCreateFormValues>({
     resolver: zodResolver(userCreateFormSchema),
-    defaultValues: { name: "", email: "", password: "", role: "AGENT", departmentId: "", branchId: "" },
+    defaultValues: { name: "", email: "", password: "", role: "AGENT", departmentId: "", branchId: "", teamId: "" },
   });
+  const roleValue = useWatch({ control, name: "role" });
 
   const roleOptions = MANAGEABLE_ROLES.map((option) => ({
     value: option,
@@ -84,7 +85,7 @@ function CreateUserForm() {
               )}
             />
 
-            <UserBranchDepartmentFields control={control} setValue={setValue} idPrefix="user" />
+            <UserBranchDepartmentFields control={control} setValue={setValue} idPrefix="user" role={roleValue} />
           </div>
           <FormFooter pending={pending} />
         </form>
@@ -129,6 +130,7 @@ function EditUserFormLoaded({ id, user }: { id: string; user: User }) {
     resolver: zodResolver(userEditFormSchema),
     defaultValues: mapUserToEditFormValues(user),
   });
+  const roleValue = useWatch({ control, name: "role" });
 
   const roleOptions = MANAGEABLE_ROLES.map((option) => ({
     value: option,
@@ -146,6 +148,7 @@ function EditUserFormLoaded({ id, user }: { id: string; user: User }) {
         isActive: values.isActive,
         departmentId: values.departmentId ? values.departmentId : null,
         branchId: values.branchId ? values.branchId : null,
+        teamId: values.teamId ? values.teamId : null,
       });
       navigate("/users", { replace: true });
     } catch (error) {
@@ -209,7 +212,7 @@ function EditUserFormLoaded({ id, user }: { id: string; user: User }) {
               />
             </Field>
 
-            <UserBranchDepartmentFields control={control} setValue={setValue} idPrefix="edit-user" />
+            <UserBranchDepartmentFields control={control} setValue={setValue} idPrefix="edit-user" role={roleValue} />
 
             <div className="rounded-lg border border-border bg-surface-subtle/50 p-4">
               <label className="flex items-start gap-3 cursor-pointer">

@@ -282,7 +282,7 @@ export async function seedTestData() {
   console.log("[2/10] Cleaning prior test seed records (idempotent reset)...");
 
   const SEED_USER_EMAILS = [
-    "admin1@crm.local", "admin2@crm.local", "admin3@crm.local",
+    "admin1@crm.local", "admin2@crm.local", "admin3@crm.local", "bahaa@crm.com",
     ...Array.from({ length: 5 }, (_, i) => `manager${i + 1}@crm.local`),
     ...Array.from({ length: 35 }, (_, i) => `agent${i + 1}@crm.local`),
     "portal.customer@crm.local",
@@ -450,6 +450,20 @@ export async function seedTestData() {
     adminUsers.push(user);
   }
 
+  // Convenience ADMIN for manual QA (short credentials — dev only; the password
+  // is bcrypt-hashed here just like every other seed account, never plaintext).
+  const bahaa = await prisma.user.create({
+    data: {
+      name: "Bahaa",
+      email: "bahaa@crm.com",
+      passwordHash: await bcrypt.hash("123", 12),
+      role: Role.ADMIN,
+      isActive: true,
+    },
+    select: { id: true, name: true, email: true, role: true },
+  });
+  adminUsers.push(bahaa);
+
   // Managers
   const managerDefs = [
     { name: "Marcus Vance", email: `manager1@${SEED_EMAIL_DOMAIN}` },
@@ -555,7 +569,7 @@ export async function seedTestData() {
     teamOfUser.set(agentUsers[a].id, { teamId: team.id, departmentId: team.departmentId, branchId: team.branchId });
   }
 
-  console.log(`  ✓ Seeded ${allStaffUsers.length} staff users (3 Admins, 5 Managers, 35 Agents [33 active, 2 inactive]) and 5 Portal Customer users.`);
+  console.log(`  ✓ Seeded ${allStaffUsers.length} staff users (4 Admins incl. bahaa@crm.com, 5 Managers, 35 Agents [33 active, 2 inactive]) and 5 Portal Customer users.`);
   console.log(`  ✓ Created ${teams.length} Teams; every Manager and Agent has an explicit team.`);
 
   // -------------------------------------------------------------------------
@@ -1100,8 +1114,9 @@ export async function seedTestData() {
   console.log(`Notifications:      ${await prisma.notification.count()}`);
   console.log(`Feedback:           ${await prisma.feedback.count()}`);
   console.log("-------------------------------------------------------");
-  console.log("\nTest Credentials (password for all: password123):");
+  console.log("\nTest Credentials (password for all seed accounts: password123):");
   console.log("-------------------------------------------------------");
+  console.log(`ADMIN:     bahaa@crm.com  (Bahaa — organization-wide)   [password: 123]`);
   console.log(`ADMIN:     admin1@${SEED_EMAIL_DOMAIN}  (Sarah Connor — organization-wide)`);
   console.log(`MANAGER:   manager1@${SEED_EMAIL_DOMAIN}  (Marcus Vance — manages "Billing Support")`);
   console.log(`MANAGER2:  manager2@${SEED_EMAIL_DOMAIN}  (Maya Lin — manages "Technical Support")`);

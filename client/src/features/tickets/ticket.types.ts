@@ -23,12 +23,14 @@ export interface TicketDetail extends TicketListItem {
   slaState: SlaState; effectiveSlaDueAt: string | null; effectiveSlaTarget: SlaTarget;
   watcherCount: number; viewerIsWatching: boolean;
   customer: TicketPerson & { phone: string | null; createdAt: string };
-  department: { id: string; name: string } | null; branch: { id: string; name: string } | null; history: TicketHistory[]; conversation: TicketConversationItem[];
+  department: { id: string; name: string } | null; branch: { id: string; name: string } | null;
+  team: { id: string; name: string; departmentId: string } | null;
+  history: TicketHistory[]; conversation: TicketConversationItem[];
 }
 export type TicketListScope = "mine" | "unassigned";
 export interface TicketFilters { search: string; page: number; limit: number; scope?: TicketListScope; status?: TicketStatus; priority?: TicketPriority; categoryId?: string; assignedAgentId?: string; customerId?: string; departmentId?: string; branchId?: string }
 export interface TicketListResponse { data: TicketListItem[]; meta: { page: number; limit: number; total: number; totalPages: number } }
-export type AgentOption = TicketPerson;
-export interface TicketCreateValues { customerId: string; subject: string; description: string; priority: TicketPriority; categoryId?: string | null; assignedAgentId?: string | null }
+export type AgentOption = TicketPerson & { teamId: string | null };
+export interface TicketCreateValues { customerId: string; subject: string; description: string; priority: TicketPriority; categoryId?: string | null; assignedAgentId?: string | null; departmentId?: string | null; teamId?: string | null }
 export type TicketUpdateValues = Partial<Omit<TicketCreateValues, "customerId"> & { status: TicketStatus }>;
 export interface TicketConversationValues { body: string }

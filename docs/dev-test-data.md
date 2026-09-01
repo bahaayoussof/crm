@@ -43,10 +43,13 @@ All seeded test accounts share the predictable development password:
 password123
 ```
 
+The one exception is the convenience QA admin `bahaa@crm.com`, whose password is `123` (bcrypt-hashed by the seed like every other account — never stored plaintext). It is created by `npm run seed:test`; `scripts/seed-bahaa.ts` (re)creates just that account on demand (`npx tsx scripts/seed-bahaa.ts` from `server/`).
+
 ### Key Seed Identities
 
 | Role | Email | Name / Profile | Purpose / Key Characteristics |
 |---|---|---|---|
+| **ADMIN** | `bahaa@crm.com` | Bahaa | Manual-QA convenience admin — password `123`, organization-wide |
 | **ADMIN** | `admin1@crm.local` | Sarah Connor | Global administration, unscoped ticket/user/audit table QA |
 | **ADMIN** | `admin2@crm.local` | Omar Farooq | Operations Admin, secondary admin verification |
 | **ADMIN** | `admin3@crm.local` | Elena Rostova | System Admin, settings & RBAC verification |

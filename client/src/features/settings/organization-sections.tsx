@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { Building2, Network, Pencil, Power, Trash2 } from "lucide-react";
+import { Building2, Network, Pencil, Power, Trash2, Users2 } from "lucide-react";
 import axios from "axios";
 import { AppSelectField } from "@/components/ui/app-select";
 import { Badge } from "@/components/ui/badge";
@@ -29,15 +29,21 @@ import { useDebouncedValue } from "@/features/customers/use-debounced-value";
 import {
   useAdminBranches,
   useAdminDepartments,
+  useAdminTeams,
   useBranchOptions,
   useCreateBranch,
   useCreateDepartment,
+  useCreateTeam,
   useDeleteBranch,
   useDeleteDepartment,
+  useDeleteTeam,
+  useDepartmentOptions,
   useUpdateBranch,
   useUpdateDepartment,
+  useUpdateTeam,
 } from "@/features/organization/organization-hooks";
-import type { Branch, Department } from "@/features/organization/organization.types";
+import { useManagerOptions } from "@/features/users/user-hooks";
+import type { Branch, Department, Team } from "@/features/organization/organization.types";
 
 const PAGE_SIZE = 15;
 type StatusFilter = "" | "active" | "inactive";
@@ -925,6 +931,446 @@ function BranchEditorDialog({
             dir="auto"
           />
         </label>
+        {error && (
+          <p role="alert" className="text-sm text-danger">
+            {error}
+          </p>
+        )}
+        <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+          <Button variant="secondary" disabled={pending} onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
+          <Button isLoading={pending} onClick={submit}>
+            {t("common.save")}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Teams (feature/team-based-manager-scope)
+// ---------------------------------------------------------------------------
+
+type TeamEditorTarget = Team | "new" | null;
+
+function teamErrorKey(code: string | undefined): string | null {
+  switch (code) {
+    case "MANAGER_ALREADY_LEADS_TEAM":
+      return "settings.teams.errors.managerAlreadyLeads";
+    case "TEAM_NAME_ALREADY_EXISTS":
+      return "settings.teams.errors.nameExists";
+    case "INVALID_TEAM_MANAGER":
+      return "settings.teams.errors.invalidManager";
+    case "INVALID_DEPARTMENT":
+      return "settings.teams.errors.invalidDepartment";
+    case "TEAM_DEPARTMENT_MISMATCH":
+      return "settings.teams.errors.departmentMismatch";
+    default:
+      return null;
+  }
+}
+
+export function TeamsSection() {
+  const { t } = useTranslation();
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<StatusFilter>("");
+  const [page, setPage] = useState(1);
+  const debouncedSearch = useDebouncedValue(search);
+
+  const query = useAdminTeams({
+    search: debouncedSearch,
+    status: status || undefined,
+    page,
+    limit: PAGE_SIZE,
+  });
+  const create = useCreateTeam();
+  const update = useUpdateTeam();
+  const remove = useDeleteTeam();
+
+  const [editorTarget, setEditorTarget] = useState<TeamEditorTarget>(null);
+  const [statusTarget, setStatusTarget] = useState<Team | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Team | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, status]);
+
+  const rows = query.data?.data ?? [];
+  const meta = query.data?.meta;
+  const hasFilters = Boolean(debouncedSearch || status);
+  const editorPending = create.isPending || update.isPending;
+
+  return (
+    <section className="space-y-4">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
+            <Users2 className="size-4" />
+            {t("settings.teams.title")}
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">{t("settings.teams.description")}</p>
+        </div>
+        <Button className="w-full sm:w-auto" onClick={() => setEditorTarget("new")}>
+          {t("settings.teams.create")}
+        </Button>
+      </header>
+
+      <DataTableSurface>
+        <DataTableToolbar>
+          <DataTableSearch
+            id="team-search"
+            ariaLabel={t("settings.teams.search")}
+            value={search}
+            onChange={setSearch}
+            placeholder={t("settings.teams.search")}
+          />
+          <div className="flex flex-wrap items-center gap-2 sm:ms-auto">
+            <StatusFilterSelect value={status} onChange={setStatus} />
+            {hasFilters && (
+              <button
+                className="button-ghost h-8.5 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  setSearch("");
+                  setStatus("");
+                }}
+              >
+                {t("settings.clearFilters")}
+              </button>
+            )}
+          </div>
+        </DataTableToolbar>
+
+        {query.isLoading ? (
+          <div className="p-4">
+            <DataTableSkeleton columns={6} />
+          </div>
+        ) : query.isError ? (
+          <div className="p-6">
+            <OrgState text={t("settings.teams.loadError")} action={() => query.refetch()} />
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="p-6">
+            <OrgState text={hasFilters ? t("settings.teams.noResults") : t("settings.teams.empty")} />
+          </div>
+        ) : (
+          <>
+            <div className="hidden overflow-x-auto md:block">
+              <Table className="min-w-[52rem]">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t("settings.teams.name")}</TableHead>
+                    <TableHead>{t("settings.teams.department")}</TableHead>
+                    <TableHead>{t("settings.teams.manager")}</TableHead>
+                    <TableHead className="w-20 text-end">{t("settings.teams.agents")}</TableHead>
+                    <TableHead className="w-28">{t("settings.status")}</TableHead>
+                    <TableHead className="w-24 text-end">{t("settings.actions")}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell className="font-medium" dir="auto">
+                        {row.name}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground" dir="auto">
+                        {row.department?.name ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground" dir="auto">
+                        {row.manager ? (
+                          <span className="flex flex-col">
+                            <span className="text-foreground">{row.manager.name}</span>
+                            <span className="truncate text-xs" dir="ltr">
+                              {row.manager.email}
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">{t("settings.teams.noManager")}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-end tabular-nums text-muted-foreground">{row.agentCount}</TableCell>
+                      <TableCell>
+                        <OrgStatusBadge active={row.isActive} />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex justify-end">
+                          <TeamRowActions
+                            row={row}
+                            onEdit={() => setEditorTarget(row)}
+                            onToggle={() => {
+                              setStatusError(null);
+                              setStatusTarget(row);
+                            }}
+                            onDelete={() => {
+                              setDeleteError(null);
+                              setDeleteTarget(row);
+                            }}
+                          />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <ul className="divide-y divide-border-subtle md:hidden">
+              {rows.map((row) => (
+                <li className="p-4" key={row.id}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium" dir="auto">
+                        {row.name}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground" dir="auto">
+                        {t("settings.teams.department")}: {row.department?.name ?? "—"} ·{" "}
+                        {t("settings.teams.agents")}: {row.agentCount}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground" dir="auto">
+                        {t("settings.teams.manager")}: {row.manager?.name ?? t("settings.teams.noManager")}
+                      </p>
+                    </div>
+                    <OrgStatusBadge active={row.isActive} />
+                  </div>
+                  <div className="mt-3 flex justify-end">
+                    <TeamRowActions
+                      row={row}
+                      onEdit={() => setEditorTarget(row)}
+                      onToggle={() => {
+                        setStatusError(null);
+                        setStatusTarget(row);
+                      }}
+                      onDelete={() => {
+                        setDeleteError(null);
+                        setDeleteTarget(row);
+                      }}
+                    />
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            {meta && meta.totalPages > 1 && (
+              <div className="border-t border-table-border px-3.5 py-2">
+                <DataTablePagination
+                  page={page}
+                  pageCount={meta.totalPages}
+                  pageSize={PAGE_SIZE}
+                  totalCount={meta.total}
+                  canPreviousPage={page > 1}
+                  canNextPage={page < meta.totalPages}
+                  onPreviousPage={() => setPage((value) => Math.max(1, value - 1))}
+                  onNextPage={() => setPage((value) => value + 1)}
+                  ariaLabel={t("settings.teams.pagination")}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </DataTableSurface>
+
+      {editorTarget && (
+        <TeamEditorDialog
+          team={editorTarget === "new" ? null : editorTarget}
+          pending={editorPending}
+          onClose={() => setEditorTarget(null)}
+          onSubmit={async (values) => {
+            if (editorTarget === "new") await create.mutateAsync(values);
+            else await update.mutateAsync({ id: editorTarget.id, input: values });
+            setEditorTarget(null);
+          }}
+        />
+      )}
+
+      {statusTarget && (
+        <OrgConfirmDialog
+          title={t(statusTarget.isActive ? "settings.teams.deactivateTitle" : "settings.teams.activateTitle", {
+            name: statusTarget.name,
+          })}
+          description={t(statusTarget.isActive ? "settings.teams.confirmDeactivate" : "settings.teams.confirmActivate")}
+          confirmLabel={t(statusTarget.isActive ? "settings.deactivate" : "settings.activate")}
+          destructive={statusTarget.isActive}
+          pending={update.isPending}
+          error={statusError}
+          onClose={() => setStatusTarget(null)}
+          onConfirm={async () => {
+            setStatusError(null);
+            try {
+              await update.mutateAsync({ id: statusTarget.id, input: { isActive: !statusTarget.isActive } });
+              setStatusTarget(null);
+            } catch {
+              setStatusError(t("settings.teams.statusError"));
+            }
+          }}
+        />
+      )}
+
+      {deleteTarget && (
+        <OrgConfirmDialog
+          title={t("settings.teams.deleteTitle", { name: deleteTarget.name })}
+          description={t("settings.teams.confirmDelete")}
+          confirmLabel={t("settings.delete")}
+          destructive
+          pending={remove.isPending}
+          error={deleteError}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={async () => {
+            setDeleteError(null);
+            try {
+              await remove.mutateAsync(deleteTarget.id);
+              setDeleteTarget(null);
+            } catch (error) {
+              const code = apiErrorCode(error);
+              setDeleteError(
+                code === "TEAM_IN_USE"
+                  ? t("settings.teams.deleteConflictInUse")
+                  : code === "TEAM_HAS_TICKETS"
+                    ? t("settings.teams.deleteConflictTickets")
+                    : t("settings.teams.deleteError"),
+              );
+            }
+          }}
+        />
+      )}
+    </section>
+  );
+}
+
+function TeamRowActions({
+  row,
+  onEdit,
+  onToggle,
+  onDelete,
+}: {
+  row: Team;
+  onEdit: () => void;
+  onToggle: () => void;
+  onDelete: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <ActionMenu
+      triggerLabel={t("settings.actions")}
+      items={[
+        { key: "edit", label: t("common.edit"), icon: <Pencil className="size-4" />, onClick: onEdit },
+        {
+          key: "status",
+          label: row.isActive ? t("settings.deactivate") : t("settings.activate"),
+          icon: <Power className="size-4" />,
+          destructive: row.isActive,
+          onClick: onToggle,
+        },
+        {
+          key: "delete",
+          label: t("settings.delete"),
+          icon: <Trash2 className="size-4" />,
+          destructive: true,
+          onClick: onDelete,
+        },
+      ]}
+    />
+  );
+}
+
+function TeamEditorDialog({
+  team,
+  pending,
+  onClose,
+  onSubmit,
+}: {
+  team: Team | null;
+  pending: boolean;
+  onClose: () => void;
+  onSubmit: (values: { name: string; departmentId: string; managerId: string | null }) => Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const departments = useDepartmentOptions();
+  const managers = useManagerOptions();
+  const [name, setName] = useState(team?.name ?? "");
+  const [departmentId, setDepartmentId] = useState(team?.departmentId ?? "");
+  const [managerId, setManagerId] = useState(team?.managerId ?? "");
+  const [error, setError] = useState("");
+
+  const departmentOptions = useMemo(
+    () => [
+      { value: "", label: t("settings.teams.selectDepartment") },
+      ...(departments.data ?? []).map((department) => ({ value: department.id, label: department.name })),
+    ],
+    [departments.data, t],
+  );
+
+  const managerOptions = useMemo(() => {
+    const list = managers.data ?? [];
+    const known = new Set(list.map((manager) => manager.id));
+    const options = list.map((manager) => ({ value: manager.id, label: manager.name, searchText: manager.email }));
+    if (team?.manager && !known.has(team.manager.id)) {
+      options.unshift({ value: team.manager.id, label: team.manager.name, searchText: team.manager.email });
+    }
+    return [{ value: "", label: t("settings.teams.noManager") }, ...options];
+  }, [managers.data, team, t]);
+
+  const submit = async () => {
+    setError("");
+    if (name.trim().length < 2) {
+      setError(t("settings.teams.validation.name"));
+      return;
+    }
+    if (!departmentId) {
+      setError(t("settings.teams.validation.department"));
+      return;
+    }
+    try {
+      await onSubmit({ name: name.trim(), departmentId, managerId: managerId || null });
+    } catch (err) {
+      const key = teamErrorKey(apiErrorCode(err));
+      setError(key ? t(key) : t("settings.teams.saveError"));
+    }
+  };
+
+  return (
+    <Modal
+      open
+      onOpenChange={(value) => {
+        if (!value && !pending) onClose();
+      }}
+      title={t(team ? "settings.teams.edit" : "settings.teams.create")}
+      description={t("settings.teams.formDescription")}
+    >
+      <div className="space-y-4">
+        <label className="block text-sm font-medium">
+          {t("settings.teams.name")}
+          <Input
+            className="mt-1"
+            value={name}
+            maxLength={100}
+            onChange={(event) => setName(event.target.value)}
+            dir="auto"
+          />
+        </label>
+        <AppSelectField
+          id="team-department"
+          label={t("settings.teams.department")}
+          searchable
+          value={departmentId}
+          onValueChange={setDepartmentId}
+          options={departmentOptions}
+          searchPlaceholder={t("common.search")}
+          emptySearchMessage={t("common.noResults")}
+        />
+        <AppSelectField
+          id="team-manager"
+          label={t("settings.teams.manager")}
+          helperText={t("settings.teams.managerHelp")}
+          searchable
+          value={managerId}
+          onValueChange={setManagerId}
+          options={managerOptions}
+          searchPlaceholder={t("common.search")}
+          emptySearchMessage={t("common.noResults")}
+        />
         {error && (
           <p role="alert" className="text-sm text-danger">
             {error}

@@ -1,11 +1,12 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { useEffect, useMemo, useState } from "react";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AppSelectField } from "@/components/ui/app-select";
 import { PageHeader } from "@/components/shared/page-header";
 import { useAuth } from "@/features/auth/auth-state";
+import { useDepartmentOptions, useTeamOptions } from "@/features/organization/organization-hooks";
 import { CustomerCombobox } from "./customer-combobox";
 import { getTicketError } from "./ticket-error";
 import { useAgents, useCategories, useCreateTicket, useTicket, useUpdateTicket } from "./ticket-hooks";
@@ -29,17 +30,30 @@ export function TicketFormPage() {
   const navigate = useNavigate();
   const ticket = useTicket(id);
   const categories = useCategories();
-  const agents = useAgents();
   const create = useCreateTicket();
   const update = useUpdateTicket(id);
   const [apiError, setApiError] = useState<string | null>(null);
+  const isAdmin = user?.role === "ADMIN";
   const canAssign = user?.role === "ADMIN" || user?.role === "MANAGER";
   const canChangePriority = canAssign || ticket.data?.assignedAgent?.id === user?.id;
 
-  const { control, register, reset, handleSubmit, formState: { errors, isSubmitting } } = useForm<TicketFormValues>({
+  const { control, register, reset, setValue, handleSubmit, formState: { errors, isSubmitting } } = useForm<TicketFormValues>({
     resolver: zodResolver(ticketFormSchema),
-    defaultValues: { customerId: "", subject: "", description: "", priority: "MEDIUM", categoryId: "", assignedAgentId: "" },
+    defaultValues: {
+      customerId: "", subject: "", description: "", priority: "MEDIUM", categoryId: "", assignedAgentId: "",
+      departmentId: "", teamId: "",
+    },
   });
+
+  // feature/team-based-manager-scope — Department → Team → Agent routing. ADMIN
+  // picks Department + Team explicitly; a MANAGER's team is implicit (the server
+  // owns it) and the agent list is server-scoped to their team.
+  const departmentId = (useWatch({ control, name: "departmentId" }) as string | undefined) ?? "";
+  const teamId = (useWatch({ control, name: "teamId" }) as string | undefined) ?? "";
+
+  const departments = useDepartmentOptions({ enabled: isAdmin });
+  const teams = useTeamOptions(departmentId || undefined, { enabled: isAdmin && Boolean(departmentId) });
+  const agents = useAgents(isAdmin ? teamId || undefined : undefined);
 
   useEffect(() => {
     if (ticket.data) {
@@ -50,6 +64,8 @@ export function TicketFormPage() {
         priority: ticket.data.priority,
         categoryId: ticket.data.category?.id ?? "",
         assignedAgentId: ticket.data.assignedAgent?.id ?? "",
+        departmentId: ticket.data.department?.id ?? "",
+        teamId: ticket.data.team?.id ?? "",
       });
     }
   }, [reset, ticket.data]);
@@ -64,14 +80,49 @@ export function TicketFormPage() {
     ...(categories.data?.map((category) => ({ value: category.id, label: category.name })) ?? []),
   ];
 
+  const departmentOptions = [
+    { value: "", label: t("tickets.selectDepartment") },
+    ...(departments.data?.map((department) => ({ value: department.id, label: department.name })) ?? []),
+  ];
+
+  const teamOptions = useMemo(() => {
+    const forDepartment = (teams.data ?? []).filter((team) => team.departmentId === departmentId);
+    const current = ticket.data?.team;
+    const options = forDepartment.map((team) => ({ value: team.id, label: team.name }));
+    if (current && current.id === teamId && !forDepartment.some((team) => team.id === current.id)) {
+      options.unshift({ value: current.id, label: current.name });
+    }
+    return [{ value: "", label: t("tickets.selectTeam") }, ...options];
+  }, [teams.data, departmentId, teamId, ticket.data?.team, t]);
+
+  // ADMIN: agents are already team-scoped by the query; still guard against a
+  // stale option after a team switch. MANAGER: server returns only own-team agents.
+  const scopedAgents = useMemo(() => {
+    if (!isAdmin || !teamId) return agents.data ?? [];
+    return (agents.data ?? []).filter((agent) => agent.teamId === teamId);
+  }, [agents.data, isAdmin, teamId]);
+
   const agentOptions = [
     { value: "", label: t("tickets.unassigned") },
-    ...(agents.data?.map((agent) => ({ value: agent.id, label: agent.name, searchText: agent.email })) ?? []),
+    ...scopedAgents.map((agent) => ({ value: agent.id, label: agent.name, searchText: agent.email })),
   ];
+
+  const handleDepartmentChange = (next: string) => {
+    setValue("departmentId", next, { shouldDirty: true });
+    setValue("teamId", "", { shouldDirty: true });
+    setValue("assignedAgentId", "", { shouldDirty: true });
+  };
+  const handleTeamChange = (next: string) => {
+    setValue("teamId", next, { shouldDirty: true });
+    setValue("assignedAgentId", "", { shouldDirty: true });
+  };
 
   const submit = handleSubmit(async (values) => {
     setApiError(null);
     try {
+      const routing = isAdmin
+        ? { departmentId: values.departmentId || null, teamId: values.teamId || null }
+        : {};
       const saved = editing
         ? await update.mutateAsync({
             subject: values.subject,
@@ -79,6 +130,7 @@ export function TicketFormPage() {
             ...(canChangePriority && { priority: values.priority }),
             categoryId: values.categoryId || null,
             ...(canAssign && { assignedAgentId: values.assignedAgentId || null }),
+            ...routing,
           })
         : await create.mutateAsync({
             customerId: values.customerId,
@@ -87,6 +139,7 @@ export function TicketFormPage() {
             priority: values.priority,
             categoryId: values.categoryId || null,
             ...(canAssign && { assignedAgentId: values.assignedAgentId || null }),
+            ...routing,
           });
       navigate(`/tickets/${saved.id}`, { replace: true });
     } catch (error) {
@@ -175,6 +228,46 @@ export function TicketFormPage() {
                   />
                 )}
               />
+              {isAdmin && (
+                <>
+                  <Controller
+                    name="departmentId"
+                    control={control}
+                    render={({ field }) => (
+                      <AppSelectField
+                        id="ticket-department"
+                        label={t("tickets.department")}
+                        labelClassName="block text-sm font-medium text-foreground"
+                        searchable
+                        value={field.value ?? ""}
+                        onValueChange={handleDepartmentChange}
+                        options={departmentOptions}
+                        searchPlaceholder={t("common.search")}
+                        emptySearchMessage={t("common.noResults")}
+                      />
+                    )}
+                  />
+                  <Controller
+                    name="teamId"
+                    control={control}
+                    render={({ field }) => (
+                      <AppSelectField
+                        id="ticket-team"
+                        label={t("tickets.team")}
+                        labelClassName="block text-sm font-medium text-foreground"
+                        searchable
+                        disabled={!departmentId}
+                        value={field.value ?? ""}
+                        onValueChange={handleTeamChange}
+                        options={teamOptions}
+                        placeholder={!departmentId ? t("tickets.selectDepartmentFirstForTeam") : undefined}
+                        searchPlaceholder={t("common.search")}
+                        emptySearchMessage={t("common.noResults")}
+                      />
+                    )}
+                  />
+                </>
+              )}
               {canAssign && (
                 <Controller
                   name="assignedAgentId"
@@ -185,8 +278,10 @@ export function TicketFormPage() {
                       label={t("tickets.assignedAgent")}
                       labelClassName="block text-sm font-medium text-foreground"
                       searchable
+                      disabled={isAdmin && !teamId}
                       searchPlaceholder={t("tickets.searchAssignee")}
                       emptySearchMessage={t("tickets.noAssigneesFound")}
+                      placeholder={isAdmin && !teamId ? t("tickets.selectTeamFirstForAgent") : undefined}
                       value={field.value}
                       onValueChange={field.onChange}
                       options={agentOptions}

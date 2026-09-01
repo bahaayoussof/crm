@@ -15,6 +15,8 @@ export const userCreateFormSchema = z.object({
   role: roleSchema,
   departmentId: orgId,
   branchId: orgId,
+  // feature/team-based-manager-scope — Team membership (MANAGER/AGENT only).
+  teamId: orgId,
 });
 
 // ADMIN-only user-management edit. An active ADMIN may edit every supported
@@ -29,6 +31,7 @@ export const userEditFormSchema = z.object({
   isActive: z.boolean().optional(),
   departmentId: orgId,
   branchId: orgId,
+  teamId: orgId,
 });
 
 export type UserCreateFormValues = z.input<typeof userCreateFormSchema>;
@@ -49,5 +52,6 @@ export function mapUserToEditFormValues(user: User): UserEditFormValues {
     isActive: user.isActive,
     departmentId: user.departmentId ?? "",
     branchId: user.branchId ?? "",
+    teamId: user.teamId ?? "",
   };
 }

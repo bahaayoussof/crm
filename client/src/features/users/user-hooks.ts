@@ -20,6 +20,19 @@ export const useUsers = (filters: UserFilters, options?: { enabled?: boolean }) 
 export const useUser = (id: string) =>
   useQuery({ queryKey: userKeys.detail(id), queryFn: () => getUser(id), enabled: Boolean(id), retry: false });
 
+/**
+ * Active MANAGER users, for the Team Management "assign manager" select.
+ * ADMIN-only surface (the `/users` list route is ADMIN-only).
+ */
+export const useManagerOptions = (options?: { enabled?: boolean }) =>
+  useQuery({
+    queryKey: [...userKeys.lists(), "manager-options"] as const,
+    queryFn: () => getUsers({ page: 1, limit: 100, search: "", role: "MANAGER", status: "active" }),
+    select: (response) => response.data.map((user) => ({ id: user.id, name: user.name, email: user.email })),
+    staleTime: 60_000,
+    enabled: options?.enabled ?? true,
+  });
+
 function useInvalidateUsers() {
   const queryClient = useQueryClient();
   return () => queryClient.invalidateQueries({ queryKey: userKeys.all });

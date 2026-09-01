@@ -6,10 +6,11 @@ import { changeAppLanguage } from "@/lib/i18n";
 const mocks = vi.hoisted(() => ({
   useTickets: vi.fn(), useTicket: vi.fn(), useCategories: vi.fn(), useAgents: vi.fn(), useCreateTicket: vi.fn(), useUpdateTicket: vi.fn(), useClaimTicket: vi.fn(), useCreateTicketMessage: vi.fn(), useCreateTicketNote: vi.fn(), useCustomers: vi.fn(), useAuth: vi.fn(),
   create: vi.fn(), update: vi.fn(), claim: vi.fn(), createMessage: vi.fn(), createNote: vi.fn(), refetch: vi.fn(),
+  departments: [] as unknown[], teams: [] as unknown[],
 }));
 vi.mock("./ticket-hooks", () => ({ useTickets: mocks.useTickets, useTicket: mocks.useTicket, useCategories: mocks.useCategories, useAgents: mocks.useAgents, useCreateTicket: mocks.useCreateTicket, useUpdateTicket: mocks.useUpdateTicket, useClaimTicket: mocks.useClaimTicket, useCreateTicketMessage: mocks.useCreateTicketMessage, useCreateTicketNote: mocks.useCreateTicketNote }));
 vi.mock("@/features/customers/customer-hooks", () => ({ useCustomers: mocks.useCustomers }));
-vi.mock("@/features/organization/organization-hooks", () => ({ useDepartmentOptions: () => ({ data: [] }), useBranchOptions: () => ({ data: [] }) }));
+vi.mock("@/features/organization/organization-hooks", () => ({ useDepartmentOptions: () => ({ data: mocks.departments }), useBranchOptions: () => ({ data: [] }), useTeamOptions: () => ({ data: mocks.teams }) }));
 vi.mock("@/features/auth/auth-state", () => ({ useAuth: mocks.useAuth }));
 vi.mock("@/features/attachments/attachment-hooks", () => ({
   useTicketAttachments: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
@@ -70,6 +71,7 @@ describe("ticket pages", () => {
   afterEach(cleanup);
   beforeEach(async () => {
     await changeAppLanguage("en"); vi.clearAllMocks();
+    mocks.departments = []; mocks.teams = [];
     mocks.useAuth.mockReturnValue({ user: { id: "admin-1", name: "Admin", email: "admin@example.com", role: "ADMIN" } });
     mocks.useTickets.mockReturnValue({ isLoading: false, isError: false, data: { data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 0 } }, refetch: mocks.refetch });
     mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: ticket });
@@ -189,6 +191,36 @@ describe("ticket pages", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create ticket" }));
     await waitFor(() => expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ customerId: "customer-1", priority: "MEDIUM", categoryId: "category-1" })));
     expect(await screen.findByText("Created detail")).toBeInTheDocument();
+  });
+
+  // feature/team-based-manager-scope
+  it("ADMIN routes Department → Team → Agent, and the Agent select stays disabled until a Team is chosen", async () => {
+    mocks.departments = [{ id: "dep-1", name: "Customer Support", branchId: "b1" }];
+    mocks.teams = [
+      { id: "team-1", name: "Billing Support", departmentId: "dep-1", managerId: null },
+      { id: "team-9", name: "Other Dept Team", departmentId: "dep-9", managerId: null },
+    ];
+    mocks.useAgents.mockReturnValue({
+      data: [{ id: "agent-1", name: "Mariam Hassan", email: "mariam@example.com", teamId: "team-1" }],
+    });
+    mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: undefined });
+    renderAt("/tickets/new", <Route path="/tickets/new" element={<TicketFormPage />} />);
+
+    // Agent select disabled before a team is picked.
+    expect(screen.getByLabelText("Assigned agent")).toBeDisabled();
+
+    // Department → only its teams are offered.
+    fireEvent.click(screen.getByRole("combobox", { name: "Department" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Customer Support" }));
+    const teamSelect = screen.getByLabelText("Team");
+    await waitFor(() => expect(teamSelect).toBeEnabled());
+    fireEvent.click(teamSelect);
+    expect(await screen.findByRole("option", { name: "Billing Support" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Other Dept Team" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("option", { name: "Billing Support" }));
+
+    // Team chosen → agent select becomes usable.
+    await waitFor(() => expect(screen.getByLabelText("Assigned agent")).toBeEnabled());
   });
 
   it("keeps agent creation available while omitting assignee selection and payload", async () => {

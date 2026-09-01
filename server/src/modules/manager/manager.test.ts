@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   userFindMany: vi.fn(),
   userFindFirst: vi.fn(),
   userFindUnique: vi.fn(),
+  teamFindUnique: vi.fn(),
   feedbackFindMany: vi.fn(),
 }));
 
@@ -16,6 +17,7 @@ vi.mock("../../config/prisma.js", () => ({
   prisma: {
     ticket: { count: mocks.ticketCount, findMany: mocks.ticketFindMany, groupBy: mocks.ticketGroupBy },
     user: { findMany: mocks.userFindMany, findFirst: mocks.userFindFirst, findUnique: mocks.userFindUnique },
+    team: { findUnique: mocks.teamFindUnique },
     feedback: { findMany: mocks.feedbackFindMany },
     $transaction: vi.fn(),
   },
@@ -56,6 +58,7 @@ beforeEach(() => {
   mocks.userFindFirst.mockResolvedValue({ id: AGENT_ID, name: "Sara", email: "sara@example.com", teamId: MGR_TEAM });
   // feature/team-based-manager-scope: resolveActorTeamId() -> user.findUnique
   mocks.userFindUnique.mockResolvedValue({ teamId: MGR_TEAM, managedTeam: { id: MGR_TEAM } });
+  mocks.teamFindUnique.mockResolvedValue({ name: "Billing Support" });
   mocks.feedbackFindMany.mockResolvedValue([]);
 });
 

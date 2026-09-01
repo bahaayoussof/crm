@@ -16,7 +16,7 @@ vi.mock("./manager-hooks", async (importOriginal) => {
 import { ManagerOverviewPage } from "./manager-overview-page";
 
 const overview = {
-  meta: { visibility: "ORGANIZATION_WIDE" as const },
+  meta: { visibility: "TEAM" as const, teamName: "Billing Support" },
   needsAttention: [
     { key: "slaBreached" as const, count: 3, ticketFilter: "sla=breached" },
     { key: "slaAtRisk" as const, count: 5, ticketFilter: "sla=at_risk" },
@@ -140,5 +140,23 @@ describe("ManagerOverviewPage", () => {
     expect(screen.getByRole("link", { name: /SLA breached/i })).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "Alice" }).length).toBeGreaterThan(0);
     expect(screen.queryByText("Open tickets")).not.toBeInTheDocument();
+  });
+
+  // feature/team-based-manager-scope
+  it("shows the manager's team name in the page context", () => {
+    renderOverview();
+    expect(screen.getByText(/Billing Support/)).toBeInTheDocument();
+  });
+
+  it("renders an informational empty state (no tabs) for a manager with no team", () => {
+    mocks.useOverview.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: { ...overview, meta: { visibility: "TEAM" as const, teamName: null } },
+      refetch: mocks.refetch,
+    });
+    renderOverview();
+    expect(screen.getByText("No team assigned")).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Team Overview" })).not.toBeInTheDocument();
   });
 });

@@ -21,10 +21,10 @@ import {
 } from "@/components/ui/table";
 import { useCreateCategory, usePutSlaRule, useSettingCategories, useSlaRules, useUpdateCategory } from "./settings-hooks";
 import type { Priority, SettingCategory, SlaRule } from "./settings.types";
-import { BranchesSection, DepartmentsSection } from "./organization-sections";
+import { BranchesSection, DepartmentsSection, TeamsSection } from "./organization-sections";
 
 const priorities: Priority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
-const SECTIONS = ["categories", "departments", "branches", "sla", "quick"] as const;
+const SECTIONS = ["categories", "departments", "branches", "teams", "sla", "quick"] as const;
 export function SettingsPage() {
   const { t } = useTranslation();
   const [section, setSection] = useState<(typeof SECTIONS)[number]>("categories");
@@ -35,6 +35,7 @@ export function SettingsPage() {
     {section === "categories" && <CategoriesSection />}
     {section === "departments" && <DepartmentsSection />}
     {section === "branches" && <BranchesSection />}
+    {section === "teams" && <TeamsSection />}
     {section === "sla" && <SlaSection />}
     {section === "quick" && <QuickRepliesSection />}
   </main>;

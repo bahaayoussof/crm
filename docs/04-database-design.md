@@ -227,4 +227,26 @@ P2 unless time allows.
 - Attachment context is validated in the service layer: at least one supported context (`ticketId`, `messageId`, or `customerId`) is required; a supplied message must belong to the supplied ticket; and customer-level attachments must belong to the intended customer. Prisma relations alone cannot enforce these cross-record invariants. `feature/attachments` (integrated into `master` at `8e24d22`; ADR-021) enforces exactly three shapes — ticket-only (`ticketId` set, `messageId`/`customerId` null), message-level (`ticketId` + `messageId` set, `customerId` null), and customer-only (`customerId` set, others null); any other combination, an empty context, and a client-supplied `storageKey`/context are rejected. Bytes are stored in a private object store keyed by a server-generated `storageKey`; PostgreSQL holds metadata only. The model has no uploader, size, checksum, `updatedAt`, or soft-delete column, so the API cannot report who uploaded a file or its size from the database, and there is no attachment deletion.
 - The `(branchId, name)` database constraint prevents duplicate department names within a non-null branch. Because PostgreSQL treats `NULL` values as distinct in unique constraints, branchless department-name uniqueness—if required—must be enforced by later service validation. `feature/departments-branches` (ADR-043, migration `20260830220000_departments_branches_fields`) adds this service validation (case-insensitive, branch-scoped) plus `Department.description/isActive`, `Branch.code(@unique)/address/isActive`, and safe-delete conflict guards; `User.departmentId/branchId` and `Ticket.departmentId/branchId` remain nullable with `SetNull` on delete so retiring an org unit never invalidates existing users or tickets. A user's department must belong to its branch when both are set (`DEPARTMENT_BRANCH_MISMATCH`), matching the SLA auto-assignment eligibility rule.
 
+### Team (`feature/team-based-manager-scope`, ADR-050, migration `20260901103646_add_team_scope`)
+
+- id
+- name
+- departmentId — **required** FK to `Department`, `onDelete: Restrict`
+- managerId — optional, `@unique` FK to `User` (`onDelete: SetNull`). The uniqueness is the V1 "one team per manager" rule; nullable so a team can be created before a manager is assigned.
+- isActive — default `true`
+- createdAt / updatedAt
+- constraints: `@@unique([departmentId, name])`; indexes on `departmentId`, `managerId`, `isActive`
+
+The Team is the real Manager-management unit:
+
+```
+Department ─▶ Team ─▶ { Manager, Agents, Tickets }
+```
+
+- `User.teamId` — optional FK to `Team` (`onDelete: SetNull`). For a MANAGER it is their membership team; the authoritative "which team does this manager lead" is `Team.managerId` (`User.managedTeam` is the back-relation). For an AGENT it is plain membership.
+- `Ticket.teamId` — optional FK to `Team` (`onDelete: SetNull`). **Authoritative owning team — never inferred from `assignedAgent.teamId`.** Nullable = "not yet routed" (ADMIN routes it; only ADMIN sees an unrouted ticket).
+- V1 invariants enforced in the service layer: one manager per team, one team per agent/manager, a ticket may only be assigned to an agent on the same team (`409 CROSS_TEAM_ASSIGNMENT` / `409 AGENT_HAS_NO_TEAM`), an unrouted ticket adopts the assignee's team on assignment, and an agent with active tickets on their current team cannot be moved to another team (`409 AGENT_HAS_ACTIVE_TICKETS`). `Team` / `Department` consistency: `Team.departmentId` must equal the ticket's / user's department when both are set (`400 TEAM_DEPARTMENT_MISMATCH`).
+- Team CRUD is ADMIN-only (`/api/settings/teams`); an active-only lookup `GET /api/teams?departmentId=` is open to every internal role. Safe-delete guards: `409 TEAM_IN_USE` (members) / `409 TEAM_HAS_TICKETS`.
+- The dev database was rebuilt from scratch around this model (see ADR-050); the seed creates 5 teams, two of them under one department, so cross-team isolation is verifiable.
+
 Any schema change that alters these concepts must update this document before or with implementation.

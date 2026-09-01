@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
 const orgHooks = vi.hoisted(() => ({
   branches: [] as { id: string; name: string; code: string | null }[],
   departments: [] as { id: string; name: string; branchId: string | null }[],
+  teams: [] as { id: string; name: string; departmentId: string; managerId: string | null }[],
 }));
 
 vi.mock("@/features/auth/auth-state", () => ({
@@ -22,6 +23,7 @@ vi.mock("@/features/notifications/notification-bell", () => ({ NotificationBell:
 vi.mock("@/features/organization/organization-hooks", () => ({
   useDepartmentOptions: () => ({ data: orgHooks.departments }),
   useBranchOptions: () => ({ data: orgHooks.branches }),
+  useTeamOptions: () => ({ data: orgHooks.teams }),
 }));
 
 vi.mock("./user-hooks", () => ({
@@ -29,6 +31,7 @@ vi.mock("./user-hooks", () => ({
   useUser: mocks.useUser,
   useCreateUser: mocks.useCreateUser,
   useUpdateUser: mocks.useUpdateUser,
+  useManagerOptions: () => ({ data: [] }),
 }));
 
 import { computeAnchoredPosition, type AnchoredGeometryOptions } from "@/components/shared/use-anchored-popover";
@@ -39,7 +42,8 @@ import type { User } from "./user.types";
 
 const admin: User = {
   id: "u-admin", name: "Aisha Admin", email: "aisha@example.com", role: "ADMIN",
-  isActive: true, departmentId: null, branchId: null, department: null, branch: null,
+  isActive: true, departmentId: null, branchId: null, teamId: null,
+  department: null, branch: null, team: null,
   createdAt: "2026-08-01T10:00:00.000Z", updatedAt: "2026-08-10T10:00:00.000Z",
 };
 const admin2: User = { ...admin, id: "u-admin2", name: "Bilal Admin", email: "bilal@example.com" };
@@ -322,6 +326,7 @@ describe("users management — forms", () => {
     vi.clearAllMocks();
     orgHooks.branches = [];
     orgHooks.departments = [];
+    orgHooks.teams = [];
     mocks.currentUser = { id: "u-admin", name: "Aisha Admin", email: "aisha@example.com", role: "ADMIN", customer: null };
     mocks.useUser.mockReturnValue({ isLoading: false, isError: false, data: admin2 });
     mocks.useCreateUser.mockReturnValue({ mutateAsync: mocks.create, isPending: false });
@@ -341,7 +346,7 @@ describe("users management — forms", () => {
     fireEvent.click(screen.getByRole("option", { name: "Manager" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(mocks.create).toHaveBeenCalledWith({ name: "New Person", email: "new@example.com", password: "password123", role: "MANAGER", departmentId: "", branchId: "" }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledWith({ name: "New Person", email: "new@example.com", password: "password123", role: "MANAGER", departmentId: "", branchId: "", teamId: "" }));
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/users"));
   });
 
@@ -387,6 +392,7 @@ describe("users management — forms", () => {
         isActive: true,
         branchId: "b1",
         departmentId: "d1",
+        teamId: null,
       }),
     );
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/users"));
@@ -411,6 +417,44 @@ describe("users management — forms", () => {
     fireEvent.click(department);
     expect(await screen.findByRole("option", { name: "Support" })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Sales" })).not.toBeInTheDocument();
+  });
+
+  it("shows a Department-dependent Team select for an AGENT and prefills the current team", async () => {
+    orgHooks.branches = [{ id: "b1", name: "HQ", code: null }];
+    orgHooks.departments = [{ id: "d1", name: "Support", branchId: "b1" }];
+    orgHooks.teams = [
+      { id: "tm1", name: "Billing Support", departmentId: "d1", managerId: null },
+      { id: "tm2", name: "Other Dept Team", departmentId: "d9", managerId: null },
+    ];
+    mocks.useUser.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: {
+        ...agent,
+        isActive: true,
+        role: "AGENT",
+        branchId: "b1",
+        departmentId: "d1",
+        teamId: "tm1",
+        branch: { id: "b1", name: "HQ" },
+        department: { id: "d1", name: "Support" },
+        team: { id: "tm1", name: "Billing Support", departmentId: "d1" },
+      },
+    });
+    renderAt("/users/u-agent/edit", <Route path="/users/:id/edit" element={<UserFormPage />} />);
+    const teamField = await screen.findByLabelText("Team");
+    expect(teamField).toHaveTextContent("Billing Support");
+    fireEvent.click(teamField);
+    expect(await screen.findByRole("option", { name: "Billing Support" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Other Dept Team" })).not.toBeInTheDocument();
+  });
+
+  it("does NOT render a Team select for an ADMIN", async () => {
+    orgHooks.branches = [{ id: "b1", name: "HQ", code: null }];
+    orgHooks.departments = [{ id: "d1", name: "Support", branchId: "b1" }];
+    renderAt("/users/u-admin2/edit", <Route path="/users/:id/edit" element={<UserFormPage />} />);
+    await screen.findByLabelText("Department");
+    expect(screen.queryByLabelText("Team")).not.toBeInTheDocument();
   });
 
   it("changing Branch clears a Department that does not belong to the new Branch", async () => {

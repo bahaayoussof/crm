@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { PhoneInput } from "@/components/shared/phone-input";
 import { AppSelectField } from "@/components/ui/app-select";
@@ -79,6 +79,7 @@ function UserEditModalForm({
     resolver: zodResolver(userEditFormSchema),
     defaultValues: mapUserToEditFormValues(user),
   });
+  const roleValue = useWatch({ control, name: "role" });
 
   const roleOptions = MANAGEABLE_ROLES.map((option) => ({
     value: option,
@@ -96,6 +97,7 @@ function UserEditModalForm({
         isActive: values.isActive,
         departmentId: values.departmentId ? values.departmentId : null,
         branchId: values.branchId ? values.branchId : null,
+        teamId: values.teamId ? values.teamId : null,
       });
       onClose();
       onSuccess?.();
@@ -203,7 +205,7 @@ function UserEditModalForm({
         )}
       </div>
 
-      <UserBranchDepartmentFields control={control} setValue={setValue} idPrefix="modal-edit-user" />
+      <UserBranchDepartmentFields control={control} setValue={setValue} idPrefix="modal-edit-user" role={roleValue} />
 
       <div className="rounded-lg border border-border bg-surface-subtle/50 p-3">
         <label className="flex items-start gap-3 cursor-pointer">

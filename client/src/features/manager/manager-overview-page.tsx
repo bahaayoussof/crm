@@ -63,11 +63,27 @@ export function ManagerOverviewPage() {
   }
 
   const data = query.data;
+  const noTeam = data.meta.visibility === "TEAM" && data.meta.teamName === null;
 
   return (
     <main className="page-container space-y-6">
-      <PageHeader title={t("manager.overview.title")} description={t("manager.overview.subtitle")} />
+      <PageHeader
+        title={t("manager.overview.title")}
+        description={
+          data.meta.teamName
+            ? `${t("manager.teamContext")}: ${data.meta.teamName}`
+            : t("manager.overview.subtitle")
+        }
+      />
 
+      {noTeam ? (
+        <EmptyState
+          icon={<Inbox className="size-6" />}
+          title={t("manager.noTeamTitle")}
+          description={t("manager.noTeamBody")}
+        />
+      ) : (
+        <>
       <ManagerTabs active={tab} onChange={setTab} />
 
       {tab === "overview" ? (
@@ -80,6 +96,8 @@ export function ManagerOverviewPage() {
           <KpiSection kpis={data.kpis} />
           <PriorityWorkSection tickets={data.priorityWork} />
         </div>
+      )}
+        </>
       )}
     </main>
   );

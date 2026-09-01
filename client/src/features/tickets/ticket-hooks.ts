@@ -9,12 +9,18 @@ export const ticketKeys = {
   details: () => [...ticketKeys.all, "detail"] as const,
   detail: (id: string) => [...ticketKeys.details(), id] as const,
   categories: ["categories", "active"] as const,
-  agents: ["users", "agents"] as const,
+  agents: (teamId?: string) => ["users", "agents", teamId ?? null] as const,
 };
 export const useTickets = (filters: TicketFilters) => useQuery({ queryKey: ticketKeys.list(filters), queryFn: () => getTickets(filters) });
 export const useTicket = (id: string) => useQuery({ queryKey: ticketKeys.detail(id), queryFn: () => getTicket(id), enabled: Boolean(id), retry: false });
 export const useCategories = () => useQuery({ queryKey: ticketKeys.categories, queryFn: getCategories });
-export const useAgents = () => useQuery({ queryKey: ticketKeys.agents, queryFn: getAgents });
+/**
+ * Ticket-assignment agent lookup. `teamId` narrows the list to one Team (ADMIN
+ * routing). A MANAGER caller is always server-scoped to their own Team
+ * regardless of this argument.
+ */
+export const useAgents = (teamId?: string) =>
+  useQuery({ queryKey: ticketKeys.agents(teamId), queryFn: () => getAgents(teamId) });
 export function useCreateTicket() { const client = useQueryClient(); return useMutation({ mutationFn: (values: TicketCreateValues) => createTicket(values), onSuccess: () => client.invalidateQueries({ queryKey: ticketKeys.lists() }) }); }
 /** Agent self-claim of an unassigned ticket from a list row. The backend
  * enforces "unassigned only" + "self only" atomically (409 on a lost race). */

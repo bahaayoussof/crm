@@ -768,3 +768,10 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 |------|--------|---------|---------|--------|
 | 14:19 | Team-based manager scope: schema+migration+DB reset+seed+shared team-scope module+manager/ticket/dashboard/reports/user/teams backend | server/src/shared/team/, server/src/modules/teams/, ticket.service.ts, manager.service.ts, seed-test-data.ts, schema.prisma | backend impl + server tsc clean; 66 server tests + all FE + i18n + docs outstanding | ~180k |
 | 15:23 | Team-scope backend hardening: closed direct-ID gaps (attachments/ai/collaboration/tasks), team-aware notifications+realtime, fixed 66 tests + added 25-test team-scope.test.ts + cross-team isolation blocks | shared/team/team-scope.ts, ai-context/attachment/collaboration/task/portal/email/whatsapp/sla-automation/realtime services + 10 test files | server tsc+eslint+vitest(41f/745t) all green; frontend/i18n/docs pending | ~250k |
+| 16:11 | Team-scope FRONTEND+i18n+docs: TeamsSection (shared DataTable), Dept->Team on user forms, Dept->Team->Agent on ticket form, manager team-context/no-team state, EN/AR keys, ADR-050 + docs 04/06/17/19 | client/src/features/{settings,organization,users,tickets,manager}, locales, docs | client tsc+eslint+vitest(63f/737t) + build green; server 750/750; browser QA pending | ~330k |
+| 16:18 | Added manual-QA ADMIN bahaa@crm.com/123 to seed-test-data.ts (bcrypt-hashed, in purge list) + scripts/seed-bahaa.ts one-off; upserted into dev DB (verified) | server/scripts/seed-test-data.ts, seed-bahaa.ts, docs/dev-test-data.md | account live, pw123 verifies, login schema allows short pw | ~8k |
+
+## Session: 2026-09-01 16:25
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|

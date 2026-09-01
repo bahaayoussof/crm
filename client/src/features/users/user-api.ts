@@ -21,6 +21,7 @@ export async function createUser(values: UserCreateFormValues) {
     role: values.role,
     departmentId: values.departmentId ? values.departmentId : null,
     branchId: values.branchId ? values.branchId : null,
+    teamId: values.teamId ? values.teamId : null,
   });
   return response.data.data;
 }
@@ -36,6 +37,7 @@ export async function updateUser(id: string, payload: UserUpdatePayload) {
   if (payload.phone !== undefined) body.phone = payload.phone;
   if (payload.departmentId !== undefined) body.departmentId = payload.departmentId;
   if (payload.branchId !== undefined) body.branchId = payload.branchId;
+  if (payload.teamId !== undefined) body.teamId = payload.teamId;
 
   const response = await apiClient.patch<ApiEnvelope<User>>(`/users/${id}`, body);
   return response.data.data;

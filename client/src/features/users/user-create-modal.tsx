@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { AppSelectField } from "@/components/ui/app-select";
 import { Modal } from "@/components/ui/modal";
@@ -34,8 +34,9 @@ export function UserCreateModal({
     formState: { errors, isSubmitting },
   } = useForm<UserCreateFormValues>({
     resolver: zodResolver(userCreateFormSchema),
-    defaultValues: { name: "", email: "", password: "", role: "AGENT", departmentId: "", branchId: "" },
+    defaultValues: { name: "", email: "", password: "", role: "AGENT", departmentId: "", branchId: "", teamId: "" },
   });
+  const roleValue = useWatch({ control, name: "role" });
 
   const roleOptions = MANAGEABLE_ROLES.map((option) => ({
     value: option,
@@ -157,7 +158,7 @@ export function UserCreateModal({
           />
         </div>
 
-        <UserBranchDepartmentFields control={control} setValue={setValue} idPrefix="modal-user" />
+        <UserBranchDepartmentFields control={control} setValue={setValue} idPrefix="modal-user" role={roleValue} />
 
         <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
           <button

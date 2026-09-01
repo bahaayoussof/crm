@@ -10,6 +10,11 @@ import type {
   DepartmentListResponse,
   DepartmentOption,
   OrgAdminFilters,
+  Team,
+  TeamAdminFilters,
+  TeamInput,
+  TeamListResponse,
+  TeamOption,
 } from "./organization.types";
 
 // --- Active-only lookups (all internal roles) --------------------------------
@@ -20,6 +25,14 @@ export async function getDepartmentOptions() {
 
 export async function getBranchOptions() {
   return (await apiClient.get<ApiEnvelope<BranchOption[]>>("/branches")).data.data;
+}
+
+export async function getTeamOptions(departmentId?: string) {
+  return (
+    await apiClient.get<ApiEnvelope<TeamOption[]>>("/teams", {
+      params: departmentId ? { departmentId } : undefined,
+    })
+  ).data.data;
 }
 
 // --- Administrative CRUD (ADMIN only) ---------------------------------------
@@ -54,4 +67,20 @@ export async function updateBranch(id: string, input: BranchInput) {
 
 export async function deleteBranch(id: string) {
   await apiClient.delete(`/settings/branches/${id}`);
+}
+
+export async function getTeams(filters: TeamAdminFilters) {
+  return (await apiClient.get<TeamListResponse>("/settings/teams", { params: filters })).data;
+}
+
+export async function createTeam(input: TeamInput) {
+  return (await apiClient.post<ApiEnvelope<Team>>("/settings/teams", input)).data.data;
+}
+
+export async function updateTeam(id: string, input: TeamInput) {
+  return (await apiClient.patch<ApiEnvelope<Team>>(`/settings/teams/${id}`, input)).data.data;
+}
+
+export async function deleteTeam(id: string) {
+  await apiClient.delete(`/settings/teams/${id}`);
 }

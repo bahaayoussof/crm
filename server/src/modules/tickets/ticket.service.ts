@@ -94,6 +94,7 @@ export async function getTicket(ticketId: string, actor: Actor, now = new Date()
     select: {
       ...ticketSummarySelect, description: true, resolvedAt: true, closedAt: true,
       department: { select: { id: true, name: true } }, branch: { select: { id: true, name: true } },
+      team: { select: { id: true, name: true, departmentId: true } },
       customer: { select: { id: true, name: true, email: true, phone: true, createdAt: true } },
       history: { orderBy: { createdAt: "desc" }, select: {
         id: true, action: true, oldValue: true, newValue: true, createdAt: true,
