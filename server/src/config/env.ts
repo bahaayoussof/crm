@@ -44,6 +44,12 @@ const envSchema = z.object({
   WHATSAPP_VERIFY_TOKEN: z.string().min(1).optional(),
   WHATSAPP_APP_SECRET: z.string().min(1).optional(),
   WHATSAPP_API_VERSION: z.string().regex(/^v\d+\.\d+$/, "WHATSAPP_API_VERSION must look like v22.0").default("v22.0"),
+  // TextBee Cloud SMS integration. Optional at startup; enforced only when SMS
+  // transport/webhook endpoints are used. Server-side only.
+  TEXTBEE_API_KEY: z.string().min(1).optional(),
+  TEXTBEE_DEVICE_ID: z.string().min(1).optional(),
+  TEXTBEE_BASE_URL: z.string().url().default("https://api.textbee.dev"),
+  TEXTBEE_WEBHOOK_SECRET: z.string().min(1).optional(),
   // AI Assistant (server/src/modules/ai) — internal agent-assistance layer only.
   // All optional: when AI_PROVIDER / AI_API_KEY / AI_MODEL are not all set (or
   // AI_PROVIDER names an unsupported vendor), the AI endpoints return a structured

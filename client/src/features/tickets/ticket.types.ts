@@ -16,7 +16,8 @@ export interface TicketConversationItem { id: string; kind: TicketConversationKi
 export type WhatsappDeliveryReason = "INTEGRATION_NOT_CONFIGURED" | "NO_RECIPIENT_PHONE" | "PROVIDER_REJECTED" | "PROVIDER_UNREACHABLE";
 export type MessageDelivery =
   | { channel: "WHATSAPP"; status: "SENT" | "FAILED"; externalId?: string; reason?: WhatsappDeliveryReason }
-  | { channel: "EMAIL"; status: "SENT"; externalId: string };
+  | { channel: "EMAIL"; status: "SENT"; externalId: string }
+  | { channel: "SMS"; status: "SENT"; externalId?: string };
 export type TicketMessageResult = TicketConversationItem & { delivery?: MessageDelivery };
 export interface TicketDetail extends TicketListItem {
   description: string; resolvedAt: string | null; closedAt: string | null;

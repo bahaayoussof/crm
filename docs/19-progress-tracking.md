@@ -1,5 +1,9 @@
 # Customer Support CRM — Progress Tracking
 
+Last Updated: 2026-09-01 (`feature/sms-integration` — TextBee Cloud SMS, ADR-051). Implemented on branch and remains unstaged/uncommitted. Provider-abstracted outbound SMS is wired through the existing ticket reply endpoint with transaction rollback on TextBee failure; signed/idempotent inbound webhook processing reuses customers/active SMS tickets or creates unassigned MEDIUM tickets, applies customer-reply workflow, team-scoped notifications, and normal realtime events. SMS attachment sending is disabled. Live TextBee/Android device and browser verification remain manual.
+
+---
+
 Last Updated: 2026-09-01 (`feature/team-based-manager-scope` — **Team-Based Manager Scope**, ADR-050). Implemented and automated-verified end-to-end (backend + frontend); branched from `master` `38d5d6c`; changes are unstaged and uncommitted.
 
 Introduces a real `Team` model (`Department → Team → { Manager, Agents, Tickets }`) and scopes `MANAGER` authorization to their own team — **superseding ADR-049's "MANAGER stays organization-wide"**. `ADMIN` remains organization-wide; `AGENT` keeps its model plus own-team narrowing of the unassigned queue / self-claim.

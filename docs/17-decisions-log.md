@@ -1,5 +1,11 @@
 # Architecture Decisions Log
 
+# ADR-051: Provider-abstracted TextBee Cloud SMS channel
+
+**Status:** Accepted on `feature/sms-integration`.
+
+SMS uses the existing Ticket/TicketMessage, authorization, workflow, notifications, and realtime systems. A small `SmsProvider` contract isolates TextBee request details. Outbound delivery occurs inside the ticket transaction so a provider failure cannot commit a successful-looking message; the accepted TextBee `smsBatchId` is stored in `TicketMessage.externalId`. Inbound callbacks require raw-body HMAC-SHA256 `X-Signature` verification and use TextBee `smsId` for idempotency. Phone/customer/ticket matching and automatic placeholder-customer behavior follow the existing WhatsApp precedent. SMS is text-only and attachment sending is disabled.
+
 Use this file for decisions not already fixed by the project documentation.
 
 Do not record trivial implementation details.

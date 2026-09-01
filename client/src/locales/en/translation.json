@@ -723,6 +723,10 @@
       "DEPARTMENT_BRANCH_MISMATCH": "The department does not belong to the selected branch.",
       "CROSS_TEAM_ASSIGNMENT": "That agent belongs to a different team than this ticket. Move the ticket to the agent's team first.",
       "AGENT_HAS_NO_TEAM": "That agent is not assigned to a team and cannot take tickets.",
+      "CUSTOMER_PHONE_REQUIRED": "Add a valid international phone number to the customer before sending SMS.",
+      "SMS_NOT_CONFIGURED": "SMS is not configured.",
+      "SMS_DELIVERY_FAILED": "TextBee could not accept the SMS. The reply was not saved.",
+      "SMS_MESSAGE_TOO_LONG": "The SMS message is too long.",
       "TEAM_DEPARTMENT_MISMATCH": "The team does not belong to the ticket's department.",
       "INVALID_TEAM": "The selected team is invalid or inactive."
     },

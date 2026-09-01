@@ -776,3 +776,4 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
 | 16:35 | Add searchable country dropdown to shared PhoneInput (name+dial code, i18n, kbd nav, RTL) | phone-input.tsx, phone-input.test.tsx, en/ar translation.json | rewrote on usePhoneInput hook + custom dropdown; 17 tests pass, tsc/lint/build green | ~45k |
+| 17:35 | Implement provider-abstracted TextBee Cloud SMS outbound/inbound, signed webhook, ticket integration, text-only UI, docs/tests | server integrations/sms, ticket service/tests, client ticket workspace/types/i18n, docs 05/17/19/23 | server full tests/typecheck + focused lint green; client typecheck/build green; full client 745/746 with unrelated timeout, rerun blocked by Vite EPERM | ~55k |

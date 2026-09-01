@@ -12,6 +12,7 @@ import {
 } from "../collaboration/collaboration.service.js";
 import { deliverOutboundReply } from "../integrations/whatsapp/whatsapp.service.js";
 import { deliverEmailReply } from "../integrations/email/email.service.js";
+import { deliverSmsReply } from "../integrations/sms/sms.service.js";
 import { replyHtmlToPlainText, sanitizeReplyHtml } from "../../shared/rich-text/reply-html.js";
 import {
   emitTicketMessageCreated,
@@ -128,7 +129,7 @@ export async function addTicketMessage(ticketId: string, input: TicketConversati
   // support-reply allowlist here — this is the trust boundary, not the client.
   const body = sanitizeReplyHtml(input.body);
   if (!body) throw new AppError(422, "EMPTY_MESSAGE", "Message body is required");
-  const { message, channel, customerPhone, emailExternalId, assignedAgentId, customerId, teamId } = await prisma.$transaction(async (tx) => {
+  const { message, channel, customerPhone, emailExternalId, smsExternalId, assignedAgentId, customerId, teamId } = await prisma.$transaction(async (tx) => {
     const ticket = await requireConversationMutationAccess(tx, ticketId, actor);
     let emailExternalId: string | null = null;
     if (ticket.channel === Channel.EMAIL) {
@@ -155,8 +156,13 @@ export async function addTicketMessage(ticketId: string, input: TicketConversati
       });
       emailExternalId = delivery.externalId;
     }
+    let smsExternalId: string | null = null;
+    if (ticket.channel === Channel.SMS) {
+      const delivery = await deliverSmsReply({ to: ticket.customer.phone, text: replyHtmlToPlainText(body) });
+      smsExternalId = delivery.externalId ?? null;
+    }
     const created = await tx.ticketMessage.create({
-      data: { id: messageId, ticketId, authorUserId: actor.userId, body, createdAt, externalId: emailExternalId },
+      data: { id: messageId, ticketId, authorUserId: actor.userId, body, createdAt, externalId: emailExternalId ?? smsExternalId },
       select: conversationSelect,
     });
     await tx.ticket.updateMany({ where: { id: ticketId, firstRespondedAt: null }, data: { firstRespondedAt: createdAt } });
@@ -173,6 +179,7 @@ export async function addTicketMessage(ticketId: string, input: TicketConversati
       channel: ticket.channel,
       customerPhone: ticket.customer?.phone ?? null,
       emailExternalId,
+      smsExternalId,
       assignedAgentId: ticket.assignedAgentId,
       customerId: ticket.customerId,
       teamId: ticket.teamId,
@@ -198,6 +205,9 @@ export async function addTicketMessage(ticketId: string, input: TicketConversati
   }
   if (channel === Channel.EMAIL) {
     return { ...message, delivery: { channel: "EMAIL", status: "SENT", externalId: emailExternalId! } as const };
+  }
+  if (channel === Channel.SMS) {
+    return { ...message, delivery: { channel: "SMS", status: "SENT", externalId: smsExternalId ?? undefined } as const };
   }
   return message;
  });

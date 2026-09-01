@@ -29,6 +29,7 @@ import { taskRouter } from "./modules/tasks/task.routes.js";
 import { taskReminderRouter } from "./modules/tasks/task-reminder.routes.js";
 import { whatsappRouter } from "./modules/integrations/whatsapp/whatsapp.routes.js";
 import { emailIntegrationRouter } from "./modules/integrations/email/email.routes.js";
+import { smsIntegrationRouter } from "./modules/integrations/sms/sms.routes.js";
 import { realtimeRouter } from "./modules/realtime/realtime.routes.js";
 
 
@@ -63,6 +64,7 @@ app.use(cors(corsOptions));
 // Buffer for HMAC signature verification. All other routes use parsed JSON below.
 app.use("/api/integrations/whatsapp", whatsappRouter);
 app.use("/api/integrations/email", emailIntegrationRouter);
+app.use("/api/integrations/sms", smsIntegrationRouter);
 
 app.use(express.json());
 

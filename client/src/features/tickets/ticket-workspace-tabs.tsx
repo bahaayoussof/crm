@@ -75,6 +75,7 @@ export const TicketWorkspaceTabs = forwardRef<TicketWorkspaceHandle, TicketWorks
   ) {
     const { t } = useTranslation();
     const isWhatsapp = channel === "WHATSAPP";
+    const isSms = channel === "SMS";
     const [tab, setTab] = useState<Tab>("reply");
     const [mode, setMode] = useState<Mode>("reply");
     const [replyText, setReplyText] = useState("");
@@ -314,7 +315,7 @@ export const TicketWorkspaceTabs = forwardRef<TicketWorkspaceHandle, TicketWorks
 
             <div className="flex flex-col gap-2 border-t border-border pt-3 sm:flex-row sm:items-center">
               <div className="sm:me-auto">
-                {canMutate && (
+                {canMutate && !isSms && (
                   <button
                     type="button"
                     className="button-secondary inline-flex items-center gap-1.5 w-full sm:w-auto"
@@ -346,7 +347,7 @@ export const TicketWorkspaceTabs = forwardRef<TicketWorkspaceHandle, TicketWorks
               isError={attachmentsError}
               onRetry={onRetryAttachments}
               locale={locale}
-              canUpload={canMutate}
+              canUpload={canMutate && !isSms}
               onUpload={onAttachFile}
             />
           </div>

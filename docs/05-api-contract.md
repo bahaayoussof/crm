@@ -6,6 +6,11 @@ Base path:
 /api
 ```
 
+## SMS integration (`LIVE` on `feature/sms-integration`)
+
+- `POST /api/integrations/sms/webhook` — public machine endpoint; raw-body TextBee `X-Signature` HMAC verification replaces CRM JWT authentication. Accepts validated `MESSAGE_RECEIVED` events only.
+- `POST /api/tickets/:id/messages` — unchanged authenticated conversation endpoint; an SMS-channel ticket dispatches plain text through the configured `SmsProvider`. Missing phone, configuration, validation, or provider failure returns a structured error and does not persist the reply.
+
 ## Implementation status legend
 
 This contract mixes live and planned endpoints. Each section is tagged:
