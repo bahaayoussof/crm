@@ -1,27 +1,31 @@
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import type { ColumnDef } from "@tanstack/react-table";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "../auth/auth-state";
 import { formatTicketDate, ticketReference } from "../tickets/ticket-format";
-import { TicketPriorityText, TicketStatusBadge } from "../tickets/ticket-badges";
+import {
+  TicketPriorityText,
+  TicketStatusBadge,
+  SlaStatusDot,
+} from "../tickets/ticket-badges";
 import { useDashboardOverview } from "./dashboard-hooks";
 import type { DashboardOverview, DashboardTicket } from "./dashboard.types";
 import {
-  TableContainer,
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from "@/components/ui/table";
+  DataTable,
+  DataTableSurface,
+  DataTableToolbar,
+} from "@/components/shared/data-table";
 import { AssigneeCell } from "@/components/shared/data-table/assignee-cell";
+import { Skeleton, TableSkeleton } from "@/components/shared/skeleton";
 import { ChartSkeleton } from "@/components/shared/charts";
-import { DashboardSectionHeader } from "./components/dashboard-section-header";
-import { DashboardMetricCard, type DashboardMetricTone } from "./components/dashboard-metric-card";
+import {
+  DashboardMetricCard,
+  type DashboardMetricTone,
+} from "./components/dashboard-metric-card";
 import { TicketStatusDonut } from "./components/ticket-status-donut";
 import { TicketActivityChart } from "./components/ticket-activity-chart";
 import { SlaHealthCard } from "./components/sla-health-card";
@@ -35,7 +39,10 @@ export function DashboardPage() {
 
   if (query.isLoading) {
     return (
-      <main className="page-container space-y-8" aria-label={t("common.loading")}>
+      <main
+        className="page-container space-y-8"
+        aria-label={t("common.loading")}
+      >
         <DashboardSkeleton />
       </main>
     );
@@ -45,7 +52,9 @@ export function DashboardPage() {
     return (
       <main className="page-container">
         <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-surface p-12 text-center shadow-subtle">
-          <p className="text-sm text-muted-foreground">{t("dashboard.loadError")}</p>
+          <p className="text-sm text-muted-foreground">
+            {t("dashboard.loadError")}
+          </p>
           <div className="mt-4">
             <Button variant="secondary" onClick={() => query.refetch()}>
               {t("common.retry")}
@@ -58,13 +67,20 @@ export function DashboardPage() {
 
   const data = query.data;
   const isAgent = user?.role === "AGENT";
-  const legacyData = data as DashboardOverview & { needsAttention?: DashboardTicket[] };
-  const primaryTickets = data.primaryTickets ?? (isAgent ? [] : legacyData.needsAttention ?? []);
+  const legacyData = data as DashboardOverview & {
+    needsAttention?: DashboardTicket[];
+  };
+  const primaryTickets =
+    data.primaryTickets ?? (isAgent ? [] : (legacyData.needsAttention ?? []));
   const primaryIds = new Set(primaryTickets.map((ticket) => ticket.id));
-  const recentTickets = (data.recentTickets ?? []).filter((ticket) => !primaryIds.has(ticket.id));
+  const recentTickets = (data.recentTickets ?? []).filter(
+    (ticket) => !primaryIds.has(ticket.id),
+  );
   const activity = data.ticketActivity ?? [];
 
-  const metrics: Array<[key: string, value: number, tone: DashboardMetricTone]> = isAgent
+  const metrics: Array<
+    [key: string, value: number, tone: DashboardMetricTone]
+  > = isAgent
     ? [
         ["openTickets", data.metrics.openTickets, "primary"],
         ["overdueTickets", data.metrics.slaBreached, "danger"],
@@ -86,14 +102,22 @@ export function DashboardPage() {
   if (isAgent) {
     return (
       <main className="page-container space-y-8">
-        <PageHeader title={t("dashboard.title")} description={t("dashboard.agentDescription")} />
+        <PageHeader
+          title={t("dashboard.title")}
+          description={t("dashboard.agentDescription")}
+        />
 
         <section
           className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
           aria-label={t("dashboard.metricsLabel")}
         >
           {metrics.map(([key, value, tone]) => (
-            <DashboardMetricCard key={key} label={t(`dashboard.metrics.${key}`)} value={value} tone={tone} />
+            <DashboardMetricCard
+              key={key}
+              label={t(`dashboard.metrics.${key}`)}
+              value={value}
+              tone={tone}
+            />
           ))}
         </section>
 
@@ -128,7 +152,10 @@ export function DashboardPage() {
 
   return (
     <main className="page-container space-y-8">
-      <PageHeader title={t("dashboard.title")} description={t("dashboard.description")} />
+      <PageHeader
+        title={t("dashboard.title")}
+        description={t("dashboard.description")}
+      />
 
       {/* KPI snapshot */}
       <section
@@ -136,13 +163,20 @@ export function DashboardPage() {
         aria-label={t("dashboard.metricsLabel")}
       >
         {metrics.map(([key, value, tone]) => (
-          <DashboardMetricCard key={key} label={t(`dashboard.metrics.${key}`)} value={value} tone={tone} />
+          <DashboardMetricCard
+            key={key}
+            label={t(`dashboard.metrics.${key}`)}
+            value={value}
+            tone={tone}
+          />
         ))}
       </section>
 
       {/* Needs attention / My assigned tickets */}
       <TicketSection
-        title={t(`dashboard.${isAgent ? "myAssignedTickets" : "needsAttention"}`)}
+        title={t(
+          `dashboard.${isAgent ? "myAssignedTickets" : "needsAttention"}`,
+        )}
         empty={t(`dashboard.${isAgent ? "emptyAssigned" : "emptyAttention"}`)}
         tickets={primaryTickets}
         detailed
@@ -195,163 +229,218 @@ function TicketSection({
 }) {
   const { t, i18n } = useTranslation();
 
+  const columns = useMemo<ColumnDef<DashboardTicket>[]>(() => {
+    const cols: ColumnDef<DashboardTicket>[] = [
+      {
+        id: "subject",
+        header: t("tickets.subject"),
+        cell: ({ row }) => (
+          <div className="min-w-0">
+            <Link
+              aria-label={`${t("tickets.columns.id")} ${row.original.id}`}
+              className="line-clamp-1 break-words text-[12px] font-medium text-foreground hover:underline transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              title={row.original.subject}
+              to={`/tickets/${row.original.id}`}
+              dir="ltr"
+            >
+              {row.original.subject}
+            </Link>
+          </div>
+        ),
+      },
+      ...(detailed
+        ? [
+            {
+              id: "customer",
+              header: t("tickets.customer"),
+              cell: ({ row }) => (
+                <div className="min-w-0 leading-tight">
+                  <p
+                    className="truncate text-[12px] font-medium text-foreground"
+                    title={row.original.customer.name}
+                  >
+                    {row.original.customer.name}
+                  </p>
+                </div>
+              ),
+            } as ColumnDef<DashboardTicket>,
+          ]
+        : []),
+      {
+        id: "status",
+        header: t("tickets.statusLabel"),
+        cell: ({ row }) => <TicketStatusBadge status={row.original.status} />,
+      },
+      {
+        id: "priority",
+        header: t("tickets.priorityLabel"),
+        cell: ({ row }) => (
+          <TicketPriorityText priority={row.original.priority} />
+        ),
+      },
+      ...(detailed
+        ? [
+            {
+              id: "sla",
+              header: t("dashboard.sla"),
+              cell: ({ row }) => <SlaStatusDot state={row.original.slaState} />,
+            } as ColumnDef<DashboardTicket>,
+          ]
+        : []),
+      {
+        id: "updated",
+        header: t("tickets.updated"),
+        cell: ({ row }) => (
+          <span className="whitespace-nowrap text-[11px] text-muted-foreground">
+            {formatTicketDate(row.original.updatedAt, i18n.language)}
+          </span>
+        ),
+      },
+      {
+        id: "agent",
+        header: () => (
+          <div className="text-center">{t("tickets.assignedAgent")}</div>
+        ),
+        cell: ({ row }) => (
+          <AssigneeCell
+            name={row.original.assignedAgent?.name}
+            unassignedLabel={t("tickets.unassigned")}
+          />
+        ),
+      },
+    ];
+    return cols;
+  }, [detailed, i18n.language, t]);
+
+  // Same width strategy as the canonical Tickets table: the subject column flexes
+  // (`w-auto`) while the rest take intentional fixed widths, so the table fits the
+  // card at desktop widths and only scrolls when genuinely too narrow.
+  const columnWidths: Record<string, string> = detailed
+    ? {
+        subject: "w-auto",
+        customer: "w-[140px]",
+        status: "w-[155px]",
+        priority: "w-[90px]",
+        sla: "w-[120px]",
+        updated: "w-[170px]",
+        agent: "w-[150px]",
+      }
+    : {
+        subject: "w-auto",
+        status: "w-[155px]",
+        priority: "w-[90px]",
+        updated: "w-[170px]",
+        agent: "w-[150px]",
+      };
+
   return (
     <section className="space-y-3">
-      <DashboardSectionHeader title={title} count={tickets.length} action={action} />
-
-      {tickets.length ? (
-        <>
-          {/* Desktop Table */}
-          <div className="hidden md:block">
-            <TableContainer>
-              <Table className={detailed ? "min-w-[68rem]" : "min-w-[54rem]"}>
-                <colgroup>
-                  <col className={detailed ? "w-64" : "w-72"} />
-                  {detailed && <col className="w-40" />}
-                  <col className="w-28" />
-                  <col className="w-40" />
-                  {detailed && <col className="w-36" />}
-                  <col className="w-44" />
-                  <col className="w-40" />
-                </colgroup>
-                <TableHeader>
-                  <TableRow>
-                    {[
-                      t("tickets.subject"),
-                      ...(detailed ? [t("tickets.customer")] : []),
-                      t("tickets.priorityLabel"),
-                      t("tickets.statusLabel"),
-                      ...(detailed ? [t("dashboard.sla")] : []),
-                      t("tickets.assignedAgent"),
-                      t("tickets.updated"),
-                    ].map((label) => (
-                      <TableHead className="whitespace-nowrap" key={label}>
-                        {label}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {tickets.map((ticket) => (
-                    <TableRow key={ticket.id}>
-                      <TableCell>
-                        <Link
-                          aria-label={`${t("tickets.columns.id")} ${ticket.id}`}
-                          className="line-clamp-2 min-w-0 break-words font-medium text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      {/* One canonical table module — the exact same shell the Tickets list
+          renders: <DataTableSurface> > <DataTableToolbar> (bordered top strip) >
+          <DataTable surface={false}> (header + body) > conditional footer. The
+          section heading + count live INSIDE the toolbar strip, not floating above
+          the card, so the block reads as a single unified table. Only the
+          columns/data differ from Tickets. No pagination here — the shared shell's
+          footer is conditional, identical to a single-page Tickets list. */}
+      <DataTableSurface>
+        <DataTableToolbar>
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-semibold tracking-tight text-foreground">
+              {title}
+            </h2>
+            {tickets.length > 0 && (
+              <Badge variant="secondary" size="sm">
+                {tickets.length}
+              </Badge>
+            )}
+          </div>
+          {action}
+        </DataTableToolbar>
+        <DataTable
+          surface={false}
+          data={tickets}
+          columns={columns}
+          getRowId={(ticket) => ticket.id}
+          columnWidths={columnWidths}
+          emptyMessage={empty}
+          renderMobileCard={
+            tickets.length
+              ? (ticket) => (
+                  <Link
+                    className="block p-3.5 transition-colors hover:bg-table-row-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
+                    to={`/tickets/${ticket.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-2.5">
+                      <div className="min-w-0">
+                        <p
+                          className="line-clamp-1 font-medium text-[12px] text-foreground"
                           title={ticket.subject}
-                          to={`/tickets/${ticket.id}`}
-                          dir="ltr"
                         >
                           {ticket.subject}
-                        </Link>
-                      </TableCell>
-                      {detailed && (
-                        <TableCell>
-                          <span className="line-clamp-2 min-w-0 break-words text-muted-foreground" title={ticket.customer.name}>
-                            {ticket.customer.name}
-                          </span>
-                        </TableCell>
+                        </p>
+                        <p
+                          className="mt-0.5 font-mono text-[10px] text-muted-foreground"
+                          title={ticket.id}
+                        >
+                          <bdi dir="ltr">{ticketReference(ticket.id)}</bdi>
+                        </p>
+                      </div>
+                      <TicketPriorityText priority={ticket.priority} />
+                    </div>
+                    {detailed && (
+                      <p
+                        className="mt-1 truncate text-[10px] text-muted-foreground"
+                        title={ticket.customer.name}
+                      >
+                        {ticket.customer.name}
+                      </p>
+                    )}
+                    <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                      <TicketStatusBadge status={ticket.status} />
+                      {detailed ? (
+                        <SlaStatusDot state={ticket.slaState} />
+                      ) : (
+                        <span className="text-[11px] text-muted-foreground">
+                          {ticket.customer.name}
+                        </span>
                       )}
-                      <TableCell className="whitespace-nowrap">
-                        <TicketPriorityText priority={ticket.priority} />
-                      </TableCell>
-                      <TableCell>
-                        <TicketStatusBadge status={ticket.status} />
-                      </TableCell>
-                      {detailed && (
-                        <TableCell className="whitespace-nowrap">
-                          <Sla state={ticket.slaState} />
-                        </TableCell>
-                      )}
-                      <TableCell>
-                        <AssigneeCell
-                          name={ticket.assignedAgent?.name}
-                          unassignedLabel={t("tickets.unassigned")}
-                        />
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                        <bdi dir="ltr">{formatTicketDate(ticket.updatedAt, i18n.language)}</bdi>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </div>
-
-          {/* Mobile Cards */}
-          <div className="grid gap-3 md:hidden">
-            {tickets.map((ticket) => (
-              <Link
-                className="min-w-0 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-subtle transition hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                to={`/tickets/${ticket.id}`}
-                key={ticket.id}
-              >
-                <div className="flex min-w-0 items-center justify-between gap-3">
-                  <span className="min-w-0 truncate font-mono text-xs font-medium text-muted-foreground" title={ticket.id} dir="ltr">
-                    {ticketReference(ticket.id)}
-                  </span>
-                  <TicketPriorityText priority={ticket.priority} />
-                </div>
-                <p className="mt-2 line-clamp-2 break-words font-semibold text-foreground" title={ticket.subject}>
-                  {ticket.subject}
-                </p>
-                {detailed && (
-                  <p className="mt-1 line-clamp-2 break-words text-xs text-muted-foreground" title={ticket.customer.name}>
-                    {ticket.customer.name}
-                  </p>
-                )}
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <TicketStatusBadge status={ticket.status} />
-                  {detailed && <Sla state={ticket.slaState} />}
-                </div>
-                <p className="mt-3 border-t border-border-subtle pt-2 min-w-0 truncate text-xs text-muted-foreground" title={ticket.assignedAgent?.name ?? t("tickets.unassigned")}>
-                  {ticket.assignedAgent?.name ?? t("tickets.unassigned")} <span aria-hidden="true">·</span>{" "}
-                  <span dir="ltr">{formatTicketDate(ticket.updatedAt, i18n.language)}</span>
-                </p>
-              </Link>
-            ))}
-          </div>
-        </>
-      ) : (
-        <div className="rounded-xl border border-dashed border-border bg-surface/50 px-4 py-8 text-center text-sm text-muted-foreground">
-          {empty}
-        </div>
-      )}
+                    </div>
+                    <p className="mt-2 border-t border-border-subtle pt-1.5 text-[10px] text-muted-foreground">
+                      {ticket.assignedAgent?.name ?? t("tickets.unassigned")}{" "}
+                      <span aria-hidden="true">·</span>{" "}
+                      <span dir="ltr">
+                        {formatTicketDate(ticket.updatedAt, i18n.language)}
+                      </span>
+                    </p>
+                  </Link>
+                )
+              : undefined
+          }
+        />
+      </DataTableSurface>
     </section>
-  );
-}
-
-function Sla({ state }: { state: DashboardTicket["slaState"] }) {
-  const { t } = useTranslation();
-  if (!state) return null;
-  const variant = state === "BREACHED" ? "danger" : state === "AT_RISK" ? "warning" : "neutral";
-  return (
-    <Badge variant={variant} size="sm">
-      {t(`dashboard.slaStates.${state}`)}
-    </Badge>
   );
 }
 
 function DashboardSkeleton() {
   return (
     <div className="space-y-8">
-      <div className="h-16 animate-pulse rounded-xl bg-muted" />
+      <Skeleton className="h-16 rounded-xl" />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {Array.from({ length: 5 }, (_, i) => (
-          <div className="h-20 animate-pulse rounded-lg bg-muted" key={i} />
+          <Skeleton className="h-20 rounded-lg" key={i} />
         ))}
       </div>
-      <div className="h-64 animate-pulse rounded-xl bg-muted" />
+      <TableSkeleton columns={7} rows={5} />
       <div className="grid gap-6 lg:grid-cols-3">
         <ChartSkeleton className="lg:col-span-2" height={340} />
         <ChartSkeleton height={340} />
       </div>
       <div className="grid gap-6 lg:grid-cols-2">
-        <div className="h-56 animate-pulse rounded-xl bg-muted" />
-        <div className="h-56 animate-pulse rounded-xl bg-muted" />
+        <Skeleton className="h-56 rounded-xl" />
+        <Skeleton className="h-56 rounded-xl" />
       </div>
-      <div className="h-64 animate-pulse rounded-xl bg-muted" />
+      <TableSkeleton columns={6} rows={5} />
     </div>
   );
 }

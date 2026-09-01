@@ -1,17 +1,9 @@
-import { flexRender, getCoreRowModel, useReactTable, type ColumnDef, type PaginationState, type Updater } from "@tanstack/react-table";
+import { type ColumnDef } from "@tanstack/react-table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from "@/components/ui/table";
+import { DataTable } from "@/components/shared/data-table";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
-import { DataTablePagination } from "@/components/shared/data-table/data-table-pagination";
 import { formatUserDate } from "./user-format";
 import { PencilIcon, UserRoundCheckIcon, UserRoundXIcon } from "./user-icons";
 import { UserStatusConfirm } from "./user-status-confirm";
@@ -40,7 +32,7 @@ interface UserTableMeta {
   onEditUser?: (user: User) => void;
 }
 
-const columnClasses: Record<string, string> = {
+const COLUMN_WIDTHS: Record<string, string> = {
   name: "w-[20%]",
   email: "w-auto",
   role: "w-[120px]",
@@ -48,6 +40,10 @@ const columnClasses: Record<string, string> = {
   status: "w-[110px]",
   createdAt: "w-[140px]",
   actions: "w-[112px]",
+};
+
+const COLUMN_CLASSES: Record<string, string> = {
+  actions: "text-end",
 };
 
 export function UserTable({
@@ -173,115 +169,57 @@ export function UserTable({
     onEditUser,
   };
 
-  const pagination = useMemo<PaginationState>(
-    () => ({ pageIndex: page - 1, pageSize }),
-    [page, pageSize]
-  );
-  const table = useReactTable({
-    data: users,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getRowId: (user) => user.id,
-    manualPagination: true,
-    pageCount,
-    state: { pagination },
-    meta,
-    onPaginationChange: (updater) => handlePaginationChange(updater, pagination, onPageChange),
-  });
-
   return (
-    <>
-      <div className="hidden md:block overflow-x-auto">
-        <Table className="min-w-[60rem]">
-          <colgroup>
-            {table.getAllLeafColumns().map((column) => (
-              <col key={column.id} className={columnClasses[column.id] ?? ""} />
-            ))}
-          </colgroup>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead
-                    className={`font-medium ${header.column.id === "actions" ? "text-end" : "text-start"}`}
-                    key={header.id}
-                  >
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id}>
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell
-                    className={cell.column.id === "actions" ? "text-end" : ""}
-                    key={cell.id}
-                  >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-
-      <ul className="divide-y divide-border-subtle bg-table-background md:hidden">
-        {users.map((user) => (
-          <li className="p-4" key={user.id}>
-            <div className="flex min-w-0 items-center gap-1.5">
-              <Link
-                className="min-w-0 truncate rounded-sm font-semibold text-foreground hover:underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                dir="auto"
-                title={user.name}
-                to={`/users/${user.id}/edit`}
-              >
-                {user.name}
-              </Link>
-              {user.id === currentUserId && <YouBadge />}
-            </div>
-            <p className="mt-1 truncate text-sm text-muted-foreground" dir="ltr" title={user.email}>
-              {user.email}
-            </p>
-            <div className="mt-2.5 flex flex-wrap items-center gap-2">
-              <RoleBadge role={user.role} />
-              <StatusBadge active={user.isActive} />
-              <span className="text-xs text-muted-foreground">
-                {t("users.columns.created")}: <bdi dir="ltr">{formatUserDate(user.createdAt, i18n.language)}</bdi>
-              </span>
-            </div>
-            <p className="mt-1 truncate text-xs text-muted-foreground" dir="auto">
-              {t("users.columns.department")}: {user.department?.name ?? t("users.departmentNone")}
-              {user.branch ? ` · ${user.branch.name}` : ""}
-            </p>
-            <div className="mt-3 flex justify-end">
-              <RowActions user={user} meta={meta} variant="mobile" />
-            </div>
-          </li>
-        ))}
-      </ul>
-
-      {pageCount > 1 && (
-        <div className="border-t border-table-border bg-table-background px-3.5 py-2">
-          <DataTablePagination
-            page={page}
-            pageCount={pageCount}
-            pageSize={pageSize}
-            totalCount={totalCount}
-            canPreviousPage={table.getCanPreviousPage()}
-            canNextPage={table.getCanNextPage()}
-            onPreviousPage={() => table.previousPage()}
-            onNextPage={() => table.nextPage()}
-            ariaLabel={t("users.pagination")}
-          />
+    <DataTable
+      surface={false}
+      data={users}
+      columns={columns}
+      getRowId={(user) => user.id}
+      meta={meta}
+      columnWidths={COLUMN_WIDTHS}
+      columnClasses={COLUMN_CLASSES}
+      minWidth="min-w-[60rem]"
+      pagination={{
+        page,
+        pageSize,
+        pageCount,
+        totalCount,
+        onPageChange,
+        ariaLabel: t("users.pagination"),
+      }}
+      renderMobileCard={(user) => (
+        <div className="p-4">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <Link
+              className="min-w-0 truncate rounded-sm font-semibold text-foreground hover:underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              dir="auto"
+              title={user.name}
+              to={`/users/${user.id}/edit`}
+            >
+              {user.name}
+            </Link>
+            {user.id === currentUserId && <YouBadge />}
+          </div>
+          <p className="mt-1 truncate text-sm text-muted-foreground" dir="ltr" title={user.email}>
+            {user.email}
+          </p>
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            <RoleBadge role={user.role} />
+            <StatusBadge active={user.isActive} />
+            <span className="text-xs text-muted-foreground">
+              {t("users.columns.created")}: <bdi dir="ltr">{formatUserDate(user.createdAt, i18n.language)}</bdi>
+            </span>
+          </div>
+          <p className="mt-1 truncate text-xs text-muted-foreground" dir="auto">
+            {t("users.columns.department")}: {user.department?.name ?? t("users.departmentNone")}
+            {user.branch ? ` · ${user.branch.name}` : ""}
+          </p>
+          <div className="mt-3 flex justify-end">
+            <RowActions user={user} meta={meta} variant="mobile" />
+          </div>
         </div>
       )}
-    </>
+    />
   );
 }
 
@@ -350,13 +288,4 @@ function RowActions({
       />
     </div>
   );
-}
-
-function handlePaginationChange(
-  updater: Updater<PaginationState>,
-  current: PaginationState,
-  onPageChange: (page: number) => void
-) {
-  const next = typeof updater === "function" ? updater(current) : updater;
-  if (next.pageIndex !== current.pageIndex) onPageChange(next.pageIndex + 1);
 }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
+import type { ColumnDef } from "@tanstack/react-table";
 import { Building2, Network, Pencil, Power, Trash2, Users2 } from "lucide-react";
 import axios from "axios";
 import { AppSelectField } from "@/components/ui/app-select";
@@ -11,20 +12,12 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  DataTable,
   DataTableSearch,
   DataTableSkeleton,
   DataTableSurface,
   DataTableToolbar,
-  DataTablePagination,
 } from "@/components/shared/data-table";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { useDebouncedValue } from "@/features/customers/use-debounced-value";
 import {
   useAdminBranches,
@@ -47,6 +40,17 @@ import type { Branch, Department, Team } from "@/features/organization/organizat
 
 const PAGE_SIZE = 15;
 type StatusFilter = "" | "active" | "inactive";
+
+/** Shared column alignment/width classes for the org data tables (Departments,
+ * Branches, Teams). Keys not present in a given section are simply ignored. */
+const ORG_COLUMN_CLASSES: Record<string, string> = {
+  name: "font-medium",
+  code: "w-28",
+  users: "w-20 text-end tabular-nums text-muted-foreground",
+  agents: "w-20 text-end tabular-nums text-muted-foreground",
+  status: "w-28",
+  actions: "w-24 text-end",
+};
 
 // ---------------------------------------------------------------------------
 // Shared primitives
@@ -216,6 +220,65 @@ export function DepartmentsSection() {
     [branchOptions.data, t],
   );
 
+  const columns = useMemo<ColumnDef<Department>[]>(
+    () => [
+      {
+        id: "name",
+        header: t("settings.departments.name"),
+        cell: ({ row }) => <span dir="auto">{row.original.name}</span>,
+      },
+      {
+        id: "description",
+        header: t("settings.departments.fieldDescription"),
+        cell: ({ row }) => (
+          <span className="block max-w-xs truncate text-muted-foreground" title={row.original.description ?? ""}>
+            {row.original.description || "—"}
+          </span>
+        ),
+      },
+      {
+        id: "branch",
+        header: t("settings.departments.branch"),
+        cell: ({ row }) => (
+          <span className="text-muted-foreground" dir="auto">
+            {row.original.branch?.name ?? "—"}
+          </span>
+        ),
+      },
+      {
+        id: "users",
+        header: t("settings.departments.users"),
+        cell: ({ row }) => row.original.userCount,
+      },
+      {
+        id: "status",
+        header: t("settings.status"),
+        cell: ({ row }) => <OrgStatusBadge active={row.original.isActive} />,
+      },
+      {
+        id: "actions",
+        header: t("settings.actions"),
+        cell: ({ row }) => (
+          <div className="flex justify-end">
+            <DeptRowActions
+              row={row.original}
+              onEdit={() => setEditorTarget(row.original)}
+              onToggle={() => {
+                setStatusError(null);
+                setStatusTarget(row.original);
+              }}
+              onDelete={() => {
+                setDeleteError(null);
+                setDeleteTarget(row.original);
+              }}
+            />
+          </div>
+        ),
+      },
+    ],
+    [t],
+  );
+
   return (
     <section className="space-y-4">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -269,109 +332,55 @@ export function DepartmentsSection() {
             <OrgState text={hasFilters ? t("settings.departments.noResults") : t("settings.departments.empty")} />
           </div>
         ) : (
-          <>
-            <div className="hidden overflow-x-auto md:block">
-              <Table className="min-w-[46rem]">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t("settings.departments.name")}</TableHead>
-                    <TableHead>{t("settings.departments.fieldDescription")}</TableHead>
-                    <TableHead>{t("settings.departments.branch")}</TableHead>
-                    <TableHead className="w-20 text-end">{t("settings.departments.users")}</TableHead>
-                    <TableHead className="w-28">{t("settings.status")}</TableHead>
-                    <TableHead className="w-24 text-end">{t("settings.actions")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell className="font-medium" dir="auto">
-                        {row.name}
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate text-muted-foreground" title={row.description ?? ""}>
-                        {row.description || "—"}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground" dir="auto">
-                        {row.branch?.name ?? "—"}
-                      </TableCell>
-                      <TableCell className="text-end tabular-nums text-muted-foreground">{row.userCount}</TableCell>
-                      <TableCell>
-                        <OrgStatusBadge active={row.isActive} />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex justify-end">
-                          <DeptRowActions
-                            row={row}
-                            onEdit={() => setEditorTarget(row)}
-                            onToggle={() => {
-                              setStatusError(null);
-                              setStatusTarget(row);
-                            }}
-                            onDelete={() => {
-                              setDeleteError(null);
-                              setDeleteTarget(row);
-                            }}
-                          />
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-
-            <ul className="divide-y divide-border-subtle md:hidden">
-              {rows.map((row) => (
-                <li className="p-4" key={row.id}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-medium" dir="auto">
-                        {row.name}
-                      </p>
-                      <p className="mt-1 break-words text-sm text-muted-foreground" dir="auto">
-                        {row.description || "—"}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {t("settings.departments.branch")}: {row.branch?.name ?? "—"} · {t("settings.departments.users")}:{" "}
-                        {row.userCount}
-                      </p>
-                    </div>
-                    <OrgStatusBadge active={row.isActive} />
+          <DataTable
+            surface={false}
+            data={rows}
+            columns={columns}
+            getRowId={(row) => row.id}
+            minWidth="min-w-[46rem]"
+            columnClasses={ORG_COLUMN_CLASSES}
+            pagination={{
+              page,
+              pageSize: PAGE_SIZE,
+              pageCount: meta?.totalPages ?? 1,
+              totalCount: meta?.total,
+              onPageChange: setPage,
+              ariaLabel: t("settings.departments.pagination"),
+            }}
+            renderMobileCard={(row) => (
+              <div className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium" dir="auto">
+                      {row.name}
+                    </p>
+                    <p className="mt-1 break-words text-sm text-muted-foreground" dir="auto">
+                      {row.description || "—"}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t("settings.departments.branch")}: {row.branch?.name ?? "—"} · {t("settings.departments.users")}:{" "}
+                      {row.userCount}
+                    </p>
                   </div>
-                  <div className="mt-3 flex justify-end">
-                    <DeptRowActions
-                      row={row}
-                      onEdit={() => setEditorTarget(row)}
-                      onToggle={() => {
-                        setStatusError(null);
-                        setStatusTarget(row);
-                      }}
-                      onDelete={() => {
-                        setDeleteError(null);
-                        setDeleteTarget(row);
-                      }}
-                    />
-                  </div>
-                </li>
-              ))}
-            </ul>
-
-            {meta && meta.totalPages > 1 && (
-              <div className="border-t border-table-border px-3.5 py-2">
-                <DataTablePagination
-                  page={page}
-                  pageCount={meta.totalPages}
-                  pageSize={PAGE_SIZE}
-                  totalCount={meta.total}
-                  canPreviousPage={page > 1}
-                  canNextPage={page < meta.totalPages}
-                  onPreviousPage={() => setPage((value) => Math.max(1, value - 1))}
-                  onNextPage={() => setPage((value) => value + 1)}
-                  ariaLabel={t("settings.departments.pagination")}
-                />
+                  <OrgStatusBadge active={row.isActive} />
+                </div>
+                <div className="mt-3 flex justify-end">
+                  <DeptRowActions
+                    row={row}
+                    onEdit={() => setEditorTarget(row)}
+                    onToggle={() => {
+                      setStatusError(null);
+                      setStatusTarget(row);
+                    }}
+                    onDelete={() => {
+                      setDeleteError(null);
+                      setDeleteTarget(row);
+                    }}
+                  />
+                </div>
               </div>
             )}
-          </>
+          />
         )}
       </DataTableSurface>
 
@@ -601,6 +610,65 @@ export function BranchesSection() {
   const hasFilters = Boolean(debouncedSearch || status);
   const editorPending = create.isPending || update.isPending;
 
+  const columns = useMemo<ColumnDef<Branch>[]>(
+    () => [
+      {
+        id: "name",
+        header: t("settings.branches.name"),
+        cell: ({ row }) => <span dir="auto">{row.original.name}</span>,
+      },
+      {
+        id: "code",
+        header: t("settings.branches.code"),
+        cell: ({ row }) => (
+          <span className="text-muted-foreground" dir="ltr">
+            {row.original.code || "—"}
+          </span>
+        ),
+      },
+      {
+        id: "address",
+        header: t("settings.branches.address"),
+        cell: ({ row }) => (
+          <span className="block max-w-xs truncate text-muted-foreground" title={row.original.address ?? ""} dir="auto">
+            {row.original.address || "—"}
+          </span>
+        ),
+      },
+      {
+        id: "users",
+        header: t("settings.branches.users"),
+        cell: ({ row }) => row.original.userCount,
+      },
+      {
+        id: "status",
+        header: t("settings.status"),
+        cell: ({ row }) => <OrgStatusBadge active={row.original.isActive} />,
+      },
+      {
+        id: "actions",
+        header: t("settings.actions"),
+        cell: ({ row }) => (
+          <div className="flex justify-end">
+            <BranchRowActions
+              row={row.original}
+              onEdit={() => setEditorTarget(row.original)}
+              onToggle={() => {
+                setStatusError(null);
+                setStatusTarget(row.original);
+              }}
+              onDelete={() => {
+                setDeleteError(null);
+                setDeleteTarget(row.original);
+              }}
+            />
+          </div>
+        ),
+      },
+    ],
+    [t],
+  );
+
   return (
     <section className="space-y-4">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -654,113 +722,59 @@ export function BranchesSection() {
             <OrgState text={hasFilters ? t("settings.branches.noResults") : t("settings.branches.empty")} />
           </div>
         ) : (
-          <>
-            <div className="hidden overflow-x-auto md:block">
-              <Table className="min-w-[48rem]">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t("settings.branches.name")}</TableHead>
-                    <TableHead className="w-28">{t("settings.branches.code")}</TableHead>
-                    <TableHead>{t("settings.branches.address")}</TableHead>
-                    <TableHead className="w-20 text-end">{t("settings.branches.users")}</TableHead>
-                    <TableHead className="w-28">{t("settings.status")}</TableHead>
-                    <TableHead className="w-24 text-end">{t("settings.actions")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell className="font-medium" dir="auto">
-                        {row.name}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground" dir="ltr">
-                        {row.code || "—"}
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate text-muted-foreground" title={row.address ?? ""} dir="auto">
-                        {row.address || "—"}
-                      </TableCell>
-                      <TableCell className="text-end tabular-nums text-muted-foreground">{row.userCount}</TableCell>
-                      <TableCell>
-                        <OrgStatusBadge active={row.isActive} />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex justify-end">
-                          <BranchRowActions
-                            row={row}
-                            onEdit={() => setEditorTarget(row)}
-                            onToggle={() => {
-                              setStatusError(null);
-                              setStatusTarget(row);
-                            }}
-                            onDelete={() => {
-                              setDeleteError(null);
-                              setDeleteTarget(row);
-                            }}
-                          />
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-
-            <ul className="divide-y divide-border-subtle md:hidden">
-              {rows.map((row) => (
-                <li className="p-4" key={row.id}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-medium" dir="auto">
-                        {row.name}
+          <DataTable
+            surface={false}
+            data={rows}
+            columns={columns}
+            getRowId={(row) => row.id}
+            minWidth="min-w-[48rem]"
+            columnClasses={ORG_COLUMN_CLASSES}
+            pagination={{
+              page,
+              pageSize: PAGE_SIZE,
+              pageCount: meta?.totalPages ?? 1,
+              totalCount: meta?.total,
+              onPageChange: setPage,
+              ariaLabel: t("settings.branches.pagination"),
+            }}
+            renderMobileCard={(row) => (
+              <div className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium" dir="auto">
+                      {row.name}
+                    </p>
+                    {row.code && (
+                      <p className="mt-1 text-xs text-muted-foreground" dir="ltr">
+                        {row.code}
                       </p>
-                      {row.code && (
-                        <p className="mt-1 text-xs text-muted-foreground" dir="ltr">
-                          {row.code}
-                        </p>
-                      )}
-                      <p className="mt-1 break-words text-sm text-muted-foreground" dir="auto">
-                        {row.address || "—"}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {t("settings.branches.users")}: {row.userCount}
-                      </p>
-                    </div>
-                    <OrgStatusBadge active={row.isActive} />
+                    )}
+                    <p className="mt-1 break-words text-sm text-muted-foreground" dir="auto">
+                      {row.address || "—"}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t("settings.branches.users")}: {row.userCount}
+                    </p>
                   </div>
-                  <div className="mt-3 flex justify-end">
-                    <BranchRowActions
-                      row={row}
-                      onEdit={() => setEditorTarget(row)}
-                      onToggle={() => {
-                        setStatusError(null);
-                        setStatusTarget(row);
-                      }}
-                      onDelete={() => {
-                        setDeleteError(null);
-                        setDeleteTarget(row);
-                      }}
-                    />
-                  </div>
-                </li>
-              ))}
-            </ul>
-
-            {meta && meta.totalPages > 1 && (
-              <div className="border-t border-table-border px-3.5 py-2">
-                <DataTablePagination
-                  page={page}
-                  pageCount={meta.totalPages}
-                  pageSize={PAGE_SIZE}
-                  totalCount={meta.total}
-                  canPreviousPage={page > 1}
-                  canNextPage={page < meta.totalPages}
-                  onPreviousPage={() => setPage((value) => Math.max(1, value - 1))}
-                  onNextPage={() => setPage((value) => value + 1)}
-                  ariaLabel={t("settings.branches.pagination")}
-                />
+                  <OrgStatusBadge active={row.isActive} />
+                </div>
+                <div className="mt-3 flex justify-end">
+                  <BranchRowActions
+                    row={row}
+                    onEdit={() => setEditorTarget(row)}
+                    onToggle={() => {
+                      setStatusError(null);
+                      setStatusTarget(row);
+                    }}
+                    onDelete={() => {
+                      setDeleteError(null);
+                      setDeleteTarget(row);
+                    }}
+                  />
+                </div>
               </div>
             )}
-          </>
+          />
         )}
       </DataTableSurface>
 
@@ -1004,6 +1018,71 @@ export function TeamsSection() {
   const hasFilters = Boolean(debouncedSearch || status);
   const editorPending = create.isPending || update.isPending;
 
+  const columns = useMemo<ColumnDef<Team>[]>(
+    () => [
+      {
+        id: "name",
+        header: t("settings.teams.name"),
+        cell: ({ row }) => <span dir="auto">{row.original.name}</span>,
+      },
+      {
+        id: "department",
+        header: t("settings.teams.department"),
+        cell: ({ row }) => (
+          <span className="text-muted-foreground" dir="auto">
+            {row.original.department?.name ?? "—"}
+          </span>
+        ),
+      },
+      {
+        id: "manager",
+        header: t("settings.teams.manager"),
+        cell: ({ row }) =>
+          row.original.manager ? (
+            <span className="flex flex-col text-muted-foreground">
+              <span className="text-foreground">{row.original.manager.name}</span>
+              <span className="truncate text-xs" dir="ltr">
+                {row.original.manager.email}
+              </span>
+            </span>
+          ) : (
+            <span className="text-muted-foreground">{t("settings.teams.noManager")}</span>
+          ),
+      },
+      {
+        id: "agents",
+        header: t("settings.teams.agents"),
+        cell: ({ row }) => row.original.agentCount,
+      },
+      {
+        id: "status",
+        header: t("settings.status"),
+        cell: ({ row }) => <OrgStatusBadge active={row.original.isActive} />,
+      },
+      {
+        id: "actions",
+        header: t("settings.actions"),
+        cell: ({ row }) => (
+          <div className="flex justify-end">
+            <TeamRowActions
+              row={row.original}
+              onEdit={() => setEditorTarget(row.original)}
+              onToggle={() => {
+                setStatusError(null);
+                setStatusTarget(row.original);
+              }}
+              onDelete={() => {
+                setDeleteError(null);
+                setDeleteTarget(row.original);
+              }}
+            />
+          </div>
+        ),
+      },
+    ],
+    [t],
+  );
+
   return (
     <section className="space-y-4">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -1057,118 +1136,55 @@ export function TeamsSection() {
             <OrgState text={hasFilters ? t("settings.teams.noResults") : t("settings.teams.empty")} />
           </div>
         ) : (
-          <>
-            <div className="hidden overflow-x-auto md:block">
-              <Table className="min-w-[52rem]">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t("settings.teams.name")}</TableHead>
-                    <TableHead>{t("settings.teams.department")}</TableHead>
-                    <TableHead>{t("settings.teams.manager")}</TableHead>
-                    <TableHead className="w-20 text-end">{t("settings.teams.agents")}</TableHead>
-                    <TableHead className="w-28">{t("settings.status")}</TableHead>
-                    <TableHead className="w-24 text-end">{t("settings.actions")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell className="font-medium" dir="auto">
-                        {row.name}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground" dir="auto">
-                        {row.department?.name ?? "—"}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground" dir="auto">
-                        {row.manager ? (
-                          <span className="flex flex-col">
-                            <span className="text-foreground">{row.manager.name}</span>
-                            <span className="truncate text-xs" dir="ltr">
-                              {row.manager.email}
-                            </span>
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">{t("settings.teams.noManager")}</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-end tabular-nums text-muted-foreground">{row.agentCount}</TableCell>
-                      <TableCell>
-                        <OrgStatusBadge active={row.isActive} />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex justify-end">
-                          <TeamRowActions
-                            row={row}
-                            onEdit={() => setEditorTarget(row)}
-                            onToggle={() => {
-                              setStatusError(null);
-                              setStatusTarget(row);
-                            }}
-                            onDelete={() => {
-                              setDeleteError(null);
-                              setDeleteTarget(row);
-                            }}
-                          />
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-
-            <ul className="divide-y divide-border-subtle md:hidden">
-              {rows.map((row) => (
-                <li className="p-4" key={row.id}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-medium" dir="auto">
-                        {row.name}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground" dir="auto">
-                        {t("settings.teams.department")}: {row.department?.name ?? "—"} ·{" "}
-                        {t("settings.teams.agents")}: {row.agentCount}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground" dir="auto">
-                        {t("settings.teams.manager")}: {row.manager?.name ?? t("settings.teams.noManager")}
-                      </p>
-                    </div>
-                    <OrgStatusBadge active={row.isActive} />
+          <DataTable
+            surface={false}
+            data={rows}
+            columns={columns}
+            getRowId={(row) => row.id}
+            minWidth="min-w-[52rem]"
+            columnClasses={ORG_COLUMN_CLASSES}
+            pagination={{
+              page,
+              pageSize: PAGE_SIZE,
+              pageCount: meta?.totalPages ?? 1,
+              totalCount: meta?.total,
+              onPageChange: setPage,
+              ariaLabel: t("settings.teams.pagination"),
+            }}
+            renderMobileCard={(row) => (
+              <div className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium" dir="auto">
+                      {row.name}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground" dir="auto">
+                      {t("settings.teams.department")}: {row.department?.name ?? "—"} ·{" "}
+                      {t("settings.teams.agents")}: {row.agentCount}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground" dir="auto">
+                      {t("settings.teams.manager")}: {row.manager?.name ?? t("settings.teams.noManager")}
+                    </p>
                   </div>
-                  <div className="mt-3 flex justify-end">
-                    <TeamRowActions
-                      row={row}
-                      onEdit={() => setEditorTarget(row)}
-                      onToggle={() => {
-                        setStatusError(null);
-                        setStatusTarget(row);
-                      }}
-                      onDelete={() => {
-                        setDeleteError(null);
-                        setDeleteTarget(row);
-                      }}
-                    />
-                  </div>
-                </li>
-              ))}
-            </ul>
-
-            {meta && meta.totalPages > 1 && (
-              <div className="border-t border-table-border px-3.5 py-2">
-                <DataTablePagination
-                  page={page}
-                  pageCount={meta.totalPages}
-                  pageSize={PAGE_SIZE}
-                  totalCount={meta.total}
-                  canPreviousPage={page > 1}
-                  canNextPage={page < meta.totalPages}
-                  onPreviousPage={() => setPage((value) => Math.max(1, value - 1))}
-                  onNextPage={() => setPage((value) => value + 1)}
-                  ariaLabel={t("settings.teams.pagination")}
-                />
+                  <OrgStatusBadge active={row.isActive} />
+                </div>
+                <div className="mt-3 flex justify-end">
+                  <TeamRowActions
+                    row={row}
+                    onEdit={() => setEditorTarget(row)}
+                    onToggle={() => {
+                      setStatusError(null);
+                      setStatusTarget(row);
+                    }}
+                    onDelete={() => {
+                      setDeleteError(null);
+                      setDeleteTarget(row);
+                    }}
+                  />
+                </div>
               </div>
             )}
-          </>
+          />
         )}
       </DataTableSurface>
 

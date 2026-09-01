@@ -258,11 +258,11 @@ describe("users management — table", () => {
 
   it("renders mobile cards with display-only role and grouped actions", () => {
     renderAt("/users", <Route path="/users" element={<UserListPage />} />);
-    const list = screen.getAllByRole("list").find((el) => el.className.includes("md:hidden"))!;
+    const list = document.querySelector<HTMLElement>(".md\\:hidden.divide-y")!;
+    expect(list).toBeTruthy();
     expect(within(list).queryByRole("combobox")).not.toBeInTheDocument();
-    const cards = within(list).getAllByRole("listitem");
+    const cards = within(list).getAllByRole("button", { name: "Actions" });
     expect(cards).toHaveLength(3);
-    expect(within(cards[0]).getByRole("button", { name: "Actions" })).toBeInTheDocument();
   });
 
   it("renders exactly one chevron per filter select", () => {

@@ -69,6 +69,16 @@ const ENTITIES = [
   "SLA_RULE",
 ] as const;
 
+/** `<colgroup>` width hints — drives the canonical shared DataTable column rhythm. */
+const COLUMN_WIDTHS: Record<string, string> = {
+  time: "w-36",
+  actor: "w-48",
+  action: "w-44",
+  entity: "w-52",
+  changes: "w-auto",
+  details: "w-20",
+};
+
 function formatDiffValue(input: unknown): string {
   if (input === null || input === undefined || input === "") return "—";
   if (typeof input === "boolean") return input ? "true" : "false";
@@ -478,8 +488,10 @@ export function AuditLogPage() {
           description={t("auditLogs.description")}
         />
 
-        {/* Filters and Search Surface */}
-        <DataTableSurface className="p-3.5 space-y-3">
+        {/* Canonical shared DataTable surface — feature-specific filters live
+            flush inside the same bordered card as the table + pagination. */}
+        <DataTableSurface>
+          <div className="space-y-3 border-b border-table-border bg-table-background p-3.5">
           {/* Mobile Filter Track (<lg) */}
           <div className="flex flex-col gap-2.5 lg:hidden">
             {/* Search Input: full width */}
@@ -679,22 +691,18 @@ export function AuditLogPage() {
               </span>
             </div>
           )}
-        </DataTableSurface>
+          </div>
 
-        {/* Results Data Table */}
+        {/* Results Data Table — shared shell owns border, header, rows,
+            hover, overflow, loading, empty and pagination. */}
         <DataTable
+          surface={false}
           data={query.data?.data ?? []}
           columns={columns}
           getRowId={(row) => row.id}
-          columnClasses={{
-            time: "w-36 min-w-32",
-            actor: "w-48 min-w-40",
-            action: "w-44 min-w-36",
-            entity: "w-52 min-w-44",
-            changes: "min-w-64",
-            details: "w-20 min-w-16 text-end",
-          }}
-          minWidth="min-w-full"
+          columnWidths={COLUMN_WIDTHS}
+          columnClasses={{ details: "text-end" }}
+          minWidth="min-w-[60rem]"
           isLoading={query.isLoading}
           isError={query.isError}
           errorState={
@@ -836,6 +844,7 @@ export function AuditLogPage() {
             </article>
           )}
         />
+        </DataTableSurface>
 
         {/* Mobile Filters Sheet */}
         <Sheet

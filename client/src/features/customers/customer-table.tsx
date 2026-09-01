@@ -1,16 +1,8 @@
-import { flexRender, getCoreRowModel, useReactTable, type ColumnDef, type PaginationState, type Updater } from "@tanstack/react-table";
+import { type ColumnDef } from "@tanstack/react-table";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from "@/components/ui/table";
-import { DataTablePagination } from "@/components/shared/data-table/data-table-pagination";
+import { DataTable } from "@/components/shared/data-table";
 import { formatDate, formatNumber } from "./customer-format";
 import type { CustomerListItem } from "./customer.types";
 
@@ -23,13 +15,22 @@ interface CustomerTableProps {
   onPageChange: (page: number) => void;
 }
 
-const columnClasses: Record<string, string> = {
+const COLUMN_WIDTHS: Record<string, string> = {
   name: "w-[22%]",
   email: "w-auto",
   phone: "w-[160px]",
   openTickets: "w-[110px]",
   totalTickets: "w-[110px]",
   lastInteraction: "w-[180px]",
+};
+
+const COLUMN_CLASSES: Record<string, string> = {
+  name: "font-semibold",
+  openTickets: "tabular-nums",
+  totalTickets: "tabular-nums",
+  lastInteraction: "whitespace-nowrap text-xs text-muted-foreground",
+  email: "text-muted-foreground",
+  phone: "text-muted-foreground",
 };
 
 export function CustomerTable({
@@ -119,122 +120,48 @@ export function CustomerTable({
     [i18n.language, t]
   );
 
-  const pagination = useMemo<PaginationState>(
-    () => ({ pageIndex: page - 1, pageSize }),
-    [page, pageSize]
-  );
-
-  const table = useReactTable({
-    data: customers,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getRowId: (customer) => customer.id,
-    manualPagination: true,
-    pageCount,
-    state: { pagination },
-    onPaginationChange: (updater) => handlePaginationChange(updater, pagination, onPageChange),
-  });
-
   return (
-    <>
-      <div className="hidden md:block overflow-x-auto">
-        <Table className="w-full">
-          <colgroup>
-            {table.getAllLeafColumns().map((column) => (
-              <col key={column.id} className={columnClasses[column.id] ?? ""} />
-            ))}
-          </colgroup>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id}>
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell
-                    className={cellClassName(cell.column.id)}
-                    key={cell.id}
-                  >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-
-      <div className="divide-y divide-border-subtle bg-table-background md:hidden">
-        {customers.map((customer) => (
-          <Link
-            className="block p-4 transition-colors hover:bg-table-row-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-            to={`/customers/${customer.id}`}
-            key={customer.id}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <p className="font-semibold text-foreground">{customer.name}</p>
-              <span className="shrink-0 text-xs font-medium text-muted-foreground">
-                {t("customers.openCount", {
-                  count: formatNumber(customer.openTicketCount, i18n.language),
-                })}
-              </span>
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              <bdi dir="ltr">{customer.email}</bdi>
+    <DataTable
+      surface={false}
+      data={customers}
+      columns={columns}
+      getRowId={(customer) => customer.id}
+      columnWidths={COLUMN_WIDTHS}
+      columnClasses={COLUMN_CLASSES}
+      pagination={{
+        page,
+        pageSize,
+        pageCount,
+        totalCount,
+        onPageChange,
+        ariaLabel: t("customers.pagination"),
+      }}
+      renderMobileCard={(customer) => (
+        <Link
+          className="block p-4 transition-colors hover:bg-table-row-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+          to={`/customers/${customer.id}`}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <p className="font-semibold text-foreground">{customer.name}</p>
+            <span className="shrink-0 text-xs font-medium text-muted-foreground">
+              {t("customers.openCount", {
+                count: formatNumber(customer.openTicketCount, i18n.language),
+              })}
+            </span>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            <bdi dir="ltr">{customer.email}</bdi>
+          </p>
+          {customer.phone && (
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              <bdi dir="ltr">{customer.phone}</bdi>
             </p>
-            {customer.phone && (
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                <bdi dir="ltr">{customer.phone}</bdi>
-              </p>
-            )}
-            <p className="mt-3 border-t border-border-subtle pt-2 text-xs text-muted-foreground">
-              {t("customers.lastInteraction")}: {formatDate(customer.lastInteractionAt, i18n.language)}
-            </p>
-          </Link>
-        ))}
-      </div>
-
-      {pageCount > 1 && (
-        <div className="border-t border-table-border bg-table-background px-3.5 py-2">
-          <DataTablePagination
-            page={page}
-            pageCount={pageCount}
-            pageSize={pageSize}
-            totalCount={totalCount}
-            canPreviousPage={table.getCanPreviousPage()}
-            canNextPage={table.getCanNextPage()}
-            onPreviousPage={() => table.previousPage()}
-            onNextPage={() => table.nextPage()}
-            ariaLabel={t("customers.pagination")}
-          />
-        </div>
+          )}
+          <p className="mt-3 border-t border-border-subtle pt-2 text-xs text-muted-foreground">
+            {t("customers.lastInteraction")}: {formatDate(customer.lastInteractionAt, i18n.language)}
+          </p>
+        </Link>
       )}
-    </>
+    />
   );
-}
-
-function handlePaginationChange(
-  updater: Updater<PaginationState>,
-  current: PaginationState,
-  onPageChange: (page: number) => void
-) {
-  const next = typeof updater === "function" ? updater(current) : updater;
-  if (next.pageIndex !== current.pageIndex) onPageChange(next.pageIndex + 1);
-}
-
-function cellClassName(columnId: string) {
-  if (columnId === "name") return "font-semibold";
-  if (columnId === "openTickets" || columnId === "totalTickets") return "tabular-nums";
-  if (columnId === "lastInteraction") return "whitespace-nowrap text-xs text-muted-foreground";
-  return "text-muted-foreground";
 }

@@ -1,17 +1,8 @@
-import { flexRender, getCoreRowModel, useReactTable, type ColumnDef, type PaginationState, type Updater } from "@tanstack/react-table";
+import { type ColumnDef } from "@tanstack/react-table";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from "@/components/ui/table";
-import { DataTablePagination } from "@/components/shared/data-table/data-table-pagination";
-import { DataTableEmptyRow } from "@/components/shared/data-table/data-table-empty";
+import { DataTable } from "@/components/shared/data-table";
 import { AssigneeCell } from "@/components/shared/data-table/assignee-cell";
 import { TicketPriorityText, TicketStatusBadge } from "./ticket-badges";
 import { formatTicketDate, ticketReference } from "./ticket-format";
@@ -30,6 +21,16 @@ interface TicketTableProps {
   claimingId?: string | null;
   onClaim?: (ticketId: string) => void;
 }
+
+const COLUMN_WIDTHS: Record<string, string> = {
+  ticket: "w-auto",
+  customer: "w-[140px]",
+  status: "w-[155px]",
+  priority: "w-[90px]",
+  category: "w-[120px]",
+  updated: "w-[170px]",
+  agent: "w-[150px]",
+};
 
 export function TicketTable({
   tickets,
@@ -134,134 +135,45 @@ export function TicketTable({
     [i18n.language, t, showClaim, claimingId, onClaim]
   );
 
-  const pagination = useMemo<PaginationState>(
-    () => ({ pageIndex: page - 1, pageSize }),
-    [page, pageSize]
-  );
-
-  const table = useReactTable({
-    data: tickets,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getRowId: (ticket) => ticket.id,
-    manualPagination: true,
-    pageCount,
-    state: { pagination },
-    onPaginationChange: (updater) => changePage(updater, pagination, onPageChange),
-  });
-
   return (
-    <>
-      {/* Desktop Table */}
-      <div className="hidden md:block overflow-x-auto">
-        <Table className="w-full">
-          <colgroup>
-            {table.getAllLeafColumns().map((column) => (
-              <col key={column.id} className={columnClass(column.id)} />
-            ))}
-          </colgroup>
-          <TableHeader>
-            {table.getHeaderGroups().map((group) => (
-              <TableRow key={group.id}>
-                {group.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.length === 0 ? (
-              <DataTableEmptyRow
-                colSpan={table.getVisibleLeafColumns().length}
-                message={emptyMessage}
-              />
-            ) : (
-              table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Mobile Card List */}
-      <div className="divide-y divide-border-subtle bg-table-background md:hidden">
-        {tickets.length === 0 ? (
-          <p className="px-4 py-8 text-center text-xs text-muted-foreground">{emptyMessage}</p>
-        ) : (
-          tickets.map((ticket) => (
-            <Link
-              className="block p-3.5 transition-colors hover:bg-table-row-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
-              to={`/tickets/${ticket.id}`}
-              key={ticket.id}
-            >
-              <div className="flex items-start justify-between gap-2.5">
-                <div>
-                  <p className="font-medium text-[12px] text-foreground">{ticket.subject}</p>
-                  <p className="mt-0.5 font-mono text-[10px] text-muted-foreground" title={ticket.id}>
-                    <bdi dir="ltr">{ticketReference(ticket.id)}</bdi>
-                  </p>
-                </div>
-                <TicketPriorityText priority={ticket.priority} />
-              </div>
-              <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                <TicketStatusBadge status={ticket.status} />
-                <span className="text-[11px] text-muted-foreground">{ticket.customer.name}</span>
-              </div>
-              <p className="mt-2 border-t border-border-subtle pt-1.5 text-[10px] text-muted-foreground">
-                {ticket.assignedAgent?.name ?? t("tickets.unassigned")} · {formatTicketDate(ticket.updatedAt, i18n.language)}
+    <DataTable
+      surface={false}
+      data={tickets}
+      columns={columns}
+      getRowId={(ticket) => ticket.id}
+      columnWidths={COLUMN_WIDTHS}
+      emptyMessage={emptyMessage}
+      pagination={{
+        page,
+        pageSize,
+        pageCount,
+        totalCount,
+        onPageChange,
+        ariaLabel: t("tickets.pagination"),
+      }}
+      renderMobileCard={(ticket) => (
+        <Link
+          className="block p-3.5 transition-colors hover:bg-table-row-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
+          to={`/tickets/${ticket.id}`}
+        >
+          <div className="flex items-start justify-between gap-2.5">
+            <div>
+              <p className="font-medium text-[12px] text-foreground">{ticket.subject}</p>
+              <p className="mt-0.5 font-mono text-[10px] text-muted-foreground" title={ticket.id}>
+                <bdi dir="ltr">{ticketReference(ticket.id)}</bdi>
               </p>
-            </Link>
-          ))
-        )}
-      </div>
-
-      {pageCount > 1 && (
-        <div className="border-t border-table-border bg-table-background px-3.5 py-2">
-          <DataTablePagination
-            page={page}
-            pageCount={pageCount}
-            pageSize={pageSize}
-            totalCount={totalCount}
-            canPreviousPage={table.getCanPreviousPage()}
-            canNextPage={table.getCanNextPage()}
-            onPreviousPage={() => table.previousPage()}
-            onNextPage={() => table.nextPage()}
-            ariaLabel={t("tickets.pagination")}
-          />
-        </div>
+            </div>
+            <TicketPriorityText priority={ticket.priority} />
+          </div>
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            <TicketStatusBadge status={ticket.status} />
+            <span className="text-[11px] text-muted-foreground">{ticket.customer.name}</span>
+          </div>
+          <p className="mt-2 border-t border-border-subtle pt-1.5 text-[10px] text-muted-foreground">
+            {ticket.assignedAgent?.name ?? t("tickets.unassigned")} · {formatTicketDate(ticket.updatedAt, i18n.language)}
+          </p>
+        </Link>
       )}
-    </>
-  );
-}
-
-function changePage(
-  updater: Updater<PaginationState>,
-  current: PaginationState,
-  onPageChange: (page: number) => void
-) {
-  const next = typeof updater === "function" ? updater(current) : updater;
-  if (next.pageIndex !== current.pageIndex) onPageChange(next.pageIndex + 1);
-}
-
-function columnClass(id: string) {
-  return (
-    {
-      ticket: "w-auto",
-      customer: "w-[140px]",
-      status: "w-[155px]",
-      priority: "w-[90px]",
-      category: "w-[120px]",
-      agent: "w-[150px]",
-      updated: "w-[170px]",
-    }[id] ?? ""
+    />
   );
 }

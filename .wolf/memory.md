@@ -790,3 +790,40 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
 | 18:16 | Fix CUSTOMER_REPLY notification targeting — new shared `customerReplyNotificationRecipientIds(db,{ticketId,teamId,assignedAgentId?,excludeUserId?})` in shared/team/team-scope.ts (assigned agent + Ticket.teamId manager + watchers, dedup; ADMIN fallback ONLY when unrouted+unassigned+unwatched). Replaced `ticketOperationalRecipientIds` use in portal.service (also dropped its separate notifyWatchers call), whatsapp.service, email.service, sms.service. `ticketOperationalRecipientIds` kept for escalation/SLA (intended global admin fan-out). | server/src/shared/team/team-scope.ts(+test +8), portal/portal.service.ts(+test +2), integrations/{whatsapp,email,sms}/*.service.ts, whatsapp.test.ts(+1), email.test.ts(+1) | server vitest 775/775, tsc clean, eslint clean | ~40k |
+
+## Session: 2026-09-01 20:49
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 21:06 | shared DataTable+Skeleton standardization slice 1 | shared/skeleton/*, data-table{,-skeleton}.tsx, 8 feature tables, users.test | vitest 748/748, tsc+eslint+build green | ~9k |
+
+## Session: 2026-09-01 21:23
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 21:24 | shared DataTable slice 2: org-sections + dashboard migration | organization-sections.tsx, dashboard-page.tsx, data-table.tsx (minWidth always) | vitest 748/748, tsc+eslint+build green | ~7k |
+| 21:29 | Dashboard Needs-attention table: match canonical Tickets visual system — removed minWidth override (min-w-[68rem]/[54rem] → default 52rem), rem-wide columnWidths → w-auto subject + fixed px matching Tickets, dropped columnClasses, cells to text-[12px]/[11px]/[10px]+line-clamp-1+truncate, local Sla badge → shared SlaStatusDot, custom empty div → DataTableEmptyCard | dashboard-page.tsx, dashboard-page.test.tsx (min-w assertion) | vitest 14/14, tsc green | ~6k |
+
+## Session: 2026-09-01 21:31
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 21:38 | investigate: Dashboard "Needs attention" vs canonical Tickets table — chrome already unified post-migration; residual diffs = column order + agent header align + (data-limited) 1-line customer cell | client/src/features/dashboard/dashboard-page.tsx | reordered dashboard cols to canonical status→priority→sla→updated→agent, centered agent header; tsc+eslint+vitest(55)+build green | ~45k |
+
+## Session: 2026-09-01 22:08
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 22:13 | Unify dashboard Needs-attention table outer shell to Tickets pattern (page-owned DataTableSurface + DataTable surface={false}) | client/src/features/dashboard/dashboard-page.tsx | tsc+14 tests pass | ~14k |
+
+## Session: 2026-09-01 22:15
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 22:20 | dashboard TicketSection: adopt canonical Tickets shell (Surface>Toolbar>DataTable), heading+count moved into toolbar strip, dropped floating DashboardSectionHeader + dashed EmptyCard | dashboard-page.tsx | 14 dashboard + 136 tickets/data-table tests pass, tsc clean | ~9k |
+
+## Session: 2026-09-01 22:21
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 22:28 | migrate Audit Logs table → canonical shared DataTable (one DataTableSurface, columnWidths colgroup, surface=false) | client/src/features/audit-logs/audit-log-page.tsx | tsc+eslint+vitest 748/748+build all green | ~12k |

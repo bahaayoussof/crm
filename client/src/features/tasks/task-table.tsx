@@ -1,17 +1,9 @@
-import {
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-  type ColumnDef,
-  type PaginationState,
-  type Updater,
-} from "@tanstack/react-table";
+import { type ColumnDef } from "@tanstack/react-table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
+import { DataTable } from "@/components/shared/data-table";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
-import { DataTablePagination } from "@/components/shared/data-table/data-table-pagination";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Role } from "@/features/auth/auth.types";
 import { TaskDeleteConfirm } from "./task-delete-confirm";
 import { formatTaskDateTime, isTaskOverdue } from "./task-format";
@@ -38,12 +30,16 @@ interface TaskTableProps {
   onPageChange: (page: number) => void;
 }
 
-const columnClasses: Record<string, string> = {
+const COLUMN_WIDTHS: Record<string, string> = {
   title: "w-auto",
   status: "w-[120px]",
   assignee: "w-[20%]",
   dueAt: "w-[184px]",
   actions: "w-[132px]",
+};
+
+const COLUMN_CLASSES: Record<string, string> = {
+  actions: "text-end",
 };
 
 interface RowActionsShared {
@@ -152,106 +148,54 @@ export function TaskTable({
     [i18n.language, t, currentUserId, currentUserRole, openConfirm, onOpenConfirm, onCloseConfirm],
   );
 
-  const pagination = useMemo<PaginationState>(() => ({ pageIndex: page - 1, pageSize }), [page, pageSize]);
-  const table = useReactTable({
-    data: tasks,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getRowId: (task) => task.id,
-    manualPagination: true,
-    pageCount,
-    state: { pagination },
-    onPaginationChange: (updater) => handlePaginationChange(updater, pagination, onPageChange),
-  });
-
   return (
-    <>
-      <div className="hidden overflow-x-auto md:block">
-        <Table className="min-w-[52rem]">
-          <colgroup>
-            {table.getAllLeafColumns().map((column) => (
-              <col key={column.id} className={columnClasses[column.id] ?? ""} />
-            ))}
-          </colgroup>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead
-                    className={`font-medium ${header.column.id === "actions" ? "text-end" : "text-start"}`}
-                    key={header.id}
-                  >
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id} className="align-top">
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell className={cell.column.id === "actions" ? "text-end" : ""} key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-
-      <div className="divide-y divide-border-subtle bg-table-background md:hidden">
-        {tasks.map((task) => (
-          <div className="p-4" key={task.id}>
-            <div className="flex items-start justify-between gap-3">
-              <Link
-                className="block min-w-0 break-words rounded-sm font-semibold text-foreground line-clamp-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                dir="auto"
-                title={task.title}
-                to={`/tasks/${task.id}`}
-              >
-                {task.title}
-              </Link>
-              <div className="flex shrink-0 flex-col items-end gap-1">
-                <TaskStatusBadge status={task.status} />
-                {isTaskOverdue(task.dueAt, task.status) && <OverdueBadge />}
-              </div>
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              <span dir="auto">{task.assignee.name}</span>
-              <span className="mx-1">·</span>
-              {task.dueAt ? (
-                <bdi dir="ltr">{formatTaskDateTime(task.dueAt, i18n.language)}</bdi>
-              ) : (
-                t("tasks.noDueDate")
-              )}
-            </p>
-            <div className="mt-2.5 flex justify-end">
-              <RowActions task={task} variant="mobile" {...shared} />
+    <DataTable
+      surface={false}
+      data={tasks}
+      columns={columns}
+      getRowId={(task) => task.id}
+      columnWidths={COLUMN_WIDTHS}
+      columnClasses={COLUMN_CLASSES}
+      rowClassName="align-top"
+      pagination={{
+        page,
+        pageSize,
+        pageCount,
+        totalCount,
+        onPageChange,
+        ariaLabel: t("tasks.pagination"),
+      }}
+      renderMobileCard={(task) => (
+        <div className="p-4">
+          <div className="flex items-start justify-between gap-3">
+            <Link
+              className="block min-w-0 break-words rounded-sm font-semibold text-foreground line-clamp-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              dir="auto"
+              title={task.title}
+              to={`/tasks/${task.id}`}
+            >
+              {task.title}
+            </Link>
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              <TaskStatusBadge status={task.status} />
+              {isTaskOverdue(task.dueAt, task.status) && <OverdueBadge />}
             </div>
           </div>
-        ))}
-      </div>
-
-      {pageCount > 1 && (
-        <div className="border-t border-table-border bg-table-background px-3.5 py-2">
-          <DataTablePagination
-            page={page}
-            pageCount={pageCount}
-            pageSize={pageSize}
-            totalCount={totalCount}
-            canPreviousPage={table.getCanPreviousPage()}
-            canNextPage={table.getCanNextPage()}
-            onPreviousPage={() => table.previousPage()}
-            onNextPage={() => table.nextPage()}
-            ariaLabel={t("tasks.pagination")}
-          />
+          <p className="mt-2 text-xs text-muted-foreground">
+            <span dir="auto">{task.assignee.name}</span>
+            <span className="mx-1">·</span>
+            {task.dueAt ? (
+              <bdi dir="ltr">{formatTaskDateTime(task.dueAt, i18n.language)}</bdi>
+            ) : (
+              t("tasks.noDueDate")
+            )}
+          </p>
+          <div className="mt-2.5 flex justify-end">
+            <RowActions task={task} variant="mobile" {...shared} />
+          </div>
         </div>
       )}
-    </>
+    />
   );
 }
 
@@ -332,13 +276,4 @@ function RowActions({
       )}
     </div>
   );
-}
-
-function handlePaginationChange(
-  updater: Updater<PaginationState>,
-  current: PaginationState,
-  onPageChange: (page: number) => void,
-) {
-  const next = typeof updater === "function" ? updater(current) : updater;
-  if (next.pageIndex !== current.pageIndex) onPageChange(next.pageIndex + 1);
 }

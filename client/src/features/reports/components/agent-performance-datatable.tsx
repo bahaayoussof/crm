@@ -1,21 +1,11 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { type ColumnDef } from "@tanstack/react-table";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from "@/components/ui/table";
-import {
-  DataTableSurface,
+  DataTable,
   DataTableToolbar,
   DataTableSearch,
-  DataTablePagination,
-  DataTableSkeleton,
-  DataTableEmptyRow,
   AssigneeCell,
 } from "@/components/shared/data-table";
 import { Badge } from "@/components/ui/badge";
@@ -83,6 +73,25 @@ function SortHeader({
   );
 }
 
+const COLUMN_WIDTHS: Record<string, string> = {
+  name: "w-[30%]",
+  assigned: "w-[14%]",
+  resolved: "w-[14%]",
+  open: "w-[14%]",
+  slaMet: "w-[14%]",
+  avgResponse: "w-[14%]",
+};
+
+const NUMERIC_CELL = "text-end tabular-nums text-[12px] text-table-foreground";
+const COLUMN_CLASSES: Record<string, string> = {
+  name: "text-start",
+  assigned: NUMERIC_CELL,
+  resolved: NUMERIC_CELL,
+  open: NUMERIC_CELL,
+  slaMet: "text-end tabular-nums text-[12px]",
+  avgResponse: NUMERIC_CELL,
+};
+
 export function AgentPerformanceDataTable({
   agents,
   isLoading,
@@ -107,256 +116,177 @@ export function AgentPerformanceDataTable({
   );
 
   const hasSearch = search.trim().length > 0;
+  const emptyMessage = hasSearch
+    ? t("reports.emptyAgentsMatch", {
+        defaultValue: "No agents match “{{search}}”.",
+        search,
+      })
+    : t("reports.emptyAgents", {
+        defaultValue: "No agent performance data found.",
+      });
+
+  const columns = useMemo<ColumnDef<AgentReportRow>[]>(
+    () => [
+      {
+        id: "name",
+        header: () => (
+          <SortHeader
+            column="name"
+            currentSortBy={sortBy}
+            sortOrder={sortOrder}
+            onSortChange={onSortChange}
+            align="start"
+          >
+            {t("reports.agents.name")}
+          </SortHeader>
+        ),
+        cell: ({ row }) => (
+          <AssigneeCell name={row.original.agentName} unassignedLabel={t("tickets.unassigned")} />
+        ),
+      },
+      {
+        id: "assigned",
+        header: () => (
+          <SortHeader column="assigned" currentSortBy={sortBy} sortOrder={sortOrder} onSortChange={onSortChange} align="end">
+            {t("reports.agents.assigned")}
+          </SortHeader>
+        ),
+        cell: ({ row }) => nf.format(row.original.assigned),
+      },
+      {
+        id: "resolved",
+        header: () => (
+          <SortHeader column="resolved" currentSortBy={sortBy} sortOrder={sortOrder} onSortChange={onSortChange} align="end">
+            {t("reports.agents.resolved")}
+          </SortHeader>
+        ),
+        cell: ({ row }) => nf.format(row.original.resolved),
+      },
+      {
+        id: "open",
+        header: () => (
+          <SortHeader column="open" currentSortBy={sortBy} sortOrder={sortOrder} onSortChange={onSortChange} align="end">
+            {t("reports.agents.open")}
+          </SortHeader>
+        ),
+        cell: ({ row }) => nf.format(row.original.open),
+      },
+      {
+        id: "slaMet",
+        header: () => (
+          <SortHeader column="slaMetPercentage" currentSortBy={sortBy} sortOrder={sortOrder} onSortChange={onSortChange} align="end">
+            {t("reports.agents.slaMet")}
+          </SortHeader>
+        ),
+        cell: ({ row }) =>
+          row.original.slaMetPct === null ? (
+            <span className="text-muted-foreground">—</span>
+          ) : (
+            <span
+              className={cn(
+                "font-medium",
+                row.original.slaMetPct >= 90
+                  ? "text-success-foreground"
+                  : row.original.slaMetPct >= 70
+                  ? "text-warning-foreground"
+                  : "text-danger-foreground"
+              )}
+            >
+              {nf.format(row.original.slaMetPct)}%
+            </span>
+          ),
+      },
+      {
+        id: "avgResponse",
+        header: () => (
+          <SortHeader column="avgFirstResponse" currentSortBy={sortBy} sortOrder={sortOrder} onSortChange={onSortChange} align="end">
+            {t("reports.agents.avgResponse")}
+          </SortHeader>
+        ),
+        cell: ({ row }) => <Duration minutes={row.original.averageFirstResponseMinutes} />,
+      },
+    ],
+    [nf, onSortChange, sortBy, sortOrder, t]
+  );
 
   return (
-    <DataTableSurface>
-      {/* 1. Shared Compact Search Toolbar */}
-      <DataTableToolbar>
-        <DataTableSearch
-          value={search}
-          onChange={onSearchChange}
-          placeholder={t("reports.agents.searchPlaceholder", { defaultValue: "Search agents…" })}
-          id="agent-performance-search"
-          ariaLabel={t("reports.agents.searchPlaceholder", { defaultValue: "Search agents…" })}
-        />
-      </DataTableToolbar>
-
-      {/* 2. Loading State */}
-      {isLoading ? (
-        <div className="p-4">
-          <DataTableSkeleton columns={6} rowCount={pageSize > 0 ? Math.min(pageSize, 8) : 5} />
-        </div>
-      ) : isError ? (
-        /* Error State */
-        <div className="p-8 text-center text-muted-foreground">
+    <DataTable
+      data={agents}
+      columns={columns}
+      getRowId={(agent) => agent.agentId}
+      columnWidths={COLUMN_WIDTHS}
+      columnClasses={COLUMN_CLASSES}
+      minWidth="min-w-[50rem]"
+      isLoading={isLoading}
+      loadingRowCount={pageSize > 0 ? Math.min(pageSize, 8) : 5}
+      isError={isError}
+      errorState={
+        <div className="text-center text-muted-foreground">
           <p className="text-xs">{t("reports.loadError")}</p>
           <button type="button" className="button-secondary text-xs mt-3" onClick={onRetry}>
             {t("common.retry")}
           </button>
         </div>
-      ) : (
-        <>
-          {/* 3. Desktop Table View */}
-          <div className="hidden md:block overflow-x-auto">
-            <Table className="min-w-[50rem]">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[30%] text-start">
-                    <SortHeader
-                      column="name"
-                      currentSortBy={sortBy}
-                      sortOrder={sortOrder}
-                      onSortChange={onSortChange}
-                      align="start"
-                    >
-                      {t("reports.agents.name")}
-                    </SortHeader>
-                  </TableHead>
-                  <TableHead className="w-[14%] text-end">
-                    <SortHeader
-                      column="assigned"
-                      currentSortBy={sortBy}
-                      sortOrder={sortOrder}
-                      onSortChange={onSortChange}
-                      align="end"
-                    >
-                      {t("reports.agents.assigned")}
-                    </SortHeader>
-                  </TableHead>
-                  <TableHead className="w-[14%] text-end">
-                    <SortHeader
-                      column="resolved"
-                      currentSortBy={sortBy}
-                      sortOrder={sortOrder}
-                      onSortChange={onSortChange}
-                      align="end"
-                    >
-                      {t("reports.agents.resolved")}
-                    </SortHeader>
-                  </TableHead>
-                  <TableHead className="w-[14%] text-end">
-                    <SortHeader
-                      column="open"
-                      currentSortBy={sortBy}
-                      sortOrder={sortOrder}
-                      onSortChange={onSortChange}
-                      align="end"
-                    >
-                      {t("reports.agents.open")}
-                    </SortHeader>
-                  </TableHead>
-                  <TableHead className="w-[14%] text-end">
-                    <SortHeader
-                      column="slaMetPercentage"
-                      currentSortBy={sortBy}
-                      sortOrder={sortOrder}
-                      onSortChange={onSortChange}
-                      align="end"
-                    >
-                      {t("reports.agents.slaMet")}
-                    </SortHeader>
-                  </TableHead>
-                  <TableHead className="w-[14%] text-end">
-                    <SortHeader
-                      column="avgFirstResponse"
-                      currentSortBy={sortBy}
-                      sortOrder={sortOrder}
-                      onSortChange={onSortChange}
-                      align="end"
-                    >
-                      {t("reports.agents.avgResponse")}
-                    </SortHeader>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {agents.length === 0 ? (
-                  <DataTableEmptyRow
-                    colSpan={6}
-                    message={
-                      hasSearch
-                        ? t("reports.emptyAgentsMatch", {
-                            defaultValue: "No agents match “{{search}}”.",
-                            search,
-                          })
-                        : t("reports.emptyAgents", {
-                            defaultValue: "No agent performance data found.",
-                          })
-                    }
-                  />
-                ) : (
-                  agents.map((agent) => (
-                    <TableRow key={agent.agentId}>
-                      {/* Agent column using shared AssigneeCell */}
-                      <TableCell className="text-start">
-                        <AssigneeCell
-                          name={agent.agentName}
-                          unassignedLabel={t("tickets.unassigned")}
-                        />
-                      </TableCell>
-
-                      {/* Numeric columns matching standard CRM table typography */}
-                      <TableCell className="text-end tabular-nums text-[12px] text-table-foreground">
-                        {nf.format(agent.assigned)}
-                      </TableCell>
-                      <TableCell className="text-end tabular-nums text-[12px] text-table-foreground">
-                        {nf.format(agent.resolved)}
-                      </TableCell>
-                      <TableCell className="text-end tabular-nums text-[12px] text-table-foreground">
-                        {nf.format(agent.open)}
-                      </TableCell>
-
-                      {/* SLA Met % with subtle semantic styling */}
-                      <TableCell className="text-end tabular-nums text-[12px]">
-                        {agent.slaMetPct === null ? (
-                          <span className="text-muted-foreground">—</span>
-                        ) : (
-                          <span
-                            className={cn(
-                              "font-medium",
-                              agent.slaMetPct >= 90
-                                ? "text-success-foreground"
-                                : agent.slaMetPct >= 70
-                                ? "text-warning-foreground"
-                                : "text-danger-foreground"
-                            )}
-                          >
-                            {nf.format(agent.slaMetPct)}%
-                          </span>
-                        )}
-                      </TableCell>
-
-                      {/* Avg Response Duration */}
-                      <TableCell className="text-end tabular-nums text-[12px] text-table-foreground">
-                        <Duration minutes={agent.averageFirstResponseMinutes} />
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* 4. Mobile Card View */}
-          <div className="divide-y divide-border-subtle bg-table-background md:hidden">
-            {agents.length === 0 ? (
-              <p className="px-4 py-8 text-center text-xs text-muted-foreground">
-                {hasSearch
-                  ? t("reports.emptyAgentsMatch", {
-                      defaultValue: "No agents match “{{search}}”.",
-                      search,
-                    })
-                  : t("reports.emptyAgents", {
-                      defaultValue: "No agent performance data found.",
-                    })}
-              </p>
+      }
+      emptyMessage={emptyMessage}
+      toolbar={
+        <DataTableToolbar>
+          <DataTableSearch
+            value={search}
+            onChange={onSearchChange}
+            placeholder={t("reports.agents.searchPlaceholder", { defaultValue: "Search agents…" })}
+            id="agent-performance-search"
+            ariaLabel={t("reports.agents.searchPlaceholder", { defaultValue: "Search agents…" })}
+          />
+        </DataTableToolbar>
+      }
+      pagination={{
+        page,
+        pageSize,
+        pageCount,
+        totalCount,
+        onPageChange,
+        alwaysShow: totalCount > 0,
+      }}
+      renderMobileCard={(agent) => (
+        <div className="p-3.5 space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <AssigneeCell name={agent.agentName} unassignedLabel={t("tickets.unassigned")} />
+            {agent.slaMetPct !== null ? (
+              <Badge
+                size="sm"
+                variant={
+                  agent.slaMetPct >= 90 ? "success" : agent.slaMetPct >= 70 ? "warning" : "danger"
+                }
+              >
+                {`${nf.format(agent.slaMetPct)}% SLA`}
+              </Badge>
             ) : (
-              agents.map((agent) => (
-                <div key={agent.agentId} className="p-3.5 space-y-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <AssigneeCell
-                      name={agent.agentName}
-                      unassignedLabel={t("tickets.unassigned")}
-                    />
-                    {agent.slaMetPct !== null ? (
-                      <Badge
-                        size="sm"
-                        variant={
-                          agent.slaMetPct >= 90
-                            ? "success"
-                            : agent.slaMetPct >= 70
-                            ? "warning"
-                            : "danger"
-                        }
-                      >
-                        {`${nf.format(agent.slaMetPct)}% SLA`}
-                      </Badge>
-                    ) : (
-                      <span className="text-[11px] text-muted-foreground">—</span>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-[11px] pt-1.5 border-t border-border-subtle">
-                    <div>
-                      <span className="text-muted-foreground">{t("reports.agents.assigned")}: </span>
-                      <span className="font-medium text-foreground tabular-nums">{nf.format(agent.assigned)}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">{t("reports.agents.resolved")}: </span>
-                      <span className="font-medium text-foreground tabular-nums">{nf.format(agent.resolved)}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">{t("reports.agents.open")}: </span>
-                      <span className="font-medium text-foreground tabular-nums">{nf.format(agent.open)}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">{t("reports.agents.avgResponse")}: </span>
-                      <span className="font-medium text-foreground tabular-nums">
-                        <Duration minutes={agent.averageFirstResponseMinutes} />
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))
+              <span className="text-[11px] text-muted-foreground">—</span>
             )}
           </div>
-        </>
-      )}
-
-      {/* 5. Shared Standard DataTable Pagination Footer */}
-      {!isLoading && !isError && totalCount > 0 && (
-        <div className="border-t border-table-border bg-table-background px-3.5 py-2">
-          <DataTablePagination
-            page={page}
-            pageSize={pageSize}
-            pageCount={pageCount}
-            totalCount={totalCount}
-            canPreviousPage={page > 1}
-            canNextPage={page < pageCount}
-            onPreviousPage={() => onPageChange(page - 1)}
-            onNextPage={() => onPageChange(page + 1)}
-          />
+          <div className="grid grid-cols-2 gap-2 text-[11px] pt-1.5 border-t border-border-subtle">
+            <div>
+              <span className="text-muted-foreground">{t("reports.agents.assigned")}: </span>
+              <span className="font-medium text-foreground tabular-nums">{nf.format(agent.assigned)}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">{t("reports.agents.resolved")}: </span>
+              <span className="font-medium text-foreground tabular-nums">{nf.format(agent.resolved)}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">{t("reports.agents.open")}: </span>
+              <span className="font-medium text-foreground tabular-nums">{nf.format(agent.open)}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">{t("reports.agents.avgResponse")}: </span>
+              <span className="font-medium text-foreground tabular-nums">
+                <Duration minutes={agent.averageFirstResponseMinutes} />
+              </span>
+            </div>
+          </div>
         </div>
       )}
-    </DataTableSurface>
+    />
   );
 }

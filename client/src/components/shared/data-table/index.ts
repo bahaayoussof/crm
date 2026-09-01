@@ -5,6 +5,7 @@ export * from "./data-table-search";
 export * from "./data-table-filters-popover";
 export * from "./data-table-pagination";
 export * from "./data-table-skeleton";
+export * from "@/components/shared/skeleton";
 export * from "./data-table-empty";
 export * from "./data-table-row-actions";
 export * from "./assignee-cell";

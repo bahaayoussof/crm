@@ -1,17 +1,9 @@
-import { flexRender, getCoreRowModel, useReactTable, type ColumnDef, type PaginationState, type Updater } from "@tanstack/react-table";
+import { type ColumnDef } from "@tanstack/react-table";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from "@/components/ui/table";
+import { DataTable } from "@/components/shared/data-table";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
-import { DataTablePagination } from "@/components/shared/data-table/data-table-pagination";
 import { formatQuickReplyDate } from "./quick-reply-format";
 import { useDeleteQuickReply } from "./quick-reply-hooks";
 import { PencilIcon, SpinnerIcon, TrashIcon } from "./quick-reply-icons";
@@ -26,11 +18,15 @@ interface QuickReplyTableProps {
   onPageChange: (page: number) => void;
 }
 
-const columnClasses: Record<string, string> = {
+const COLUMN_WIDTHS: Record<string, string> = {
   title: "w-[24%]",
   body: "w-auto",
   updatedAt: "w-[184px]",
   actions: "w-[116px]",
+};
+
+const COLUMN_CLASSES: Record<string, string> = {
+  actions: "text-end",
 };
 
 export function QuickReplyTable({
@@ -93,110 +89,52 @@ export function QuickReplyTable({
     [i18n.language, t]
   );
 
-  const pagination = useMemo<PaginationState>(
-    () => ({ pageIndex: page - 1, pageSize }),
-    [page, pageSize]
-  );
-  const table = useReactTable({
-    data: quickReplies,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getRowId: (quickReply) => quickReply.id,
-    manualPagination: true,
-    pageCount,
-    state: { pagination },
-    onPaginationChange: (updater) => handlePaginationChange(updater, pagination, onPageChange),
-  });
-
   return (
-    <>
-      <div className="hidden md:block overflow-x-auto">
-        <Table className="min-w-[52rem]">
-          <colgroup>
-            {table.getAllLeafColumns().map((column) => (
-              <col key={column.id} className={columnClasses[column.id] ?? ""} />
-            ))}
-          </colgroup>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead
-                    className={`font-medium ${header.column.id === "actions" ? "text-end" : "text-start"}`}
-                    key={header.id}
-                  >
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id} className="align-top">
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell
-                    className={cell.column.id === "actions" ? "text-end" : ""}
-                    key={cell.id}
-                  >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-
-      <div className="divide-y divide-border-subtle bg-table-background md:hidden">
-        {quickReplies.map((quickReply) => (
-          <div className="p-4" key={quickReply.id}>
-            <Link
-              className="block min-w-0 rounded-sm break-words font-semibold text-foreground line-clamp-2 hover:underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              dir="auto"
-              title={quickReply.title}
-              to={`/quick-replies/${quickReply.id}/edit`}
-            >
-              {quickReply.title}
-            </Link>
-            <p
-              className="mt-1.5 line-clamp-3 whitespace-pre-line break-words [overflow-wrap:anywhere] text-sm text-muted-foreground"
-              dir="auto"
-              title={quickReply.body}
-            >
-              {quickReply.body}
-            </p>
-            <p className="mt-2.5 border-t border-border-subtle pt-2 text-xs text-muted-foreground">
-              {t("quickReplies.columns.updated")}:{" "}
-              <bdi dir="ltr">{formatQuickReplyDate(quickReply.updatedAt, i18n.language)}</bdi>
-              <span className="mx-1">·</span>
-              <span dir="auto">{quickReply.createdBy.name}</span>
-            </p>
-            <div className="mt-2.5 flex justify-end">
-              <RowActions quickReply={quickReply} />
-            </div>
+    <DataTable
+      surface={false}
+      data={quickReplies}
+      columns={columns}
+      getRowId={(quickReply) => quickReply.id}
+      columnWidths={COLUMN_WIDTHS}
+      columnClasses={COLUMN_CLASSES}
+      rowClassName="align-top"
+      pagination={{
+        page,
+        pageSize,
+        pageCount,
+        totalCount,
+        onPageChange,
+        ariaLabel: t("quickReplies.pagination"),
+      }}
+      renderMobileCard={(quickReply) => (
+        <div className="p-4">
+          <Link
+            className="block min-w-0 rounded-sm break-words font-semibold text-foreground line-clamp-2 hover:underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            dir="auto"
+            title={quickReply.title}
+            to={`/quick-replies/${quickReply.id}/edit`}
+          >
+            {quickReply.title}
+          </Link>
+          <p
+            className="mt-1.5 line-clamp-3 whitespace-pre-line break-words [overflow-wrap:anywhere] text-sm text-muted-foreground"
+            dir="auto"
+            title={quickReply.body}
+          >
+            {quickReply.body}
+          </p>
+          <p className="mt-2.5 border-t border-border-subtle pt-2 text-xs text-muted-foreground">
+            {t("quickReplies.columns.updated")}:{" "}
+            <bdi dir="ltr">{formatQuickReplyDate(quickReply.updatedAt, i18n.language)}</bdi>
+            <span className="mx-1">·</span>
+            <span dir="auto">{quickReply.createdBy.name}</span>
+          </p>
+          <div className="mt-2.5 flex justify-end">
+            <RowActions quickReply={quickReply} />
           </div>
-        ))}
-      </div>
-
-      {pageCount > 1 && (
-        <div className="border-t border-table-border bg-table-background px-3.5 py-2">
-          <DataTablePagination
-            page={page}
-            pageCount={pageCount}
-            pageSize={pageSize}
-            totalCount={totalCount}
-            canPreviousPage={table.getCanPreviousPage()}
-            canNextPage={table.getCanNextPage()}
-            onPreviousPage={() => table.previousPage()}
-            onNextPage={() => table.nextPage()}
-            ariaLabel={t("quickReplies.pagination")}
-          />
         </div>
       )}
-    </>
+    />
   );
 }
 
@@ -321,13 +259,4 @@ function RowActions({ quickReply }: { quickReply: QuickReply }) {
       )}
     </div>
   );
-}
-
-function handlePaginationChange(
-  updater: Updater<PaginationState>,
-  current: PaginationState,
-  onPageChange: (page: number) => void
-) {
-  const next = typeof updater === "function" ? updater(current) : updater;
-  if (next.pageIndex !== current.pageIndex) onPageChange(next.pageIndex + 1);
 }

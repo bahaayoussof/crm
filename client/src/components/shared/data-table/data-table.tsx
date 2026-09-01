@@ -29,23 +29,43 @@ export interface DataTablePaginationConfig {
   totalCount?: number;
   onPageChange?: (page: number) => void;
   ariaLabel?: string;
+  /**
+   * Render the footer even on a single page (e.g. to keep a "Showing 1–N of N"
+   * result count visible). Default: footer only shows when there is more than
+   * one page.
+   */
+  alwaysShow?: boolean;
 }
+
+type ClassResolver = Record<string, string> | ((columnId: string) => string);
 
 export interface DataTableProps<TData> {
   data: TData[];
   columns: ColumnDef<TData>[];
   getRowId?: (item: TData) => string;
+  /** Toolbar content — rendered flush inside the same bordered surface. */
   toolbar?: ReactNode;
   pagination?: DataTablePaginationConfig;
   isLoading?: boolean;
   loadingRowCount?: number;
   isError?: boolean;
   errorState?: ReactNode;
+  /** Shown in the table body when there are no rows (string or custom node). */
   emptyMessage?: ReactNode;
+  /** Optional action rendered under `emptyMessage`. */
+  emptyAction?: ReactNode;
   renderMobileCard?: (item: TData, index: number) => ReactNode;
-  columnClasses?: Record<string, string> | ((columnId: string) => string);
+  /** Per-column `<col>` width hints (Tailwind classes) — drives a `<colgroup>`. */
+  columnWidths?: Record<string, string>;
+  /** Per-column extra classes applied to both the header cell and the body cell. */
+  columnClasses?: ClassResolver;
+  /** Extra class(es) for every body `<tr>`. */
+  rowClassName?: string | ((item: TData, index: number) => string);
+  /** Min-width (horizontal-scroll target) for the inner table. */
   minWidth?: string;
   meta?: TableMeta<TData>;
+  /** Set `false` to render without the bordered surface (caller provides it). */
+  surface?: boolean;
   className?: string;
 }
 
@@ -60,10 +80,14 @@ export function DataTable<TData>({
   isError,
   errorState,
   emptyMessage,
+  emptyAction,
   renderMobileCard,
+  columnWidths,
   columnClasses,
+  rowClassName,
   minWidth = "min-w-[52rem]",
   meta,
+  surface = true,
   className,
 }: DataTableProps<TData>) {
   const paginationState = useMemo<PaginationState>(
@@ -99,45 +123,61 @@ export function DataTable<TData>({
     if (typeof columnClasses === "function") return columnClasses(colId);
     return columnClasses[colId] ?? "";
   };
+  const getRowClass = (item: TData, index: number) =>
+    typeof rowClassName === "function" ? rowClassName(item, index) : rowClassName;
 
-  return (
-    <DataTableSurface className={className}>
-      {/* Optional Toolbar */}
+  const leafColumns = table.getAllLeafColumns();
+
+  const showPagination =
+    pagination &&
+    (pagination.alwaysShow ||
+      pagination.pageCount > 1 ||
+      (pagination.totalCount !== undefined &&
+        pagination.totalCount > (pagination.pageSize ?? 20)));
+
+  const content = (
+    <>
       {toolbar}
 
-      {/* Loading State */}
       {isLoading ? (
         <DataTableSkeleton
-          columns={columns.length}
+          columns={
+            columnWidths
+              ? leafColumns.map((col) => ({ width: columnWidths[col.id] }))
+              : columns.length
+          }
           rowCount={loadingRowCount}
         />
       ) : isError ? (
-        /* Error State */
         <div className="p-6">{errorState}</div>
       ) : (
         <>
-          {/* Desktop Table View */}
-          <div className="hidden md:block overflow-x-auto">
-            <Table className={minWidth}>
+          {/* Desktop table */}
+          <div className="hidden overflow-x-auto md:block">
+            <Table className={cn(minWidth, columnWidths && "w-full")}>
+              {columnWidths && (
+                <colgroup>
+                  {leafColumns.map((col) => (
+                    <col key={col.id} className={columnWidths[col.id] ?? ""} />
+                  ))}
+                </colgroup>
+              )}
               <TableHeader>
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => {
-                      const colClass = getColClass(header.column.id);
-                      return (
-                        <TableHead
-                          key={header.id}
-                          className={cn(colClass)}
-                        >
-                          {header.isPlaceholder
-                            ? null
-                            : flexRender(
-                                header.column.columnDef.header,
-                                header.getContext()
-                              )}
-                        </TableHead>
-                      );
-                    })}
+                    {headerGroup.headers.map((header) => (
+                      <TableHead
+                        key={header.id}
+                        className={cn(getColClass(header.column.id))}
+                      >
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
+                      </TableHead>
+                    ))}
                   </TableRow>
                 ))}
               </TableHeader>
@@ -146,24 +186,25 @@ export function DataTable<TData>({
                   <DataTableEmptyRow
                     colSpan={table.getVisibleLeafColumns().length}
                     message={emptyMessage}
+                    action={emptyAction}
                   />
                 ) : (
-                  table.getRowModel().rows.map((row) => (
-                    <TableRow key={row.id}>
-                      {row.getVisibleCells().map((cell) => {
-                        const colClass = getColClass(cell.column.id);
-                        return (
-                          <TableCell
-                            key={cell.id}
-                            className={cn(colClass)}
-                          >
-                            {flexRender(
-                              cell.column.columnDef.cell,
-                              cell.getContext()
-                            )}
-                          </TableCell>
-                        );
-                      })}
+                  table.getRowModel().rows.map((row, index) => (
+                    <TableRow
+                      key={row.id}
+                      className={cn(getRowClass(row.original, index))}
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell
+                          key={cell.id}
+                          className={cn(getColClass(cell.column.id))}
+                        >
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext()
+                          )}
+                        </TableCell>
+                      ))}
                     </TableRow>
                   ))
                 )}
@@ -171,7 +212,7 @@ export function DataTable<TData>({
             </Table>
           </div>
 
-          {/* Mobile Card List View (if provided) */}
+          {/* Mobile card list */}
           {renderMobileCard && (
             <div className="divide-y divide-border-subtle bg-table-background md:hidden">
               {data.length === 0 ? (
@@ -194,8 +235,7 @@ export function DataTable<TData>({
         </>
       )}
 
-      {/* Pagination Footer */}
-      {pagination && (pagination.pageCount > 1 || (pagination.totalCount !== undefined && pagination.totalCount > (pagination.pageSize ?? 20))) && (
+      {showPagination && (
         <div className="border-t border-table-border bg-table-background px-3.5 py-2">
           <DataTablePagination
             page={pagination.page}
@@ -210,6 +250,11 @@ export function DataTable<TData>({
           />
         </div>
       )}
-    </DataTableSurface>
+    </>
   );
+
+  if (surface) {
+    return <DataTableSurface className={className}>{content}</DataTableSurface>;
+  }
+  return <div className={className}>{content}</div>;
 }
