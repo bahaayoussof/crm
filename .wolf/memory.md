@@ -777,3 +777,10 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 |------|--------|---------|---------|--------|
 | 16:35 | Add searchable country dropdown to shared PhoneInput (name+dial code, i18n, kbd nav, RTL) | phone-input.tsx, phone-input.test.tsx, en/ar translation.json | rewrote on usePhoneInput hook + custom dropdown; 17 tests pass, tsc/lint/build green | ~45k |
 | 17:35 | Implement provider-abstracted TextBee Cloud SMS outbound/inbound, signed webhook, ticket integration, text-only UI, docs/tests | server integrations/sms, ticket service/tests, client ticket workspace/types/i18n, docs 05/17/19/23 | server full tests/typecheck + focused lint green; client typecheck/build green; full client 745/746 with unrelated timeout, rerun blocked by Vite EPERM | ~55k |
+| 17:49 | Fix ticket PATCH Prisma P2028 on remote pooled DB by bounding only updateTicket interactive transaction at 15s | server/src/modules/tickets/ticket.service.ts | typecheck + focused lint + ticket tests 84/84 green | ~8k |
+
+## Session: 2026-09-01 17:50
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 18:00 | Proactive SMS/Email/WhatsApp ticket creation: channel Select on New Ticket form + per-channel customer-contact validation (backend + client) | server ticket.schema.ts / ticket.service.ts / ticket.test.ts, client ticket-form-page.tsx / ticket.schemas.ts / ticket.types.ts / ticket-pages.test.tsx / quick-reply-composer.test.tsx, en+ar translation.json | server 764/764, client tickets 136 + pages/composer 75, tsc x2 + lint + build + diff --check green | ~45k |

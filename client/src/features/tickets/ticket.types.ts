@@ -1,6 +1,10 @@
 export type TicketStatus = "OPEN" | "IN_PROGRESS" | "WAITING_CUSTOMER" | "RESOLVED" | "CLOSED" | "ESCALATED";
 export type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 export type TicketChannel = "WEB" | "EMAIL" | "WHATSAPP" | "SMS" | "LIVE_CHAT";
+// Channels an internal user may pick when proactively creating a ticket. Single
+// source of truth on the client — the form and its schema both derive from this.
+export const TICKET_CREATE_CHANNELS = ["WEB", "EMAIL", "WHATSAPP", "SMS"] as const;
+export type TicketCreateChannel = (typeof TICKET_CREATE_CHANNELS)[number];
 export type SlaState = "ON_TRACK" | "AT_RISK" | "BREACHED" | "MET" | "NOT_CONFIGURED";
 export type SlaTarget = "FIRST_RESPONSE" | "RESOLUTION" | null;
 export interface TicketPerson { id: string; name: string; email: string }
@@ -32,6 +36,7 @@ export type TicketListScope = "mine" | "unassigned";
 export interface TicketFilters { search: string; page: number; limit: number; scope?: TicketListScope; status?: TicketStatus; priority?: TicketPriority; categoryId?: string; assignedAgentId?: string; customerId?: string; departmentId?: string; branchId?: string }
 export interface TicketListResponse { data: TicketListItem[]; meta: { page: number; limit: number; total: number; totalPages: number } }
 export type AgentOption = TicketPerson & { teamId: string | null };
-export interface TicketCreateValues { customerId: string; subject: string; description: string; priority: TicketPriority; categoryId?: string | null; assignedAgentId?: string | null; departmentId?: string | null; teamId?: string | null }
-export type TicketUpdateValues = Partial<Omit<TicketCreateValues, "customerId"> & { status: TicketStatus }>;
+export interface TicketCreateValues { customerId: string; subject: string; description: string; priority: TicketPriority; channel: TicketCreateChannel; categoryId?: string | null; assignedAgentId?: string | null; departmentId?: string | null; teamId?: string | null }
+// `channel` is fixed at creation and never updated (it drives provider routing).
+export type TicketUpdateValues = Partial<Omit<TicketCreateValues, "customerId" | "channel"> & { status: TicketStatus }>;
 export interface TicketConversationValues { body: string }

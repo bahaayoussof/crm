@@ -400,6 +400,14 @@ describe("TicketConversation imperative reply insertion (AI 'Insert into Reply')
     await openAndPick(/Greeting/);
     await waitFor(() => expect(replyText()).toBe("Intro. Hello and welcome to our support team."));
   });
+
+  it("hides the Attach file trigger for an SMS-channel ticket (text only)", () => {
+    renderConversation({ channel: "WEB" });
+    expect(screen.getByRole("button", { name: "Attach file" })).toBeInTheDocument();
+    cleanup();
+    renderConversation({ channel: "SMS" });
+    expect(screen.queryByRole("button", { name: "Attach file" })).not.toBeInTheDocument();
+  });
 });
 
 describe("quick reply picker is absent from the Customer Portal", () => {

@@ -11,6 +11,7 @@ import { CustomerCombobox } from "./customer-combobox";
 import { getTicketError } from "./ticket-error";
 import { useAgents, useCategories, useCreateTicket, useTicket, useUpdateTicket } from "./ticket-hooks";
 import { ticketFormSchema, type TicketFormValues } from "./ticket.schemas";
+import { TICKET_CREATE_CHANNELS } from "./ticket.types";
 import { TicketPage, TicketSkeleton, TicketState } from "./ticket-ui";
 import {
   TicketFormActions,
@@ -40,7 +41,7 @@ export function TicketFormPage() {
   const { control, register, reset, setValue, handleSubmit, formState: { errors, isSubmitting } } = useForm<TicketFormValues>({
     resolver: zodResolver(ticketFormSchema),
     defaultValues: {
-      customerId: "", subject: "", description: "", priority: "MEDIUM", categoryId: "", assignedAgentId: "",
+      customerId: "", subject: "", description: "", priority: "MEDIUM", channel: "WEB", categoryId: "", assignedAgentId: "",
       departmentId: "", teamId: "",
     },
   });
@@ -50,6 +51,9 @@ export function TicketFormPage() {
   // owns it) and the agent list is server-scoped to their team.
   const departmentId = (useWatch({ control, name: "departmentId" }) as string | undefined) ?? "";
   const teamId = (useWatch({ control, name: "teamId" }) as string | undefined) ?? "";
+  const channel = (useWatch({ control, name: "channel" }) as TicketFormValues["channel"] | undefined) ?? "WEB";
+  const channelOptions = TICKET_CREATE_CHANNELS.map((value) => ({ value, label: t(`tickets.channel.${value}`) }));
+  const channelHint = channel === "WEB" ? null : t(`tickets.channelHint.${channel}`);
 
   const departments = useDepartmentOptions({ enabled: isAdmin });
   const teams = useTeamOptions(departmentId || undefined, { enabled: isAdmin && Boolean(departmentId) });
@@ -137,6 +141,7 @@ export function TicketFormPage() {
             subject: values.subject,
             description: values.description,
             priority: values.priority,
+            channel: values.channel,
             categoryId: values.categoryId || null,
             ...(canAssign && { assignedAgentId: values.assignedAgentId || null }),
             ...routing,
@@ -184,6 +189,27 @@ export function TicketFormPage() {
                     )}
                   />
                 </Field>
+              )}
+              {!editing && (
+                <div className="space-y-1.5">
+                  <Controller
+                    name="channel"
+                    control={control}
+                    render={({ field }) => (
+                      <AppSelectField
+                        id="ticket-channel"
+                        label={t("tickets.channelLabel")}
+                        labelClassName="block text-sm font-medium text-foreground"
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        options={channelOptions}
+                      />
+                    )}
+                  />
+                  {channelHint && (
+                    <p className="text-xs text-muted-foreground" role="status">{channelHint}</p>
+                  )}
+                </div>
               )}
               <Field id="ticket-subject" label={t("tickets.subject")} error={errors.subject?.message ? t(errors.subject.message) : undefined}>
                 <input id="ticket-subject" className="input" aria-invalid={Boolean(errors.subject)} {...register("subject")} />

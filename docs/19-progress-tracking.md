@@ -2,6 +2,8 @@
 
 Last Updated: 2026-09-01 (`feature/sms-integration` — TextBee Cloud SMS, ADR-051). Implemented on branch and remains unstaged/uncommitted. Provider-abstracted outbound SMS is wired through the existing ticket reply endpoint with transaction rollback on TextBee failure; signed/idempotent inbound webhook processing reuses customers/active SMS tickets or creates unassigned MEDIUM tickets, applies customer-reply workflow, team-scoped notifications, and normal realtime events. SMS attachment sending is disabled. Live TextBee/Android device and browser verification remain manual.
 
+Runtime follow-up: ticket PATCH on the remote pooled database exceeded Prisma's five-second interactive-transaction default (`P2028` at 5.194s). The atomic `updateTicket` operation now has an operation-local 15-second timeout; no global timeout or transaction boundary was changed. Server typecheck, focused lint, and ticket tests 84/84 pass.
+
 ---
 
 Last Updated: 2026-09-01 (`feature/team-based-manager-scope` — **Team-Based Manager Scope**, ADR-050). Implemented and automated-verified end-to-end (backend + frontend); branched from `master` `38d5d6c`; changes are unstaged and uncommitted.

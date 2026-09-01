@@ -2,6 +2,7 @@ import { Channel, Prisma, Role, TicketStatus } from "@prisma/client";
 import { randomBytes, randomUUID } from "node:crypto";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
+import { normalizePhoneNumber } from "../../shared/utils/phone.js";
 import { deriveSla } from "../../shared/sla/derive-sla.js";
 import { slaFilterWhere } from "../../shared/sla/sla-filter.js";
 import { createNotifications } from "../notifications/notification.service.js";
@@ -272,6 +273,9 @@ export async function createTicket(input: CreateTicketInput, actor: Actor, reque
   return withRealtimeOutbox(async () => {
    const ticket = await prisma.$transaction(async (tx) => {
     const relations = await validateRelations(tx, creationInput);
+    // Channel contact requirement — reject before any row is written so a partial
+    // ticket is never created (structured 422, localized on the client).
+    assertCustomerReachableForChannel(creationInput.channel, relations.customer);
     if (creationInput.assignedAgentId) {
       assertAgentAssignableToTicket(creationInput.teamId ?? null, relations.agent?.teamId ?? null);
     }
@@ -440,6 +444,12 @@ export async function updateTicket(ticketId: string, input: UpdateTicketInput, a
       (input.departmentId !== undefined && input.departmentId !== current.departmentId) ||
       (input.branchId !== undefined && input.branchId !== current.branchId);
     return { updated, changed };
+   }, {
+    // This atomic update can include relation validation, SLA recalculation,
+    // history/audit writes, assignment/escalation notifications, and watcher
+    // fan-out. Remote pooled PostgreSQL can legitimately take longer than
+    // Prisma's 5s interactive-transaction default across those round trips.
+    timeout: 15_000,
    });
    // Only signal when visible ticket state actually changed — a no-op PATCH stays quiet.
    if (changed) emitTicketUpdated({ ticketId, assignedAgentId: updated.assignedAgent?.id ?? null, customerId: updated.customer?.id ?? null, teamId: updated.teamId });
@@ -544,7 +554,7 @@ function validateTransition(from: TicketStatus, to: TicketStatus, role: Role) {
 }
 
 async function validateRelations(tx: Prisma.TransactionClient, input: Partial<CreateTicketInput & UpdateTicketInput>, organization?: { departmentId?: string | null; branchId?: string | null; teamId?: string | null }) {
-  const customer = input.customerId ? await tx.customer.findUnique({ where: { id: input.customerId }, select: { id: true } }) : null;
+  const customer = input.customerId ? await tx.customer.findUnique({ where: { id: input.customerId }, select: { id: true, phone: true, email: true } }) : null;
   if (input.customerId && !customer) throw new AppError(404, "CUSTOMER_NOT_FOUND", "Customer not found");
   const agent = input.assignedAgentId ? await tx.user.findFirst({ where: { id: input.assignedAgentId, role: Role.AGENT }, select: { id: true, name: true, teamId: true } }) : null;
   if (input.assignedAgentId && !agent) throw new AppError(400, "INVALID_ASSIGNED_AGENT", "Assigned user must be an agent");
@@ -566,7 +576,39 @@ async function validateRelations(tx: Prisma.TransactionClient, input: Partial<Cr
   if (team && effectiveDepartmentId && team.departmentId !== effectiveDepartmentId) {
     throw new AppError(400, "TEAM_DEPARTMENT_MISMATCH", "Team does not belong to the ticket's department");
   }
-  return { agent, category, team };
+  return { agent, category, team, customer };
+}
+
+/**
+ * Contact-channel guard for proactively created tickets. The composer in Ticket
+ * Details sends subsequent replies through the channel's provider, so the
+ * customer must be reachable on that channel at creation time.
+ *
+ *   SMS / WHATSAPP → a valid international phone number (same normalization the
+ *                    SMS and WhatsApp integrations use)
+ *   EMAIL          → an email address
+ *   WEB            → no external contact requirement
+ */
+function assertCustomerReachableForChannel(
+  channel: Channel,
+  customer: { phone: string | null; email: string | null } | null,
+) {
+  if (channel === Channel.SMS || channel === Channel.WHATSAPP) {
+    if (!customer?.phone || !normalizePhoneNumber(customer.phone)) {
+      throw new AppError(
+        422,
+        "CUSTOMER_PHONE_REQUIRED",
+        `Add a valid international phone number to the customer before creating a ${channel} ticket`,
+      );
+    }
+  }
+  if (channel === Channel.EMAIL && !customer?.email) {
+    throw new AppError(
+      422,
+      "CUSTOMER_EMAIL_REQUIRED",
+      "Add an email address to the customer before creating an email ticket",
+    );
+  }
 }
 
 function history(ticketId: string, actorUserId: string, action: string, oldValue: string | null, newValue: string | null): Prisma.TicketHistoryCreateManyInput {

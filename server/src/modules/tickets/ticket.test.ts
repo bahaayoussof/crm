@@ -269,6 +269,66 @@ describe("ticket API", () => {
     expect(invalidAgent.status).toBe(400); expect(invalidAgent.body.error.code).toBe("INVALID_ASSIGNED_AGENT");
   });
 
+  const createBody = (channel: string) => ({ subject: "Proactive outreach", description: "Reaching out to the customer", customerId: "ce83f10dcd2c68747c3f3ba14", channel });
+
+  it("creates a WEB ticket and persists the selected channel", async () => {
+    const response = await request(app).post("/api/tickets").set(auth()).send(createBody("WEB"));
+    expect(response.status).toBe(201);
+    expect(mocks.ticketCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ channel: "WEB" }) }));
+  });
+
+  it("creates an SMS ticket when the customer has a valid phone number", async () => {
+    mocks.customerFind.mockResolvedValue({ id: "ce83f10dcd2c68747c3f3ba14", phone: "+12025550123", email: null });
+    const response = await request(app).post("/api/tickets").set(auth()).send(createBody("SMS"));
+    expect(response.status).toBe(201);
+    expect(mocks.ticketCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ channel: "SMS" }) }));
+  });
+
+  it("rejects an SMS ticket when the customer has no phone number", async () => {
+    mocks.customerFind.mockResolvedValue({ id: "ce83f10dcd2c68747c3f3ba14", phone: null, email: "c@example.com" });
+    const response = await request(app).post("/api/tickets").set(auth()).send(createBody("SMS"));
+    expect(response.status).toBe(422);
+    expect(response.body.error.code).toBe("CUSTOMER_PHONE_REQUIRED");
+    expect(mocks.ticketCreate).not.toHaveBeenCalled();
+  });
+
+  it("creates a WhatsApp ticket when the customer has a valid phone number", async () => {
+    mocks.customerFind.mockResolvedValue({ id: "ce83f10dcd2c68747c3f3ba14", phone: "+12025550123", email: null });
+    const response = await request(app).post("/api/tickets").set(auth()).send(createBody("WHATSAPP"));
+    expect(response.status).toBe(201);
+    expect(mocks.ticketCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ channel: "WHATSAPP" }) }));
+  });
+
+  it("rejects a WhatsApp ticket when the customer has no phone number", async () => {
+    mocks.customerFind.mockResolvedValue({ id: "ce83f10dcd2c68747c3f3ba14", phone: null, email: "c@example.com" });
+    const response = await request(app).post("/api/tickets").set(auth()).send(createBody("WHATSAPP"));
+    expect(response.status).toBe(422);
+    expect(response.body.error.code).toBe("CUSTOMER_PHONE_REQUIRED");
+    expect(mocks.ticketCreate).not.toHaveBeenCalled();
+  });
+
+  it("creates an Email ticket when the customer has an email address", async () => {
+    mocks.customerFind.mockResolvedValue({ id: "ce83f10dcd2c68747c3f3ba14", phone: null, email: "customer@example.net" });
+    const response = await request(app).post("/api/tickets").set(auth()).send(createBody("EMAIL"));
+    expect(response.status).toBe(201);
+    expect(mocks.ticketCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ channel: "EMAIL" }) }));
+  });
+
+  it("rejects an Email ticket when the customer has no email address", async () => {
+    mocks.customerFind.mockResolvedValue({ id: "ce83f10dcd2c68747c3f3ba14", phone: "+15551230000", email: null });
+    const response = await request(app).post("/api/tickets").set(auth()).send(createBody("EMAIL"));
+    expect(response.status).toBe(422);
+    expect(response.body.error.code).toBe("CUSTOMER_EMAIL_REQUIRED");
+    expect(mocks.ticketCreate).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unsupported channel value with a 400 validation error", async () => {
+    const response = await request(app).post("/api/tickets").set(auth()).send(createBody("LIVE_CHAT"));
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("VALIDATION_ERROR");
+    expect(mocks.ticketCreate).not.toHaveBeenCalled();
+  });
+
   it("returns details with history and hides another agent's ticket", async () => {
     mocks.ticketFindFirst.mockResolvedValueOnce({ ...summary, description: "Issue", history: [], department: null, branch: null, messages: [], notes: [] });
     expect((await request(app).get("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(agent))).status).toBe(200);

@@ -32,7 +32,10 @@ export const createTicketSchema = z.object({
   description: z.string().trim().min(1).max(20_000),
   customerId: databaseIdSchema,
   priority: z.nativeEnum(TicketPriority).default(TicketPriority.MEDIUM),
-  channel: z.nativeEnum(Channel).default(Channel.WEB),
+  // Proactively created tickets support these four channels only. LIVE_CHAT (and
+  // any unknown value) is rejected with a 400 VALIDATION_ERROR — the CRM does not
+  // originate live-chat conversations.
+  channel: z.enum([Channel.WEB, Channel.EMAIL, Channel.WHATSAPP, Channel.SMS]).default(Channel.WEB),
   categoryId: nullableDatabaseIdSchema,
   assignedAgentId: nullableDatabaseIdSchema,
   departmentId: nullableDatabaseIdSchema,

@@ -193,6 +193,29 @@ describe("ticket pages", () => {
     expect(await screen.findByText("Created detail")).toBeInTheDocument();
   });
 
+  it("creates a ticket with the selected channel and shows the contextual hint", async () => {
+    mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: undefined }); mocks.create.mockResolvedValue(listTicket);
+    renderAt("/tickets/new", <><Route path="/tickets/new" element={<TicketFormPage />} /><Route path="/tickets/:id" element={<p>Created detail</p>} /></>);
+    fireEvent.focus(screen.getByRole("combobox", { name: "Customer" }));
+    fireEvent.click(screen.getByRole("option", { name: /Ahmed Mohamed/ }));
+    fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "Proactive SMS" } });
+    fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Reaching out" } });
+
+    const channelTrigger = screen.getByRole("combobox", { name: "Channel" });
+    fireEvent.keyDown(channelTrigger, { key: "ArrowDown" });
+    await waitFor(() => expect(screen.getByRole("option", { name: "SMS" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("option", { name: "SMS" }));
+    expect(await screen.findByText("Messages will be sent to the customer's phone number.")).toBeInTheDocument();
+
+    const categoryTrigger = screen.getByRole("combobox", { name: "Category" });
+    fireEvent.keyDown(categoryTrigger, { key: "ArrowDown" });
+    await waitFor(() => expect(screen.getByRole("option", { name: "Billing" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("option", { name: "Billing" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Create ticket" }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ channel: "SMS" })));
+  });
+
   // feature/team-based-manager-scope
   it("ADMIN routes Department → Team → Agent, and the Agent select stays disabled until a Team is chosen", async () => {
     mocks.departments = [{ id: "dep-1", name: "Customer Support", branchId: "b1" }];
