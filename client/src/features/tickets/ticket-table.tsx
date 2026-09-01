@@ -25,6 +25,10 @@ interface TicketTableProps {
   pageCount: number;
   totalCount?: number;
   onPageChange: (page: number) => void;
+  /** Unassigned-queue view for an agent: render a per-row "Claim" action. */
+  showClaim?: boolean;
+  claimingId?: string | null;
+  onClaim?: (ticketId: string) => void;
 }
 
 export function TicketTable({
@@ -35,6 +39,9 @@ export function TicketTable({
   pageCount,
   totalCount,
   onPageChange,
+  showClaim = false,
+  claimingId = null,
+  onClaim,
 }: TicketTableProps) {
   const { t, i18n } = useTranslation();
 
@@ -92,16 +99,6 @@ export function TicketTable({
         ),
       },
       {
-        id: "agent",
-        header: t("tickets.assignedAgent"),
-        cell: ({ row }) => (
-          <AssigneeCell
-            name={row.original.assignedAgent?.name}
-            unassignedLabel={t("tickets.unassigned")}
-          />
-        ),
-      },
-      {
         id: "updated",
         accessorKey: "updatedAt",
         header: t("tickets.updated"),
@@ -111,8 +108,30 @@ export function TicketTable({
           </span>
         ),
       },
+      {
+        id: "agent",
+        header: () => <div className="text-center">{t("tickets.assignedAgent")}</div>,
+        cell: ({ row }) =>
+          showClaim && !row.original.assignedAgent ? (
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => onClaim?.(row.original.id)}
+                disabled={claimingId === row.original.id}
+                className="button px-4 text-[11px] font-medium disabled:opacity-60 cursor-pointer"
+              >
+                {claimingId === row.original.id ? t("tickets.claiming") : t("tickets.claim")}
+              </button>
+            </div>
+          ) : (
+            <AssigneeCell
+              name={row.original.assignedAgent?.name}
+              unassignedLabel={t("tickets.unassigned")}
+            />
+          ),
+      },
     ],
-    [i18n.language, t]
+    [i18n.language, t, showClaim, claimingId, onClaim]
   );
 
   const pagination = useMemo<PaginationState>(

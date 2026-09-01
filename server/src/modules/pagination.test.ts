@@ -222,9 +222,9 @@ describe("Pagination & Table Query Contracts", () => {
       );
     });
 
-    it("AGENT query scopes both findMany and count to assigned or unassigned tickets", async () => {
+    it("AGENT ticket list defaults to My Tickets and scopes both findMany and count to assigned-to-self", async () => {
       mocks.ticketFindMany.mockResolvedValue([]);
-      mocks.ticketCount.mockResolvedValue(85); // Agent 1 sees only 85 tickets
+      mocks.ticketCount.mockResolvedValue(45); // Agent 1's own tickets only
 
       const response = await request(app)
         .get("/api/tickets?page=1&limit=20")
@@ -234,12 +234,12 @@ describe("Pagination & Table Query Contracts", () => {
       expect(response.body.meta).toEqual({
         page: 1,
         limit: 20,
-        total: 85,
-        totalPages: 5,
+        total: 45,
+        totalPages: 3,
       });
 
       const agentScope = expect.objectContaining({
-        OR: [{ assignedAgentId: "agent-1" }, { assignedAgentId: null }],
+        assignedAgentId: "agent-1",
       });
 
       expect(mocks.ticketFindMany).toHaveBeenCalledWith(

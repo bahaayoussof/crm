@@ -16,6 +16,20 @@ export const useTicket = (id: string) => useQuery({ queryKey: ticketKeys.detail(
 export const useCategories = () => useQuery({ queryKey: ticketKeys.categories, queryFn: getCategories });
 export const useAgents = () => useQuery({ queryKey: ticketKeys.agents, queryFn: getAgents });
 export function useCreateTicket() { const client = useQueryClient(); return useMutation({ mutationFn: (values: TicketCreateValues) => createTicket(values), onSuccess: () => client.invalidateQueries({ queryKey: ticketKeys.lists() }) }); }
+/** Agent self-claim of an unassigned ticket from a list row. The backend
+ * enforces "unassigned only" + "self only" atomically (409 on a lost race). */
+export function useClaimTicket() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, agentId }: { id: string; agentId: string }) => updateTicket(id, { assignedAgentId: agentId }),
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ticketKeys.lists() }),
+        client.invalidateQueries({ queryKey: ["dashboard"] }),
+      ]);
+    },
+  });
+}
 export function useUpdateTicket(id: string) {
   const client = useQueryClient();
   return useMutation({ mutationFn: (values: TicketUpdateValues) => updateTicket(id, values), onSuccess: async () => {

@@ -6,6 +6,10 @@ import { paginationFields } from "../../shared/validation/pagination.schema.js";
 export const ticketListQuerySchema = z.object({
   search: z.string().trim().max(100).default(""),
   ...paginationFields(),
+  // AGENT ticket lists are split into these two scopes only — there is no "all".
+  // Any other value is a 400 VALIDATION_ERROR (no clamping). Ignored for
+  // ADMIN/MANAGER, whose lists are never scope-narrowed.
+  scope: z.enum(["mine", "unassigned"]).optional(),
   status: z.nativeEnum(TicketStatus).optional(),
   priority: z.nativeEnum(TicketPriority).optional(),
   categoryId: databaseIdSchema.optional(),

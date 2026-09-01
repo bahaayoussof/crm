@@ -4,6 +4,21 @@ Use this file for decisions not already fixed by the project documentation.
 
 Do not record trivial implementation details.
 
+### ADR-048: Strict AGENT ticket visibility + agent personal work-console dashboard
+
+**Date:** 2026-09-01
+
+**Context.** The `AGENT` role could reach any assigned-or-unassigned ticket through one implicit merged list, could not self-claim from the queue, and saw organization-wide numbers on the dashboard (status distribution, activity series, recent tickets, several KPIs). The requirement is a focused agent workspace whose data boundary is enforced in the query/service layer, not the UI.
+
+**Decision.**
+- **List scoping** is a separate concern from the single-ticket security boundary. `ticketVisibilityWhere(actor)` (AGENT → assigned-OR-unassigned) stays the guard for `GET /:id`, `PATCH`, conversation and watchers so an agent can still open an unassigned ticket to claim it. A new `ticketListVisibilityWhere(actor, scope)` scopes `GET /tickets` for agents to `mine` (default, assigned-to-self) or `unassigned` (`assignedToId === null`). No "all" scope; `?scope` is a 2-value enum so anything else is `400`. A client `assignedAgentId` filter is dropped for agents.
+- **Self-assignment** is an atomic conditional update (`UPDATE … WHERE assignedToId IS NULL`) in a dedicated `selfAssignTicket` path — never a read-then-write. Lost race → `409 TICKET_ALREADY_ASSIGNED`; already-mine → idempotent `200`; any non-self target, a release, or a bundled field → `403`.
+- **Agent dashboard** metrics/distribution/activity/recent are all scoped to `assignedToId === self`. A new AGENT-only `agentPerformance` block (avg first response / resolution, resolved count, personal SLA %, CSAT) is added; no ranking, team comparison, or org-wide analytics — those remain `ADMIN`/`MANAGER`-only in `/reports`. The agent dashboard UI drops the org activity chart + status donut in favour of KPIs → priority queue → SLA + personal performance → recent activity.
+- Cohort SLA outcome helpers were extracted verbatim from `reports.service.ts` to `server/src/shared/sla/sla-outcomes.ts` so the dashboard can reuse the identical math; Reports behaviour and response shapes are unchanged.
+- Realtime (`canReceive`) was already own+unassigned with a metadata-free wire payload — no change.
+
+**Consequences.** Admin/Manager ticket list, dashboard, and assignment flows are untouched. Customer Portal authorization is untouched. `docs/05` ticket-list and dashboard sections updated. Backend tests cover: default `mine` scope, `unassigned` scope, invalid scope → 400, ignored agent `assignedAgentId`, direct foreign-ticket `GET` → 404, atomic self-assign success / 409 / idempotent / 403 / 404, and self-scoped agent dashboard metrics + `agentPerformance` presence.
+
 ### ADR-047: Reports Information Architecture Redesign & Sub-route Analytics
 
 **Date:** 2026-08-31

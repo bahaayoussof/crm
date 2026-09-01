@@ -131,16 +131,45 @@ describe("ticket API", () => {
     expect(response.status).toBe(200); expect(response.body).toMatchObject({ data: [], meta: { total: 0, totalPages: 0 } });
   });
 
-  it("keeps AGENT visibility alongside ticket ID search", async () => {
+  it("keeps AGENT My Tickets scope alongside ticket ID search", async () => {
     await request(app).get(`/api/tickets?search=${summary.id}`).set(auth(agent));
     expect(mocks.ticketFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({
-      OR: [{ assignedAgentId: agent.id }, { assignedAgentId: null }], AND: expect.any(Array),
+      assignedAgentId: agent.id, AND: expect.any(Array),
     }) }));
+    expect(mocks.ticketFindMany.mock.calls.at(-1)?.[0].where).not.toHaveProperty("OR");
   });
 
-  it("scopes AGENT visibility to assigned and unassigned tickets", async () => {
+  it("defaults AGENT ticket lists to My Tickets (assigned-to-self only)", async () => {
     await request(app).get("/api/tickets").set(auth(agent));
-    expect(mocks.ticketFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ OR: [{ assignedAgentId: agent.id }, { assignedAgentId: null }] }) }));
+    const where = mocks.ticketFindMany.mock.calls.at(-1)?.[0].where;
+    expect(where).toEqual(expect.objectContaining({ assignedAgentId: agent.id }));
+    expect(where).not.toHaveProperty("OR");
+  });
+
+  it("scopes AGENT ticket lists to the unassigned queue on ?scope=unassigned", async () => {
+    await request(app).get("/api/tickets?scope=unassigned").set(auth(agent));
+    const where = mocks.ticketFindMany.mock.calls.at(-1)?.[0].where;
+    expect(where).toEqual(expect.objectContaining({ assignedAgentId: null }));
+  });
+
+  it("rejects an unsupported AGENT scope value with a 400 validation error", async () => {
+    const response = await request(app).get("/api/tickets?scope=all").set(auth(agent));
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("ignores a client-supplied assignedAgentId filter for AGENT (never widens scope)", async () => {
+    await request(app).get(`/api/tickets?assignedAgentId=${otherAgent.id}`).set(auth(agent));
+    const where = mocks.ticketFindMany.mock.calls.at(-1)?.[0].where;
+    expect(where).toEqual(expect.objectContaining({ assignedAgentId: agent.id }));
+  });
+
+  it("honours assignedAgentId filter for ADMIN and ignores scope", async () => {
+    mocks.ticketFindMany.mockResolvedValue([summary]); mocks.ticketCount.mockResolvedValue(1);
+    await request(app).get(`/api/tickets?assignedAgentId=${agent.id}&scope=unassigned`).set(auth(admin));
+    const where = mocks.ticketFindMany.mock.calls.at(-1)?.[0].where;
+    expect(where).toEqual(expect.objectContaining({ assignedAgentId: agent.id }));
+    expect(where).not.toHaveProperty("OR");
   });
 
   it.each([["ADMIN", admin], ["MANAGER", manager]] as const)("filters %s ticket lists by customer without narrowing global role visibility", async (_role, identity) => {
@@ -151,15 +180,15 @@ describe("ticket API", () => {
     expect(mocks.ticketFindMany.mock.calls.at(-1)?.[0].where).not.toHaveProperty("OR");
   });
 
-  it("intersects customer filtering with AGENT assigned-or-unassigned visibility", async () => {
+  it("intersects customer filtering with AGENT My Tickets scope", async () => {
     mocks.ticketFindMany.mockResolvedValue([summary]); mocks.ticketCount.mockResolvedValue(1);
     const response = await request(app).get("/api/tickets?customerId=ce83f10dcd2c68747c3f3ba14").set(auth(agent));
     expect(response.status).toBe(200);
     expect(mocks.ticketFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({
       customerId: "ce83f10dcd2c68747c3f3ba14",
-      OR: [{ assignedAgentId: agent.id }, { assignedAgentId: null }],
+      assignedAgentId: agent.id,
     }) }));
-    expect(mocks.ticketCount).toHaveBeenCalledWith({ where: expect.objectContaining({ customerId: "ce83f10dcd2c68747c3f3ba14", OR: expect.any(Array) }) });
+    expect(mocks.ticketCount).toHaveBeenCalledWith({ where: expect.objectContaining({ customerId: "ce83f10dcd2c68747c3f3ba14", assignedAgentId: agent.id }) });
   });
 
   it("returns an empty page when a customer has no tickets visible to AGENT", async () => {
@@ -537,6 +566,56 @@ describe("ticket API", () => {
     expect((await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(manager)).send({ status: "ESCALATED" })).status).toBe(200);
     const assignment = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(agent)).send({ assignedAgentId: otherAgent.id });
     expect(assignment.status).toBe(403);
+  });
+
+  it("lets an AGENT self-assign an unassigned ticket atomically", async () => {
+    mocks.ticketFindFirst
+      .mockResolvedValueOnce({ id: current.id, assignedAgentId: null })
+      .mockResolvedValueOnce({ ...summary, assignedAgent: { id: agent.id, name: "Assigned Agent", email: "agent@example.com" } });
+    mocks.ticketUpdateMany.mockResolvedValueOnce({ count: 1 });
+    const response = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(agent)).send({ assignedAgentId: agent.id });
+    expect(response.status).toBe(200);
+    expect(response.body.data.assignedAgent.id).toBe(agent.id);
+    expect(mocks.ticketUpdateMany).toHaveBeenCalledWith({ where: { id: "c737ce60fccf9da889f4605c0", assignedAgentId: null }, data: { assignedAgentId: agent.id } });
+    expect(mocks.historyCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: "ASSIGNMENT_CHANGED", actorUserId: agent.id, oldValue: null }) }));
+  });
+
+  it("returns 409 when an AGENT self-assign loses the race for an already-claimed ticket", async () => {
+    mocks.ticketFindFirst.mockResolvedValueOnce({ id: current.id, assignedAgentId: null });
+    mocks.ticketUpdateMany.mockResolvedValueOnce({ count: 0 });
+    const response = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(agent)).send({ assignedAgentId: agent.id });
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe("TICKET_ALREADY_ASSIGNED");
+    expect(mocks.historyCreate).not.toHaveBeenCalled();
+  });
+
+  it("treats an AGENT self-assign of a ticket already theirs as an idempotent success", async () => {
+    mocks.ticketFindFirst
+      .mockResolvedValueOnce({ id: current.id, assignedAgentId: agent.id })
+      .mockResolvedValueOnce({ ...summary, assignedAgent: { id: agent.id, name: "Assigned Agent", email: "agent@example.com" } });
+    const response = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(agent)).send({ assignedAgentId: agent.id });
+    expect(response.status).toBe(200);
+    expect(mocks.ticketUpdateMany).not.toHaveBeenCalled();
+    expect(mocks.historyCreate).not.toHaveBeenCalled();
+  });
+
+  it("rejects an AGENT assigning a ticket to another agent (403, no DB write)", async () => {
+    const response = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(agent)).send({ assignedAgentId: otherAgent.id });
+    expect(response.status).toBe(403);
+    expect(mocks.ticketUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("rejects an AGENT self-assign bundled with other fields (403)", async () => {
+    const response = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(agent)).send({ assignedAgentId: agent.id, status: "IN_PROGRESS" });
+    expect(response.status).toBe(403);
+    expect(mocks.ticketUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when an AGENT self-assigns a ticket assigned to another agent", async () => {
+    mocks.ticketFindFirst.mockResolvedValueOnce(null);
+    const response = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(agent)).send({ assignedAgentId: agent.id });
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe("TICKET_NOT_FOUND");
   });
 
   it("recalculates unresolved SLA deadlines on priority change", async () => {

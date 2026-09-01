@@ -17,7 +17,7 @@ import { useTicket, useUpdateTicket } from "./ticket-hooks";
 import { TicketSidebar } from "./ticket-sidebar";
 import { TicketWorkspaceTabs, type TicketWorkspaceHandle } from "./ticket-workspace-tabs";
 import { TicketPage, TicketState } from "./ticket-ui";
-import { canCloseTicket, canManageTicketDefinition, canOperateAssignedTicket } from "./ticket-permissions";
+import { canCloseTicket, canManageTicketDefinition, canOperateAssignedTicket, canSelfAssignTicket } from "./ticket-permissions";
 
 export function TicketDetailPage() {
   const { t, i18n } = useTranslation();
@@ -76,6 +76,7 @@ export function TicketDetailPage() {
   const canManage = Boolean(user && canManageTicketDefinition(user.role));
   const canWorkflow = Boolean(user && canOperateAssignedTicket(record, user));
   const canClose = Boolean(user && canCloseTicket(record, user));
+  const canSelfAssign = Boolean(user && canSelfAssignTicket(record, user));
 
   const ticketLevelAttachments = attachments.data?.filter((item) => item.messageId === null) ?? [];
   const messageAttachments = new Map<string, typeof ticketLevelAttachments>();
@@ -153,6 +154,8 @@ export function TicketDetailPage() {
             canManage={canManage}
             canWorkflow={canWorkflow}
             canClose={canClose}
+            canSelfAssign={canSelfAssign}
+            currentUserId={user?.id ?? null}
             locale={i18n.language}
           />
         </div>

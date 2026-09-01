@@ -12,3 +12,9 @@ export function canOperateAssignedTicket(ticket: TicketDetail, user: AuthUser) {
 export function canCloseTicket(ticket: TicketDetail, user: AuthUser) {
   return ticket.status === "RESOLVED" && canOperateAssignedTicket(ticket, user);
 }
+
+/** An agent may claim an unassigned ticket for themselves. Backend is the
+ * authority — this only decides whether to render the "Assign to me" control. */
+export function canSelfAssignTicket(ticket: TicketDetail, user: AuthUser) {
+  return user.role === "AGENT" && !ticket.assignedAgent;
+}

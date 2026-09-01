@@ -1,5 +1,13 @@
 import { Prisma, Role, TicketPriority, TicketStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
+import {
+  average,
+  compliancePct,
+  firstResponseOutcome,
+  minutesBetween,
+  resolutionOutcome,
+  type SlaOutcome,
+} from "../../shared/sla/sla-outcomes.js";
 import type { ReportsAgentsQuery, ReportsRange } from "./reports.schema.js";
 
 const DAY_MS = 86_400_000;
@@ -38,7 +46,6 @@ const reportTicketSelect = {
 
 
 type ReportTicket = Prisma.TicketGetPayload<{ select: typeof reportTicketSelect }>;
-type SlaOutcome = "MET" | "BREACHED" | "PENDING" | "NONE";
 
 // ---------------------------------------------------------------------------
 // Loading
@@ -75,37 +82,6 @@ function within(date: Date | null | undefined, range: ReportsRange): boolean {
 
 const createdInRange = (ticket: ReportTicket, range: ReportsRange) => within(ticket.createdAt, range);
 const resolvedInRange = (ticket: ReportTicket, range: ReportsRange) => within(ticket.resolvedAt, range);
-
-function firstResponseOutcome(ticket: ReportTicket, now: Date): SlaOutcome {
-  if (!ticket.firstResponseDueAt) return "NONE";
-  if (ticket.firstRespondedAt) {
-    return ticket.firstRespondedAt.getTime() <= ticket.firstResponseDueAt.getTime() ? "MET" : "BREACHED";
-  }
-  return now.getTime() > ticket.firstResponseDueAt.getTime() ? "BREACHED" : "PENDING";
-}
-
-function resolutionOutcome(ticket: ReportTicket, now: Date): SlaOutcome {
-  if (!ticket.resolutionDueAt) return "NONE";
-  const completedAt = ticket.resolvedAt ?? ticket.closedAt;
-  if (completedAt) {
-    return completedAt.getTime() <= ticket.resolutionDueAt.getTime() ? "MET" : "BREACHED";
-  }
-  return now.getTime() > ticket.resolutionDueAt.getTime() ? "BREACHED" : "PENDING";
-}
-
-function compliancePct(met: number, breached: number): number | null {
-  const total = met + breached;
-  return total === 0 ? null : Math.round((met / total) * 100);
-}
-
-function average(values: number[]): number | null {
-  if (values.length === 0) return null;
-  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
-}
-
-function minutesBetween(from: Date, to: Date): number {
-  return (to.getTime() - from.getTime()) / 60_000;
-}
 
 function utcDayKey(date: Date): string {
   return date.toISOString().slice(0, 10);

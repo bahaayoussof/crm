@@ -2,8 +2,10 @@ import { Role, TicketPriority, TicketStatus } from "@prisma/client";
 import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ count: vi.fn(), groupBy: vi.fn(), findMany: vi.fn() }));
-vi.mock("../../config/prisma.js", () => ({ prisma: { ticket: mocks, $transaction: vi.fn() } }));
+const mocks = vi.hoisted(() => ({ count: vi.fn(), groupBy: vi.fn(), findMany: vi.fn(), feedbackFindMany: vi.fn() }));
+vi.mock("../../config/prisma.js", () => ({
+  prisma: { ticket: { count: mocks.count, groupBy: mocks.groupBy, findMany: mocks.findMany }, feedback: { findMany: mocks.feedbackFindMany }, $transaction: vi.fn() },
+}));
 
 import { app } from "../../app.js";
 import { createAccessToken } from "../auth/auth-token.js";
@@ -20,6 +22,7 @@ describe("dashboard overview", () => {
     mocks.count.mockResolvedValueOnce(5).mockResolvedValueOnce(2).mockResolvedValueOnce(1).mockResolvedValueOnce(1).mockResolvedValueOnce(1).mockResolvedValueOnce(3).mockResolvedValueOnce(1);
     mocks.groupBy.mockResolvedValue([{ status: TicketStatus.OPEN, _count: { _all: 5 } }]);
     mocks.findMany.mockResolvedValue([]);
+    mocks.feedbackFindMany.mockResolvedValue([]);
   });
 
   it("rejects unauthenticated and CUSTOMER access", async () => {
@@ -34,11 +37,29 @@ describe("dashboard overview", () => {
     expect(mocks.count.mock.calls[0][0].where).not.toHaveProperty("OR");
   });
 
-  it("applies assigned-or-unassigned visibility to every AGENT query", async () => {
+  it("scopes AGENT dashboard aggregates to the agent's own tickets only", async () => {
     await request(app).get("/api/dashboard/overview").set(auth("c6ff3b3bd11c44cac620c43d5", Role.AGENT));
-    const serialized = JSON.stringify([...mocks.count.mock.calls, ...mocks.findMany.mock.calls, ...mocks.groupBy.mock.calls]);
-    expect(serialized).not.toContain("agent-2");
-    expect(serialized.match(/c6ff3b3bd11c44cac620c43d5/g)?.length).toBeGreaterThan(10);
+    // Open Tickets KPI, status distribution, activity series and recent list must
+    // all be assigned-to-self — never assigned-or-unassigned, never org-wide.
+    expect(mocks.count.mock.calls[0][0].where).toEqual(expect.objectContaining({ assignedAgentId: "c6ff3b3bd11c44cac620c43d5" }));
+    expect(mocks.count.mock.calls[0][0].where).not.toHaveProperty("OR");
+    expect(JSON.stringify(mocks.groupBy.mock.calls[0][0].where)).toBe('{"assignedAgentId":"c6ff3b3bd11c44cac620c43d5"}');
+    const recentCall = mocks.findMany.mock.calls.find((call) => call[0]?.take === 8);
+    const recentWhere = JSON.stringify(recentCall?.[0].where);
+    expect(recentWhere).toContain('"assignedAgentId":"c6ff3b3bd11c44cac620c43d5"');
+    expect(recentWhere).not.toContain('"assignedAgentId":null');
+  });
+
+  it("includes an agent-scoped performance block for AGENT and omits it for ADMIN/MANAGER", async () => {
+    mocks.feedbackFindMany.mockResolvedValueOnce([{ rating: 5 }, { rating: 4 }]);
+    const agentData = await getDashboardOverview({ userId: "c6ff3b3bd11c44cac620c43d5", role: Role.AGENT }, now);
+    expect(agentData.agentPerformance).toEqual(expect.objectContaining({
+      windowDays: 30, resolvedCount: expect.any(Number), csat: { averageRating: 4.5, responseCount: 2 },
+    }));
+    expect(mocks.feedbackFindMany.mock.calls[0][0].where).toEqual(expect.objectContaining({ ticket: { assignedAgentId: "c6ff3b3bd11c44cac620c43d5" } }));
+
+    const adminData = await getDashboardOverview({ userId: "admin", role: Role.ADMIN }, now);
+    expect(adminData).not.toHaveProperty("agentPerformance");
   });
 
   it("uses UTC day boundaries for resolved today", async () => {
@@ -77,7 +98,7 @@ describe("dashboard overview", () => {
     const high = { ...base, id: "high", assignedAgent: agent, priority: TicketPriority.HIGH };
     const mediumOld = { ...base, id: "medium-a", assignedAgent: agent, updatedAt: new Date("2026-08-24T10:00:00.000Z") };
     const mediumTie = { ...base, id: "medium-b", assignedAgent: agent, updatedAt: mediumOld.updatedAt };
-    mocks.findMany.mockReset().mockResolvedValueOnce([breached]).mockResolvedValueOnce([risk]).mockResolvedValueOnce([urgent]).mockResolvedValueOnce([high]).mockResolvedValueOnce([mediumTie, mediumOld]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    mocks.findMany.mockReset().mockResolvedValueOnce([breached]).mockResolvedValueOnce([risk]).mockResolvedValueOnce([urgent]).mockResolvedValueOnce([high]).mockResolvedValueOnce([mediumTie, mediumOld]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValue([]);
     const data = await getDashboardOverview({ userId: "c6ff3b3bd11c44cac620c43d5", role: Role.AGENT }, now);
     expect(data.primaryQueueType).toBe("MY_ASSIGNED_TICKETS");
     expect(data.primaryTickets.map((item) => item.id)).toEqual(["breached", "risk", "urgent", "high", "medium-a", "medium-b"]);
@@ -91,8 +112,9 @@ describe("dashboard overview", () => {
   it("excludes primary IDs before fetching up to eight deterministic recent tickets", async () => {
     mocks.findMany.mockResolvedValue([]);
     await getDashboardOverview({ userId: "c6ff3b3bd11c44cac620c43d5", role: Role.AGENT }, now);
-    expect(mocks.findMany.mock.calls.at(-1)?.[0]).toMatchObject({ take: 8, orderBy: [{ updatedAt: "desc" }, { id: "asc" }] });
-    expect(mocks.groupBy.mock.calls[0][0]).toMatchObject({ by: ["status"], where: { OR: [{ assignedAgentId: "c6ff3b3bd11c44cac620c43d5" }, { assignedAgentId: null }] } });
+    const recentCall = mocks.findMany.mock.calls.find((call) => call[0]?.take === 8);
+    expect(recentCall?.[0]).toMatchObject({ take: 8, orderBy: [{ updatedAt: "desc" }, { id: "asc" }] });
+    expect(mocks.groupBy.mock.calls[0][0]).toMatchObject({ by: ["status"], where: { assignedAgentId: "c6ff3b3bd11c44cac620c43d5" } });
   });
 
   it("returns a 30-day zero-filled opened/resolved activity series bucketed by UTC day", async () => {
@@ -119,11 +141,11 @@ describe("dashboard overview", () => {
     expect(activityWhere).toContain('"resolvedAt":true');
   });
 
-  it("preserves AGENT assigned-or-unassigned visibility in Recent Tickets and excludes primary IDs", async () => {
+  it("scopes AGENT Recent Tickets to assigned-to-self and excludes primary IDs", async () => {
     const assigned = { ...base, id: "primary", assignedAgent: { id: "c6ff3b3bd11c44cac620c43d5", name: "Agent" } };
-    mocks.findMany.mockReset().mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([assigned]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    mocks.findMany.mockReset().mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([assigned]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValue([]);
     await getDashboardOverview({ userId: "c6ff3b3bd11c44cac620c43d5", role: Role.AGENT }, now);
-    const recentWhere = mocks.findMany.mock.calls.at(-1)?.[0].where;
-    expect(recentWhere).toEqual({ AND: [{ OR: [{ assignedAgentId: "c6ff3b3bd11c44cac620c43d5" }, { assignedAgentId: null }] }, { id: { notIn: ["primary"] } }] });
+    const recentCall = mocks.findMany.mock.calls.find((call) => call[0]?.take === 8);
+    expect(recentCall?.[0].where).toEqual({ AND: [{ assignedAgentId: "c6ff3b3bd11c44cac620c43d5" }, { id: { notIn: ["primary"] } }] });
   });
 });

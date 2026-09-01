@@ -18,7 +18,7 @@ import {
   withRealtimeOutbox,
 } from "../realtime/realtime.publisher.js";
 import type { CreateTicketInput, TicketConversationInput, TicketListQuery, UpdateTicketInput } from "./ticket.schema.js";
-import { ticketVisibilityWhere, type TicketActor as Actor } from "./ticket-visibility.js";
+import { ticketListVisibilityWhere, ticketVisibilityWhere, type TicketActor as Actor } from "./ticket-visibility.js";
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../audit-logs/audit-log.constants.js";
 import { createAuditLog } from "../audit-logs/audit-log.service.js";
 import type { AuditRequestContext } from "../audit-logs/audit-request-context.js";
@@ -42,12 +42,16 @@ const transitions: Record<TicketStatus, TicketStatus[]> = {
 };
 
 export async function listTickets(query: TicketListQuery, actor: Actor) {
+  // AGENT lists are scope-bound (mine | unassigned, default mine). A client-
+  // supplied assignedAgentId filter is ignored for agents — it can only ever be
+  // used to try to look at another agent's queue, and must never widen scope.
+  const assignedAgentFilter = actor.role === Role.AGENT ? undefined : query.assignedAgentId;
   const where: Prisma.TicketWhereInput = {
-    ...ticketVisibilityWhere(actor),
+    ...ticketListVisibilityWhere(actor, query.scope),
     ...(query.status && { status: query.status }),
     ...(query.priority && { priority: query.priority }),
     ...(query.categoryId && { categoryId: query.categoryId }),
-    ...(query.assignedAgentId && { assignedAgentId: query.assignedAgentId }),
+    ...(assignedAgentFilter && { assignedAgentId: assignedAgentFilter }),
     ...(query.customerId && { customerId: query.customerId }),
     ...(query.departmentId && { departmentId: query.departmentId }),
     ...(query.branchId && { branchId: query.branchId }),
@@ -260,6 +264,11 @@ export async function createTicket(input: CreateTicketInput, actor: Actor, reque
 
 export async function updateTicket(ticketId: string, input: UpdateTicketInput, actor: Actor, requestContext?: AuditRequestContext) {
   const now = new Date();
+  // An agent touching `assignedAgentId` is always a self-claim — routed to a
+  // dedicated atomic path, never the generic read-then-update below.
+  if (actor.role === Role.AGENT && input.assignedAgentId !== undefined) {
+    return selfAssignTicket(ticketId, input, actor, requestContext);
+  }
   return withRealtimeOutbox(async () => {
    const { updated, changed } = await prisma.$transaction(async (tx) => {
     const current = await tx.ticket.findFirst({
@@ -367,6 +376,59 @@ export async function updateTicket(ticketId: string, input: UpdateTicketInput, a
    // Only signal when visible ticket state actually changed — a no-op PATCH stays quiet.
    if (changed) emitTicketUpdated({ ticketId, assignedAgentId: updated.assignedAgent?.id ?? null, customerId: updated.customer?.id ?? null });
    return updated;
+  });
+}
+
+/**
+ * Agent self-claim of an unassigned ticket. Concurrency-safe: the claim is a
+ * conditional `updateMany` guarded by `assignedAgentId: null`, so two agents
+ * racing the same ticket produce exactly one winner and one
+ * `409 TICKET_ALREADY_ASSIGNED`. An agent can only assign the ticket to
+ * themselves, in a request that carries no other field.
+ */
+async function selfAssignTicket(ticketId: string, input: UpdateTicketInput, actor: Actor, requestContext?: AuditRequestContext) {
+  const fields = Object.keys(input) as (keyof UpdateTicketInput)[];
+  if (fields.length !== 1 || fields[0] !== "assignedAgentId") {
+    throw forbidden("Agents may only claim a ticket in a dedicated request");
+  }
+  if (input.assignedAgentId !== actor.userId) throw forbidden("Agents cannot choose a ticket assignee");
+
+  return withRealtimeOutbox(async () => {
+    const result = await prisma.$transaction(async (tx) => {
+      // Reachable by this agent at all? (assigned-to-self or unassigned) → else 404.
+      const current = await tx.ticket.findFirst({
+        where: { id: ticketId, ...ticketVisibilityWhere(actor) },
+        select: { id: true, assignedAgentId: true },
+      });
+      if (!current) throw new AppError(404, "TICKET_NOT_FOUND", "Ticket not found");
+
+      const ticketAfter = async () => {
+        const row = await tx.ticket.findFirst({ where: { id: ticketId }, select: ticketSummarySelect });
+        if (!row) throw new AppError(404, "TICKET_NOT_FOUND", "Ticket not found");
+        return row;
+      };
+
+      // Idempotent: already mine → success, no history/audit/event.
+      if (current.assignedAgentId === actor.userId) return { ticket: await ticketAfter(), changed: false };
+
+      const { count } = await tx.ticket.updateMany({
+        where: { id: ticketId, assignedAgentId: null },
+        data: { assignedAgentId: actor.userId },
+      });
+      if (count === 0) {
+        throw new AppError(409, "TICKET_ALREADY_ASSIGNED", "This ticket was already claimed by another agent");
+      }
+
+      const actorName = (await tx.user.findFirst({ where: { id: actor.userId }, select: { name: true } }))?.name ?? actor.userId;
+      await tx.ticketHistory.create({ data: { ticketId, actorUserId: actor.userId, action: "ASSIGNMENT_CHANGED", oldValue: null, newValue: actorName } });
+      await createAuditLog({ actorId: actor.userId, action: AUDIT_ACTIONS.TICKET_ASSIGNED, entityType: AUDIT_ENTITY_TYPES.TICKET, entityId: ticketId, changes: { assignedAgentId: { from: null, to: actor.userId } }, requestContext }, tx);
+      return { ticket: await ticketAfter(), changed: true };
+    });
+
+    if (result.changed) {
+      emitTicketUpdated({ ticketId, assignedAgentId: actor.userId, customerId: result.ticket.customer?.id ?? null });
+    }
+    return result.ticket;
   });
 }
 

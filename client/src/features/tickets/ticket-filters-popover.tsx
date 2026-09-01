@@ -26,6 +26,8 @@ interface TicketFiltersPopoverProps {
   branchOptions: Option[];
   onFilterChange: (key: string, value: string) => void;
   onClearFilters: () => void;
+  /** Agents never filter by assignee (they cannot see other agents' work). */
+  showAgentFilter?: boolean;
 }
 
 export function TicketFiltersPopover({
@@ -43,11 +45,12 @@ export function TicketFiltersPopover({
   branchOptions,
   onFilterChange,
   onClearFilters,
+  showAgentFilter = true,
 }: TicketFiltersPopoverProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
-  const activeCount = [status, priority, categoryId, assignedAgentId, departmentId, branchId].filter(Boolean).length;
+  const activeCount = [status, priority, categoryId, showAgentFilter ? assignedAgentId : undefined, departmentId, branchId].filter(Boolean).length;
 
   const { triggerRef, panelRef, style } = useAnchoredPopover<HTMLButtonElement, HTMLDivElement>({
     open,
@@ -153,20 +156,22 @@ export function TicketFiltersPopover({
                 />
               </div>
 
-              <div>
-                <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
-                  {t("tickets.assignedAgent")}
-                </label>
-                <AppSelect
-                  ariaLabel={t("tickets.assignedAgent")}
-                  searchable
-                  searchPlaceholder={t("tickets.searchAssignee")}
-                  emptySearchMessage={t("tickets.noAssigneesFound")}
-                  value={assignedAgentId ?? ""}
-                  onValueChange={(val) => onFilterChange("assignedAgentId", val)}
-                  options={agentOptions}
-                />
-              </div>
+              {showAgentFilter && (
+                <div>
+                  <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                    {t("tickets.assignedAgent")}
+                  </label>
+                  <AppSelect
+                    ariaLabel={t("tickets.assignedAgent")}
+                    searchable
+                    searchPlaceholder={t("tickets.searchAssignee")}
+                    emptySearchMessage={t("tickets.noAssigneesFound")}
+                    value={assignedAgentId ?? ""}
+                    onValueChange={(val) => onFilterChange("assignedAgentId", val)}
+                    options={agentOptions}
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="mb-1 block text-[11px] font-medium text-muted-foreground">

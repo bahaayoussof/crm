@@ -4,10 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { changeAppLanguage } from "@/lib/i18n";
 
 const mocks = vi.hoisted(() => ({
-  useTickets: vi.fn(), useTicket: vi.fn(), useCategories: vi.fn(), useAgents: vi.fn(), useCreateTicket: vi.fn(), useUpdateTicket: vi.fn(), useCreateTicketMessage: vi.fn(), useCreateTicketNote: vi.fn(), useCustomers: vi.fn(), useAuth: vi.fn(),
-  create: vi.fn(), update: vi.fn(), createMessage: vi.fn(), createNote: vi.fn(), refetch: vi.fn(),
+  useTickets: vi.fn(), useTicket: vi.fn(), useCategories: vi.fn(), useAgents: vi.fn(), useCreateTicket: vi.fn(), useUpdateTicket: vi.fn(), useClaimTicket: vi.fn(), useCreateTicketMessage: vi.fn(), useCreateTicketNote: vi.fn(), useCustomers: vi.fn(), useAuth: vi.fn(),
+  create: vi.fn(), update: vi.fn(), claim: vi.fn(), createMessage: vi.fn(), createNote: vi.fn(), refetch: vi.fn(),
 }));
-vi.mock("./ticket-hooks", () => ({ useTickets: mocks.useTickets, useTicket: mocks.useTicket, useCategories: mocks.useCategories, useAgents: mocks.useAgents, useCreateTicket: mocks.useCreateTicket, useUpdateTicket: mocks.useUpdateTicket, useCreateTicketMessage: mocks.useCreateTicketMessage, useCreateTicketNote: mocks.useCreateTicketNote }));
+vi.mock("./ticket-hooks", () => ({ useTickets: mocks.useTickets, useTicket: mocks.useTicket, useCategories: mocks.useCategories, useAgents: mocks.useAgents, useCreateTicket: mocks.useCreateTicket, useUpdateTicket: mocks.useUpdateTicket, useClaimTicket: mocks.useClaimTicket, useCreateTicketMessage: mocks.useCreateTicketMessage, useCreateTicketNote: mocks.useCreateTicketNote }));
 vi.mock("@/features/customers/customer-hooks", () => ({ useCustomers: mocks.useCustomers }));
 vi.mock("@/features/organization/organization-hooks", () => ({ useDepartmentOptions: () => ({ data: [] }), useBranchOptions: () => ({ data: [] }) }));
 vi.mock("@/features/auth/auth-state", () => ({ useAuth: mocks.useAuth }));
@@ -76,6 +76,7 @@ describe("ticket pages", () => {
     mocks.useCategories.mockReturnValue({ data: [{ id: "category-1", name: "Billing" }] }); mocks.useAgents.mockReturnValue({ data: [{ id: "agent-1", name: "Mariam Hassan", email: "mariam@example.com" }] });
     mocks.useCustomers.mockReturnValue({ isLoading: false, data: { data: [{ id: "customer-1", name: "Ahmed Mohamed", email: "ahmed@example.com" }], meta: { page: 1, limit: 10, total: 1, totalPages: 1 } } });
     mocks.useCreateTicket.mockReturnValue({ mutateAsync: mocks.create }); mocks.useUpdateTicket.mockReturnValue({ mutateAsync: mocks.update, isPending: false });
+    mocks.useClaimTicket.mockReturnValue({ mutate: mocks.claim, isPending: false, isError: false, error: null, variables: undefined });
     mocks.useCreateTicketMessage.mockReturnValue({ mutateAsync: mocks.createMessage, isPending: false }); mocks.useCreateTicketNote.mockReturnValue({ mutateAsync: mocks.createNote, isPending: false });
   });
 
@@ -335,11 +336,50 @@ describe("ticket pages", () => {
     await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({ status: "CLOSED" }));
   });
 
-  it("renders an unassigned ticket read-only to an agent", () => {
+  it("offers an agent a self-assign action on an unassigned ticket and keeps it otherwise read-only", async () => {
     mocks.useAuth.mockReturnValue({ user: { id: "agent-1", name: "Agent", email: "agent@example.com", role: "AGENT" } });
     mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: { ...ticket, assignedAgent: null } });
+    mocks.update.mockResolvedValue(listTicket);
     renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
-    expect(screen.getByText("This ticket must be assigned to you before you can change its workflow or conversation.")).toBeInTheDocument(); expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument(); expect(screen.getByRole("button", { name: "Reply" })).toBeDisabled();
+    // No workflow editing, no other-agent assignee picker, reply disabled…
+    expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Assigned agent" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reply" })).toBeDisabled();
+    // …but a claim action that self-assigns via the update mutation.
+    fireEvent.click(screen.getByRole("button", { name: "Assign to me" }));
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({ assignedAgentId: "agent-1" }));
+  });
+
+  it("gives an agent a My Tickets / Unassigned scope switcher (default My Tickets, no All)", () => {
+    mocks.useAuth.mockReturnValue({ user: { id: "agent-1", name: "Agent", email: "agent@example.com", role: "AGENT" } });
+    renderAt("/tickets", <Route path="/tickets" element={<TicketListPage />} />);
+    const tablist = screen.getByRole("tablist", { name: "Ticket scope" });
+    expect(within(tablist).getByRole("tab", { name: "My Tickets" })).toHaveAttribute("aria-selected", "true");
+    expect(within(tablist).getByRole("tab", { name: "Unassigned" })).toHaveAttribute("aria-selected", "false");
+    expect(within(tablist).queryByRole("tab", { name: /all/i })).not.toBeInTheDocument();
+    // Default scope is sent to the backend as "mine".
+    expect(mocks.useTickets).toHaveBeenLastCalledWith(expect.objectContaining({ scope: "mine" }));
+  });
+
+  it("switches an agent list to the Unassigned scope from the URL", () => {
+    mocks.useAuth.mockReturnValue({ user: { id: "agent-1", name: "Agent", email: "agent@example.com", role: "AGENT" } });
+    renderAt("/tickets?scope=unassigned", <Route path="/tickets" element={<TicketListPage />} />);
+    expect(screen.getByRole("tab", { name: "Unassigned" })).toHaveAttribute("aria-selected", "true");
+    expect(mocks.useTickets).toHaveBeenLastCalledWith(expect.objectContaining({ scope: "unassigned" }));
+  });
+
+  it("hides the scope switcher from admins but keeps the assignee filter", () => {
+    renderAt("/tickets", <Route path="/tickets" element={<TicketListPage />} />);
+    expect(screen.queryByRole("tablist", { name: "Ticket scope" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Filter options" }));
+    expect(within(screen.getByRole("dialog", { name: "Filters" })).getByText("Assigned agent")).toBeInTheDocument();
+  });
+
+  it("does not offer the assignee filter to an agent", () => {
+    mocks.useAuth.mockReturnValue({ user: { id: "agent-1", name: "Agent", email: "agent@example.com", role: "AGENT" } });
+    renderAt("/tickets", <Route path="/tickets" element={<TicketListPage />} />);
+    fireEvent.click(screen.getByRole("button", { name: "Filter options" }));
+    expect(within(screen.getByRole("dialog", { name: "Filters" })).queryByText("Assigned agent")).not.toBeInTheDocument();
   });
 
   it("contains long subject and customer values in separate accessible cells", () => {

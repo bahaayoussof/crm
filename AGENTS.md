@@ -202,14 +202,42 @@ The AI MUST NOT:
 The AI MAY:
 - inspect Git state
 - show diffs
-- create a local feature branch when explicitly requested
+-  create a local feature/fix/refactor branch when required by the Branch Rule
 - stage nothing unless explicitly requested
 
 All commits and pushes are performed manually by the developer.
 
+The AI MUST NOT run destructive working-tree commands without explicit developer approval, including:
+- `git reset --hard`
+- `git clean`
+- `git checkout -- <file>`
+- `git restore` when it would discard changes
+- `git stash`
+- any command that deletes or overwrites uncommitted work
+
 ## Branch Rule
 
 Every feature or isolated fix must be implemented on its own branch.
+
+If the current branch is `master` and the task is a feature, isolated fix, refactor, test task, or documentation task that changes repository state, the AI MUST create and switch to the appropriate local branch before modifying any files.
+
+This does not require a separate explicit user instruction.
+
+The AI MUST NOT implement repository changes directly on `master`.
+
+Do not reuse an existing feature branch for an unrelated task.
+
+If already on a branch whose scope does not match the requested task, create a new appropriate branch before implementation.
+
+Do not silently branch from another unfinished feature branch.
+
+Feature branches should normally start from `master` unless the developer explicitly requests a different base branch.
+
+Before creating a new task branch from `master`, verify that the local `master` represents the intended base.
+
+Do not pull, fetch, merge, rebase, or otherwise update `master` automatically unless explicitly requested.
+
+If local `master` appears behind or diverged from its remote-tracking branch, report it before creating the task branch.
 
 Naming convention:
 
@@ -243,6 +271,56 @@ Do not:
 - add new roles or permissions without updating `docs/06-auth-rbac.md`
 - introduce production integrations for WhatsApp, SMS, email ingestion, ERP, or external systems unless explicitly requested
 - perform large unrelated refactors during feature implementation
+
+### Working Tree Safety
+
+Before creating or switching branches, the AI MUST inspect:
+- current branch
+- `git status`
+- staged changes
+- unstaged changes
+- untracked files
+
+The AI MUST NOT discard, overwrite, move, stash, reset, or otherwise alter pre-existing developer changes without explicit approval.
+
+If existing changes are unrelated to the requested task and make branch creation or implementation unsafe, STOP and report the conflict.
+
+If existing uncommitted changes clearly belong to the requested task and are currently on `master`, create the required feature branch while preserving those changes, then continue there.
+
+### Dependency Control
+
+Do not add, remove, replace, or upgrade runtime or development dependencies unless:
+- the task explicitly requires it, or
+- the existing stack cannot reasonably implement the requirement.
+
+If a new dependency is materially required, explain why before adding it.
+
+Do not modify lockfiles unless a dependency change is intentional.
+
+### Database Safety
+
+The AI MUST NOT:
+- reset a database
+- drop schemas/tables
+- delete production or developer data
+- run destructive migrations
+- run destructive seed scripts
+- use `prisma migrate reset`
+- use force-reset or data-loss commands
+
+unless explicitly approved by the developer.
+
+Schema changes must use the project's documented migration workflow.
+
+Never assume a configured database is disposable.
+
+### Secrets and Environment Files
+
+Never expose, print, commit, copy into documentation, or hard-code secrets, tokens, passwords, API keys, private URLs, or credentials.
+
+Do not overwrite existing `.env` files.
+
+Use `.env.example` for documenting required environment variables and placeholder values only.
 
 ## Implementation Style
 

@@ -26,6 +26,7 @@ import { TicketStatusDonut } from "./components/ticket-status-donut";
 import { TicketActivityChart } from "./components/ticket-activity-chart";
 import { SlaHealthCard } from "./components/sla-health-card";
 import { OperationalSummary } from "./components/operational-summary";
+import { AgentPerformanceCard } from "./components/agent-performance-card";
 
 export function DashboardPage() {
   const { t } = useTranslation();
@@ -65,8 +66,8 @@ export function DashboardPage() {
 
   const metrics: Array<[key: string, value: number, tone: DashboardMetricTone]> = isAgent
     ? [
-        ["assignedToMe", data.metrics.assignedToMe, "primary"],
-        ["slaBreached", data.metrics.slaBreached, "danger"],
+        ["openTickets", data.metrics.openTickets, "primary"],
+        ["overdueTickets", data.metrics.slaBreached, "danger"],
         ["slaAtRisk", data.metrics.slaAtRisk, "warning"],
         ["waitingCustomer", data.metrics.waitingCustomer, "neutral"],
         ["resolvedToday", data.metrics.resolvedToday, "success"],
@@ -78,6 +79,52 @@ export function DashboardPage() {
         ["slaBreached", data.metrics.slaBreached, "danger"],
         ["resolvedToday", data.metrics.resolvedToday, "success"],
       ];
+
+  // AGENT: a lean personal work console — no organization-wide analytics.
+  // "What needs attention now → at risk/overdue → my workload → recent activity
+  //  → small personal performance summary." No activity chart, no status donut.
+  if (isAgent) {
+    return (
+      <main className="page-container space-y-8">
+        <PageHeader title={t("dashboard.title")} description={t("dashboard.agentDescription")} />
+
+        <section
+          className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
+          aria-label={t("dashboard.metricsLabel")}
+        >
+          {metrics.map(([key, value, tone]) => (
+            <DashboardMetricCard key={key} label={t(`dashboard.metrics.${key}`)} value={value} tone={tone} />
+          ))}
+        </section>
+
+        <TicketSection
+          title={t("dashboard.priorityWorkQueue")}
+          empty={t("dashboard.emptyAssigned")}
+          tickets={primaryTickets}
+          detailed
+        />
+
+        <section className="grid gap-6 lg:grid-cols-2">
+          <SlaHealthCard data={data} />
+          <AgentPerformanceCard performance={data.agentPerformance} />
+        </section>
+
+        <TicketSection
+          title={t("dashboard.recentTickets")}
+          empty={t("dashboard.emptyRecent")}
+          tickets={recentTickets}
+          action={
+            <Link
+              className="text-sm font-medium text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              to="/tickets"
+            >
+              {t("dashboard.viewAll")}
+            </Link>
+          }
+        />
+      </main>
+    );
+  }
 
   return (
     <main className="page-container space-y-8">

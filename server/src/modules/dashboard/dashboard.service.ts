@@ -1,6 +1,13 @@
 import { Prisma, TicketPriority, TicketStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { deriveSla, SLA_WARNING_MINUTES } from "../../shared/sla/derive-sla.js";
+import {
+  average,
+  compliancePct,
+  firstResponseOutcome,
+  minutesBetween,
+  resolutionOutcome,
+} from "../../shared/sla/sla-outcomes.js";
 import { ticketVisibilityWhere, type TicketActor } from "../tickets/ticket-visibility.js";
 
 export const ACTIVE_STATUSES = [TicketStatus.OPEN, TicketStatus.IN_PROGRESS, TicketStatus.WAITING_CUSTOMER, TicketStatus.ESCALATED] as const;
@@ -19,27 +26,32 @@ type DashboardRecord = Prisma.TicketGetPayload<{ select: typeof dashboardTicketS
 export type PrimaryQueueType = "NEEDS_ATTENTION" | "MY_ASSIGNED_TICKETS";
 
 export async function getDashboardOverview(actor: TicketActor, now = new Date()) {
+  const isAgent = actor.role === "AGENT";
   const visible = ticketVisibilityWhere(actor);
+  // Every agent-facing number is scoped to the agent's OWN tickets — the agent
+  // dashboard is a personal work console, never an organization-wide view. For
+  // ADMIN/MANAGER `scoped` === `visible` (everything).
+  const scoped = isAgent ? { assignedAgentId: actor.userId } satisfies Prisma.TicketWhereInput : visible;
   const active = { ...visible, status: { in: [...ACTIVE_STATUSES] } } satisfies Prisma.TicketWhereInput;
+  const activeScoped = { ...scoped, status: { in: [...ACTIVE_STATUSES] } } satisfies Prisma.TicketWhereInput;
   const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const tomorrow = new Date(today.getTime() + 86_400_000);
   const warningEnd = new Date(now.getTime() + SLA_WARNING_MINUTES * 60_000);
   const breached = slaWindowWhere(now);
   const atRisk = { NOT: breached, ...slaWindowWhere(warningEnd) } satisfies Prisma.TicketWhereInput;
   const ticketArgs = { select: dashboardTicketSelect, take: 10, orderBy: [{ updatedAt: "asc" as const }, { id: "asc" as const }] };
-  const isAgent = actor.role === "AGENT";
   const primaryScope = isAgent ? { ...active, assignedAgentId: actor.userId } satisfies Prisma.TicketWhereInput : active;
   const activityStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - (ACTIVITY_WINDOW_DAYS - 1)));
 
   const [openTickets, assignedToMe, unassignedTickets, slaBreached, slaAtRisk, resolvedToday, waitingCustomer, distribution, breachedRows, riskRows, urgentRows, highRows, mediumRows, lowRows, unassignedRows, oldestRows, activityRows] = await Promise.all([
-    prisma.ticket.count({ where: active }),
+    prisma.ticket.count({ where: activeScoped }),
     prisma.ticket.count({ where: { ...active, assignedAgentId: actor.userId } }),
     prisma.ticket.count({ where: { ...active, assignedAgentId: null } }),
-    prisma.ticket.count({ where: andWhere(active, breached) }),
-    prisma.ticket.count({ where: andWhere(active, atRisk) }),
-    prisma.ticket.count({ where: { ...visible, resolvedAt: { gte: today, lt: tomorrow } } }),
-    prisma.ticket.count({ where: { ...active, status: TicketStatus.WAITING_CUSTOMER } }),
-    prisma.ticket.groupBy({ by: ["status"], where: visible, _count: { _all: true }, orderBy: { status: "asc" } }),
+    prisma.ticket.count({ where: andWhere(activeScoped, breached) }),
+    prisma.ticket.count({ where: andWhere(activeScoped, atRisk) }),
+    prisma.ticket.count({ where: { ...scoped, resolvedAt: { gte: today, lt: tomorrow } } }),
+    prisma.ticket.count({ where: { ...activeScoped, status: TicketStatus.WAITING_CUSTOMER } }),
+    prisma.ticket.groupBy({ by: ["status"], where: scoped, _count: { _all: true }, orderBy: { status: "asc" } }),
     prisma.ticket.findMany({ where: andWhere(primaryScope, breached), ...ticketArgs }),
     prisma.ticket.findMany({ where: andWhere(primaryScope, atRisk), ...ticketArgs }),
     prisma.ticket.findMany({ where: { ...primaryScope, priority: TicketPriority.URGENT }, ...ticketArgs }),
@@ -49,7 +61,7 @@ export async function getDashboardOverview(actor: TicketActor, now = new Date())
     prisma.ticket.findMany({ where: { ...active, assignedAgentId: null }, ...ticketArgs }),
     prisma.ticket.findMany({ where: primaryScope, ...ticketArgs }),
     prisma.ticket.findMany({
-      where: andWhere(visible, { OR: [{ createdAt: { gte: activityStart, lte: now } }, { resolvedAt: { gte: activityStart, lte: now } }] }),
+      where: andWhere(scoped, { OR: [{ createdAt: { gte: activityStart, lte: now } }, { resolvedAt: { gte: activityStart, lte: now } }] }),
       select: { createdAt: true, resolvedAt: true },
     }),
   ]);
@@ -63,11 +75,12 @@ export async function getDashboardOverview(actor: TicketActor, now = new Date())
     .slice(0, 10);
   const primaryIds = primaryTickets.map((ticket) => ticket.id);
   const recent = await prisma.ticket.findMany({
-    where: andWhere(visible, { id: { notIn: primaryIds } }),
+    where: andWhere(scoped, { id: { notIn: primaryIds } }),
     select: dashboardTicketSelect,
     take: 8,
     orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
   });
+  const agentPerformance = isAgent ? await buildAgentPerformance(actor.userId, activityStart, now) : undefined;
   return {
     metrics: { openTickets, assignedToMe, unassignedTickets, slaAtRisk, slaBreached, resolvedToday, waitingCustomer },
     statusDistribution: distribution.map((item) => ({ status: item.status, count: item._count._all })),
@@ -75,7 +88,68 @@ export async function getDashboardOverview(actor: TicketActor, now = new Date())
     primaryQueueType,
     primaryTickets: primaryTickets.map((ticket) => serialize(ticket, now)),
     recentTickets: recent.map((ticket) => serialize(ticket, now)),
+    ...(agentPerformance ? { agentPerformance } : {}),
     generatedAt: now.toISOString(),
+  };
+}
+
+/**
+ * Personal performance summary for the logged-in agent over the same trailing
+ * window as the activity series. Scoped strictly to `assignedAgentId === agentId`
+ * — never other agents, never organization-wide. Reuses the shared cohort SLA
+ * outcome helpers (identical math to Reports).
+ */
+async function buildAgentPerformance(agentId: string, windowStart: Date, now: Date) {
+  const perfSelect = {
+    createdAt: true, firstResponseDueAt: true, firstRespondedAt: true,
+    resolutionDueAt: true, resolvedAt: true, closedAt: true,
+  } satisfies Prisma.TicketSelect;
+  const [tickets, feedback] = await Promise.all([
+    prisma.ticket.findMany({
+      where: {
+        assignedAgentId: agentId,
+        OR: [{ createdAt: { gte: windowStart, lte: now } }, { resolvedAt: { gte: windowStart, lte: now } }],
+      },
+      select: perfSelect,
+    }),
+    prisma.feedback.findMany({
+      where: { ticket: { assignedAgentId: agentId }, createdAt: { gte: windowStart, lte: now } },
+      select: { rating: true },
+    }),
+  ]);
+
+  const firstResponseMinutes: number[] = [];
+  const resolutionMinutes: number[] = [];
+  let slaMet = 0;
+  let slaBreached = 0;
+  let resolvedCount = 0;
+  for (const ticket of tickets) {
+    const fr = firstResponseOutcome(ticket, now);
+    if (fr === "MET") slaMet += 1;
+    if (fr === "BREACHED") slaBreached += 1;
+    if (ticket.firstRespondedAt) firstResponseMinutes.push(minutesBetween(ticket.createdAt, ticket.firstRespondedAt));
+    const completedAt = ticket.resolvedAt ?? ticket.closedAt;
+    if (completedAt && completedAt.getTime() >= windowStart.getTime()) {
+      resolvedCount += 1;
+      resolutionMinutes.push(minutesBetween(ticket.createdAt, completedAt));
+    }
+    const res = resolutionOutcome(ticket, now);
+    if (res === "MET") slaMet += 1;
+    if (res === "BREACHED") slaBreached += 1;
+  }
+
+  const ratings = feedback.map((entry) => entry.rating);
+  const averageRating = ratings.length
+    ? Math.round((ratings.reduce((sum, value) => sum + value, 0) / ratings.length) * 100) / 100
+    : null;
+
+  return {
+    windowDays: ACTIVITY_WINDOW_DAYS,
+    avgFirstResponseMinutes: average(firstResponseMinutes),
+    avgResolutionMinutes: average(resolutionMinutes),
+    resolvedCount,
+    slaCompliancePct: compliancePct(slaMet, slaBreached),
+    csat: { averageRating, responseCount: ratings.length },
   };
 }
 

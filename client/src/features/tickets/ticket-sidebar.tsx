@@ -20,17 +20,26 @@ interface TicketSidebarProps {
   canManage: boolean;
   canWorkflow: boolean;
   canClose: boolean;
+  canSelfAssign: boolean;
+  currentUserId: string | null;
   locale: string;
 }
 
 /** The right context rail: exactly two cards — Ticket details and SLA. Customer,
  * Description, Activity, Followers, metadata and AI Assistant all live elsewhere
  * on the page now. */
-export function TicketSidebar({ record, canManage, canWorkflow, canClose, locale }: TicketSidebarProps) {
+export function TicketSidebar({ record, canManage, canWorkflow, canClose, canSelfAssign, currentUserId, locale }: TicketSidebarProps) {
   return (
     <aside className="min-w-0">
       <div className="space-y-3">
-        <PropertiesSection record={record} canManage={canManage} canWorkflow={canWorkflow} canClose={canClose} />
+        <PropertiesSection
+          record={record}
+          canManage={canManage}
+          canWorkflow={canWorkflow}
+          canClose={canClose}
+          canSelfAssign={canSelfAssign}
+          currentUserId={currentUserId}
+        />
         <SlaSection record={record} language={locale} />
       </div>
     </aside>
@@ -51,11 +60,15 @@ function PropertiesSection({
   canManage,
   canWorkflow,
   canClose,
+  canSelfAssign,
+  currentUserId,
 }: {
   record: TicketDetail;
   canManage: boolean;
   canWorkflow: boolean;
   canClose: boolean;
+  canSelfAssign: boolean;
+  currentUserId: string | null;
 }) {
   const { t } = useTranslation();
   const update = useUpdateTicket(record.id);
@@ -152,7 +165,27 @@ function PropertiesSection({
           {error}
         </p>
       )}
-      {!canWorkflow ? (
+      {canSelfAssign && currentUserId && (
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">{t("tickets.claimHint")}</p>
+          <button
+            type="button"
+            className="button-primary w-full sm:w-auto"
+            disabled={update.isPending}
+            onClick={async () => {
+              setError(null);
+              try {
+                await update.mutateAsync({ assignedAgentId: currentUserId });
+              } catch (caught) {
+                setError(getTicketError(caught, t("tickets.claimError"), t));
+              }
+            }}
+          >
+            {update.isPending ? t("tickets.claiming") : t("tickets.assignToMe")}
+          </button>
+        </div>
+      )}
+      {canSelfAssign ? null : !canWorkflow ? (
         <p className="rounded-md border border-border bg-surface-subtle p-3 text-sm text-muted-foreground">
           {t("tickets.unassignedReadOnly")}
         </p>
