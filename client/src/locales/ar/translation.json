@@ -257,6 +257,10 @@
     "reset": "إعادة تعيين",
     "close": "إغلاق"
   },
+  "phoneInput": {
+    "searchPlaceholder": "ابحث عن الدولة أو الرمز",
+    "noResults": "لا توجد دول مطابقة"
+  },
   "datePicker": {
     "placeholder": "اختر التاريخ",
     "rangePlaceholder": "اختر نطاقًا زمنيًا",

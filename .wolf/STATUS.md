@@ -1,5 +1,7 @@
 # STATUS — crm
 
+> **Searchable Phone country dropdown (2026-09-01, branch `feature/team-based-manager-scope`, unstaged): DONE.** Shared `client/src/components/shared/phone-input/phone-input.tsx` rebuilt on `react-international-phone`'s `usePhoneInput` hook (v4.8.0 has no dropdown search) + a custom country dropdown: sticky CRM `.input` search box (i18n `phoneInput.searchPlaceholder`), filter by country name OR dial code with `+`/space-insensitive normalize, `role="status"` empty state (`phoneInput.noResults`), ArrowUp/Down/Enter/Escape keyboard, focus returns to phone input on select, query resets on reopen. EN+AR keys added. Phone parse/format/validation/E.164/RHF integration unchanged (all still in the hook). `phone-input.test.tsx` 17/17 (+10 new), client `tsc -b` + `eslint` clean, `npm run build` green, consumer suites (users/customers/profile/auth) 98/98. Every current + future PhoneInput consumer gets it automatically. See cerebrum Key Learnings [2026-09-01].
+
 > **Team-Based Manager Scope (2026-09-01, branch `feature/team-based-manager-scope` off `master` `38d5d6c`, unstaged/uncommitted): FEATURE COMPLETE END-TO-END (backend + frontend + i18n + docs). ADR-050.**
 >
 > **Session 3 — Frontend / i18n / Docs / Verification: DONE.**

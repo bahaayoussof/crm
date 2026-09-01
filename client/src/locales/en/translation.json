@@ -257,6 +257,10 @@
     "reset": "Reset",
     "close": "Close"
   },
+  "phoneInput": {
+    "searchPlaceholder": "Search country or code",
+    "noResults": "No countries found"
+  },
   "datePicker": {
     "placeholder": "Select date",
     "rangePlaceholder": "Select date range",
