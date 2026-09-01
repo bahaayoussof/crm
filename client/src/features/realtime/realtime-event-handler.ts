@@ -2,6 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { ticketKeys } from "@/features/tickets/ticket-hooks";
 import { notificationKeys } from "@/features/notifications/notification-hooks";
 import { portalKeys } from "@/features/portal/portal-hooks";
+import { managerKeys } from "@/features/manager/manager-hooks";
 import type { RealtimeEvent } from "./realtime.types";
 
 /**
@@ -33,6 +34,7 @@ export function handleRealtimeEvent(queryClient: QueryClient, event: RealtimeEve
       // The open conversation refetches; ticket lists may reorder (updatedAt).
       void queryClient.invalidateQueries({ queryKey: ticketKeys.detail(event.ticketId) });
       void queryClient.invalidateQueries({ queryKey: ticketKeys.lists() });
+      void queryClient.invalidateQueries({ queryKey: managerKeys.all });
       return;
     }
     case "ticket.updated": {
@@ -45,6 +47,7 @@ export function handleRealtimeEvent(queryClient: QueryClient, event: RealtimeEve
       void queryClient.invalidateQueries({ queryKey: ticketKeys.detail(event.ticketId) });
       void queryClient.invalidateQueries({ queryKey: ticketKeys.lists() });
       void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      void queryClient.invalidateQueries({ queryKey: managerKeys.all });
       return;
     }
     case "notification.created":

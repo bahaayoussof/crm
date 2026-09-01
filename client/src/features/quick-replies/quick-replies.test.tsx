@@ -234,14 +234,16 @@ describe("quick replies navigation visibility", () => {
     mocks.useQuickReplies.mockReturnValue(listResult([greeting]));
   });
 
-  it.each(["ADMIN", "MANAGER"] as const)("shows the Quick Replies nav item to %s", (role) => {
-    mocks.role = role;
+  it("shows the Quick Replies nav item to ADMIN", () => {
+    mocks.role = "ADMIN";
     render(<MemoryRouter><AppShell audience="internal"><div /></AppShell></MemoryRouter>);
     expect(screen.getAllByRole("link", { name: "Quick Replies" }).length).toBeGreaterThan(0);
   });
 
-  it("hides the Quick Replies nav item from AGENT", () => {
-    mocks.role = "AGENT";
+  // MANAGER keeps full Quick Replies RBAC and route access, but the Manager Work
+  // Console nav is deliberately focused (Overview/Tickets/Team/Tasks/Reports/KB).
+  it.each(["MANAGER", "AGENT"] as const)("hides the Quick Replies nav item from %s", (role) => {
+    mocks.role = role;
     render(<MemoryRouter><AppShell audience="internal"><div /></AppShell></MemoryRouter>);
     expect(screen.queryByRole("link", { name: "Quick Replies" })).not.toBeInTheDocument();
   });

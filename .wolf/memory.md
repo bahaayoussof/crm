@@ -719,3 +719,33 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | 10:09 | Made Reports Date Range consume remaining row space and added locale-aware compact interval labels without changing typography or filter values | report-toolbar.tsx, date-picker-utils.ts, focused tests, docs/OpenWolf tracking | 32/32 focused tests, typecheck, lint, build green; live pixel QA blocked by missing designqc | ~3500 |
 | 10:50 | Enforced strict AGENT ticket visibility: added `ticketListVisibilityWhere` (mine|unassigned scopes, default mine, no "all"), atomic self-claim in `updateTicket` via conditional `updateMany` (409 `TICKET_ALREADY_ASSIGNED` on lost race), stripped client-supplied `assignedAgentId` for agents; scoped every AGENT dashboard metric/list to self + added agent-only `agentPerformance` block; extracted cohort SLA helpers to `shared/sla/sla-outcomes.ts` (pure move, Reports unchanged) | ticket-visibility.ts, ticket.service.ts, ticket.schema.ts, dashboard.service.ts, shared/sla/sla-outcomes.ts, reports.service.ts, server tests | server 683/683, tsc/lint green | ~14000 |
 | 10:55 | Frontend: AGENT ticket list My Tickets/Unassigned scope switcher (default mine) + per-row Claim in Unassigned queue, assignee filter hidden for agents; ticket detail "Assign to me" self-claim button; lean AGENT dashboard work console (KPIs + Priority Work Queue + Recently Updated + SLA + new AgentPerformanceCard, no org charts); EN/AR keys | ticket-list-page.tsx, ticket-table.tsx, ticket-filters-popover.tsx, ticket-sidebar.tsx, ticket-permissions.ts, ticket-hooks.ts, dashboard-page.tsx, agent-performance-card.tsx, locales | client 704/705 (1 known flake), tsc/lint/build green | ~14000 |
+
+## Session: 2026-09-01 11:24
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-01 (Manager Work Console)
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| --:-- | Branch feature/manager-work-console off master 5af37c4 | git | created | 1k |
+| --:-- | New read-only manager module (overview/team/agent-detail) + routes/schema/controller/test | server/src/modules/manager/* | server vitest 697/697, tsc+eslint clean | 40k |
+| --:-- | Shared sla-filter.ts + additive GET /api/tickets sla/assignee params | server/src/shared/sla/sla-filter.ts, tickets/ticket.{schema,service,test}.ts | +3 ticket tests green | 8k |
+| --:-- | Manager console frontend (feature dir, ManagerRoute, routes, nav-config MANAGER branch, getRoleHome, realtime handler) | client/src/features/manager/*, app/router/*, app/layouts/nav-config.ts, features/auth/auth-routing.ts, features/realtime/realtime-event-handler.ts | client vitest 718/718, tsc -b clean, build green | 60k |
+| --:-- | EN/AR i18n manager.* + navigation.overview/team | client/src/locales/{en,ar}/translation.json | i18n test green | 6k |
+| --:-- | Fixed 3 pinned tests (realtime keys, getRoleHome, QR nav) + added coverage (manager-console, manager-route, sidebar) | *.test.tsx | all green | 10k |
+| --:-- | Docs: ADR-049 (17), auth-rbac (06), api-contract (05), ui-pages-spec (18 §4a + nav), progress-tracking (19) | docs/* | updated | 12k |
+| --:-- | .wolf: STATUS, cerebrum (Key Learning + Do-Not-Repeat), buglog bug-150, memory | .wolf/* | updated | 4k |
+
+## Session: 2026-09-01 12:33
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 12:38 | Split Manager "Team Operations" into 2 lightweight tabs (Team Overview = Needs Attention + Team Workload; Operations = Operational KPIs + Priority Work). Reused shared DataTableSurface + ui/table primitives + DataTableEmptyRow + AssigneeCell/TicketStatusBadge/TicketPriorityText. Team Workload now two stacked full-width tables (Highest load / Has capacity), dropped inline progress bar. Priority Work aligned to main Tickets table (desktop table + mobile cards, [12px]/[11px] sizing). Added manager.tabs.* EN/AR keys. | client/src/features/manager/manager-overview-page.tsx, manager-console.test.tsx, client/src/locales/{en,ar}/translation.json | manager-console.test 9/9, tsc -b clean, eslint clean | ~40k |
+
+## Session: 2026-09-01 12:42
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 12:46 | Refactor Manager Team table to shared DataTable system (canonical = reports AgentPerformanceDataTable) | client/src/features/manager/manager-team-page.tsx | tsc clean, 23 tests pass | ~30k |

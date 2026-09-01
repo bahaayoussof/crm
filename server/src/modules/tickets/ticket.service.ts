@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import { deriveSla } from "../../shared/sla/derive-sla.js";
+import { slaFilterWhere } from "../../shared/sla/sla-filter.js";
 import { createNotifications } from "../notifications/notification.service.js";
 import {
   applyNoteMentions,
@@ -46,22 +47,32 @@ export async function listTickets(query: TicketListQuery, actor: Actor) {
   // supplied assignedAgentId filter is ignored for agents — it can only ever be
   // used to try to look at another agent's queue, and must never widen scope.
   const assignedAgentFilter = actor.role === Role.AGENT ? undefined : query.assignedAgentId;
+  // `assignee=unassigned` and `sla=` are ADMIN/MANAGER operational shortcuts; an
+  // AGENT list stays scope-bound and never gains the unassigned-only filter here
+  // (the Unassigned scope tab already covers that case).
+  const unassignedOnly = actor.role !== Role.AGENT && query.assignee === "unassigned";
+  const conditions: Prisma.TicketWhereInput[] = [];
+  if (query.search) {
+    conditions.push({ OR: [
+      { id: query.search },
+      { subject: { contains: query.search, mode: "insensitive" } },
+      { description: { contains: query.search, mode: "insensitive" } },
+      { customer: { name: { contains: query.search, mode: "insensitive" } } },
+      { customer: { email: { contains: query.search, mode: "insensitive" } } },
+    ] });
+  }
+  if (query.sla) conditions.push(slaFilterWhere(query.sla, new Date()));
   const where: Prisma.TicketWhereInput = {
     ...ticketListVisibilityWhere(actor, query.scope),
     ...(query.status && { status: query.status }),
     ...(query.priority && { priority: query.priority }),
     ...(query.categoryId && { categoryId: query.categoryId }),
     ...(assignedAgentFilter && { assignedAgentId: assignedAgentFilter }),
+    ...(unassignedOnly && { assignedAgentId: null }),
     ...(query.customerId && { customerId: query.customerId }),
     ...(query.departmentId && { departmentId: query.departmentId }),
     ...(query.branchId && { branchId: query.branchId }),
-    ...(query.search && { AND: [{ OR: [
-      { id: query.search },
-      { subject: { contains: query.search, mode: "insensitive" } },
-      { description: { contains: query.search, mode: "insensitive" } },
-      { customer: { name: { contains: query.search, mode: "insensitive" } } },
-      { customer: { email: { contains: query.search, mode: "insensitive" } } },
-    ] }] }),
+    ...(conditions.length > 0 && { AND: conditions }),
   };
   const skip = (query.page - 1) * query.limit;
   const [records, total] = await prisma.$transaction([

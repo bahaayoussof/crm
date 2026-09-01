@@ -5,10 +5,10 @@ import type { AuthUser } from "./auth.types";
 const user = (role: AuthUser["role"]): AuthUser => ({ id: "user-1", name: "Test User", email: "test@example.com", role, customer: null });
 
 describe("authentication routing", () => {
-  it("maps customers to the portal and internal roles to the dashboard", () => {
+  it("maps customers to the portal, managers to the work console, and other internal roles to the dashboard", () => {
     expect(getRoleHome("CUSTOMER")).toBe("/portal");
     expect(getRoleHome("ADMIN")).toBe("/dashboard");
-    expect(getRoleHome("MANAGER")).toBe("/dashboard");
+    expect(getRoleHome("MANAGER")).toBe("/manager");
     expect(getRoleHome("AGENT")).toBe("/dashboard");
   });
 

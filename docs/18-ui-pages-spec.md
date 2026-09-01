@@ -354,6 +354,58 @@ Mobile:
 
 ---
 
+# 4a. Manager Work Console (`feature/manager-work-console`, ADR-049)
+
+Dedicated MANAGER (and ADMIN) operations experience. Supervision-first — it reuses the
+shared ticket queue, Reports APIs, SLA math, Tasks, realtime, and notifications; it does
+**not** clone the Agent workspace and is **not** a reduced Admin dashboard. Guarded by
+`ManagerRoute` (MANAGER + ADMIN → view; others → `/dashboard` replace). All data is
+organization-wide (no Manager→Department relation in the schema — see
+`docs/06-auth-rbac.md`).
+
+## Overview — `/manager`
+
+Backed by one aggregated call `GET /api/manager/overview`. Vertical order, operations
+before analytics:
+
+1. **Needs Attention** (top priority): clickable cards — SLA breached, SLA at risk,
+   Escalated, Urgent unassigned. Each is a link to the shared `/tickets` queue with the
+   matching filter (`?sla=breached`, `?sla=at_risk`, `?status=ESCALATED`,
+   `?assignee=unassigned&priority=URGENT`). Zero-count cards render muted, not hidden.
+2. **Team Workload**: compact per-agent table (Agent, Open, In progress, Waiting, At risk,
+   Resolved today + a relative load bar — no arbitrary good/bad threshold). ≤8 agents →
+   all rows; larger team → a "Highest load" / "Has capacity" split so overloaded and
+   available agents are both visible. Row → agent detail; "View full team →" → `/manager/team`.
+3. **Operational KPIs**: Open, Unassigned, Resolved today, SLA compliance, Avg first
+   response, Avg resolution. SLA/response cards deep-link to `/reports/sla`.
+4. **Priority Work**: compact ≤10-row list (escalated / breached / urgent), reusing the
+   ticket status/priority/assignee cells. Row → ticket. Not a second full queue.
+
+## Team — `/manager/team`
+
+`GET /api/manager/team`. Full agent table on the shared `DataTableSurface` /
+toolbar / search / pagination primitives: Agent, Open Assigned, In Progress, Waiting
+Customer, Resolved (30d), SLA Compliance, Avg First Response, Avg Resolution. URL-synced
+`search` / `sortBy` / `sortOrder` / `page`. Desktop table → stacked cards on mobile. Row →
+agent detail.
+
+## Agent Detail — `/manager/team/:agentId`
+
+`GET /api/manager/team/:agentId` (unknown / non-AGENT id → 404). Current workload (4 stat
+cards) + SLA-risk counts, 30-day performance (avg first response / resolution, resolved
+count, SLA %, CSAT), SLA-risk ticket list, recent activity list, and a prominent
+**"View {name}'s tickets →"** → `/tickets?assignedAgentId=<id>`. No HR fields — support
+operations only.
+
+## Responsive / RTL
+
+KPI and workload cards stack on tablet/mobile; the team table switches to cards on mobile;
+filters stay usable; no horizontal page overflow; EN LTR and AR RTL both correct. Uses the
+existing design tokens, `MetricCard`, `EmptyState`, shared table primitives — no new visual
+identity.
+
+---
+
 # 5. Tickets List
 
 ## Route
@@ -2057,12 +2109,19 @@ Settings
 ## MANAGER
 
 ```text
-Dashboard
+Overview   (Manager Work Console, /manager)
 Tickets
-Customers
-Knowledge Base
+Team       (/manager/team)
+Tasks
 Reports
+Knowledge Base
 ```
+
+Implemented (`feature/manager-work-console`, ADR-049). MANAGER's home is the Manager
+Work Console at `/manager`; `/dashboard` redirects a MANAGER there. Customers and Quick
+Replies are intentionally **not** in the MANAGER navigation (their routes and backend RBAC
+are unchanged and still reachable). Users / Audit Logs / Settings stay ADMIN-only. See
+section 4a.
 
 Settings access only when explicitly granted.
 

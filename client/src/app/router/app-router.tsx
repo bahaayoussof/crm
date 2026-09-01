@@ -43,6 +43,19 @@ import { AuditLogPage } from "@/features/audit-logs/audit-log-page";
 import { AuditLogRoute } from "./audit-log-route";
 import { InternalProfilePage } from "@/features/profile/internal-profile-page";
 import { RealtimeProvider } from "@/features/realtime/realtime-provider";
+import { ManagerRoute } from "./manager-route";
+import { ManagerOverviewPage } from "@/features/manager/manager-overview-page";
+import { ManagerTeamPage } from "@/features/manager/manager-team-page";
+import { ManagerAgentDetailPage } from "@/features/manager/manager-agent-detail-page";
+import { useAuth } from "@/features/auth/auth-state";
+import { isManagerHomeRole } from "@/features/manager/manager-permissions";
+
+/** MANAGER's home is the Work Console; everyone else keeps the shared dashboard. */
+function DashboardEntry() {
+  const { user } = useAuth();
+  if (user && isManagerHomeRole(user.role)) return <Navigate to="/manager" replace />;
+  return <DashboardPage />;
+}
 
 export function AppRouter() {
   return <BrowserRouter><RealtimeProvider><Routes>
@@ -51,7 +64,12 @@ export function AppRouter() {
     <Route path="/forgot-password" element={<ForgotPasswordPage />} />
     <Route path="/reset-password" element={<ResetPasswordPage />} />
     <Route element={<ProtectedRoute audience="internal" />}>
-      <Route path="/dashboard" element={<DashboardPage />} />
+      <Route path="/dashboard" element={<DashboardEntry />} />
+      <Route element={<ManagerRoute />}>
+        <Route path="/manager" element={<ManagerOverviewPage />} />
+        <Route path="/manager/team" element={<ManagerTeamPage />} />
+        <Route path="/manager/team/:agentId" element={<ManagerAgentDetailPage />} />
+      </Route>
       <Route path="/tickets" element={<TicketListPage />} />
       <Route path="/tickets/new" element={<TicketFormPage />} />
       <Route element={<TicketEditRoute />}><Route path="/tickets/:id/edit" element={<TicketFormPage />} /></Route>

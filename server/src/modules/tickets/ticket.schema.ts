@@ -14,6 +14,12 @@ export const ticketListQuerySchema = z.object({
   priority: z.nativeEnum(TicketPriority).optional(),
   categoryId: databaseIdSchema.optional(),
   assignedAgentId: databaseIdSchema.optional(),
+  // Operational shortcut used by the Manager Work Console "Needs Attention"
+  // deep-links (and available to any ADMIN/MANAGER). Ignored for AGENT lists.
+  assignee: z.enum(["unassigned"]).optional(),
+  // SLA-state filter (derived, not stored). `breached` / `at_risk` mirror
+  // `shared/sla/derive-sla.ts` via `shared/sla/sla-filter.ts`.
+  sla: z.enum(["breached", "at_risk"]).optional(),
   customerId: databaseIdSchema.optional(),
   departmentId: databaseIdSchema.optional(),
   branchId: databaseIdSchema.optional(),

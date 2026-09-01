@@ -49,6 +49,38 @@ export function getNavigationSections(
     ];
   }
 
+  // MANAGER gets a focused, operations-first console — Overview / Tickets / Team
+  // / Tasks / Reports / Knowledge Base — and nothing else. Customers, Quick
+  // Replies, Users, Audit Logs and Settings are intentionally absent from the
+  // Manager nav (their routes and backend RBAC are unchanged).
+  if (user?.role === "MANAGER") {
+    return [
+      {
+        id: "main",
+        labelKey: "navigation.sections.main",
+        label: "Main",
+        items: [{ to: "/manager", key: "overview", icon: DashboardNavIcon }],
+      },
+      {
+        id: "support",
+        labelKey: "navigation.sections.support",
+        label: "Support",
+        items: [
+          { to: "/tickets", key: "tickets", icon: TicketsNavIcon },
+          { to: "/manager/team", key: "team", icon: UsersNavIcon },
+          { to: "/knowledge-base", key: "knowledgeBase", icon: KnowledgeBaseNavIcon },
+          { to: "/tasks", key: "tasks", icon: TasksNavIcon },
+        ],
+      },
+      {
+        id: "management",
+        labelKey: "navigation.sections.management",
+        label: "Management",
+        items: [{ to: "/reports", key: "reports", icon: ReportsNavIcon }],
+      },
+    ];
+  }
+
   const sections: NavSectionConfig[] = [
     {
       id: "main",

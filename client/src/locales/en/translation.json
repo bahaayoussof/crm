@@ -3,11 +3,93 @@
   "notifications": { "title": "Notifications", "bellLabel": "Notifications, {{count}} unread", "markAllRead": "Mark all as read", "empty": "You're all caught up.", "error": "Notifications could not be loaded.", "unread": "Unread" },
   "theme": { "title": "Theme", "light": "Light", "dark": "Dark", "system": "System", "mode": "Appearance" },
   "navigation": {
-    "languageSwitcher": "Choose language", "primary": "Primary navigation", "dashboard": "Dashboard", "tickets": "Tickets", "customers": "Customers", "knowledgeBase": "Knowledge Base", "tasks": "Tasks", "reports": "Reports", "reportsOverview": "Overview", "reportsSla": "SLA Performance", "reportsAgents": "Agent Performance", "reportsTickets": "Ticket Breakdown", "quickReplies": "Quick Replies", "users": "Users", "settings": "Settings", "auditLogs": "Audit Logs",
+    "languageSwitcher": "Choose language", "primary": "Primary navigation", "dashboard": "Dashboard", "overview": "Overview", "team": "Team", "tickets": "Tickets", "customers": "Customers", "knowledgeBase": "Knowledge Base", "tasks": "Tasks", "reports": "Reports", "reportsOverview": "Overview", "reportsSla": "SLA Performance", "reportsAgents": "Agent Performance", "reportsTickets": "Ticket Breakdown", "quickReplies": "Quick Replies", "users": "Users", "settings": "Settings", "auditLogs": "Audit Logs",
     "collapseSidebar": "Collapse sidebar", "expandSidebar": "Expand sidebar",
     "portalHome": "Portal home", "portalContext": "Support portal", "workspaceContext": "Support workspace", "openCustomers": "Open customer records",
     "portalOverview": "Overview", "portalRequests": "My Requests", "portalNewRequest": "New Request", "portalKnowledgeBase": "Help Center", "portalProfile": "Profile",
     "sections": { "main": "Main", "support": "Support", "management": "Management" }
+  },
+
+  "manager": {
+    "overview": { "title": "Team Operations", "subtitle": "What needs your attention right now" },
+    "tabs": { "label": "Team Operations views", "teamOverview": "Team Overview", "operations": "Operations" },
+    "needsAttention": {
+      "title": "Needs Attention",
+      "slaBreached": "SLA breached",
+      "slaAtRisk": "SLA at risk",
+      "escalated": "Escalated",
+      "unassignedUrgent": "Urgent unassigned",
+      "empty": "Nothing needs your attention right now."
+    },
+    "workload": {
+      "title": "Team Workload",
+      "viewFullTeam": "View full team",
+      "highestLoad": "Highest load",
+      "hasCapacity": "Has capacity",
+      "agent": "Agent",
+      "open": "Open",
+      "inProgress": "In progress",
+      "waiting": "Waiting",
+      "atRisk": "At risk",
+      "resolvedToday": "Resolved today",
+      "empty": "No active agents."
+    },
+    "kpis": {
+      "title": "Operational KPIs",
+      "openTickets": "Open tickets",
+      "unassigned": "Unassigned",
+      "resolvedToday": "Resolved today",
+      "slaCompliance": "SLA compliance",
+      "avgFirstResponse": "Avg first response",
+      "avgResolution": "Avg resolution"
+    },
+    "priorityWork": {
+      "title": "Priority Work",
+      "empty": "No escalated, breached, or urgent tickets.",
+      "colSubject": "Subject",
+      "colStatus": "Status",
+      "colPriority": "Priority",
+      "colAssignee": "Assignee",
+      "colUpdated": "Updated"
+    },
+    "team": {
+      "title": "Team",
+      "subtitle": "Agent workload and 30-day performance",
+      "search": "Search agents",
+      "back": "Back to team",
+      "empty": "No agents found.",
+      "loadError": "The team could not be loaded.",
+      "name": "Agent",
+      "openAssigned": "Open assigned",
+      "inProgress": "In progress",
+      "waitingCustomer": "Waiting customer",
+      "resolved": "Resolved (30d)",
+      "slaCompliance": "SLA compliance",
+      "avgFirstResponse": "Avg first response",
+      "avgResolution": "Avg resolution"
+    },
+    "agentDetail": {
+      "workload": "Current workload",
+      "performance": "Performance (30 days)",
+      "slaRiskTickets": "SLA-risk tickets",
+      "recentActivity": "Recent activity",
+      "viewTickets": "View {{name}}'s tickets",
+      "notFound": "Agent not found.",
+      "openAssigned": "Open assigned",
+      "inProgress": "In progress",
+      "waitingCustomer": "Waiting customer",
+      "escalated": "Escalated",
+      "slaBreached": "SLA breached",
+      "slaAtRisk": "SLA at risk",
+      "resolved": "Resolved",
+      "slaCompliance": "SLA compliance",
+      "avgFirstResponse": "Avg first response",
+      "avgResolution": "Avg resolution",
+      "csat": "CSAT",
+      "noRiskTickets": "No SLA-risk tickets.",
+      "noRecentActivity": "No recent activity."
+    },
+    "common": { "loadError": "Something went wrong loading the console." }
   },
 
   "auditLogs": {

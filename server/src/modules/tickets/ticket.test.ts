@@ -172,6 +172,24 @@ describe("ticket API", () => {
     expect(where).not.toHaveProperty("OR");
   });
 
+  it("applies an SLA-state filter for ADMIN/MANAGER via an AND fragment", async () => {
+    await request(app).get("/api/tickets?sla=breached").set(auth(admin));
+    const where = mocks.ticketFindMany.mock.calls.at(-1)?.[0].where;
+    const fragment = JSON.stringify(where.AND);
+    expect(fragment).toContain("resolutionDueAt");
+    expect(fragment).toContain('"status":{"notIn"');
+  });
+
+  it("filters to unassigned tickets on ?assignee=unassigned for ADMIN/MANAGER", async () => {
+    await request(app).get("/api/tickets?assignee=unassigned").set(auth(admin));
+    expect(mocks.ticketFindMany.mock.calls.at(-1)?.[0].where).toEqual(expect.objectContaining({ assignedAgentId: null }));
+  });
+
+  it("ignores ?assignee=unassigned for AGENT (scope stays assigned-to-self)", async () => {
+    await request(app).get("/api/tickets?assignee=unassigned").set(auth(agent));
+    expect(mocks.ticketFindMany.mock.calls.at(-1)?.[0].where).toEqual(expect.objectContaining({ assignedAgentId: agent.id }));
+  });
+
   it.each([["ADMIN", admin], ["MANAGER", manager]] as const)("filters %s ticket lists by customer without narrowing global role visibility", async (_role, identity) => {
     mocks.ticketFindMany.mockResolvedValue([summary]); mocks.ticketCount.mockResolvedValue(1);
     const response = await request(app).get("/api/tickets?customerId=ce83f10dcd2c68747c3f3ba14").set(auth(identity));

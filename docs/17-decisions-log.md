@@ -1291,3 +1291,27 @@ The previous ticket lifecycle included a redundant `NEW` status that created unn
 
 - No breaking change to external ticket APIs besides rejecting `NEW` as a valid status value.
 - Simplified operational model for agents and managers without triage overhead between `NEW` and `OPEN`.
+
+
+# ADR-049: Manager Work Console — dedicated operations experience; MANAGER scope stays organization-wide
+
+**Status:** Accepted (implemented and verified; uncommitted, branch `feature/manager-work-console`)
+
+## Context
+
+MANAGER had no distinct experience: `/dashboard` rendered the same ADMIN/MANAGER analytics view, and running the team meant hopping between `/reports/agents`, `/reports/sla`, and `/tickets`. The role model in `docs/06-auth-rbac.md` describes MANAGER as operational team supervision (monitor, assign/reassign, escalate, SLA risk, agent performance, intervene) — an experience the UI never expressed.
+
+## Decision
+
+- **Dedicated console.** New `/manager` (Overview), `/manager/team` (agent workload + 30-day performance), `/manager/team/:agentId` (agent drill-down), guarded by `ManagerRoute` (MANAGER + ADMIN). MANAGER's post-login home (`getRoleHome`) is `/manager`; `/dashboard` redirects a MANAGER to `/manager`. `DashboardPage` is unchanged.
+- **Focused navigation.** MANAGER nav = Overview / Tickets / Team / Tasks / Reports / Knowledge Base only. Customers and Quick Replies are removed from the MANAGER nav (routes and backend RBAC unchanged); Users / Audit Logs / Settings remain ADMIN-only.
+- **One aggregated endpoint.** `GET /api/manager/overview` returns Needs-Attention counts (+ ticket-queue deep-link filters), operational KPIs, per-agent workload, and a priority-work list in a single batched response — no per-ticket fan-out. `GET /api/manager/team` and `GET /api/manager/team/:agentId` back the other two pages. All three are `requireRole(ADMIN, MANAGER)`. SLA math reuses `shared/sla/sla-outcomes.ts` + `derive-sla.ts`; no report calculation is duplicated.
+- **MANAGER data scope stays ORGANIZATION-WIDE.** The schema has **no `Manager -> Department/Team` ownership relation** (`Department`/`Branch` have no `managerId`). Per the feature brief, we do **not** invent fragile scoping. `manager.service.ts` `managerTicketScopeWhere(actor)` returns `{}` today and is the single seam where real scoping is added when the relation exists; the overview response carries `meta.visibility = "ORGANIZATION_WIDE"` so the limitation is visible in the API, not just prose.
+- **Additive ticket-list filters.** `GET /api/tickets` gains optional `sla=breached|at_risk` (shared `shared/sla/sla-filter.ts`) and `assignee=unassigned` (ADMIN/MANAGER only) so Needs-Attention cards deep-link to the existing shared queue. AGENT list behavior is unchanged.
+- **Realtime/notifications reuse.** No new socket/SSE or notification type. `realtime-event-handler.ts` adds `managerKeys.all` to its existing ADMIN/MANAGER ticket-event invalidation.
+
+## Consequences
+
+- No schema change, no migration, no new dependency, no new mutation capability (every write the console triggers goes through an existing endpoint with its existing RBAC).
+- Follow-up: a real `Manager -> Department/Team` relation + data scoping is a separate branch; `managerTicketScopeWhere` / `managerAgentWhere` are the only places to change.
+- Live multi-role DB verification and EN/AR/RTL/dark browser QA are outstanding (no running DB/browser in this environment).

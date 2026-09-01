@@ -231,6 +231,22 @@ describe("Sidebar component", () => {
     expect(screen.queryByRole("link", { name: "Settings" })).not.toBeInTheDocument();
   });
 
+  it("renders the focused Manager Work Console navigation", () => {
+    renderSidebar({ user: managerUser, collapsed: false });
+
+    expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute("href", "/manager");
+    expect(screen.getByRole("link", { name: "Team" })).toHaveAttribute("href", "/manager/team");
+    expect(screen.getByRole("link", { name: "Tickets" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Knowledge Base" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Tasks" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Reports" })).toBeInTheDocument();
+
+    // Admin-only + de-scoped sections are absent from the Manager nav
+    for (const name of ["Dashboard", "Customers", "Quick Replies", "Users", "Settings", "Audit Logs"]) {
+      expect(screen.queryByRole("link", { name })).not.toBeInTheDocument();
+    }
+  });
+
   it("renders only customer-safe navigation for the customer audience", () => {
     renderSidebar({ user: customerUser, audience: "customer", collapsed: false });
 

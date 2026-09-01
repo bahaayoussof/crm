@@ -3,11 +3,93 @@
   "notifications": { "title": "الإشعارات", "bellLabel": "الإشعارات، {{count}} غير مقروءة", "markAllRead": "تحديد الكل كمقروء", "empty": "لا توجد إشعارات جديدة.", "error": "تعذر تحميل الإشعارات.", "unread": "غير مقروء" },
   "theme": { "title": "المظهر", "light": "فاتح", "dark": "داكن", "system": "تلقائي", "mode": "المظهر" },
   "navigation": {
-    "languageSwitcher": "اختيار اللغة", "primary": "التنقل الرئيسي", "dashboard": "لوحة التحكم", "tickets": "التذاكر", "customers": "العملاء", "knowledgeBase": "قاعدة المعرفة", "tasks": "المهام", "reports": "التقارير", "reportsOverview": "نظرة عامة", "reportsSla": "أداء اتفاقية مستوى الخدمة", "reportsAgents": "أداء الوكلاء", "reportsTickets": "تفصيل التذاكر", "quickReplies": "الردود السريعة", "users": "المستخدمون", "settings": "الإعدادات", "auditLogs": "سجلات التدقيق",
+    "languageSwitcher": "اختيار اللغة", "primary": "التنقل الرئيسي", "dashboard": "لوحة التحكم", "overview": "نظرة عامة", "team": "الفريق", "tickets": "التذاكر", "customers": "العملاء", "knowledgeBase": "قاعدة المعرفة", "tasks": "المهام", "reports": "التقارير", "reportsOverview": "نظرة عامة", "reportsSla": "أداء اتفاقية مستوى الخدمة", "reportsAgents": "أداء الوكلاء", "reportsTickets": "تفصيل التذاكر", "quickReplies": "الردود السريعة", "users": "المستخدمون", "settings": "الإعدادات", "auditLogs": "سجلات التدقيق",
     "collapseSidebar": "طي الشريط الجانبي", "expandSidebar": "توسيع الشريط الجانبي",
     "portalHome": "الصفحة الرئيسية للبوابة", "portalContext": "بوابة الدعم", "workspaceContext": "مساحة عمل الدعم", "openCustomers": "فتح سجلات العملاء",
     "portalOverview": "نظرة عامة", "portalRequests": "طلباتي", "portalNewRequest": "طلب جديد", "portalKnowledgeBase": "مركز المساعدة", "portalProfile": "الملف الشخصي",
     "sections": { "main": "الرئيسية", "support": "الدعم", "management": "الإدارة" }
+  },
+
+  "manager": {
+    "overview": { "title": "عمليات الفريق", "subtitle": "ما الذي يحتاج انتباهك الآن" },
+    "tabs": { "label": "عروض عمليات الفريق", "teamOverview": "نظرة عامة على الفريق", "operations": "العمليات" },
+    "needsAttention": {
+      "title": "يتطلب الانتباه",
+      "slaBreached": "تجاوز اتفاقية مستوى الخدمة",
+      "slaAtRisk": "اتفاقية مستوى الخدمة معرّضة للخطر",
+      "escalated": "مُصعّدة",
+      "unassignedUrgent": "عاجلة غير مُسندة",
+      "empty": "لا شيء يتطلب انتباهك الآن."
+    },
+    "workload": {
+      "title": "عبء عمل الفريق",
+      "viewFullTeam": "عرض الفريق كاملاً",
+      "highestLoad": "الأعلى عبئاً",
+      "hasCapacity": "لديه سعة",
+      "agent": "الوكيل",
+      "open": "مفتوحة",
+      "inProgress": "قيد المعالجة",
+      "waiting": "بانتظار العميل",
+      "atRisk": "معرّضة للخطر",
+      "resolvedToday": "محلولة اليوم",
+      "empty": "لا يوجد وكلاء نشطون."
+    },
+    "kpis": {
+      "title": "مؤشرات الأداء التشغيلية",
+      "openTickets": "التذاكر المفتوحة",
+      "unassigned": "غير مُسندة",
+      "resolvedToday": "محلولة اليوم",
+      "slaCompliance": "الالتزام باتفاقية مستوى الخدمة",
+      "avgFirstResponse": "متوسط أول رد",
+      "avgResolution": "متوسط الحل"
+    },
+    "priorityWork": {
+      "title": "العمل ذو الأولوية",
+      "empty": "لا توجد تذاكر مُصعّدة أو متجاوزة أو عاجلة.",
+      "colSubject": "الموضوع",
+      "colStatus": "الحالة",
+      "colPriority": "الأولوية",
+      "colAssignee": "المُسند إليه",
+      "colUpdated": "آخر تحديث"
+    },
+    "team": {
+      "title": "الفريق",
+      "subtitle": "عبء العمل والأداء خلال 30 يوماً",
+      "search": "البحث عن الوكلاء",
+      "back": "العودة إلى الفريق",
+      "empty": "لم يتم العثور على وكلاء.",
+      "loadError": "تعذّر تحميل الفريق.",
+      "name": "الوكيل",
+      "openAssigned": "المفتوحة المُسندة",
+      "inProgress": "قيد المعالجة",
+      "waitingCustomer": "بانتظار العميل",
+      "resolved": "محلولة (30 يوماً)",
+      "slaCompliance": "الالتزام باتفاقية مستوى الخدمة",
+      "avgFirstResponse": "متوسط أول رد",
+      "avgResolution": "متوسط الحل"
+    },
+    "agentDetail": {
+      "workload": "عبء العمل الحالي",
+      "performance": "الأداء (30 يوماً)",
+      "slaRiskTickets": "تذاكر معرّضة لخطر اتفاقية مستوى الخدمة",
+      "recentActivity": "النشاط الأخير",
+      "viewTickets": "عرض تذاكر {{name}}",
+      "notFound": "لم يتم العثور على الوكيل.",
+      "openAssigned": "المفتوحة المُسندة",
+      "inProgress": "قيد المعالجة",
+      "waitingCustomer": "بانتظار العميل",
+      "escalated": "مُصعّدة",
+      "slaBreached": "تجاوز اتفاقية مستوى الخدمة",
+      "slaAtRisk": "معرّضة للخطر",
+      "resolved": "محلولة",
+      "slaCompliance": "الالتزام باتفاقية مستوى الخدمة",
+      "avgFirstResponse": "متوسط أول رد",
+      "avgResolution": "متوسط الحل",
+      "csat": "رضا العملاء",
+      "noRiskTickets": "لا توجد تذاكر معرّضة للخطر.",
+      "noRecentActivity": "لا يوجد نشاط حديث."
+    },
+    "common": { "loadError": "حدث خطأ أثناء تحميل لوحة التحكم." }
   },
 
   "auditLogs": {

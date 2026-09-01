@@ -15,19 +15,24 @@ describe("handleRealtimeEvent", () => {
   const keys = (spy: { mock: { calls: unknown[][] } }) =>
     spy.mock.calls.map(([arg]) => JSON.stringify((arg as { queryKey: unknown[] }).queryKey));
 
-  it("ticket.message.created invalidates that ticket's detail and the ticket lists only", () => {
+  it("ticket.message.created invalidates that ticket's detail, the ticket lists, and the manager console", () => {
     const { client, spy } = setup();
     handleRealtimeEvent(client, { type: "ticket.message.created", ticketId: "t7", messageId: "m1", visibility: "public" });
-    expect(keys(spy)).toEqual([JSON.stringify(["tickets", "detail", "t7"]), JSON.stringify(["tickets", "list"])]);
+    expect(keys(spy)).toEqual([
+      JSON.stringify(["tickets", "detail", "t7"]),
+      JSON.stringify(["tickets", "list"]),
+      JSON.stringify(["manager"]),
+    ]);
   });
 
-  it("ticket.updated also refreshes the dashboard", () => {
+  it("ticket.updated also refreshes the dashboard and the manager console", () => {
     const { client, spy } = setup();
     handleRealtimeEvent(client, { type: "ticket.updated", ticketId: "t7" });
     expect(keys(spy)).toEqual([
       JSON.stringify(["tickets", "detail", "t7"]),
       JSON.stringify(["tickets", "list"]),
       JSON.stringify(["dashboard"]),
+      JSON.stringify(["manager"]),
     ]);
   });
 
