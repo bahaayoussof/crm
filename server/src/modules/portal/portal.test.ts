@@ -94,6 +94,36 @@ describe("customer portal", () => {
     expect(emitMessageMock).not.toHaveBeenCalled();
   });
 
+  it("targets a customer reply at the assigned agent + ticket team manager only — never a global ADMIN fan-out", async () => {
+    mocks.ticket.findFirst.mockResolvedValue({ id: "cdd8a71b2bbc6072cc903a822", status: TicketStatus.OPEN, subject: "Help", assignedAgentId: "agent-a", teamId: "team-a" });
+    mocks.ticketMessage.create.mockResolvedValue({ id: "m1", body: "Thanks", createdAt: new Date(), author: { id: "customer", name: "Ahmed", role: Role.CUSTOMER } });
+    mocks.ticketWatcher.findMany.mockResolvedValue([]);
+    mocks.user.findMany.mockResolvedValue([{ id: "agent-a" }, { id: "mgr-a" }]);
+
+    const res = await request(app).post("/api/portal/tickets/cdd8a71b2bbc6072cc903a822/messages").set(auth("customer", Role.CUSTOMER)).send({ body: "Thanks" });
+    expect(res.status).toBe(201);
+
+    // Staff lookup is the assignee + this team's manager — not the unconditional ADMIN clause.
+    expect(mocks.user.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { isActive: true, OR: [{ id: "agent-a" }, { role: Role.MANAGER, managedTeam: { id: "team-a" } }] },
+    }));
+    expect(mocks.user.findMany).not.toHaveBeenCalledWith(expect.objectContaining({ where: { role: Role.ADMIN, isActive: true } }));
+    const recipientIds = (mocks.notification.createMany.mock.calls.at(-1)![0].data as { userId: string }[]).map((row) => row.userId).sort();
+    expect(recipientIds).toEqual(["agent-a", "mgr-a"]);
+  });
+
+  it("sends exactly one customer-reply notification when the assigned agent is also a watcher", async () => {
+    mocks.ticket.findFirst.mockResolvedValue({ id: "cdd8a71b2bbc6072cc903a822", status: TicketStatus.OPEN, subject: "Help", assignedAgentId: "agent-a", teamId: null });
+    mocks.ticketMessage.create.mockResolvedValue({ id: "m1", body: "Thanks", createdAt: new Date(), author: { id: "customer", name: "Ahmed", role: Role.CUSTOMER } });
+    mocks.ticketWatcher.findMany.mockResolvedValue([{ userId: "agent-a" }, { userId: "watcher-1" }]);
+    mocks.user.findMany.mockResolvedValue([{ id: "agent-a" }]);
+
+    const res = await request(app).post("/api/portal/tickets/cdd8a71b2bbc6072cc903a822/messages").set(auth("customer", Role.CUSTOMER)).send({ body: "Thanks" });
+    expect(res.status).toBe(201);
+    const recipientIds = (mocks.notification.createMany.mock.calls.at(-1)![0].data as { userId: string }[]).map((row) => row.userId).sort();
+    expect(recipientIds).toEqual(["agent-a", "watcher-1"]);
+  });
+
   it("sanitizes the rich portal reply HTML and rejects a markup-only body", async () => {
     mocks.ticket.findFirst.mockResolvedValue({ id: "cdd8a71b2bbc6072cc903a822", status: TicketStatus.OPEN });
     mocks.ticketMessage.create.mockResolvedValue({ id: "m", body: "x", createdAt: new Date(), author: { id: "customer", name: "Ahmed", role: Role.CUSTOMER } });

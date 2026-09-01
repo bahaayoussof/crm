@@ -784,3 +784,9 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
 | 18:00 | Proactive SMS/Email/WhatsApp ticket creation: channel Select on New Ticket form + per-channel customer-contact validation (backend + client) | server ticket.schema.ts / ticket.service.ts / ticket.test.ts, client ticket-form-page.tsx / ticket.schemas.ts / ticket.types.ts / ticket-pages.test.tsx / quick-reply-composer.test.tsx, en+ar translation.json | server 764/764, client tickets 136 + pages/composer 75, tsc x2 + lint + build + diff --check green | ~45k |
+
+## Session: 2026-09-01 18:08
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 18:16 | Fix CUSTOMER_REPLY notification targeting — new shared `customerReplyNotificationRecipientIds(db,{ticketId,teamId,assignedAgentId?,excludeUserId?})` in shared/team/team-scope.ts (assigned agent + Ticket.teamId manager + watchers, dedup; ADMIN fallback ONLY when unrouted+unassigned+unwatched). Replaced `ticketOperationalRecipientIds` use in portal.service (also dropped its separate notifyWatchers call), whatsapp.service, email.service, sms.service. `ticketOperationalRecipientIds` kept for escalation/SLA (intended global admin fan-out). | server/src/shared/team/team-scope.ts(+test +8), portal/portal.service.ts(+test +2), integrations/{whatsapp,email,sms}/*.service.ts, whatsapp.test.ts(+1), email.test.ts(+1) | server vitest 775/775, tsc clean, eslint clean | ~40k |

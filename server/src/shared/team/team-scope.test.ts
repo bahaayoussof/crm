@@ -4,17 +4,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   userFindUnique: vi.fn(),
   userFindMany: vi.fn(),
+  watcherFindMany: vi.fn(),
 }));
 
 vi.mock("../../config/prisma.js", () => ({
   prisma: {
     user: { findUnique: mocks.userFindUnique, findMany: mocks.userFindMany },
+    ticketWatcher: { findMany: mocks.watcherFindMany },
   },
 }));
 
 import {
   assertAgentAssignableToTicket,
   assertManagerTicketAccess,
+  customerReplyNotificationRecipientIds,
   resolveActorTeamId,
   resolveActorTeamScope,
   teamScopedAgentWhere,
@@ -188,5 +191,92 @@ describe("ticketOperationalRecipientIds", () => {
     mocks.userFindMany.mockResolvedValue([]);
     await ticketOperationalRecipientIds(db, { teamId: "team-a", excludeUserId: "mgr-a" });
     expect(mocks.userFindMany.mock.calls[0][0].where.id).toEqual({ not: "mgr-a" });
+  });
+});
+
+describe("customerReplyNotificationRecipientIds", () => {
+  const db = {
+    user: { findMany: mocks.userFindMany },
+    ticketWatcher: { findMany: mocks.watcherFindMany },
+  } as never;
+
+  beforeEach(() => {
+    mocks.watcherFindMany.mockResolvedValue([]);
+  });
+
+  it("assigned ticket → ONLY the assigned agent (no ADMIN, no manager)", async () => {
+    mocks.userFindMany.mockResolvedValue([{ id: "agent-a" }]);
+    const ids = await customerReplyNotificationRecipientIds(db, {
+      ticketId: "t1",
+      teamId: null,
+      assignedAgentId: "agent-a",
+    });
+    expect(ids).toEqual(["agent-a"]);
+    expect(mocks.userFindMany).toHaveBeenCalledTimes(1);
+    expect(mocks.userFindMany.mock.calls[0][0].where.OR).toEqual([{ id: "agent-a" }]);
+  });
+
+  it("team-routed ticket → assigned agent + ONLY that team's manager (keyed on teamId)", async () => {
+    mocks.userFindMany.mockResolvedValue([{ id: "agent-a" }, { id: "mgr-a" }]);
+    const ids = await customerReplyNotificationRecipientIds(db, {
+      ticketId: "t1",
+      teamId: "team-a",
+      assignedAgentId: "agent-a",
+    });
+    expect(ids.sort()).toEqual(["agent-a", "mgr-a"]);
+    expect(mocks.userFindMany.mock.calls[0][0].where.OR).toEqual([
+      { id: "agent-a" },
+      { role: Role.MANAGER, managedTeam: { id: "team-a" } },
+    ]);
+  });
+
+  it("unassigned team-routed ticket → ONLY the team manager clause, no assignee clause", async () => {
+    mocks.userFindMany.mockResolvedValue([{ id: "mgr-a" }]);
+    await customerReplyNotificationRecipientIds(db, { ticketId: "t1", teamId: "team-a" });
+    expect(mocks.userFindMany.mock.calls[0][0].where.OR).toEqual([
+      { role: Role.MANAGER, managedTeam: { id: "team-a" } },
+    ]);
+  });
+
+  it("includes watchers, deduplicated against the assigned agent", async () => {
+    mocks.userFindMany.mockResolvedValue([{ id: "agent-a" }]);
+    mocks.watcherFindMany.mockResolvedValue([{ userId: "agent-a" }, { userId: "watcher-1" }]);
+    const ids = await customerReplyNotificationRecipientIds(db, {
+      ticketId: "t1",
+      teamId: null,
+      assignedAgentId: "agent-a",
+    });
+    expect(ids.sort()).toEqual(["agent-a", "watcher-1"]);
+  });
+
+  it("unrouted + unassigned + unwatched → falls back to every active ADMIN", async () => {
+    mocks.userFindMany.mockResolvedValue([{ id: "admin-1" }, { id: "admin-2" }]);
+    const ids = await customerReplyNotificationRecipientIds(db, { ticketId: "t1", teamId: null });
+    expect(ids.sort()).toEqual(["admin-1", "admin-2"]);
+    expect(mocks.userFindMany).toHaveBeenCalledTimes(1);
+    expect(mocks.userFindMany.mock.calls[0][0].where).toEqual({ role: Role.ADMIN, isActive: true });
+  });
+
+  it("an assigned OR team-routed ticket never hits the ADMIN fallback, even with no watchers", async () => {
+    mocks.userFindMany.mockResolvedValue([{ id: "agent-a" }]);
+    const ids = await customerReplyNotificationRecipientIds(db, {
+      ticketId: "t1",
+      teamId: null,
+      assignedAgentId: "agent-a",
+    });
+    expect(ids).toEqual(["agent-a"]);
+    expect(mocks.userFindMany).toHaveBeenCalledTimes(1);
+    expect(mocks.userFindMany.mock.calls[0][0].where.OR).toBeDefined();
+  });
+
+  it("excludeUserId drops the actor and the fallback never re-adds them", async () => {
+    mocks.watcherFindMany.mockResolvedValue([{ userId: "cust-user" }]);
+    mocks.userFindMany.mockResolvedValue([{ id: "admin-1" }, { id: "cust-user" }]);
+    const ids = await customerReplyNotificationRecipientIds(db, {
+      ticketId: "t1",
+      teamId: null,
+      excludeUserId: "cust-user",
+    });
+    expect(ids).toEqual(["admin-1"]);
   });
 });

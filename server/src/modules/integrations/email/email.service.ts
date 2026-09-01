@@ -7,7 +7,7 @@ import { emailSchema } from "../../../shared/validation/common.schema.js";
 import { replyHtmlToPlainText, sanitizeReplyHtml } from "../../../shared/rich-text/reply-html.js";
 import { createNotifications } from "../../notifications/notification.service.js";
 import { emitTicketMessageCreated, withRealtimeOutbox } from "../../realtime/realtime.publisher.js";
-import { ticketOperationalRecipientIds } from "../../../shared/team/team-scope.js";
+import { customerReplyNotificationRecipientIds } from "../../../shared/team/team-scope.js";
 import { MAX_ATTACHMENT_BYTES } from "../../attachments/attachment.constants.js";
 import { detectFileType } from "../../attachments/detect-file-type.js";
 import { sanitizeFileName } from "../../attachments/file-name.js";
@@ -181,10 +181,13 @@ async function notifyInbound(
   tx: Prisma.TransactionClient,
   ticket: { id: string; subject: string; assignedAgentId: string | null },
 ) {
-  // Team-aware recipients (feature/team-based-manager-scope): ADMINs + this
-  // ticket's team manager only + the assigned agent.
+  // Shared CUSTOMER_REPLY targeting (same rule for every channel): assigned
+  // agent + ONLY this ticket's team manager (Ticket.teamId) + watchers. No
+  // global ADMIN fan-out — admins are reached only as watchers or via the
+  // unrouted/unassigned/unwatched fallback (a brand-new inbound ticket).
   const teamRow = await tx.ticket.findUnique({ where: { id: ticket.id }, select: { teamId: true } });
-  const recipientIds = await ticketOperationalRecipientIds(tx, {
+  const recipientIds = await customerReplyNotificationRecipientIds(tx, {
+    ticketId: ticket.id,
     teamId: teamRow?.teamId ?? null,
     assignedAgentId: ticket.assignedAgentId,
   });

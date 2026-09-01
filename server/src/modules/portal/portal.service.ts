@@ -2,10 +2,9 @@ import { Channel, Prisma, Role, TicketPriority, TicketStatus } from "@prisma/cli
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import { createNotifications } from "../notifications/notification.service.js";
-import { notifyWatchers, NOTIFICATION_WATCH_ACTIVITY } from "../collaboration/collaboration.service.js";
 import { sanitizeReplyHtml } from "../../shared/rich-text/reply-html.js";
 import { emitTicketMessageCreated, withRealtimeOutbox } from "../realtime/realtime.publisher.js";
-import { ticketOperationalRecipientIds } from "../../shared/team/team-scope.js";
+import { customerReplyNotificationRecipientIds } from "../../shared/team/team-scope.js";
 import type { PortalCreateTicketInput, PortalReplyInput, PortalStatus, PortalTicketListQuery } from "./portal.schema.js";
 
 const listSelect = { id: true, subject: true, status: true, category: { select: { id: true, name: true } }, createdAt: true, updatedAt: true } satisfies Prisma.TicketSelect;
@@ -113,27 +112,18 @@ export async function reply(id: string, input: PortalReplyInput, userId: string)
       await tx.ticketHistory.create({ data: { ticketId: id, actorUserId: userId, action: "STATUS_CHANGED", oldValue: ticket.status, newValue: next } });
     }
 
-    // Fan-out: assigned agent + every active ADMIN + ONLY this ticket's team
-    // manager (feature/team-based-manager-scope — an unrouted ticket reaches
-    // ADMINs only). The customer author is excluded.
-    const filtered = await ticketOperationalRecipientIds(tx, {
+    // Targeted CUSTOMER_REPLY fan-out via the shared resolver (same rule for
+    // every channel): assigned agent + ONLY this ticket's team manager +
+    // watchers, deduplicated. No global ADMIN fan-out — an ADMIN is reached only
+    // as a watcher, or via the unrouted/unassigned/unwatched fallback. The
+    // replying customer is excluded.
+    const recipients = await customerReplyNotificationRecipientIds(tx, {
+      ticketId: id,
       teamId: ticket.teamId,
       assignedAgentId: ticket.assignedAgentId,
       excludeUserId: userId,
     });
-    await createNotifications(tx, filtered, "CUSTOMER_REPLY", "Customer replied", `Customer replied to ticket #${id}: ${ticket.subject}`, id);
-
-    // feature/team-collaboration — also notify internal watchers who are not
-    // already covered by the assignee / admin / manager fan-out above. The
-    // customer (author) is excluded via actorUserId.
-    await notifyWatchers(tx, {
-      ticketId: id,
-      actorUserId: userId,
-      type: NOTIFICATION_WATCH_ACTIVITY,
-      title: "Customer replied on a ticket you follow",
-      message: `Customer replied to ticket #${id}: ${ticket.subject}`,
-      excludeUserIds: filtered,
-    });
+    await createNotifications(tx, recipients, "CUSTOMER_REPLY", "Customer replied", `Customer replied to ticket #${id}: ${ticket.subject}`, id);
 
     return {
       result: { id: message.id, body: message.body, createdAt: message.createdAt, author: { id: message.author.id, name: message.author.name, kind: "CUSTOMER" as const } },

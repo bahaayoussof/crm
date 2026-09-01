@@ -143,6 +143,69 @@ export async function ticketOperationalRecipientIds(
 }
 
 /**
+ * Recipients for a NORMAL customer-reply notification (`CUSTOMER_REPLY`), shared
+ * by every inbound channel (Customer Portal / WEB, WhatsApp, Email, SMS). This is
+ * deliberately NARROWER than {@link ticketOperationalRecipientIds}: a routine
+ * customer reply is ticket activity, not an operational escalation, so it must
+ * NOT fan out to every ADMIN by role.
+ *
+ * Targets, deduplicated:
+ *   - the assigned agent (when the ticket has one, and they are active)
+ *   - the manager of the ticket's team — resolved from `teamId` ONLY (never
+ *     inferred from the assignee's team); an unrouted ticket reaches no manager
+ *   - every user explicitly watching the ticket (this is the only way an ADMIN
+ *     receives a normal customer reply — by being a watcher)
+ *
+ * Fallback: when the above resolves to nobody — an unrouted, unassigned,
+ * unwatched ticket, which in practice is a brand-new inbound WhatsApp/Email/SMS
+ * ticket with no operational owner yet — every active ADMIN is notified so the
+ * reply is not silently dropped. This is the smallest safety net, NOT a general
+ * admin fan-out: any assigned OR team-routed ticket skips it entirely.
+ *
+ * `excludeUserId` drops the actor (the replying customer's user id on the portal
+ * path). Authorization: every target already satisfies ticket visibility
+ * (assignee, own-team manager, or a watcher added through a visibility check) —
+ * this does not widen who can see the ticket.
+ */
+export async function customerReplyNotificationRecipientIds(
+  db: Prisma.TransactionClient,
+  opts: {
+    ticketId: string;
+    teamId: string | null;
+    assignedAgentId?: string | null;
+    excludeUserId?: string | null;
+  },
+): Promise<string[]> {
+  const exclude = new Set([opts.excludeUserId].filter(Boolean) as string[]);
+  const ids = new Set<string>();
+
+  const staffOr: Prisma.UserWhereInput[] = [];
+  if (opts.assignedAgentId) staffOr.push({ id: opts.assignedAgentId });
+  // Team manager is keyed on Ticket.teamId — the source of truth. An unrouted
+  // ticket (teamId null) never adds a manager clause.
+  if (opts.teamId) staffOr.push({ role: Role.MANAGER, managedTeam: { id: opts.teamId } });
+  if (staffOr.length > 0) {
+    const staff = await db.user.findMany({ where: { isActive: true, OR: staffOr }, select: { id: true } });
+    for (const user of staff) ids.add(user.id);
+  }
+
+  const watchers = await db.ticketWatcher.findMany({
+    where: { ticketId: opts.ticketId },
+    select: { userId: true },
+  });
+  for (const watcher of watchers) ids.add(watcher.userId);
+
+  for (const id of exclude) ids.delete(id);
+
+  if (ids.size === 0) {
+    const admins = await db.user.findMany({ where: { role: Role.ADMIN, isActive: true }, select: { id: true } });
+    for (const admin of admins) if (!exclude.has(admin.id)) ids.add(admin.id);
+  }
+
+  return [...ids];
+}
+
+/**
  * Assignment invariant (Phase 10): a ticket may only be assigned to an agent on
  * the SAME team. Never silently moves the agent, the ticket, or team ownership —
  * returns a structured error the client can surface.

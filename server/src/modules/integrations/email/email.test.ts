@@ -1,3 +1,4 @@
+import { Role } from "@prisma/client";
 import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -7,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   userFindUnique: vi.fn(), userCreate: vi.fn(), userFindMany: vi.fn(),
   customerFindFirst: vi.fn(), customerCreate: vi.fn(),
   ticketFindFirst: vi.fn(), ticketFindMany: vi.fn(), ticketFindUnique: vi.fn(), ticketCreate: vi.fn(), ticketUpdate: vi.fn(),
-  slaFindFirst: vi.fn(), historyCreate: vi.fn(), notificationCreateMany: vi.fn(), attachmentCreateMany: vi.fn(),
+  slaFindFirst: vi.fn(), historyCreate: vi.fn(), notificationCreateMany: vi.fn(), attachmentCreateMany: vi.fn(), watcherFindMany: vi.fn(),
   transaction: vi.fn(), storagePut: vi.fn(), storageRemove: vi.fn(),
 }));
 
@@ -19,6 +20,7 @@ vi.mock("../../../config/prisma.js", () => {
     ticket: { findFirst: mocks.ticketFindFirst, findMany: mocks.ticketFindMany, findUnique: mocks.ticketFindUnique, create: mocks.ticketCreate, update: mocks.ticketUpdate },
     slaRule: { findFirst: mocks.slaFindFirst },
     ticketHistory: { create: mocks.historyCreate },
+    ticketWatcher: { findMany: mocks.watcherFindMany },
     notification: { createMany: mocks.notificationCreateMany },
     attachment: { createMany: mocks.attachmentCreateMany },
     $transaction: mocks.transaction,
@@ -125,6 +127,7 @@ describe("Resend email integration", () => {
     mocks.slaFindFirst.mockResolvedValue(null);
     mocks.historyCreate.mockResolvedValue({});
     mocks.notificationCreateMany.mockResolvedValue({ count: 1 });
+    mocks.watcherFindMany.mockResolvedValue([]);
     mocks.messageCreate.mockResolvedValue({ id: "message-1" });
     mocks.attachmentCreateMany.mockResolvedValue({ count: 1 });
     mocks.storagePut.mockResolvedValue(undefined);
@@ -136,6 +139,7 @@ describe("Resend email integration", () => {
       ticket: { findFirst: mocks.ticketFindFirst, findMany: mocks.ticketFindMany, findUnique: mocks.ticketFindUnique, create: mocks.ticketCreate, update: mocks.ticketUpdate },
       slaRule: { findFirst: mocks.slaFindFirst },
       ticketHistory: { create: mocks.historyCreate },
+      ticketWatcher: { findMany: mocks.watcherFindMany },
       notification: { createMany: mocks.notificationCreateMany },
       attachment: { createMany: mocks.attachmentCreateMany },
     }));
@@ -197,6 +201,23 @@ describe("Resend email integration", () => {
       ticket: { customerId: "customer-1", channel: "EMAIL" },
     }) }));
     expect(mocks.ticketCreate).not.toHaveBeenCalled();
+  });
+
+  it("targets a reply to an assigned, team-routed ticket at the agent + team manager only (no global ADMIN fan-out)", async () => {
+    mocks.customerFindFirst.mockResolvedValue({ id: "customer-1" });
+    mocks.retrieve.mockResolvedValue({ ...received, headers: { ...received.headers, "in-reply-to": "<prior@example.net>" } });
+    mocks.messageFindFirst.mockResolvedValue({ ticket: { id: "ticket-existing", status: "OPEN", subject: "Existing", assignedAgentId: "agent-a", emailThreadToken: "token" } });
+    mocks.ticketFindUnique.mockResolvedValue({ teamId: "team-a" });
+    mocks.watcherFindMany.mockResolvedValue([]);
+    mocks.userFindMany.mockResolvedValue([{ id: "agent-a" }, { id: "mgr-a" }]);
+    const response = await signed();
+    expect(response.body.data).toMatchObject({ status: "MESSAGE_APPENDED" });
+    // The shared resolver queries staff by an OR of the assignee + this team's
+    // manager — never the unconditional `{ role: ADMIN }` clause.
+    expect(mocks.userFindMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { isActive: true, OR: [{ id: "agent-a" }, { role: Role.MANAGER, managedTeam: { id: "team-a" } }] },
+    }));
+    expect(mocks.watcherFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { ticketId: "ticket-existing" } }));
   });
 
   it("does not let a subject reference bypass sender/customer scoping", async () => {

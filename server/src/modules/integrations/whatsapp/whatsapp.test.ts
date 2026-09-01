@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-import { Prisma } from "@prisma/client";
+import { Prisma, Role } from "@prisma/client";
 import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   historyCreate: vi.fn(),
   slaFindFirst: vi.fn(),
   notificationCreateMany: vi.fn(),
+  watcherFindMany: vi.fn(),
   transaction: vi.fn(),
   sendTextMessage: vi.fn(),
 }));
@@ -31,6 +32,7 @@ vi.mock("../../../config/prisma.js", () => {
     customer: { findMany: mocks.customerFindMany, findUnique: mocks.customerFindUnique, create: mocks.customerCreate },
     ticket: { findFirst: mocks.ticketFindFirst, findUnique: mocks.ticketFindUnique, create: mocks.ticketCreate, update: mocks.ticketUpdate },
     ticketHistory: { create: mocks.historyCreate },
+    ticketWatcher: { findMany: mocks.watcherFindMany },
     slaRule: { findFirst: mocks.slaFindFirst },
     notification: { createMany: mocks.notificationCreateMany },
     $transaction: mocks.transaction,
@@ -123,6 +125,7 @@ describe("WhatsApp integration", () => {
             customer: { findMany: mocks.customerFindMany, findUnique: mocks.customerFindUnique, create: mocks.customerCreate },
             ticket: { findFirst: mocks.ticketFindFirst, findUnique: mocks.ticketFindUnique, create: mocks.ticketCreate, update: mocks.ticketUpdate },
             ticketHistory: { create: mocks.historyCreate },
+            ticketWatcher: { findMany: mocks.watcherFindMany },
             slaRule: { findFirst: mocks.slaFindFirst },
             notification: { createMany: mocks.notificationCreateMany },
           })
@@ -144,6 +147,7 @@ describe("WhatsApp integration", () => {
     mocks.historyCreate.mockResolvedValue({});
     mocks.slaFindFirst.mockResolvedValue({ firstResponseMinutes: 60, resolutionMinutes: 1440 });
     mocks.notificationCreateMany.mockResolvedValue({ count: 1 });
+    mocks.watcherFindMany.mockResolvedValue([]);
     mocks.sendTextMessage.mockResolvedValue({ messageId: "wamid.OUT1" });
   });
 
@@ -278,6 +282,19 @@ describe("WhatsApp integration", () => {
       expect(mocks.messageCreate).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ ticketId: "ticket-open", externalId: "wamid.SECOND" }) }),
       );
+    });
+
+    it("targets an assigned, team-routed reply at the agent + team manager only (no global ADMIN fan-out)", async () => {
+      mocks.customerFindMany.mockResolvedValue([{ id: "c5961965bf33677e0488514c4" }]);
+      mocks.ticketFindFirst.mockResolvedValue({ id: "ticket-open", status: "OPEN", subject: "WhatsApp: earlier", assignedAgentId: "agent-1" });
+      mocks.ticketFindUnique.mockResolvedValue({ teamId: "team-a" });
+      mocks.watcherFindMany.mockResolvedValue([]);
+      mocks.userFindMany.mockResolvedValue([{ id: "agent-1" }, { id: "mgr-a" }]);
+      await send(textPayload({ id: "wamid.ROUTED" }));
+      expect(mocks.userFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { isActive: true, OR: [{ id: "agent-1" }, { role: Role.MANAGER, managedTeam: { id: "team-a" } }] } }),
+      );
+      expect(mocks.watcherFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { ticketId: "ticket-open" } }));
     });
 
     it("moves a WAITING_CUSTOMER ticket back to IN_PROGRESS", async () => {

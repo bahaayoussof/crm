@@ -4,7 +4,7 @@ import { Channel, Prisma, Role, TicketPriority, TicketStatus } from "@prisma/cli
 import { prisma } from "../../../config/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { normalizePhoneNumber } from "../../../shared/utils/phone.js";
-import { ticketOperationalRecipientIds } from "../../../shared/team/team-scope.js";
+import { customerReplyNotificationRecipientIds } from "../../../shared/team/team-scope.js";
 import { createNotifications } from "../../notifications/notification.service.js";
 import { emitTicketMessageCreated, withRealtimeOutbox } from "../../realtime/realtime.publisher.js";
 import { getSmsProvider } from "./sms.provider.js";
@@ -54,7 +54,10 @@ export async function processInboundSms(input: InboundSms) {
       await tx.ticket.update({ where: { id: ticket.id }, data: { status: TicketStatus.IN_PROGRESS } });
       await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorUserId: null, action: "STATUS_CHANGED", oldValue: TicketStatus.WAITING_CUSTOMER, newValue: TicketStatus.IN_PROGRESS } });
     }
-    const recipients = await ticketOperationalRecipientIds(tx, { teamId: ticket.teamId, assignedAgentId: ticket.assignedAgentId });
+    // Shared CUSTOMER_REPLY targeting (same rule for every channel): assigned
+    // agent + ONLY this ticket's team manager (Ticket.teamId) + watchers, with
+    // an ADMIN fallback only for an unrouted/unassigned/unwatched ticket.
+    const recipients = await customerReplyNotificationRecipientIds(tx, { ticketId: ticket.id, teamId: ticket.teamId, assignedAgentId: ticket.assignedAgentId });
     await createNotifications(tx, recipients, "CUSTOMER_REPLY", "Customer replied", `Customer replied to ticket #${ticket.id}: ${ticket.subject}`, ticket.id);
     return { status: created ? "TICKET_CREATED" as const : "MESSAGE_APPENDED" as const, ticketId: ticket.id, messageId: message.id, assignedAgentId: ticket.assignedAgentId, customerId: customer.id, teamId: ticket.teamId };
   }).catch((error) => {
