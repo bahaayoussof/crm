@@ -1,5 +1,15 @@
 # STATUS — crm
 
+> **Final QA & Production Readiness Audit (2026-09-02, branch `test/final-qa-production-readiness` off `master` `935c91e`, uncommitted): DONE. Recommendation READY WITH FIXES.**
+>
+> - **Report:** `docs/24-final-qa-production-readiness.md` (name uses `24-` because `docs/20-...` collides with `20-whatsapp-integration.md`). `docs/19` got an authoritative CURRENT STATE header reconciling the stale "uncommitted" log entries with git truth (the AI-widget / unified-support / team-auto-assign work is now ON `master`).
+> - **Baseline:** server typecheck OK; server ESLint **was FAIL** (2 pre-existing `scripts/verify-login.ts` `no-unused-expressions`) → **fixed** (`if/else`); server tests 839/47. Client typecheck/lint(2 pre-existing warns)/tests 767/64/build all OK. `git diff --check` OK.
+> - **Fixes (2, minimal):** (1) `verify-login.ts` lint. (2) `server/src/config/env.ts` — new exported `assertProductionSecretsConfigured(nodeEnv, raw)` + `DEV_JWT_SECRET`/`DEV_DATABASE_URL`: `NODE_ENV=production` startup now throws if `JWT_SECRET`/`DATABASE_URL` unset or still the shipped dev default (token-forgery risk). New `server/src/config/env.test.ts` (6). Dev/test unaffected.
+> - **After fixes:** server tests **845/48**; server typecheck+lint clean. Client unchanged 767/64 + build.
+> - **Open HIGH (NOT fixed — own branch + product decision + pinned-test rewrite):** SLA-monitor cron `assignUnassignedTickets()` picks agents by department/branch and **ignores `Ticket.teamId`**; also assigns unrouted (`teamId=null`) tickets → contradicts ADR-051 / `modules/assignment`. No cross-team data leak (agent sees only own assigned ticket) but breaks team ownership + manager visibility/realtime for those tickets. Fix = skip `teamId===null` + require `agent.teamId===ticket.teamId` in `chooseAgent`, or delegate to `autoAssignTicket(tx,…)`.
+> - **NOT VERIFIED (no browser / no disposable DB / no live creds here):** fresh-DB `migrate deploy`+seed+journeys; multi-role EN/AR/RTL/dark/responsive browser matrix; live Resend/Meta/TextBee/AI provider + real Blob round-trip (TextBee inbound `x-signature` is a CRM-invented scheme — must match TextBee's real contract); prod deploy smoke (SPA deep-link refresh — no `client/vercel.json`, relies on Vercel Vite preset; CORS; cron auth).
+> - Not committed/pushed.
+
 > **Team-Scoped Automatic Ticket Assignment (2026-09-02, `feature/automatic-assignment` off latest `master`, uncommitted): DONE + SERVER GATES GREEN. Backend-only, ZERO client change, NO Prisma migration. ADR-051.**
 >
 > Closes `SLA & Automation → Automatic Assignment` (the last original-requirement gap). Prior state: only a 5-min SLA-monitor cron auto-assigned, and by DEPARTMENT/BRANCH equality — not the authoritative `Ticket.teamId`, and never synchronously.

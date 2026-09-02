@@ -1,5 +1,67 @@
 # Customer Support CRM — Progress Tracking
 
+## CURRENT STATE — 2026-09-02 (Final QA & Production Readiness Audit)
+
+> This block is the authoritative current summary. Everything below it is a
+> historical, append-only log. Many older entries describe work as "on branch",
+> "unstaged", or "uncommitted" that has **since been integrated into `master`** —
+> read those as history, not as the present working-tree state.
+
+**Repository truth (git):** `master` HEAD `935c91e feat: add team-scoped
+automatic ticket assignment`. Recent integrated commits: `2204d5e`/`b4607cd`/
+`ddb080a` (memory/docs), `27034b7 feat: unify customer AI and live support in
+floating widget`, `935c91e` team-scoped automatic assignment. So the
+"Customer-facing AI chatbot", "Unified Support Widget", and "Team-Scoped
+Automatic Ticket Assignment" work that the log and `.wolf/STATUS.md` describe as
+uncommitted is **now committed on `master`**.
+
+**Audit branch:** `test/final-qa-production-readiness` (off `935c91e`) —
+`docs/24-final-qa-production-readiness.md` is the full report. Changes on this
+branch are unstaged/uncommitted; nothing was staged, committed, pushed, merged,
+rebased, or tagged.
+
+**Automated verification (run this audit, on the audit branch):**
+
+| Gate | Result |
+| --- | --- |
+| Server TypeScript | PASS (exit 0) |
+| Server ESLint | PASS (exit 0) — *was FAIL*: 2 pre-existing errors in `scripts/verify-login.ts` fixed this audit |
+| Server tests (Vitest) | PASS — **845 / 48 files** (was 839 / 47; +6 in new `config/env.test.ts`) |
+| Client TypeScript | PASS (exit 0) |
+| Client ESLint | PASS (exit 0) — 2 pre-existing non-failing `react-refresh` warnings remain |
+| Client tests (Vitest) | PASS — **767 / 64 files** |
+| Client production build | PASS (exit 0) — pre-existing single-chunk >500 kB warning (`index-*.js` ≈ 2.12 MB / 606 kB gzip) |
+| `git diff --check` | PASS (exit 0) |
+
+**Fixes applied this audit (2, both minimal):**
+1. `server/scripts/verify-login.ts` — ternary-as-statement → `if/else` (restores
+   the server ESLint gate).
+2. `server/src/config/env.ts` — new `assertProductionSecretsConfigured()`:
+   `NODE_ENV=production` startup now throws if `JWT_SECRET` / `DATABASE_URL` are
+   unset or still the shipped dev default (token-forgery risk). New
+   `server/src/config/env.test.ts` (6 tests). Dev/test behavior unchanged.
+
+**Open HIGH finding (not fixed — needs its own branch + product decision):**
+the SLA-monitor cron `assignUnassignedTickets()` selects agents by
+department/branch and ignores `Ticket.teamId`, and assigns unrouted
+(`teamId = null`) tickets — contradicting ADR-051 / the canonical
+`modules/assignment` engine. Details + recommended fix in
+`docs/24-final-qa-production-readiness.md` §8 (SEC/WF-1).
+
+**Manual verification still outstanding (NOT performed — no browser / no
+disposable DB / no live provider credentials in this environment):**
+- Fresh-database migration apply + seed + journey run.
+- Multi-role browser matrix (ADMIN / MANAGER A / MANAGER B / AGENT A / AGENT B /
+  CUSTOMER A / CUSTOMER B) across EN/AR, RTL, light/dark, responsive.
+- Live Email (Resend) / WhatsApp (Meta) / SMS (TextBee) / AI provider behavior;
+  real Vercel Blob round-trip. TextBee's inbound `x-signature` scheme is
+  CRM-defined and must be confirmed against TextBee's real webhook contract.
+- Production deployment smoke test (SPA deep-link refresh, CORS, cron auth).
+
+**Release recommendation:** READY WITH FIXES.
+
+---
+
 ## Customer-facing AI chatbot — 2026-09-02
 
 Implemented and automated-verified on `feature/customer-ai-chatbot`; the pre-existing customer-AI implementation is staged while this floating-widget refactor remains unstaged, and all work is uncommitted. The dedicated page/nav item is replaced by one customer-only widget mounted in `AppShell`; local React state survives Portal child-route navigation, `/portal/support` redirects to an auto-open compatibility URL, and the existing API, published-KB grounding, rate limiting, article rendering, and canonical Portal-ticket handoff remain unchanged. Focused widget/shell tests passed (7/7); portal-routing plus attachment isolation passed (53/53); full client suite passed (787/787, 65 files). Client typecheck, changed-file ESLint, i18n parity through the full suite, and production build passed. Full server/customer-AI verification remains the prior green result because backend code was not changed. Live provider, real PostgreSQL, and authenticated EN/AR light/dark mobile/desktop browser QA remain unverified.

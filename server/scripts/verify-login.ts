@@ -23,11 +23,13 @@ async function main() {
       const claims = verifyAccessToken(res.token);
       const pass = c.expectRole !== "REJECT" && res.user.role === c.expectRole && claims.role === c.expectRole && claims.userId === res.user.id;
       console.log(`${pass ? "PASS" : "FAIL"}  ${c.email.padEnd(28)} -> role=${res.user.role} token=${claims.role === res.user.role ? "valid" : "MISMATCH"}`);
-      pass ? ok++ : fail++;
+      if (pass) ok++;
+      else fail++;
     } catch (e) {
       const rejectedAsExpected = c.expectRole === "REJECT";
       console.log(`${rejectedAsExpected ? "PASS" : "FAIL"}  ${c.email.padEnd(28)} -> rejected (${(e as Error).message})`);
-      rejectedAsExpected ? ok++ : fail++;
+      if (rejectedAsExpected) ok++;
+      else fail++;
     }
   }
   console.log(`\n${ok}/${ok + fail} passed`);

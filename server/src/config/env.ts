@@ -71,3 +71,37 @@ if (!result.success) {
 
 export const env = result.data;
 
+/** The development fallbacks baked into the schema above. */
+export const DEV_JWT_SECRET = "development-jwt-secret-key-must-be-at-least-32-characters-long";
+export const DEV_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/crm";
+
+/**
+ * Production safety net: the development fallbacks for JWT_SECRET / DATABASE_URL
+ * exist only so a fresh clone boots without a .env. They must never silently
+ * reach a production deployment — a shipped default JWT secret allows token
+ * forgery. Fail fast at startup instead. Dev/test are unaffected.
+ *
+ * Reads the RAW values (not the parsed `env`) so an unset variable — which the
+ * schema fills with the dev default — is still caught.
+ */
+export function assertProductionSecretsConfigured(
+  nodeEnv: string,
+  raw: { JWT_SECRET?: string; DATABASE_URL?: string },
+): void {
+  if (nodeEnv !== "production") return;
+  const missing: string[] = [];
+  if (!raw.JWT_SECRET || raw.JWT_SECRET === DEV_JWT_SECRET) missing.push("JWT_SECRET");
+  if (!raw.DATABASE_URL || raw.DATABASE_URL === DEV_DATABASE_URL) missing.push("DATABASE_URL");
+  if (missing.length > 0) {
+    throw new Error(
+      `Refusing to start in production with development defaults for: ${missing.join(", ")}. ` +
+        "Set a strong, unique value for each in the deployment environment.",
+    );
+  }
+}
+
+assertProductionSecretsConfigured(env.NODE_ENV, {
+  JWT_SECRET: process.env.JWT_SECRET,
+  DATABASE_URL: process.env.DATABASE_URL,
+});
+
