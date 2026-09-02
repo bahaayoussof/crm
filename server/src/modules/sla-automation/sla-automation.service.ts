@@ -4,28 +4,19 @@ import { createNotifications } from "../notifications/notification.service.js";
 import { emitTicketUpdated, withRealtimeOutbox } from "../realtime/realtime.publisher.js";
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../audit-logs/audit-log.constants.js";
 import { createAuditLog } from "../audit-logs/audit-log.service.js";
-import {
-  ASSIGNMENT_ACTIVE_STATUSES,
-  AUTO_ASSIGNMENT_AUDIT_REASON,
-  AUTO_ASSIGNMENT_HISTORY_ACTION,
-  AUTO_ASSIGNMENT_NOTIFICATION_TYPE,
-} from "../assignment/assignment.types.js";
+import { autoAssignTicket } from "../assignment/assignment.service.js";
+import { ASSIGNMENT_ACTIVE_STATUSES } from "../assignment/assignment.types.js";
 
-// The bounded SLA-monitor cron keeps its own DEPARTMENT/BRANCH-scoped candidate
-// policy (see docs/08). It shares only the active-status set and the automatic-
-// assignment vocabulary with the synchronous team-scoped engine in
-// modules/assignment, so the trail reads identically from either path.
+// The bounded SLA-monitor cron discovers *candidate tickets* only. The
+// assignment decision itself is delegated to the single canonical engine in
+// modules/assignment (`autoAssignTicket`, ADR-051), so there is exactly one
+// automatic-assignment policy: `Ticket.teamId` is the authoritative ownership
+// boundary. Department/Branch are NOT used as substitutes for Team ownership and
+// a ticket with `teamId = null` is intentionally left unassigned for ADMIN
+// routing — the cron never infers or invents a Team.
 const ACTIVE_STATUSES = ASSIGNMENT_ACTIVE_STATUSES;
 const ESCALATABLE_STATUSES = ACTIVE_STATUSES.filter((status) => status !== TicketStatus.ESCALATED);
 export const SLA_MONITOR_BATCH_SIZE = 100;
-
-type EligibleAgent = {
-  id: string;
-  name: string;
-  departmentId: string | null;
-  branchId: string | null;
-  activeTicketCount: number;
-};
 
 export interface SlaMonitorResult {
   assigned: number;
@@ -48,71 +39,41 @@ export async function runSlaMonitor(now = new Date()): Promise<SlaMonitorResult>
 }
 
 async function assignUnassignedTickets() {
-  const [tickets, agentRows] = await Promise.all([
-    prisma.ticket.findMany({
-      where: { assignedAgentId: null, status: { in: [...ACTIVE_STATUSES] } },
-      take: SLA_MONITOR_BATCH_SIZE,
-      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-      select: { id: true, subject: true, departmentId: true, branchId: true, customerId: true },
-    }),
-    prisma.user.findMany({
-      where: { role: Role.AGENT, isActive: true },
-      orderBy: { id: "asc" },
-      select: {
-        id: true,
-        name: true,
-        departmentId: true,
-        branchId: true,
-        _count: { select: { assignedTickets: { where: { status: { in: [...ACTIVE_STATUSES] } } } } },
-      },
-    }),
-  ]);
-
-  const agents: EligibleAgent[] = agentRows.map((agent) => ({
-    id: agent.id,
-    name: agent.name,
-    departmentId: agent.departmentId,
-    branchId: agent.branchId,
-    activeTicketCount: agent._count.assignedTickets,
-  }));
+  // Candidate discovery is SLA-specific: unassigned, active-status, oldest first,
+  // bounded batch. Team routing is authoritative — an unrouted ticket
+  // (`teamId = null`) is excluded here and stays unassigned; the cron never
+  // infers a Team from Department/Branch/category/customer/previous assignee.
+  const tickets = await prisma.ticket.findMany({
+    where: { assignedAgentId: null, teamId: { not: null }, status: { in: [...ACTIVE_STATUSES] } },
+    take: SLA_MONITOR_BATCH_SIZE,
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    select: { id: true, customerId: true, teamId: true, status: true },
+  });
   let updated = 0;
 
   for (const ticket of tickets) {
-    const agent = chooseAgent(agents, ticket);
-    if (!agent) continue;
+    // Delegate the actual assignment to the canonical engine: it re-reads the
+    // ticket + team-scoped eligible agents inside the transaction, applies the
+    // least-workload / deterministic tie-break strategy, runs the same guarded
+    // `updateMany`, and writes the canonical history / audit / notification.
+    // Each ticket commits before the next, so intra-run workload stays accurate.
+    const outcome = await prisma.$transaction((tx) =>
+      autoAssignTicket(tx, {
+        ticketId: ticket.id,
+        teamId: ticket.teamId,
+        assignedAgentId: null,
+        status: ticket.status,
+      }),
+    );
 
-    const assigned = await prisma.$transaction(async (tx) => {
-      const mutation = await tx.ticket.updateMany({
-        where: { id: ticket.id, assignedAgentId: null, status: { in: [...ACTIVE_STATUSES] } },
-        data: { assignedAgentId: agent.id },
-      });
-      if (mutation.count !== 1) return false;
-
-      await tx.ticketHistory.create({
-        data: {
-          ticketId: ticket.id,
-          actorUserId: null,
-          action: AUTO_ASSIGNMENT_HISTORY_ACTION,
-          oldValue: null,
-          newValue: agent.name,
-        },
-      });
-      await createAuditLog({ actorId: null, action: AUDIT_ACTIONS.TICKET_ASSIGNED, entityType: AUDIT_ENTITY_TYPES.TICKET, entityId: ticket.id, changes: { assignedAgentId: { from: null, to: agent.id } }, metadata: { reason: AUTO_ASSIGNMENT_AUDIT_REASON } }, tx);
-      await createNotifications(
-        tx,
-        [agent.id],
-        AUTO_ASSIGNMENT_NOTIFICATION_TYPE,
-        "Ticket automatically assigned",
-        `Ticket #${ticket.id}: ${ticket.subject} was automatically assigned to you`,
-        ticket.id,
-      );
-      return true;
-    });
-
-    if (assigned) {
+    if (outcome) {
       updated += 1;
-      agent.activeTicketCount += 1;
-      emitTicketUpdated({ ticketId: ticket.id, assignedAgentId: agent.id, customerId: ticket.customerId });
+      emitTicketUpdated({
+        ticketId: ticket.id,
+        assignedAgentId: outcome.assignedAgentId,
+        customerId: ticket.customerId,
+        teamId: ticket.teamId,
+      });
     }
   }
   return { inspected: tickets.length, updated };
@@ -185,18 +146,6 @@ async function escalateBreachedTickets(now: Date) {
     }
   }
   return { inspected: tickets.length, updated };
-}
-
-function chooseAgent(
-  agents: EligibleAgent[],
-  ticket: { departmentId: string | null; branchId: string | null },
-) {
-  return agents
-    .filter((agent) =>
-      (ticket.departmentId === null || agent.departmentId === ticket.departmentId) &&
-      (ticket.branchId === null || agent.branchId === ticket.branchId),
-    )
-    .sort((left, right) => left.activeTicketCount - right.activeTicketCount || left.id.localeCompare(right.id))[0];
 }
 
 export const slaAutomationPolicy = { ACTIVE_STATUSES, ESCALATABLE_STATUSES };

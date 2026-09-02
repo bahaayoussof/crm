@@ -31,7 +31,7 @@ run, and live Email / WhatsApp / SMS / AI provider behavior.
 | --- | --- |
 | Release recommendation | **READY WITH FIXES** |
 | Blockers | 0 |
-| High-risk findings | 1 open (SLA cron team-scoping) + outstanding manual verification (live providers, fresh DB, browser matrix) |
+| High-risk findings | 0 open (SEC/WF-1 SLA cron team-scoping **RESOLVED** on `fix/sla-team-scoped-assignment`) + outstanding manual verification (live providers, fresh DB, browser matrix) |
 | Medium-risk findings | 4 |
 | Low / info findings | 4 |
 | Bugs fixed during audit | 2 |
@@ -44,7 +44,7 @@ run, and live Email / WhatsApp / SMS / AI provider behavior.
 | --- | --- | --- | --- | --- | --- |
 | Server TypeScript | Yes | – | PASS | `npm --prefix server run typecheck` → exit 0 | |
 | Server ESLint | Yes | – | PASS (was FAIL) | `npm --prefix server run lint` → exit 0 | Pre-existing 2 errors in `scripts/verify-login.ts` fixed this audit |
-| Server tests | Yes | – | PASS | `vitest run` → **845 passed / 48 files** | Was 839/47 before audit; +6 in new `env.test.ts` |
+| Server tests | Yes | – | PASS | `vitest run` → **854 passed / 48 files** | 845 at audit time (+6 `env.test.ts`); +9 more from the SEC/WF-1 `sla-automation.test.ts` rewrite |
 | Client TypeScript | Yes | – | PASS | `npm --prefix client run typecheck` → exit 0 | |
 | Client ESLint | Yes | – | PASS | `npm --prefix client run lint` → exit 0 | 2 pre-existing `react-refresh/only-export-components` **warnings** (non-failing) |
 | Client tests | Yes | – | PASS | `vitest run` → **767 passed / 64 files** | |
@@ -54,7 +54,7 @@ run, and live Email / WhatsApp / SMS / AI provider behavior.
 | Team isolation (MANAGER/AGENT) | Yes | – | PASS (code review + tests) | `shared/team/team-scope.ts`, `tickets/ticket-visibility.ts` | Query-level scoping; cross-team id → 404 (no existence leak) |
 | Customer isolation (Portal) | Yes | – | PASS (code review + tests) | `portal/portal.service.ts` (`customerIdFor` + `{ id, customerId }` on every query) | IDOR-safe; no client `customerId`/email in authz |
 | Automatic assignment engine | Yes | – | PASS (code review + tests) | `modules/assignment/*`, `assignment.test.ts` | Team-scoped, race-safe, never overwrites, never infers a team |
-| Automatic assignment — SLA cron path | Yes | – | **PARTIAL** | `sla-automation.service.ts` `assignUnassignedTickets` | Uses dept/branch candidates, **ignores `Ticket.teamId`** — see finding SEC/WF-1 |
+| Automatic assignment — SLA cron path | Yes | – | PASS (was PARTIAL) | `sla-automation.service.ts` `assignUnassignedTickets`, `sla-automation.test.ts` | SEC/WF-1 fixed on `fix/sla-team-scoped-assignment`: cron is now a candidate finder that skips `teamId = null` and delegates to canonical `autoAssignTicket(tx, …)`; dept/branch no longer used |
 | Realtime SSE audience isolation | Yes | – | PASS (code review + tests) | `realtime.service.ts` `canReceive`, `realtime.test.ts` | ADMIN/MANAGER(team)/AGENT(assigned or own-team unassigned)/CUSTOMER(own+public) |
 | Realtime transactional safety | Yes | – | PASS | `withRealtimeOutbox` in `realtime.publisher.ts` | Events buffered, flushed only after commit, discarded on throw |
 | Webhook signature verification | Yes | – | PASS (code review) | `whatsapp.signature.ts`, `sms.signature.ts`, email integration | HMAC-SHA256 + `timingSafeEqual`; raw body preserved (routers mounted before `express.json()`) |
@@ -230,7 +230,7 @@ document.
 | ID | Severity | Finding | Impact | Resolution |
 | --- | --- | --- | --- | --- |
 | SEC-1 | **HIGH** | `config/env.ts` supplied a working development fallback for `JWT_SECRET` (`"development-jwt-secret-key-must-be-at-least-32-characters-long"`) and `DATABASE_URL`. A production deploy that forgot to set `JWT_SECRET` would boot with a publicly-known signing key → anyone can forge a valid admin JWT. | Full authentication bypass / privilege escalation if misconfigured. | **FIXED.** Added `assertProductionSecretsConfigured()` in `env.ts`: when `NODE_ENV=production`, an unset or dev-default `JWT_SECRET`/`DATABASE_URL` throws at startup. Dev/test unaffected. Regression: `server/src/config/env.test.ts` (6 tests). |
-| SEC/WF-1 | **HIGH (open)** | The SLA-monitor cron `assignUnassignedTickets()` (`sla-automation.service.ts`) selects candidate agents by `departmentId`/`branchId` equality only and **ignores `Ticket.teamId`**. It also assigns tickets whose `teamId` is `null`. Customer channels (Portal/Email/WhatsApp/SMS) create tickets with `teamId = null` and no dept/branch → `chooseAgent` matches any active agent → within 5 minutes an arbitrary least-loaded agent org-wide is auto-assigned. | Contradicts ADR-051 / the canonical engine ("unrouted `teamId = null` → left for ADMIN routing") and can produce a cross-team assignment that `assertAgentAssignableToTicket` would reject on the manual path. No cross-team **data leak** (the agent only ever sees their own assigned ticket), but the ticket's team ownership stays `null`, so its owning manager cannot see it and realtime `ticket.updated` (keyed on `teamId`) reaches ADMIN only. | **Documented, not fixed.** Recommended: in `assignUnassignedTickets` skip tickets with `teamId === null`, add `teamId` to the ticket + agent `select`, and require `agent.teamId === ticket.teamId` in `chooseAgent` — or delegate the inner assignment to `modules/assignment/autoAssignTicket(tx, …)`. Both change the pinned `sla-automation.test.ts` fixtures/assertions and need their own branch + product sign-off on whether the cron should assign unrouted tickets at all. |
+| SEC/WF-1 | **HIGH — RESOLVED** (`fix/sla-team-scoped-assignment`) | The SLA-monitor cron `assignUnassignedTickets()` (`sla-automation.service.ts`) selected candidate agents by `departmentId`/`branchId` equality only and **ignored `Ticket.teamId`**. It also assigned tickets whose `teamId` was `null`. Customer channels (Portal/Email/WhatsApp/SMS) create tickets with `teamId = null` and no dept/branch → `chooseAgent` matched any active agent → within 5 minutes an arbitrary least-loaded agent org-wide was auto-assigned. | Contradicted ADR-051 / the canonical engine ("unrouted `teamId = null` → left for ADMIN routing") and could produce a cross-team assignment that `assertAgentAssignableToTicket` would reject on the manual path. No cross-team **data leak** (the agent only ever sees their own assigned ticket), but the ticket's team ownership stayed `null`, so its owning manager could not see it and realtime `ticket.updated` (keyed on `teamId`) reached ADMIN only. | **FIXED.** `assignUnassignedTickets()` is now a bounded *candidate finder* — its `findMany` filters `teamId: { not: null }` (plus unassigned + active status) and it delegates every assignment decision to the canonical `autoAssignTicket(tx, …)`, one transaction per candidate. The legacy `chooseAgent`/`EligibleAgent` dept-branch selection and the duplicated history/audit/notification writes were deleted. `Ticket.teamId` is now the single authoritative ownership boundary on every automatic path; a `teamId = null` ticket is left unassigned for ADMIN routing (automatic Team routing remains out of scope). Regression: `sla-automation.test.ts` rewritten (16 tests) — team scoping, least-loaded, deterministic tie, unrouted no-op, cross-team dept/branch rejection, guarded no-reassign, no-eligible-agent safe no-op, terminal exclusion, canonical side effects, batch consistency. Full server suite **854 passed / 48 files**; `tsc` + `eslint` clean; `git diff --check` clean; no client changes. |
 | SEC-2 | MEDIUM | In-memory rate-limit buckets (`middleware/rate-limit.ts`, used by customer AI and `/api/tickets/:id/ai`) are per-process. | On multi-instance / serverless the effective limit is `max × instanceCount`; a cold start resets a caller's bucket. | Acceptable for the assessment. For production, back the limiter with a shared store (Redis / Upstash) or accept the looser bound. Documented. |
 | SEC-3 | LOW | `verifyAccessToken` calls `jwt.verify(token, env.JWT_SECRET)` without pinning `algorithms: ["HS256"]`. | No practical exploit here — only a symmetric secret is ever configured, and jsonwebtoken v9 does not accept `alg: none` without an explicit opt-in — but pinning is defense-in-depth. | Recommend adding `{ algorithms: ["HS256"] }`. Not changed (no vulnerability, avoids churn). |
 | SEC-4 | LOW | WhatsApp `X-Hub-Signature-256` comparison (`whatsapp.signature.ts`) compares the provider-supplied hex string case-sensitively against a lowercase digest. | Meta sends lowercase hex, so no real impact; a spec change to uppercase hex would break verification. | Optional: lowercase `provided` before compare. |
@@ -301,8 +301,10 @@ Concrete checklist — none of these could be done in this environment.
          notification present.
    - [ ] Already-assigned ticket is never reassigned.
    - [ ] Route an unrouted ticket to a team → auto-assign fires once.
-   - [ ] **Confirm the SLA-cron behavior against SEC/WF-1** before enabling the
-         cron in production.
+   - [x] **SEC/WF-1 resolved** — SLA cron delegates to the canonical team-scoped
+         engine and skips `teamId = null` tickets (`fix/sla-team-scoped-assignment`).
+         Live check: an unrouted customer-channel ticket is *not* auto-assigned by
+         the cron; a routed unassigned ticket is assigned to an in-team agent only.
 5. **Live providers** (each with real credentials, then mark verified):
    - [ ] Email (Resend): inbound webhook → ticket; outbound reply delivered;
          signature rejection on a tampered body.
@@ -325,12 +327,16 @@ Concrete checklist — none of these could be done in this environment.
 ## 11. Final Recommendation
 
 **READY WITH FIXES** — automated system integrity is strong and both quality
-gates are fully green after this audit. Two real defects were fixed (broken
-server ESLint gate; production-unsafe JWT/DB fallback). Before production release:
+gates are fully green after this audit. Three real defects were fixed (broken
+server ESLint gate; production-unsafe JWT/DB fallback; SEC/WF-1 SLA-cron team
+scoping). Before production release:
 
-1. Resolve **SEC/WF-1** (SLA-monitor cron ignores `Ticket.teamId`) — decide the
-   intended behavior for unrouted tickets and align the cron with the canonical
-   assignment engine, on its own branch with updated tests.
+1. ~~Resolve **SEC/WF-1** (SLA-monitor cron ignores `Ticket.teamId`).~~ **Done**
+   on `fix/sla-team-scoped-assignment`: the cron now finds candidates only
+   (routed, unassigned, active) and delegates the decision to the canonical
+   `autoAssignTicket(tx, …)`; unrouted (`teamId = null`) tickets are left for
+   ADMIN routing. Rewritten `sla-automation.test.ts` (16 tests); full server
+   suite 854/48 green.
 2. Complete the outstanding **manual verification**: a fresh-database migration
    run, live Email / WhatsApp / SMS / AI provider validation (the SMS inbound
    signature scheme in particular), a real Blob round-trip, and the multi-role

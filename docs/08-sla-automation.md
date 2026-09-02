@@ -78,6 +78,13 @@ Preferred later automation:
 
 Manual assignment is acceptable for the core delivery.
 
+All automatic Agent selection — synchronous ticket creation/update **and** the
+bounded SLA-monitor cron — now obeys `Ticket.teamId` as the authoritative
+ownership boundary through one shared engine (`server/src/modules/assignment/`).
+Department and Branch are never used as substitutes for Team ownership.
+Automatic Team routing remains out of scope: a ticket with `teamId = null` is
+intentionally left unassigned for ADMIN routing.
+
 ### Synchronous Team-Scoped Automatic Assignment (ADR-051)
 
 Implemented as real backend behavior, not a UI button. One canonical service —
@@ -142,14 +149,15 @@ Portal-created requests snapshot the active MEDIUM rule. Customer replies never 
 
 Vercel Cron calls the internal `GET /api/internal/sla-monitor` endpoint every five minutes with the independent server-side `CRON_SECRET`. This is not a normal authenticated product endpoint and does not accept product JWT authorization. One execution processes bounded batches of at most 100 assignment candidates and 100 escalation candidates, ordered deterministically so later executions drain larger backlogs.
 
-Automatic assignment:
+Automatic assignment (SEC/WF-1 fix — the cron is now a *candidate finder* only; the assignment decision is delegated to the canonical team-scoped engine, `autoAssignTicket(tx, …)`):
 
-- considers only active statuses and tickets whose `assignedAgentId` is null
-- never changes an existing manual or automated assignment
-- considers active `AGENT` users only
-- requires equality for every non-null ticket `departmentId` and `branchId`; an unconstrained ticket may use any active agent
-- chooses the eligible agent with the fewest tickets in active statuses, then `id ASC`
-- increments the in-memory load after each successful assignment so one run distributes its batch consistently
+- candidate discovery selects tickets that are unassigned (`assignedAgentId` null), in an active status, **and already routed to a Team (`teamId` not null)** — oldest first, bounded batch
+- an unrouted ticket (`teamId = null`) is never a candidate and stays unassigned; the cron never infers a Team from `departmentId`, `branchId`, category, customer, or a previous assignee
+- for each candidate the engine picks the least active-workload eligible active `AGENT` **whose `User.teamId === Ticket.teamId`**, then `id ASC` as a deterministic tie-break — cross-team Agents are excluded by the query, so a Department or Branch match on an Agent of another Team is not eligible
+- never changes an existing manual or automated assignment (guarded `updateMany` on `assignedAgentId: null` + same `teamId` + active status)
+- each candidate is assigned in its own transaction that commits before the next, so one run distributes its batch consistently (a later ticket sees the earlier assignment's workload)
+- no eligible in-team Agent is a safe no-op; the batch continues with the other candidates
+- **bounded scalability note (acceptable for V1):** the engine re-reads team-scoped eligible Agents and their workload per candidate, so a full batch is up to ~200 additional indexed reads per five-minute run. This is intentional — one canonical assignment policy over a micro-optimised second one. A per-team pre-aggregation is a future optimisation, not a correctness gap.
 
 Automatic escalation:
 

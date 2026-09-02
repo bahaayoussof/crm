@@ -955,3 +955,12 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | 16:10 | Prod env hardening | server/src/config/env.ts + new env.test.ts | assertProductionSecretsConfigured throws in prod on dev-default JWT_SECRET/DATABASE_URL; 6 tests | 4k |
 | 16:20 | Re-ran server gates | server | typecheck+lint clean; tests 845/48 (was 839/47) | 3k |
 | 16:30 | Wrote final QA report + reconciled tracker | docs/24-final-qa-production-readiness.md (new), docs/19 (current-state header) | READY WITH FIXES; 0 blockers; 1 open HIGH (SLA cron ignores Ticket.teamId); live provider/DB/browser NOT VERIFIED | 8k |
+
+## Session: 2026-09-02 16:41
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 16:45 | Fix SEC/WF-1: SLA cron team-scoped assignment | server/src/modules/sla-automation/sla-automation.service.ts | Removed legacy chooseAgent/EligibleAgent dept-branch policy + duplicated history/audit/notif writes; assignUnassignedTickets now finds candidates (teamId not null + unassigned + active) and delegates to canonical autoAssignTicket(tx,…), one tx per ticket | 6k |
+| 16:47 | Rewrote SLA tests | server/src/modules/sla-automation/sla-automation.test.ts | 16 tests: team scope, least-loaded, deterministic tie, unrouted no-op, cross-team dept/branch rejection, guarded no-reassign, no-eligible no-op, terminal exclusion, canonical side effects, batch consistency; real autoAssignTicket driven via fake prisma | 5k |
+| 16:50 | Server gates | server | tsc clean, eslint clean, vitest 854/48, git diff --check clean, no client changes | 3k |
+| 16:52 | Docs | docs/08, docs/17 (ADR-051 + ADR-030 superseded notes), docs/19, docs/24 (SEC/WF-1 RESOLVED) | Ticket.teamId authoritative on every automatic path; automatic Team routing stays out of scope | 4k |

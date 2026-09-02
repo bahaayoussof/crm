@@ -26,7 +26,7 @@ rebased, or tagged.
 | --- | --- |
 | Server TypeScript | PASS (exit 0) |
 | Server ESLint | PASS (exit 0) — *was FAIL*: 2 pre-existing errors in `scripts/verify-login.ts` fixed this audit |
-| Server tests (Vitest) | PASS — **845 / 48 files** (was 839 / 47; +6 in new `config/env.test.ts`) |
+| Server tests (Vitest) | PASS — **854 / 48 files** (845 at audit + 9 from the SEC/WF-1 `sla-automation.test.ts` rewrite; was 839 / 47 pre-audit) |
 | Client TypeScript | PASS (exit 0) |
 | Client ESLint | PASS (exit 0) — 2 pre-existing non-failing `react-refresh` warnings remain |
 | Client tests (Vitest) | PASS — **767 / 64 files** |
@@ -41,12 +41,20 @@ rebased, or tagged.
    unset or still the shipped dev default (token-forgery risk). New
    `server/src/config/env.test.ts` (6 tests). Dev/test behavior unchanged.
 
-**Open HIGH finding (not fixed — needs its own branch + product decision):**
-the SLA-monitor cron `assignUnassignedTickets()` selects agents by
-department/branch and ignores `Ticket.teamId`, and assigns unrouted
-(`teamId = null`) tickets — contradicting ADR-051 / the canonical
-`modules/assignment` engine. Details + recommended fix in
-`docs/24-final-qa-production-readiness.md` §8 (SEC/WF-1).
+**HIGH finding SEC/WF-1 — RESOLVED** on branch `fix/sla-team-scoped-assignment`
+(off `master` `7199657`; unstaged/uncommitted). The SLA-monitor cron
+`assignUnassignedTickets()` no longer has its own department/branch assignment
+policy: it is now a bounded candidate finder (`findMany` filters
+`teamId: { not: null }` + unassigned + active status) that delegates every
+assignment decision to the canonical `autoAssignTicket(tx, …)`, one transaction
+per candidate. Legacy `chooseAgent`/`EligibleAgent` and the duplicated
+history/audit/notification writes were deleted. `Ticket.teamId` is now the
+single authoritative ownership boundary on every automatic path; an unrouted
+(`teamId = null`) ticket is left unassigned for ADMIN routing (automatic Team
+routing stays out of scope). `sla-automation.test.ts` rewritten (16 tests, +9).
+Server `tsc` + `eslint` clean; full server suite **854 / 48**; `git diff --check`
+clean; no client changes. Details in
+`docs/24-final-qa-production-readiness.md` §8 (SEC/WF-1) and ADR-051 / ADR-030.
 
 **Manual verification still outstanding (NOT performed — no browser / no
 disposable DB / no live provider credentials in this environment):**
