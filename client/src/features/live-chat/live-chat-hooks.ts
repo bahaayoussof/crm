@@ -49,6 +49,29 @@ export function useStartLiveChat() {
 }
 
 /**
+ * End the current live chat (`active -> RESOLVED`). The server owns the
+ * transition; realtime `ticket.updated` reaches the staff side. We seed the
+ * canonical ticket cache with the resolved detail and refetch the portal
+ * surfaces + the bootstrap (which then returns `null`, so the page falls back to
+ * Department selection — a RESOLVED chat is never resumed).
+ */
+export function useEndLiveChat(ticketId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.endLiveChat(ticketId),
+    onSuccess: async (chat: LiveChat) => {
+      qc.setQueryData(portalKeys.ticket(ticketId), chat);
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: portalKeys.ticket(ticketId) }),
+        qc.invalidateQueries({ queryKey: liveChatKeys.root }),
+        qc.invalidateQueries({ queryKey: portalKeys.overview }),
+        qc.invalidateQueries({ queryKey: portalKeys.tickets() }),
+      ]);
+    },
+  });
+}
+
+/**
  * Send a customer message on the live chat. Reuses the canonical portal reply
  * endpoint (`POST /portal/tickets/:id/messages`) — no live-chat-specific message
  * path. Refetches the canonical history + the bootstrap after the write commits.

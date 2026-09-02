@@ -6,8 +6,9 @@ const mocks = vi.hoisted(() => ({
   customer: { findUnique: vi.fn() },
   department: { findUnique: vi.fn(), findMany: vi.fn() },
   team: { findFirst: vi.fn() },
-  ticket: { findFirst: vi.fn(), create: vi.fn() },
+  ticket: { findFirst: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
   ticketHistory: { create: vi.fn().mockResolvedValue({}) },
+  auditLog: { create: vi.fn().mockResolvedValue({}) },
   slaRule: { findFirst: vi.fn().mockResolvedValue({ firstResponseMinutes: 30, resolutionMinutes: 120 }) },
   user: { findUnique: vi.fn().mockResolvedValue({ passwordChangedAt: null }) },
 }));
@@ -360,6 +361,137 @@ describe("portal live chat", () => {
   });
 
   // --- Internal resolver -----------------------------------------------
+
+  // --- Customer manual end -------------------------------------------------
+
+  const ownedRow = (status: TicketStatus = TicketStatus.IN_PROGRESS) => ({
+    id: CHAT_ID,
+    status,
+    channel: "LIVE_CHAT",
+    assignedAgentId: null,
+    teamId: TEAM_ID,
+  });
+  const endUrl = `/api/portal/live-chat/${CHAT_ID}/end`;
+
+  it("lets the owning customer end an active LIVE_CHAT — transitions to RESOLVED with canonical fields", async () => {
+    mocks.ticket.findFirst
+      .mockResolvedValueOnce(ownedRow(TicketStatus.IN_PROGRESS)) // ownership lookup
+      .mockResolvedValueOnce(detailRow(TicketStatus.RESOLVED)); // ticketDetail
+    mocks.ticket.updateMany.mockResolvedValue({ count: 1 });
+
+    const response = await request(app).post(endUrl).set(auth("customer", Role.CUSTOMER));
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.status).toBe("RESOLVED");
+
+    const update = mocks.ticket.updateMany.mock.calls[0][0];
+    expect(update.where).toMatchObject({ id: CHAT_ID, customerId: CUSTOMER_ID, channel: "LIVE_CHAT" });
+    expect(update.where.status.in).toEqual(
+      expect.arrayContaining([TicketStatus.OPEN, TicketStatus.IN_PROGRESS, TicketStatus.WAITING_CUSTOMER, TicketStatus.ESCALATED]),
+    );
+    expect(update.data.status).toBe("RESOLVED");
+    expect(update.data.resolvedAt).toBeInstanceOf(Date);
+    // routing / ownership fields are never touched by the transition
+    expect(update.data).not.toHaveProperty("departmentId");
+    expect(update.data).not.toHaveProperty("teamId");
+    expect(update.data).not.toHaveProperty("assignedAgentId");
+    expect(update.data).not.toHaveProperty("customerId");
+
+    expect(mocks.ticketHistory.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        ticketId: CHAT_ID,
+        actorUserId: "customer",
+        action: "STATUS_CHANGED",
+        newValue: TicketStatus.RESOLVED,
+      }),
+    });
+    expect(mocks.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: "TICKET_STATUS_CHANGED",
+          entityId: CHAT_ID,
+          metadata: expect.objectContaining({ reason: "live_chat_ended_by_customer" }),
+        }),
+      }),
+    );
+    expect(emitUpdated).toHaveBeenCalledWith(
+      expect.objectContaining({ ticketId: CHAT_ID, teamId: TEAM_ID, customerId: CUSTOMER_ID }),
+    );
+  });
+
+  it("rejects the anonymous caller and every internal role from ending a chat", async () => {
+    expect((await request(app).post(endUrl)).status).toBe(401);
+    for (const role of [Role.ADMIN, Role.MANAGER, Role.AGENT]) {
+      expect((await request(app).post(endUrl).set(auth("staff", role))).status).toBe(403);
+    }
+    expect(mocks.ticket.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when the ticket is not owned by the calling customer (cross-customer)", async () => {
+    mocks.ticket.findFirst.mockResolvedValueOnce(null);
+    const response = await request(app).post(endUrl).set(auth("customer", Role.CUSTOMER));
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe("TICKET_NOT_FOUND");
+    expect(mocks.ticket.updateMany).not.toHaveBeenCalled();
+    // ownership is enforced in the query
+    expect(mocks.ticket.findFirst.mock.calls[0][0].where).toMatchObject({ id: CHAT_ID, customerId: CUSTOMER_ID });
+  });
+
+  it("rejects a non-LIVE_CHAT ticket with 400 NOT_A_LIVE_CHAT and changes nothing", async () => {
+    mocks.ticket.findFirst.mockResolvedValueOnce({ ...ownedRow(), channel: "WEB" });
+    const response = await request(app).post(endUrl).set(auth("customer", Role.CUSTOMER));
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("NOT_A_LIVE_CHAT");
+    expect(mocks.ticket.updateMany).not.toHaveBeenCalled();
+    expect(emitUpdated).not.toHaveBeenCalled();
+  });
+
+  it("is idempotent when the chat is already RESOLVED — no second transition / history / audit / event", async () => {
+    mocks.ticket.findFirst
+      .mockResolvedValueOnce(ownedRow(TicketStatus.RESOLVED))
+      .mockResolvedValueOnce(detailRow(TicketStatus.RESOLVED));
+    const response = await request(app).post(endUrl).set(auth("customer", Role.CUSTOMER));
+    expect(response.status).toBe(200);
+    expect(response.body.data.status).toBe("RESOLVED");
+    expect(mocks.ticket.updateMany).not.toHaveBeenCalled();
+    expect(mocks.ticketHistory.create).not.toHaveBeenCalled();
+    expect(mocks.auditLog.create).not.toHaveBeenCalled();
+    expect(emitUpdated).not.toHaveBeenCalled();
+  });
+
+  it("never reopens a CLOSED chat — 409 TICKET_CLOSED", async () => {
+    mocks.ticket.findFirst.mockResolvedValueOnce(ownedRow(TicketStatus.CLOSED));
+    const response = await request(app).post(endUrl).set(auth("customer", Role.CUSTOMER));
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe("TICKET_CLOSED");
+    expect(mocks.ticket.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("ignores any body fields — the server owns the transition (no status/teamId/customerId injection)", async () => {
+    mocks.ticket.findFirst
+      .mockResolvedValueOnce(ownedRow(TicketStatus.OPEN))
+      .mockResolvedValueOnce(detailRow(TicketStatus.RESOLVED));
+    mocks.ticket.updateMany.mockResolvedValue({ count: 1 });
+    const response = await request(app)
+      .post(endUrl)
+      .set(auth("customer", Role.CUSTOMER))
+      .send({ status: "CLOSED", teamId: "cattacker1111111111111111", customerId: "cattacker2222222222222222" });
+    expect(response.status).toBe(200);
+    expect(response.body.data.status).toBe("RESOLVED");
+    expect(mocks.ticket.updateMany.mock.calls[0][0].data).toEqual({ status: "RESOLVED", resolvedAt: expect.any(Date) });
+  });
+
+  it("stays safe under a lost race — a concurrent resolve makes updateMany a no-op (count 0)", async () => {
+    mocks.ticket.findFirst
+      .mockResolvedValueOnce(ownedRow(TicketStatus.IN_PROGRESS))
+      .mockResolvedValueOnce(detailRow(TicketStatus.RESOLVED));
+    mocks.ticket.updateMany.mockResolvedValue({ count: 0 });
+    const response = await request(app).post(endUrl).set(auth("customer", Role.CUSTOMER));
+    expect(response.status).toBe(200);
+    expect(mocks.ticketHistory.create).not.toHaveBeenCalled();
+    expect(mocks.auditLog.create).not.toHaveBeenCalled();
+    expect(emitUpdated).not.toHaveBeenCalled();
+  });
 
   it("resolveLiveChatTeam returns the oldest active team + the department branch", async () => {
     const tx = {

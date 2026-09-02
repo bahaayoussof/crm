@@ -25,3 +25,14 @@ export const TERMINAL_LIVE_CHAT_STATUSES: readonly LiveChatStatus[] = ["RESOLVED
 export function isTerminalLiveChat(status: LiveChatStatus): boolean {
   return TERMINAL_LIVE_CHAT_STATUSES.includes(status);
 }
+
+/**
+ * Advisory inactivity-warning window for the customer UI ONLY. The authoritative
+ * 30-minute auto-resolve lives server-side (`live-chat.config.ts`); these values
+ * just decide when to show "this chat may close soon" and are never sent to the
+ * server. Warning shows between {@link LIVE_CHAT_INACTIVITY_WARNING_MS} and
+ * {@link LIVE_CHAT_INACTIVITY_LIMIT_MS} of silence, and only after the first
+ * staff reply (an unanswered chat is never auto-resolved for inactivity).
+ */
+export const LIVE_CHAT_INACTIVITY_WARNING_MS = 25 * 60_000;
+export const LIVE_CHAT_INACTIVITY_LIMIT_MS = 30 * 60_000;

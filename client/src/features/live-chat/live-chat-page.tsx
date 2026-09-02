@@ -1,10 +1,11 @@
-import { MessagesSquare, Paperclip, Wifi, WifiOff } from "lucide-react";
-import { useRef, useState } from "react";
+import { LogOut, MessagesSquare, Paperclip, Wifi, WifiOff } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Skeleton } from "@/components/shared/skeleton";
 import { AppSelectField } from "@/components/ui/app-select";
+import { Modal } from "@/components/ui/modal";
 import { FileUploadModal } from "@/components/shared/file-upload";
 import { ConversationMessage, ConversationSection } from "@/features/tickets/ticket-conversation-ui";
 import { MessageAttachmentList } from "@/features/attachments/attachment-ui";
@@ -18,18 +19,29 @@ import { PortalPage, PortalStatus } from "@/features/portal/portal-ui";
 import { useRealtimeStatus } from "@/features/realtime/realtime-status";
 import type { RealtimeConnectionStatus } from "@/features/realtime/realtime.types";
 import {
+  useEndLiveChat,
   useLiveChat,
   useLiveChatDepartments,
   useSendLiveChatMessage,
   useStartLiveChat,
 } from "./live-chat-hooks";
-import type { LiveChat } from "./live-chat.types";
+import {
+  isTerminalLiveChat,
+  LIVE_CHAT_INACTIVITY_LIMIT_MS,
+  LIVE_CHAT_INACTIVITY_WARNING_MS,
+  type LiveChat,
+} from "./live-chat.types";
 
 /** Customer Portal → Live Chat. A live chat IS a LIVE_CHAT Ticket; this page is a
  * conversational surface over the shared portal ticket + realtime infrastructure. */
 export function LiveChatPage() {
   const { t } = useTranslation();
   const bootstrap = useLiveChat();
+  // Local "the customer just ended this chat" flag. The bootstrap query also flips
+  // to `null` (a RESOLVED chat is never resumed) — this just lets us show a clear
+  // final state with a "Start new chat" CTA instead of snapping to the Department
+  // picker.
+  const [ended, setEnded] = useState(false);
 
   if (bootstrap.isLoading) {
     return (
@@ -61,9 +73,26 @@ export function LiveChatPage() {
     );
   }
 
-  const chat = bootstrap.data ?? null;
+  const startNew = () => {
+    setEnded(false);
+    void bootstrap.refetch();
+  };
 
-  if (!chat) {
+  if (ended) {
+    return (
+      <PortalPage>
+        <PageHeader title={t("liveChat.title")} description={t("liveChat.subtitle")} />
+        <LiveChatEndedCard onStartNew={startNew} />
+      </PortalPage>
+    );
+  }
+
+  // Only a non-terminal chat is resumable. RESOLVED / CLOSED are never reopened
+  // from `/portal/live-chat` — the customer picks a Department and starts fresh.
+  const bootstrapChat = bootstrap.data ?? null;
+  const active = bootstrapChat && !isTerminalLiveChat(bootstrapChat.status) ? bootstrapChat : null;
+
+  if (!active) {
     return (
       <PortalPage>
         <PageHeader title={t("liveChat.title")} description={t("liveChat.subtitle")} />
@@ -74,7 +103,12 @@ export function LiveChatPage() {
 
   return (
     <PortalPage>
-      <LiveChatRoom chatId={chat.id} initial={chat} />
+      <LiveChatRoom
+        chatId={active.id}
+        initial={active}
+        onEnded={() => setEnded(true)}
+        onStartNew={startNew}
+      />
     </PortalPage>
   );
 }
@@ -166,6 +200,36 @@ function LiveChatStartCard() {
   );
 }
 
+/**
+ * Clear terminal state after a chat ends (customer "End chat", staff resolve, or
+ * the inactivity sweep). No composer, no attachments — just a way back to the
+ * Department picker.
+ */
+function LiveChatEndedCard({ onStartNew }: { onStartNew: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <section
+      className="mt-6 overflow-hidden rounded-md border border-border bg-card text-card-foreground shadow-subtle"
+      aria-label={t("liveChat.endedTitle")}
+    >
+      <div className="space-y-4 p-4 sm:p-6">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-surface-secondary/50 text-muted-foreground">
+            <MessagesSquare className="size-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-foreground">{t("liveChat.endedTitle")}</h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">{t("liveChat.endedBody")}</p>
+          </div>
+        </div>
+        <button type="button" className="button-primary w-full sm:w-auto" onClick={onStartNew}>
+          {t("liveChat.startNewChat")}
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function ConnectionPill({ status }: { status: RealtimeConnectionStatus }) {
   const { t } = useTranslation();
   const online = status === "open";
@@ -196,7 +260,17 @@ function ConnectionPill({ status }: { status: RealtimeConnectionStatus }) {
   );
 }
 
-function LiveChatRoom({ chatId, initial }: { chatId: string; initial: LiveChat }) {
+function LiveChatRoom({
+  chatId,
+  initial,
+  onEnded,
+  onStartNew,
+}: {
+  chatId: string;
+  initial: LiveChat;
+  onEnded: () => void;
+  onStartNew: () => void;
+}) {
   const { t, i18n } = useTranslation();
   const status = useRealtimeStatus();
   // The canonical, database-backed history. Realtime invalidates this key, so the
@@ -205,6 +279,7 @@ function LiveChatRoom({ chatId, initial }: { chatId: string; initial: LiveChat }
   const chat = detail.data ?? initial;
 
   const send = useSendLiveChatMessage(chatId);
+  const end = useEndLiveChat(chatId);
   const attachments = usePortalTicketAttachments(chatId);
   const upload = useUploadPortalTicketAttachment(chatId);
 
@@ -212,9 +287,32 @@ function LiveChatRoom({ chatId, initial }: { chatId: string; initial: LiveChat }
   const [text, setText] = useState("");
   const [sendToken, setSendToken] = useState(0);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const readOnly = chat.status === "CLOSED";
-  const reopens = chat.status === "RESOLVED";
+  const resolved = chat.status === "RESOLVED";
+  const conversational = !readOnly && !resolved;
+
+  // Advisory inactivity warning. Client-only, no persistence: shows once the chat
+  // has had a staff reply and the newest message is 25–30 min old. The 30-min
+  // auto-resolve itself is server-owned.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!conversational) return;
+    const id = window.setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, [conversational]);
+
+  const lastMessage = chat.messages.length ? chat.messages[chat.messages.length - 1] : null;
+  const hasStaffReply = chat.messages.some((message) => message.author.kind === "SUPPORT");
+  const lastMessageMs = lastMessage ? new Date(lastMessage.createdAt).getTime() : null;
+  const idleMs = lastMessageMs === null ? 0 : nowMs - lastMessageMs;
+  const showInactivityWarning =
+    conversational &&
+    hasStaffReply &&
+    lastMessageMs !== null &&
+    idleMs >= LIVE_CHAT_INACTIVITY_WARNING_MS &&
+    idleMs < LIVE_CHAT_INACTIVITY_LIMIT_MS;
 
   const messageAttachments = new Map<string, NonNullable<typeof attachments.data>>();
   for (const item of attachments.data ?? []) {
@@ -236,18 +334,47 @@ function LiveChatRoom({ chatId, initial }: { chatId: string; initial: LiveChat }
     }
   };
 
+  const confirmEnd = async () => {
+    if (end.isPending) return;
+    try {
+      await end.mutateAsync();
+      setConfirmOpen(false);
+      onEnded();
+    } catch {
+      /* surfaced via end.isError */
+    }
+  };
+
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <PageHeader
-        title={t("liveChat.title")}
-        description={t("liveChat.subtitle")}
-        actions={
-          <div className="flex items-center gap-2">
+      {/* Header: title + passive conversation state on one side; the destructive
+       * "End chat" action pushed to the opposite edge so it never reads as a
+       * status indicator. Layout is flex/gap/justify-between only — no hardcoded
+       * spacing — so it mirrors naturally in RTL and wraps cleanly when narrow. */}
+      <header className="flex flex-col gap-3 border-b border-border pb-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              {t("liveChat.title")}
+            </h1>
             <PortalStatus status={chat.status} />
             <ConnectionPill status={status} />
           </div>
-        }
-      />
+          <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            {t("liveChat.subtitle")}
+          </p>
+        </div>
+        {conversational && (
+          <button
+            type="button"
+            className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-md border border-danger-soft bg-transparent px-2.5 py-1 text-xs font-medium text-danger-foreground transition hover:border-danger/30 hover:bg-danger-soft/60 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/30 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={() => setConfirmOpen(true)}
+          >
+            <LogOut className="size-3.5 shrink-0" aria-hidden="true" />
+            {t("liveChat.endAction")}
+          </button>
+        )}
+      </header>
 
       {status !== "open" && (
         <p
@@ -255,6 +382,15 @@ function LiveChatRoom({ chatId, initial }: { chatId: string; initial: LiveChat }
           role="status"
         >
           {t("liveChat.connection.banner")}
+        </p>
+      )}
+
+      {showInactivityWarning && (
+        <p
+          className="rounded-md border border-warning-soft bg-warning-soft/30 px-3 py-2 text-xs text-warning-foreground"
+          role="status"
+        >
+          {t("liveChat.inactivityWarning")}
         </p>
       )}
 
@@ -287,67 +423,66 @@ function LiveChatRoom({ chatId, initial }: { chatId: string; initial: LiveChat }
         </ConversationSection>
       </div>
 
-      <section
-        className="overflow-hidden rounded-md border border-border bg-card text-card-foreground shadow-subtle"
-        aria-label={t("liveChat.composerLabel")}
-      >
-        <div className="p-4 sm:p-5">
-          {readOnly ? (
-            <p className="rounded-md border border-border bg-surface-secondary/40 p-3 text-sm text-muted-foreground">
-              {t("liveChat.closedNotice")}
-            </p>
-          ) : (
-            <form onSubmit={submit} className="space-y-3">
-              <div className="min-w-0">
-                <h2 className="text-sm font-semibold text-foreground">{t("liveChat.composerHeading")}</h2>
-                <p className="mt-0.5 text-xs text-muted-foreground" id="live-chat-composer-help">
-                  {t("liveChat.composerHelp")}
-                </p>
-              </div>
-              {reopens && (
-                <p className="rounded-md border border-primary/30 bg-primary-subtle p-2.5 text-xs text-primary sm:text-sm">
-                  {t("liveChat.reopenNotice")}
-                </p>
-              )}
-              <TicketReplyEditor
-                ref={editorRef}
-                id="live-chat-composer"
-                ariaLabel={t("liveChat.composerLabel")}
-                ariaDescribedBy="live-chat-composer-help"
-                placeholder={t("liveChat.composerPlaceholder")}
-                disabled={send.isPending}
-                onTextChange={setText}
-              />
-              {send.isError && (
-                <p className="text-sm text-danger" role="alert">
-                  {t("liveChat.sendError")}
-                </p>
-              )}
-              <div className="flex flex-col gap-2 border-t border-border pt-3 sm:flex-row sm:items-center">
-                <button
-                  type="button"
-                  className="button-secondary inline-flex w-full items-center gap-1.5 sm:me-auto sm:w-auto"
-                  onClick={() => setUploadOpen(true)}
-                >
-                  <Paperclip
-                    className="size-4 shrink-0 text-muted-foreground"
-                    strokeWidth={1.75}
-                    aria-hidden="true"
-                  />
-                  <span>{t("attachments.attachFile")}</span>
-                </button>
-                <button
-                  type="submit"
-                  className="button-primary sm:ms-auto sm:w-auto"
-                  disabled={send.isPending || !text.trim()}
-                >
-                  {send.isPending ? t("liveChat.sending") : t("liveChat.send")}
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      </section>
+      {resolved ? (
+        <LiveChatEndedCard onStartNew={onStartNew} />
+      ) : (
+        <section
+          className="overflow-hidden rounded-md border border-border bg-card text-card-foreground shadow-subtle"
+          aria-label={t("liveChat.composerLabel")}
+        >
+          <div className="p-4 sm:p-5">
+            {readOnly ? (
+              <p className="rounded-md border border-border bg-surface-secondary/40 p-3 text-sm text-muted-foreground">
+                {t("liveChat.closedNotice")}
+              </p>
+            ) : (
+              <form onSubmit={submit} className="space-y-3">
+                <div className="min-w-0">
+                  <h2 className="text-sm font-semibold text-foreground">{t("liveChat.composerHeading")}</h2>
+                  <p className="mt-0.5 text-xs text-muted-foreground" id="live-chat-composer-help">
+                    {t("liveChat.composerHelp")}
+                  </p>
+                </div>
+                <TicketReplyEditor
+                  ref={editorRef}
+                  id="live-chat-composer"
+                  ariaLabel={t("liveChat.composerLabel")}
+                  ariaDescribedBy="live-chat-composer-help"
+                  placeholder={t("liveChat.composerPlaceholder")}
+                  disabled={send.isPending}
+                  onTextChange={setText}
+                />
+                {send.isError && (
+                  <p className="text-sm text-danger" role="alert">
+                    {t("liveChat.sendError")}
+                  </p>
+                )}
+                <div className="flex flex-col gap-2 border-t border-border pt-3 sm:flex-row sm:items-center">
+                  <button
+                    type="button"
+                    className="button-secondary inline-flex w-full items-center gap-1.5 sm:me-auto sm:w-auto"
+                    onClick={() => setUploadOpen(true)}
+                  >
+                    <Paperclip
+                      className="size-4 shrink-0 text-muted-foreground"
+                      strokeWidth={1.75}
+                      aria-hidden="true"
+                    />
+                    <span>{t("attachments.attachFile")}</span>
+                  </button>
+                  <button
+                    type="submit"
+                    className="button-primary sm:ms-auto sm:w-auto"
+                    disabled={send.isPending || !text.trim()}
+                  >
+                    {send.isPending ? t("liveChat.sending") : t("liveChat.send")}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </section>
+      )}
 
       <FileUploadModal
         open={uploadOpen}
@@ -355,6 +490,42 @@ function LiveChatRoom({ chatId, initial }: { chatId: string; initial: LiveChat }
         onUpload={(file) => upload.mutateAsync(file)}
         isUploading={upload.isPending}
       />
+
+      <Modal
+        open={confirmOpen}
+        onOpenChange={(open) => {
+          if (!end.isPending) setConfirmOpen(open);
+        }}
+        title={t("liveChat.endConfirmTitle")}
+        description={t("liveChat.endConfirmBody")}
+        maxWidth="sm"
+      >
+        <div className="space-y-3">
+          {end.isError && (
+            <p className="text-sm text-danger" role="alert">
+              {t("liveChat.endError")}
+            </p>
+          )}
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              className="button-secondary"
+              onClick={() => setConfirmOpen(false)}
+              disabled={end.isPending}
+            >
+              {t("liveChat.endCancel")}
+            </button>
+            <button
+              type="button"
+              className="button-danger"
+              onClick={confirmEnd}
+              disabled={end.isPending}
+            >
+              {end.isPending ? t("liveChat.ending") : t("liveChat.endAction")}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

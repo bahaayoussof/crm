@@ -16,3 +16,10 @@ export const getLiveChatDepartments = async (): Promise<LiveChatDepartment[]> =>
  */
 export const startLiveChat = async (departmentId: string): Promise<LiveChat> =>
   (await apiClient.post<ApiEnvelope<LiveChat>>("/portal/live-chat", { departmentId })).data.data;
+
+/**
+ * End an active live chat (`active -> RESOLVED`). The body is empty — the server
+ * owns the transition. Returns the resolved chat detail.
+ */
+export const endLiveChat = async (ticketId: string): Promise<LiveChat> =>
+  (await apiClient.post<ApiEnvelope<LiveChat>>(`/portal/live-chat/${ticketId}/end`)).data.data;

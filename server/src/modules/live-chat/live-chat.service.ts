@@ -3,6 +3,8 @@ import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import { emitTicketUpdated, withRealtimeOutbox } from "../realtime/realtime.publisher.js";
 import { customerIdFor, ticketDetail } from "../portal/portal.service.js";
+import { createAuditLog } from "../audit-logs/audit-log.service.js";
+import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../audit-logs/audit-log.constants.js";
 import type { LiveChatStartInput } from "./live-chat.schema.js";
 
 /**
@@ -203,6 +205,92 @@ export async function startLiveChat(userId: string, input: LiveChatStartInput) {
       teamId: created.teamId,
     });
     return ticketDetail(created.id, userId);
+  });
+}
+
+/**
+ * `POST /api/portal/live-chat/:ticketId/end` — the customer explicitly ends an
+ * active live chat.
+ *
+ * V1 policy: `active -> RESOLVED` only. The customer end action NEVER moves a
+ * chat to `CLOSED` (that stays part of the staff/system workflow), and NEVER
+ * re-routes it — `departmentId` / `teamId` / assignment / conversation history
+ * are all preserved. Afterwards the customer can start a brand-new live chat and
+ * pick a Department again (a RESOLVED chat is terminal for `/portal/live-chat`).
+ *
+ * Reuses the canonical resolve mechanics: `status = RESOLVED` + `resolvedAt`, a
+ * `STATUS_CHANGED` TicketHistory row (actor = the customer), and one audit-log
+ * entry whose `metadata.reason` marks the customer as the resolution source. The
+ * existing `ticket.updated` realtime event drives both the customer and staff
+ * UIs via query invalidation — no bespoke notification.
+ *
+ * Safe under repeat / race:
+ *   - already RESOLVED  → idempotent 200, no second history/audit/event
+ *   - CLOSED            → 409 TICKET_CLOSED (never reopened by this action)
+ *   - not a LIVE_CHAT   → 400 NOT_A_LIVE_CHAT
+ *   - not owned by the caller → 404 (ownership is in the `where`)
+ * The transition is a conditional `updateMany` guarded by the active statuses, so
+ * a concurrent staff/inactivity resolve produces exactly one winner.
+ */
+export async function endLiveChat(userId: string, ticketId: string) {
+  const customerId = await customerIdFor(userId);
+  return withRealtimeOutbox(async () => {
+    const outcome = await prisma.$transaction(async (tx) => {
+      const ticket = await tx.ticket.findFirst({
+        where: { id: ticketId, customerId },
+        select: { id: true, status: true, channel: true, assignedAgentId: true, teamId: true },
+      });
+      if (!ticket) throw new AppError(404, "TICKET_NOT_FOUND", "Ticket not found");
+      if (ticket.channel !== Channel.LIVE_CHAT) {
+        throw new AppError(400, "NOT_A_LIVE_CHAT", "This conversation is not a live chat");
+      }
+      // Idempotent: a chat already resolved by the customer, staff, or the
+      // inactivity sweep is a no-op success.
+      if (ticket.status === TicketStatus.RESOLVED) return { changed: false, ticket };
+      // A closed chat is terminal — the customer end action must not reopen it.
+      if (ticket.status === TicketStatus.CLOSED) {
+        throw new AppError(409, "TICKET_CLOSED", "This chat is already closed");
+      }
+
+      const now = new Date();
+      const mutation = await tx.ticket.updateMany({
+        where: { id: ticketId, customerId, channel: Channel.LIVE_CHAT, status: { in: RESUMABLE_STATUSES } },
+        data: { status: TicketStatus.RESOLVED, resolvedAt: now },
+      });
+      if (mutation.count !== 1) return { changed: false, ticket };
+
+      await tx.ticketHistory.create({
+        data: {
+          ticketId,
+          actorUserId: userId,
+          action: "STATUS_CHANGED",
+          oldValue: ticket.status,
+          newValue: TicketStatus.RESOLVED,
+        },
+      });
+      await createAuditLog(
+        {
+          actorId: userId,
+          action: AUDIT_ACTIONS.TICKET_STATUS_CHANGED,
+          entityType: AUDIT_ENTITY_TYPES.TICKET,
+          entityId: ticketId,
+          changes: { status: { from: ticket.status, to: TicketStatus.RESOLVED } },
+          metadata: { reason: "live_chat_ended_by_customer" },
+        },
+        tx,
+      );
+      return { changed: true, ticket };
+    });
+
+    if (outcome.changed) {
+      emitTicketUpdated({
+        ticketId,
+        assignedAgentId: outcome.ticket.assignedAgentId,
+        customerId,
+        teamId: outcome.ticket.teamId,
+      });
+    }
+    return ticketDetail(ticketId, userId);
   });
 }
 

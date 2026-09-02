@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { changeAppLanguage } from "@/lib/i18n";
@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   departments: vi.fn(),
   start: vi.fn(),
   send: vi.fn(),
+  end: vi.fn(),
   detail: vi.fn(),
   attachList: vi.fn(),
   attachUpload: vi.fn(),
@@ -15,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   refetch: vi.fn(),
   startMutate: vi.fn(),
   sendMutate: vi.fn(),
+  endMutate: vi.fn(),
   uploadMutate: vi.fn(),
 }));
 
@@ -24,6 +26,7 @@ vi.mock("./live-chat-hooks", () => ({
   useLiveChatDepartments: mocks.departments,
   useStartLiveChat: mocks.start,
   useSendLiveChatMessage: mocks.send,
+  useEndLiveChat: mocks.end,
 }));
 vi.mock("@/features/portal/portal-hooks", () => ({ usePortalTicket: mocks.detail }));
 vi.mock("@/features/attachments/attachment-hooks", () => ({
@@ -76,6 +79,8 @@ describe("LiveChatPage", () => {
     mocks.detail.mockReturnValue({ data: chat() });
     mocks.start.mockReturnValue({ mutate: mocks.startMutate, isPending: false, isError: false });
     mocks.send.mockReturnValue({ mutateAsync: mocks.sendMutate, isPending: false, isError: false });
+    mocks.endMutate.mockResolvedValue(chat({ status: "RESOLVED" }));
+    mocks.end.mockReturnValue({ mutateAsync: mocks.endMutate, isPending: false, isError: false });
     mocks.attachList.mockReturnValue({ data: [], isLoading: false, isError: false, refetch: mocks.refetch });
     mocks.attachUpload.mockReturnValue({ mutateAsync: mocks.uploadMutate, isPending: false });
     mocks.status.mockReturnValue("open");
@@ -213,19 +218,160 @@ describe("LiveChatPage", () => {
     expect(screen.getByText("Recovered after refresh")).toBeInTheDocument();
   });
 
-  it("is read-only when the chat is closed", () => {
-    mocks.bootstrap.mockReturnValue({ data: chat({ status: "CLOSED" }), isLoading: false, isError: false });
-    mocks.detail.mockReturnValue({ data: chat({ status: "CLOSED" }) });
+  it("does not resume a CLOSED chat — falls back to the department start screen", () => {
+    mocks.bootstrap.mockReturnValue({ data: chat({ status: "CLOSED" }), isLoading: false, isError: false, refetch: mocks.refetch });
     renderPage();
-    expect(screen.getByText(/This chat is closed/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Start a live chat" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Send" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "End chat" })).not.toBeInTheDocument();
   });
 
-  it("warns that a resolved chat will reopen on reply", () => {
-    mocks.bootstrap.mockReturnValue({ data: chat({ status: "RESOLVED" }), isLoading: false, isError: false });
-    mocks.detail.mockReturnValue({ data: chat({ status: "RESOLVED" }) });
+  it("does not resume a RESOLVED chat — falls back to the department start screen", () => {
+    mocks.bootstrap.mockReturnValue({ data: chat({ status: "RESOLVED" }), isLoading: false, isError: false, refetch: mocks.refetch });
     renderPage();
-    expect(screen.getByText(/Sending a message will reopen it/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Start a live chat" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Send" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "End chat" })).not.toBeInTheDocument();
+  });
+
+  // --- Customer manual end ------------------------------------------------
+
+  const openEndDialog = () => {
+    fireEvent.click(screen.getByRole("button", { name: "End chat" }));
+    return screen.getByRole("dialog");
+  };
+
+  it("shows an End chat action on an active chat", () => {
+    renderPage();
+    expect(screen.getByRole("button", { name: "End chat" })).toBeInTheDocument();
+  });
+
+  it("opens a confirmation dialog instead of ending immediately", () => {
+    renderPage();
+    expect(mocks.endMutate).not.toHaveBeenCalled();
+    const dialog = openEndDialog();
+    expect(dialog).toHaveTextContent("End this chat?");
+    expect(dialog).toHaveTextContent("You won't be able to send more messages");
+    expect(mocks.endMutate).not.toHaveBeenCalled();
+  });
+
+  it("keeps the chat active when the customer cancels", () => {
+    renderPage();
+    openEndDialog();
+    fireEvent.click(screen.getByRole("button", { name: "Keep chatting" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send" })).toBeInTheDocument();
+    expect(mocks.endMutate).not.toHaveBeenCalled();
+  });
+
+  it("sends the end mutation on confirm and then renders the ended state with a Start new chat CTA", async () => {
+    renderPage();
+    const dialog = openEndDialog();
+    fireEvent.click(within(dialog).getByRole("button", { name: "End chat" }));
+    await waitFor(() => expect(mocks.endMutate).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole("heading", { name: "This chat has ended" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start new chat" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Send" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Attach file" })).not.toBeInTheDocument();
+  });
+
+  it("returns to the department selection flow from Start new chat", async () => {
+    mocks.bootstrap.mockReturnValue({ data: null, isLoading: false, isError: false, refetch: mocks.refetch });
+    mocks.detail.mockReturnValue({ data: chat() });
+    // active chat via bootstrap for the first render, then ended
+    mocks.bootstrap.mockReturnValueOnce({ data: chat(), isLoading: false, isError: false, refetch: mocks.refetch });
+    renderPage();
+    const dialog = openEndDialog();
+    fireEvent.click(within(dialog).getByRole("button", { name: "End chat" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Start new chat" }));
+    expect(mocks.refetch).toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: "Start a live chat" })).toBeInTheDocument();
+  });
+
+  it("prevents a double submit while the end mutation is pending", () => {
+    mocks.end.mockReturnValue({ mutateAsync: mocks.endMutate, isPending: true, isError: false });
+    renderPage();
+    const dialog = openEndDialog();
+    expect(within(dialog).getByRole("button", { name: "Ending…" })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: "Keep chatting" })).toBeDisabled();
+  });
+
+  it("surfaces an end error inside the dialog", () => {
+    mocks.end.mockReturnValue({ mutateAsync: mocks.endMutate, isPending: false, isError: true });
+    renderPage();
+    const dialog = openEndDialog();
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("We couldn't end the chat. Please try again.");
+  });
+
+  it("renders the End chat action in Arabic", async () => {
+    await changeAppLanguage("ar");
+    renderPage();
+    expect(screen.getByRole("button", { name: "إنهاء المحادثة" })).toBeInTheDocument();
+    await changeAppLanguage("en");
+  });
+
+  it("keeps the header grouped in EN: title + Open + Connected together, End chat apart", () => {
+    renderPage();
+    const heading = screen.getByRole("heading", { name: "Live Chat" });
+    // status metadata sits in the same title row as the heading
+    const titleRow = heading.parentElement as HTMLElement;
+    expect(within(titleRow).getByText("Open")).toBeInTheDocument();
+    expect(within(titleRow).getByText("Connected")).toBeInTheDocument();
+    // the destructive action is a sibling of the title group, not inside the row
+    expect(within(titleRow).queryByRole("button", { name: "End chat" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "End chat" })).toBeInTheDocument();
+  });
+
+  it("keeps the header usable and grouped in Arabic/RTL", async () => {
+    await changeAppLanguage("ar");
+    renderPage();
+    const heading = screen.getByRole("heading", { name: "الدردشة المباشرة" });
+    const titleRow = heading.parentElement as HTMLElement;
+    expect(within(titleRow).getByText("مفتوحة")).toBeInTheDocument();
+    expect(within(titleRow).getByText("متصل")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "إنهاء المحادثة" })).toBeInTheDocument();
+    expect(document.documentElement.dir).toBe("rtl");
+    await changeAppLanguage("en");
+  });
+
+  // --- Inactivity warning ----------------------------------------------
+
+  const isoMinsAgo = (mins: number) => new Date(Date.now() - mins * 60_000).toISOString();
+
+  it("warns about inactivity once a staff reply exists and the last message is 25–30 min old", () => {
+    mocks.detail.mockReturnValue({
+      data: chat({
+        messages: [
+          message({ id: "c1", kind: "CUSTOMER" }),
+          { ...message({ id: "s1", kind: "SUPPORT" }), createdAt: isoMinsAgo(26) },
+        ],
+      }),
+    });
+    renderPage();
+    expect(screen.getByText("This chat may close soon due to inactivity.")).toBeInTheDocument();
+  });
+
+  it("does not warn before the first staff reply", () => {
+    mocks.detail.mockReturnValue({
+      data: chat({
+        messages: [{ ...message({ id: "c1", kind: "CUSTOMER" }), createdAt: isoMinsAgo(26) }],
+      }),
+    });
+    renderPage();
+    expect(screen.queryByText("This chat may close soon due to inactivity.")).not.toBeInTheDocument();
+  });
+
+  it("does not warn while the conversation is still recent", () => {
+    mocks.detail.mockReturnValue({
+      data: chat({
+        messages: [
+          message({ id: "c1", kind: "CUSTOMER" }),
+          { ...message({ id: "s1", kind: "SUPPORT" }), createdAt: isoMinsAgo(4) },
+        ],
+      }),
+    });
+    renderPage();
+    expect(screen.queryByText("This chat may close soon due to inactivity.")).not.toBeInTheDocument();
   });
 
   it("renders Arabic + RTL", async () => {

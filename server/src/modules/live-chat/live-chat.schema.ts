@@ -16,3 +16,12 @@ import { databaseIdSchema } from "../../shared/validation/common.schema.js";
 export const liveChatStartSchema = z.object({ departmentId: databaseIdSchema.optional() }).strict();
 
 export type LiveChatStartInput = z.infer<typeof liveChatStartSchema>;
+
+/**
+ * `POST /api/portal/live-chat/:ticketId/end` — the ticket comes from the path.
+ * The body carries nothing: the server decides the transition (`active ->
+ * RESOLVED`). No `status` / `customerId` / `teamId` / `channel` is accepted.
+ */
+export const liveChatEndParamsSchema = z.object({ ticketId: databaseIdSchema });
+
+export type LiveChatEndParams = z.infer<typeof liveChatEndParamsSchema>;

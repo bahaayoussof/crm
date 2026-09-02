@@ -12,7 +12,7 @@ import {
 import * as feedbackController from "../feedback/feedback.controller.js";
 import { feedbackParamsSchema, submitFeedbackSchema } from "../feedback/feedback.schema.js";
 import * as liveChatController from "../live-chat/live-chat.controller.js";
-import { liveChatStartSchema } from "../live-chat/live-chat.schema.js";
+import { liveChatEndParamsSchema, liveChatStartSchema } from "../live-chat/live-chat.schema.js";
 
 export const portalRouter = Router();
 portalRouter.use(requireAuth, requireRole(Role.CUSTOMER), requireFreshToken);
@@ -24,6 +24,7 @@ portalRouter.get("/overview", controller.overview);
 portalRouter.get("/live-chat", liveChatController.get);
 portalRouter.get("/live-chat/departments", liveChatController.departments);
 portalRouter.post("/live-chat", validateBody(liveChatStartSchema), liveChatController.start);
+portalRouter.post("/live-chat/:ticketId/end", validateParams(liveChatEndParamsSchema), liveChatController.end);
 portalRouter.get("/profile", controller.profile);
 portalRouter.patch("/profile", validateBody(portalProfileUpdateSchema), controller.updateProfile);
 portalRouter.get("/categories", controller.categories);

@@ -845,3 +845,33 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
 | 09:42 | Live Chat routing: replace prior-ticket team heuristic with customer-selected Department. New `GET /portal/live-chat/departments` (active dept + has active team, id+name only). `POST /portal/live-chat` body `{ departmentId? }` (optional only for no-body resume; required for create → 400 DEPARTMENT_REQUIRED); server resolves oldest active Team in that dept (`createdAt` asc,`id` asc), persists departmentId+teamId+branchId on the initial ticket row. Inactive dept→400, unknown→404, no active team→503 `LIVE_CHAT_DEPARTMENT_UNAVAILABLE`. Removed `resolveLiveChatTeamId`. | server/src/modules/live-chat/{schema,service,controller,test}.ts, portal.routes.ts, client live-chat/{api,hooks,types,page,test}, locales en+ar | all gates green (server 794 tests, client 768/769 — 1 pre-existing flaky attachments test, passes isolated; both typechecks, eslint, client build, i18n parity) | ~90k |
+
+## Session: 2026-09-02 09:58
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-02 09:59
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-02 10:01
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-02 — Live Chat End-Chat + Inactivity Auto-Resolve
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 10:12 | Customer manual End Chat: `POST /portal/live-chat/:ticketId/end` → active→RESOLVED, idempotent (RESOLVED no-op / CLOSED 409 / non-LIVE_CHAT 400), conditional `updateMany` guarded by RESUMABLE statuses, canonical STATUS_CHANGED history (actor=customer) + audit `metadata.reason:live_chat_ended_by_customer`, `emitTicketUpdated`. No reroute, no notifications. | live-chat.{service,controller,schema}.ts, portal.routes.ts | done | ~6k |
+| 10:13 | Inactivity auto-resolve cron `GET /api/internal/live-chat-inactivity` (`*/5`, `requireCronSecret` reused). Candidate = LIVE_CHAT + active + `firstRespondedAt!=null` + `messages:{none:{createdAt:{gt: now-30m}}}` (bounded take 100). Per-ticket tx re-checks the SAME predicate as conditional `updateMany` → message-race safe + repeat-safe. actorUserId=null history + audit `reason:live_chat_inactivity_auto_resolve`. Unanswered chats never touched. | live-chat-inactivity.{service,controller,routes}.ts, live-chat.config.ts (`LIVE_CHAT_INACTIVITY_MINUTES=30`), app.ts, vercel.json | done | ~7k |
+| 10:15 | Frontend: `useEndLiveChat` hook/api; End chat header button; shared `@/components/ui/modal` confirm (Keep chatting / End chat, pending-locked); `LiveChatEndedCard` final state + Start new chat → Department picker (`isTerminalLiveChat` guard on bootstrap + `bootstrap.refetch()`); advisory 25–30m inactivity banner (client-only, `messages.some(kind==='SUPPORT')` + last-msg age, 30s tick). RESOLVED/CLOSED from bootstrap now render the start screen (never resumed). EN+AR `liveChat.end*/ended*/startNewChat/inactivityWarning` keys. | live-chat-page.tsx, live-chat-hooks.ts, live-chat-api.ts, live-chat.types.ts, {en,ar}/translation.json | done | ~9k |
+| 10:18 | Gates: server vitest **813/813** (45 files); client live-chat-page **32/32**, i18n parity 2/2; server+client `tsc` clean; changed-file `eslint` clean (server+client); `vite build` green; `git diff --check` clean. Full client run 778/780 — 2 unrelated parallel-load timeouts (audit-log-page, ticket-details-layout), both **46/46 in isolation**. Not committed. | live-chat.test.ts (+8), live-chat-inactivity.test.ts (new, 9), live-chat-page.test.tsx (+ end/inactivity, 2 resume tests rewritten) | done | ~4k |
+
+## Session: 2026-09-02 10:29
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 10:35 | Live Chat header: split passive state (title+Open+Connected) from destructive End chat; replaced PageHeader w/ local <header> flex justify-between; compact outline-danger End chat btn + LogOut icon | client/src/features/live-chat/live-chat-page.tsx, live-chat-page.test.tsx | 34 tests pass, tsc/eslint/build clean | ~9k |
