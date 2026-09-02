@@ -12,6 +12,13 @@ export type LiveChatStatus = PortalTicketStatus;
 /** `null` = the customer has no resumable live chat and can start one. */
 export type LiveChatBootstrap = LiveChat | null;
 
+/**
+ * Customer-safe Department reference data for the "start a live chat" screen.
+ * The server only ever returns routable Departments (active + has an active
+ * team) and only these two fields — no branch / manager / team / counts.
+ */
+export type LiveChatDepartment = { id: string; name: string };
+
 /** Terminal in the portal sense — read-only, start a fresh chat instead. */
 export const TERMINAL_LIVE_CHAT_STATUSES: readonly LiveChatStatus[] = ["RESOLVED", "CLOSED"];
 

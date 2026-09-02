@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Skeleton } from "@/components/shared/skeleton";
+import { AppSelectField } from "@/components/ui/app-select";
 import { FileUploadModal } from "@/components/shared/file-upload";
 import { ConversationMessage, ConversationSection } from "@/features/tickets/ticket-conversation-ui";
 import { MessageAttachmentList } from "@/features/attachments/attachment-ui";
@@ -16,7 +17,12 @@ import { usePortalTicket } from "@/features/portal/portal-hooks";
 import { PortalPage, PortalStatus } from "@/features/portal/portal-ui";
 import { useRealtimeStatus } from "@/features/realtime/realtime-status";
 import type { RealtimeConnectionStatus } from "@/features/realtime/realtime.types";
-import { useLiveChat, useSendLiveChatMessage, useStartLiveChat } from "./live-chat-hooks";
+import {
+  useLiveChat,
+  useLiveChatDepartments,
+  useSendLiveChatMessage,
+  useStartLiveChat,
+} from "./live-chat-hooks";
 import type { LiveChat } from "./live-chat.types";
 
 /** Customer Portal → Live Chat. A live chat IS a LIVE_CHAT Ticket; this page is a
@@ -24,7 +30,6 @@ import type { LiveChat } from "./live-chat.types";
 export function LiveChatPage() {
   const { t } = useTranslation();
   const bootstrap = useLiveChat();
-  const start = useStartLiveChat();
 
   if (bootstrap.isLoading) {
     return (
@@ -62,29 +67,7 @@ export function LiveChatPage() {
     return (
       <PortalPage>
         <PageHeader title={t("liveChat.title")} description={t("liveChat.subtitle")} />
-        <EmptyState
-          className="mt-6"
-          icon={<MessagesSquare className="size-6" aria-hidden="true" />}
-          title={t("liveChat.startTitle")}
-          description={t("liveChat.startBody")}
-          action={
-            <div className="flex flex-col items-center gap-2">
-              <button
-                type="button"
-                className="button-primary"
-                onClick={() => start.mutate()}
-                disabled={start.isPending}
-              >
-                {start.isPending ? t("liveChat.starting") : t("liveChat.startAction")}
-              </button>
-              {start.isError && (
-                <p className="text-sm text-danger" role="alert">
-                  {t("liveChat.startError")}
-                </p>
-              )}
-            </div>
-          }
-        />
+        <LiveChatStartCard />
       </PortalPage>
     );
   }
@@ -93,6 +76,93 @@ export function LiveChatPage() {
     <PortalPage>
       <LiveChatRoom chatId={chat.id} initial={chat} />
     </PortalPage>
+  );
+}
+
+/**
+ * The "start a live chat" screen shown only when the customer has no resumable
+ * chat. The customer must pick a Department before pressing Start; the server
+ * then resolves the Team and creates the LIVE_CHAT ticket already routed.
+ */
+function LiveChatStartCard() {
+  const { t } = useTranslation();
+  const departments = useLiveChatDepartments();
+  const start = useStartLiveChat();
+  const [departmentId, setDepartmentId] = useState("");
+
+  const options = (departments.data ?? []).map((department) => ({
+    value: department.id,
+    label: department.name,
+  }));
+  const noDepartments = departments.isSuccess && options.length === 0;
+  const canSubmit = Boolean(departmentId) && !start.isPending && !noDepartments;
+
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!canSubmit) return;
+    start.mutate(departmentId);
+  };
+
+  return (
+    <section
+      className="mt-6 overflow-hidden rounded-md border border-border bg-card text-card-foreground shadow-subtle"
+      aria-label={t("liveChat.startTitle")}
+    >
+      <div className="space-y-4 p-4 sm:p-6">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-surface-secondary/50 text-muted-foreground">
+            <MessagesSquare className="size-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-foreground">{t("liveChat.startTitle")}</h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">{t("liveChat.startBody")}</p>
+          </div>
+        </div>
+
+        {departments.isError ? (
+          <div className="space-y-2">
+            <p className="text-sm text-danger" role="alert">
+              {t("liveChat.departmentsError")}
+            </p>
+            <button
+              type="button"
+              className="button-secondary"
+              onClick={() => departments.refetch()}
+            >
+              {t("common.retry")}
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={submit} className="space-y-4">
+            <AppSelectField
+              id="live-chat-department"
+              label={t("liveChat.departmentLabel")}
+              placeholder={
+                departments.isLoading
+                  ? t("common.loading")
+                  : t("liveChat.departmentPlaceholder")
+              }
+              value={departmentId}
+              onValueChange={setDepartmentId}
+              options={options}
+              disabled={departments.isLoading || noDepartments}
+              helperText={noDepartments ? t("liveChat.noDepartments") : undefined}
+            />
+
+            <div className="flex flex-col gap-2">
+              <button type="submit" className="button-primary w-full sm:w-auto" disabled={!canSubmit}>
+                {start.isPending ? t("liveChat.starting") : t("liveChat.startAction")}
+              </button>
+              {start.isError && (
+                <p className="text-sm text-danger" role="alert">
+                  {t("liveChat.startError")}
+                </p>
+              )}
+            </div>
+          </form>
+        )}
+      </div>
+    </section>
   );
 }
 

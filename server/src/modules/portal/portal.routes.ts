@@ -22,6 +22,7 @@ portalRouter.get("/overview", controller.overview);
 // These two endpoints only bootstrap the portal experience (resume / start);
 // messages go through the shared `POST /portal/tickets/:id/messages`.
 portalRouter.get("/live-chat", liveChatController.get);
+portalRouter.get("/live-chat/departments", liveChatController.departments);
 portalRouter.post("/live-chat", validateBody(liveChatStartSchema), liveChatController.start);
 portalRouter.get("/profile", controller.profile);
 portalRouter.patch("/profile", validateBody(portalProfileUpdateSchema), controller.updateProfile);

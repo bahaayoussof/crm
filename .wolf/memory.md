@@ -839,3 +839,9 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
 | 09:20 | Live Chat team routing: resolve teamId from customer's newest routed ticket (active team) inside the create txn; null fallback kept. No routing engine, no agent assignment. | server/src/modules/live-chat/live-chat.service.ts (+resolveLiveChatTeamId), live-chat.test.ts (+5 tests) | server 788/788, live-chat 13/13, typecheck+eslint clean, git diff --check clean | ~35k |
+
+## Session: 2026-09-02 09:28
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 09:42 | Live Chat routing: replace prior-ticket team heuristic with customer-selected Department. New `GET /portal/live-chat/departments` (active dept + has active team, id+name only). `POST /portal/live-chat` body `{ departmentId? }` (optional only for no-body resume; required for create → 400 DEPARTMENT_REQUIRED); server resolves oldest active Team in that dept (`createdAt` asc,`id` asc), persists departmentId+teamId+branchId on the initial ticket row. Inactive dept→400, unknown→404, no active team→503 `LIVE_CHAT_DEPARTMENT_UNAVAILABLE`. Removed `resolveLiveChatTeamId`. | server/src/modules/live-chat/{schema,service,controller,test}.ts, portal.routes.ts, client live-chat/{api,hooks,types,page,test}, locales en+ar | all gates green (server 794 tests, client 768/769 — 1 pre-existing flaky attachments test, passes isolated; both typechecks, eslint, client build, i18n parity) | ~90k |

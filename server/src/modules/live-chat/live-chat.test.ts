@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   customer: { findUnique: vi.fn() },
+  department: { findUnique: vi.fn(), findMany: vi.fn() },
+  team: { findFirst: vi.fn() },
   ticket: { findFirst: vi.fn(), create: vi.fn() },
   ticketHistory: { create: vi.fn().mockResolvedValue({}) },
   slaRule: { findFirst: vi.fn().mockResolvedValue({ firstResponseMinutes: 30, resolutionMinutes: 120 }) },
@@ -34,6 +36,9 @@ const emitUpdated = vi.mocked(emitTicketUpdated);
 const auth = (id: string, role: Role) => ({ Authorization: `Bearer ${createAccessToken({ id, role })}` });
 const CUSTOMER_ID = "c0bd7029e0d7aeffc87b34f26";
 const CHAT_ID = "cdd8a71b2bbc6072cc903a822";
+const DEPT_ID = "cdep111111111111111111111";
+const TEAM_ID = "cteam11111111111111111111";
+const BRANCH_ID = "cbr1111111111111111111111";
 
 const detailRow = (status: TicketStatus = TicketStatus.OPEN) => ({
   id: CHAT_ID,
@@ -47,6 +52,18 @@ const detailRow = (status: TicketStatus = TicketStatus.OPEN) => ({
   feedback: null,
 });
 
+/** Wire the happy-path create: no resumable chat, active department + team. */
+function arrangeCreate() {
+  mocks.ticket.findFirst
+    .mockResolvedValueOnce(null) // resumable lookup
+    .mockResolvedValueOnce(detailRow(TicketStatus.OPEN)); // ticketDetail after create
+  mocks.department.findUnique.mockResolvedValue({ id: DEPT_ID, isActive: true, branchId: BRANCH_ID });
+  mocks.team.findFirst.mockResolvedValue({ id: TEAM_ID });
+  mocks.ticket.create.mockResolvedValue({ id: CHAT_ID, customerId: CUSTOMER_ID, teamId: TEAM_ID });
+}
+
+const startBody = { departmentId: DEPT_ID };
+
 describe("portal live chat", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -57,9 +74,11 @@ describe("portal live chat", () => {
 
   it("rejects the anonymous caller and every internal role", async () => {
     expect((await request(app).get("/api/portal/live-chat")).status).toBe(401);
+    expect((await request(app).get("/api/portal/live-chat/departments")).status).toBe(401);
     expect((await request(app).post("/api/portal/live-chat")).status).toBe(401);
     for (const role of [Role.ADMIN, Role.MANAGER, Role.AGENT]) {
       expect((await request(app).get("/api/portal/live-chat").set(auth("staff", role))).status).toBe(403);
+      expect((await request(app).get("/api/portal/live-chat/departments").set(auth("staff", role))).status).toBe(403);
       expect((await request(app).post("/api/portal/live-chat").set(auth("staff", role))).status).toBe(403);
     }
   });
@@ -71,12 +90,41 @@ describe("portal live chat", () => {
     expect(response.body.error.code).toBe("CUSTOMER_PROFILE_REQUIRED");
   });
 
+  // --- Department selector endpoint -----------------------------------------
+
+  it("GET /departments returns only active departments that have an active team, id + name only", async () => {
+    mocks.department.findMany.mockResolvedValue([
+      { id: DEPT_ID, name: "Billing" },
+      { id: "cdep222222222222222222222", name: "Support" },
+    ]);
+    const response = await request(app)
+      .get("/api/portal/live-chat/departments")
+      .set(auth("customer", Role.CUSTOMER));
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual([
+      { id: DEPT_ID, name: "Billing" },
+      { id: "cdep222222222222222222222", name: "Support" },
+    ]);
+    // server-enforced filter: active department AND at least one active team
+    expect(mocks.department.findMany).toHaveBeenCalledWith({
+      where: { isActive: true, teams: { some: { isActive: true } } },
+      orderBy: [{ name: "asc" }, { id: "asc" }],
+      select: { id: true, name: true },
+    });
+    // no internal metadata in the projection
+    const select = mocks.department.findMany.mock.calls[0][0].select;
+    expect(select).not.toHaveProperty("branchId");
+    expect(select).not.toHaveProperty("managerId");
+    expect(select).not.toHaveProperty("_count");
+  });
+
+  // --- Resume ---------------------------------------------------------------
+
   it("GET returns null when the customer has no resumable live chat", async () => {
-    mocks.ticket.findFirst.mockResolvedValueOnce(null); // resumable lookup
+    mocks.ticket.findFirst.mockResolvedValueOnce(null);
     const response = await request(app).get("/api/portal/live-chat").set(auth("customer", Role.CUSTOMER));
     expect(response.status).toBe(200);
     expect(response.body.data).toBeNull();
-    // resume lookup is always scoped to the authenticated customer + LIVE_CHAT + non-terminal status
     const where = mocks.ticket.findFirst.mock.calls[0][0].where;
     expect(where.customerId).toBe(CUSTOMER_ID);
     expect(where.channel).toBe("LIVE_CHAT");
@@ -87,8 +135,8 @@ describe("portal live chat", () => {
 
   it("GET resumes the most recent non-terminal live chat", async () => {
     mocks.ticket.findFirst
-      .mockResolvedValueOnce({ id: CHAT_ID }) // resumable lookup
-      .mockResolvedValueOnce(detailRow(TicketStatus.IN_PROGRESS)); // ticketDetail
+      .mockResolvedValueOnce({ id: CHAT_ID })
+      .mockResolvedValueOnce(detailRow(TicketStatus.IN_PROGRESS));
     const response = await request(app).get("/api/portal/live-chat").set(auth("customer", Role.CUSTOMER));
     expect(response.status).toBe(200);
     expect(response.body.data.id).toBe(CHAT_ID);
@@ -97,14 +145,32 @@ describe("portal live chat", () => {
     expect(mocks.ticket.findFirst.mock.calls[0][0].orderBy).toEqual([{ createdAt: "desc" }, { id: "asc" }]);
   });
 
-  it("POST starts a new LIVE_CHAT ticket with server defaults, teamId null when no routing signal exists", async () => {
+  it("POST resumes an existing chat without re-routing it — department/team are never touched", async () => {
     mocks.ticket.findFirst
-      .mockResolvedValueOnce(null) // resumable lookup
-      .mockResolvedValueOnce(null) // routing lookup: customer has no prior routed ticket
-      .mockResolvedValueOnce(detailRow(TicketStatus.OPEN)); // ticketDetail after create
-    mocks.ticket.create.mockResolvedValue({ id: CHAT_ID, customerId: CUSTOMER_ID, teamId: null });
+      .mockResolvedValueOnce({ id: CHAT_ID }) // resumable lookup hits
+      .mockResolvedValueOnce(detailRow(TicketStatus.IN_PROGRESS)); // ticketDetail
+    const response = await request(app)
+      .post("/api/portal/live-chat")
+      .set(auth("customer", Role.CUSTOMER))
+      .send(startBody);
+    expect(response.status).toBe(201);
+    expect(response.body.data.id).toBe(CHAT_ID);
+    expect(mocks.ticket.create).not.toHaveBeenCalled();
+    // resume short-circuits BEFORE any routing work
+    expect(mocks.department.findUnique).not.toHaveBeenCalled();
+    expect(mocks.team.findFirst).not.toHaveBeenCalled();
+    expect(mocks.ticket.findFirst).toHaveBeenCalledTimes(2);
+    expect(emitUpdated).not.toHaveBeenCalled();
+  });
 
-    const response = await request(app).post("/api/portal/live-chat").set(auth("customer", Role.CUSTOMER)).send({});
+  // --- Create: routing by selected Department ------------------------------
+
+  it("POST creates a LIVE_CHAT ticket scoped to the selected Department + resolved Team", async () => {
+    arrangeCreate();
+    const response = await request(app)
+      .post("/api/portal/live-chat")
+      .set(auth("customer", Role.CUSTOMER))
+      .send(startBody);
     expect(response.status).toBe(201);
     expect(response.body.data.id).toBe(CHAT_ID);
 
@@ -115,94 +181,147 @@ describe("portal live chat", () => {
       priority: "MEDIUM",
       channel: "LIVE_CHAT",
       assignedAgentId: null,
-      teamId: null,
+      categoryId: null,
+      departmentId: DEPT_ID,
+      teamId: TEAM_ID,
+      branchId: BRANCH_ID,
     });
     expect(data.firstResponseDueAt).toBeInstanceOf(Date);
     expect(data.resolutionDueAt).toBeInstanceOf(Date);
     expect(mocks.ticketHistory.create).toHaveBeenCalledWith({ data: expect.objectContaining({ actorUserId: "customer", action: "TICKET_CREATED" }) });
-    expect(emitUpdated).toHaveBeenCalledWith(expect.objectContaining({ ticketId: CHAT_ID, assignedAgentId: null, teamId: null }));
-    // Fallback path still produces exactly one ticket — no duplicate.
-    expect(mocks.ticket.create).toHaveBeenCalledTimes(1);
-  });
-
-  it("POST routes the new LIVE_CHAT to the team of the customer's most recent routed ticket", async () => {
-    mocks.ticket.findFirst
-      .mockResolvedValueOnce(null) // resumable lookup
-      .mockResolvedValueOnce({ teamId: "tteam111111111111111111111" }) // routing lookup: prior routed ticket
-      .mockResolvedValueOnce(detailRow(TicketStatus.OPEN)); // ticketDetail after create
-    mocks.ticket.create.mockResolvedValue({ id: CHAT_ID, customerId: CUSTOMER_ID, teamId: "tteam111111111111111111111" });
-
-    const response = await request(app).post("/api/portal/live-chat").set(auth("customer", Role.CUSTOMER)).send({});
-    expect(response.status).toBe(201);
-
-    // routing lookup is scoped to this customer, only routed tickets, only active teams, newest first
-    const routingWhere = mocks.ticket.findFirst.mock.calls[1][0];
-    expect(routingWhere.where).toMatchObject({ customerId: CUSTOMER_ID, teamId: { not: null }, team: { is: { isActive: true } } });
-    expect(routingWhere.orderBy).toEqual([{ createdAt: "desc" }, { id: "asc" }]);
-
-    expect(mocks.ticket.create.mock.calls[0][0].data.teamId).toBe("tteam111111111111111111111");
-    // realtime audience receives the resolved teamId on the first (and only) event
+    // first + only realtime event already carries the resolved teamId
     expect(emitUpdated).toHaveBeenCalledTimes(1);
-    expect(emitUpdated).toHaveBeenCalledWith(expect.objectContaining({ ticketId: CHAT_ID, assignedAgentId: null, teamId: "tteam111111111111111111111" }));
-  });
-
-  it("POST resumes instead of creating a duplicate when an active chat exists, and emits nothing", async () => {
-    mocks.ticket.findFirst
-      .mockResolvedValueOnce({ id: CHAT_ID }) // resumable lookup
-      .mockResolvedValueOnce(detailRow(TicketStatus.OPEN)); // ticketDetail
-    const response = await request(app).post("/api/portal/live-chat").set(auth("customer", Role.CUSTOMER)).send({});
-    expect(response.status).toBe(201);
-    expect(response.body.data.id).toBe(CHAT_ID);
-    expect(mocks.ticket.create).not.toHaveBeenCalled();
-    expect(emitUpdated).not.toHaveBeenCalled();
-  });
-
-  it("treats a RESOLVED/CLOSED live chat as terminal and starts a fresh one", async () => {
-    // resumable lookup already excludes terminal statuses at the DB layer → returns null
-    mocks.ticket.findFirst
-      .mockResolvedValueOnce(null) // resumable lookup
-      .mockResolvedValueOnce(null) // routing lookup
-      .mockResolvedValueOnce(detailRow(TicketStatus.OPEN)); // ticketDetail
-    mocks.ticket.create.mockResolvedValue({ id: "cnew111111111111111111111", customerId: CUSTOMER_ID, teamId: null });
-    const response = await request(app).post("/api/portal/live-chat").set(auth("customer", Role.CUSTOMER)).send({});
-    expect(response.status).toBe(201);
+    expect(emitUpdated).toHaveBeenCalledWith(expect.objectContaining({ ticketId: CHAT_ID, assignedAgentId: null, teamId: TEAM_ID }));
     expect(mocks.ticket.create).toHaveBeenCalledTimes(1);
   });
 
-  it("resumes an existing live chat without re-routing it (no create, no team update event)", async () => {
-    mocks.ticket.findFirst
-      .mockResolvedValueOnce({ id: CHAT_ID }) // resumable lookup hits
-      .mockResolvedValueOnce(detailRow(TicketStatus.IN_PROGRESS)); // ticketDetail
-    const response = await request(app).post("/api/portal/live-chat").set(auth("customer", Role.CUSTOMER)).send({});
-    expect(response.status).toBe(201);
-    expect(mocks.ticket.create).not.toHaveBeenCalled();
-    // no routing lookup, no ticket.update, no realtime team change for a resumed chat
-    expect(mocks.ticket.findFirst).toHaveBeenCalledTimes(2);
-    expect(emitUpdated).not.toHaveBeenCalled();
-  });
-
-  it("resolveLiveChatTeamId only considers this customer's routed tickets on active teams, newest first", async () => {
-    const tx = { ticket: { findFirst: vi.fn().mockResolvedValue({ teamId: "tactive11111111111111111a" }) } };
-    const result = await liveChatInternals.resolveLiveChatTeamId(tx as never, CUSTOMER_ID);
-    expect(result).toBe("tactive11111111111111111a");
-    expect(tx.ticket.findFirst).toHaveBeenCalledWith({
-      where: { customerId: CUSTOMER_ID, teamId: { not: null }, team: { is: { isActive: true } } },
-      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
-      select: { teamId: true },
+  it("resolves the Team only within the selected Department, deterministically oldest-first", async () => {
+    arrangeCreate();
+    await request(app).post("/api/portal/live-chat").set(auth("customer", Role.CUSTOMER)).send(startBody);
+    expect(mocks.team.findFirst).toHaveBeenCalledWith({
+      where: { departmentId: DEPT_ID, isActive: true },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      select: { id: true },
     });
   });
 
-  it("resolveLiveChatTeamId returns null when the customer has no routed ticket on an active team", async () => {
-    const tx = { ticket: { findFirst: vi.fn().mockResolvedValue(null) } };
-    expect(await liveChatInternals.resolveLiveChatTeamId(tx as never, CUSTOMER_ID)).toBeNull();
+  it("does NOT consult the customer's ticket history for routing (heuristic removed)", async () => {
+    arrangeCreate();
+    await request(app).post("/api/portal/live-chat").set(auth("customer", Role.CUSTOMER)).send(startBody);
+    // exactly two ticket.findFirst calls: the resumable lookup + ticketDetail.
+    // No third "most recent routed ticket" lookup.
+    expect(mocks.ticket.findFirst).toHaveBeenCalledTimes(2);
+    for (const call of mocks.ticket.findFirst.mock.calls) {
+      expect(call[0].where).not.toHaveProperty("teamId");
+    }
+    expect(liveChatInternals).not.toHaveProperty("resolveLiveChatTeamId");
   });
 
-  it("never accepts a client-supplied customerId or any other field", async () => {
-    for (const body of [{ customerId: "cd9298a10d1b0735837dc4bd8" }, { channel: "WEB" }, { status: "CLOSED" }, { subject: "x" }]) {
-      const response = await request(app).post("/api/portal/live-chat").set(auth("customer", Role.CUSTOMER)).send(body);
+  it("persists branchId as null when the Department has no branch", async () => {
+    mocks.ticket.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce(detailRow());
+    mocks.department.findUnique.mockResolvedValue({ id: DEPT_ID, isActive: true, branchId: null });
+    mocks.team.findFirst.mockResolvedValue({ id: TEAM_ID });
+    mocks.ticket.create.mockResolvedValue({ id: CHAT_ID, customerId: CUSTOMER_ID, teamId: TEAM_ID });
+    await request(app).post("/api/portal/live-chat").set(auth("customer", Role.CUSTOMER)).send(startBody);
+    expect(mocks.ticket.create.mock.calls[0][0].data.branchId).toBeNull();
+  });
+
+  // --- Invalid routing ----------------------------------------------------
+
+  it("rejects an unknown Department with 404 and creates nothing", async () => {
+    mocks.ticket.findFirst.mockResolvedValueOnce(null);
+    mocks.department.findUnique.mockResolvedValue(null);
+    const response = await request(app)
+      .post("/api/portal/live-chat")
+      .set(auth("customer", Role.CUSTOMER))
+      .send(startBody);
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe("DEPARTMENT_NOT_FOUND");
+    expect(mocks.ticket.create).not.toHaveBeenCalled();
+    expect(emitUpdated).not.toHaveBeenCalled();
+  });
+
+  it("rejects an inactive Department and creates nothing", async () => {
+    mocks.ticket.findFirst.mockResolvedValueOnce(null);
+    mocks.department.findUnique.mockResolvedValue({ id: DEPT_ID, isActive: false, branchId: BRANCH_ID });
+    const response = await request(app)
+      .post("/api/portal/live-chat")
+      .set(auth("customer", Role.CUSTOMER))
+      .send(startBody);
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("DEPARTMENT_INACTIVE");
+    expect(mocks.ticket.create).not.toHaveBeenCalled();
+  });
+
+  it("returns a customer-safe 'unavailable' error when the Department has no active Team, and creates nothing", async () => {
+    mocks.ticket.findFirst.mockResolvedValueOnce(null);
+    mocks.department.findUnique.mockResolvedValue({ id: DEPT_ID, isActive: true, branchId: BRANCH_ID });
+    mocks.team.findFirst.mockResolvedValue(null);
+    const response = await request(app)
+      .post("/api/portal/live-chat")
+      .set(auth("customer", Role.CUSTOMER))
+      .send(startBody);
+    expect(response.status).toBe(503);
+    expect(response.body.error.code).toBe("LIVE_CHAT_DEPARTMENT_UNAVAILABLE");
+    // no internal team configuration leaked
+    expect(JSON.stringify(response.body)).not.toMatch(/team/i);
+    expect(mocks.ticket.create).not.toHaveBeenCalled();
+    expect(emitUpdated).not.toHaveBeenCalled();
+  });
+
+  // --- Strict input ------------------------------------------------------
+
+  it("rejects a malformed departmentId or any server-controlled field", async () => {
+    for (const body of [
+      { departmentId: "not-a-cuid" },
+      { departmentId: DEPT_ID, customerId: "cd9298a10d1b0735837dc4bd8" },
+      { departmentId: DEPT_ID, teamId: TEAM_ID },
+      { departmentId: DEPT_ID, channel: "WEB" },
+      { departmentId: DEPT_ID, status: "CLOSED" },
+      { departmentId: DEPT_ID, priority: "HIGH" },
+      { departmentId: DEPT_ID, assignedAgentId: "x" },
+    ]) {
+      const response = await request(app)
+        .post("/api/portal/live-chat")
+        .set(auth("customer", Role.CUSTOMER))
+        .send(body);
       expect(response.status).toBe(400);
     }
     expect(mocks.ticket.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a create with no departmentId (DEPARTMENT_REQUIRED) and creates nothing", async () => {
+    mocks.ticket.findFirst.mockResolvedValueOnce(null); // no resumable chat
+    const response = await request(app)
+      .post("/api/portal/live-chat")
+      .set(auth("customer", Role.CUSTOMER))
+      .send({});
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("DEPARTMENT_REQUIRED");
+    expect(mocks.ticket.create).not.toHaveBeenCalled();
+  });
+
+  it("POST with no body resumes an existing chat (departmentId not required to resume)", async () => {
+    mocks.ticket.findFirst
+      .mockResolvedValueOnce({ id: CHAT_ID }) // resumable lookup hits
+      .mockResolvedValueOnce(detailRow(TicketStatus.IN_PROGRESS)); // ticketDetail
+    const response = await request(app)
+      .post("/api/portal/live-chat")
+      .set(auth("customer", Role.CUSTOMER))
+      .send({});
+    expect(response.status).toBe(201);
+    expect(response.body.data.id).toBe(CHAT_ID);
+    expect(mocks.ticket.create).not.toHaveBeenCalled();
+    expect(mocks.department.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("forces channel = LIVE_CHAT server-side regardless of input", async () => {
+    arrangeCreate();
+    await request(app)
+      .post("/api/portal/live-chat")
+      .set(auth("customer", Role.CUSTOMER))
+      .send(startBody);
+    expect(mocks.ticket.create.mock.calls[0][0].data.channel).toBe("LIVE_CHAT");
   });
 
   it("derives the customer strictly from auth, not from any input", async () => {
@@ -211,5 +330,48 @@ describe("portal live chat", () => {
     await request(app).get("/api/portal/live-chat").set(auth("cb9b8f9ca9e0d9e79cf06cef9", Role.CUSTOMER));
     expect(mocks.customer.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: "cb9b8f9ca9e0d9e79cf06cef9" } }));
     expect(mocks.ticket.findFirst.mock.calls[0][0].where.customerId).toBe("c61b1436de3085c47167cb3c9");
+  });
+
+  // --- Race safety -----------------------------------------------------
+
+  it("does not create a duplicate when an active chat appears first (create-or-resume preserved)", async () => {
+    mocks.ticket.findFirst
+      .mockResolvedValueOnce({ id: CHAT_ID }) // resumable lookup wins the race
+      .mockResolvedValueOnce(detailRow(TicketStatus.OPEN));
+    const response = await request(app)
+      .post("/api/portal/live-chat")
+      .set(auth("customer", Role.CUSTOMER))
+      .send(startBody);
+    expect(response.status).toBe(201);
+    expect(response.body.data.id).toBe(CHAT_ID);
+    expect(mocks.ticket.create).not.toHaveBeenCalled();
+    expect(emitUpdated).not.toHaveBeenCalled();
+  });
+
+  it("treats a RESOLVED/CLOSED live chat as terminal and starts a fresh routed one", async () => {
+    arrangeCreate();
+    const response = await request(app)
+      .post("/api/portal/live-chat")
+      .set(auth("customer", Role.CUSTOMER))
+      .send(startBody);
+    expect(response.status).toBe(201);
+    expect(mocks.ticket.create).toHaveBeenCalledTimes(1);
+    expect(mocks.ticket.create.mock.calls[0][0].data.teamId).toBe(TEAM_ID);
+  });
+
+  // --- Internal resolver -----------------------------------------------
+
+  it("resolveLiveChatTeam returns the oldest active team + the department branch", async () => {
+    const tx = {
+      department: { findUnique: vi.fn().mockResolvedValue({ id: DEPT_ID, isActive: true, branchId: BRANCH_ID }) },
+      team: { findFirst: vi.fn().mockResolvedValue({ id: TEAM_ID }) },
+    };
+    const result = await liveChatInternals.resolveLiveChatTeam(tx as never, DEPT_ID);
+    expect(result).toEqual({ teamId: TEAM_ID, branchId: BRANCH_ID });
+    expect(tx.team.findFirst).toHaveBeenCalledWith({
+      where: { departmentId: DEPT_ID, isActive: true },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      select: { id: true },
+    });
   });
 });

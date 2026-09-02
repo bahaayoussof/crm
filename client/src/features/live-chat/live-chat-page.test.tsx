@@ -1,10 +1,11 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { changeAppLanguage } from "@/lib/i18n";
 
 const mocks = vi.hoisted(() => ({
   bootstrap: vi.fn(),
+  departments: vi.fn(),
   start: vi.fn(),
   send: vi.fn(),
   detail: vi.fn(),
@@ -18,8 +19,9 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("./live-chat-hooks", () => ({
-  liveChatKeys: { root: ["portal", "live-chat"] },
+  liveChatKeys: { root: ["portal", "live-chat"], departments: ["portal", "live-chat", "departments"] },
   useLiveChat: mocks.bootstrap,
+  useLiveChatDepartments: mocks.departments,
   useStartLiveChat: mocks.start,
   useSendLiveChatMessage: mocks.send,
 }));
@@ -61,6 +63,16 @@ describe("LiveChatPage", () => {
     await changeAppLanguage("en");
     vi.clearAllMocks();
     mocks.bootstrap.mockReturnValue({ data: chat(), isLoading: false, isError: false, refetch: mocks.refetch });
+    mocks.departments.mockReturnValue({
+      data: [
+        { id: "d1", name: "Billing" },
+        { id: "d2", name: "Technical Support" },
+      ],
+      isLoading: false,
+      isError: false,
+      isSuccess: true,
+      refetch: mocks.refetch,
+    });
     mocks.detail.mockReturnValue({ data: chat() });
     mocks.start.mockReturnValue({ mutate: mocks.startMutate, isPending: false, isError: false });
     mocks.send.mockReturnValue({ mutateAsync: mocks.sendMutate, isPending: false, isError: false });
@@ -82,26 +94,71 @@ describe("LiveChatPage", () => {
     expect(mocks.refetch).toHaveBeenCalled();
   });
 
-  it("renders the start state when there is no active chat and can start one", () => {
+  const noChat = () =>
     mocks.bootstrap.mockReturnValue({ data: null, isLoading: false, isError: false, refetch: mocks.refetch });
+
+  it("shows the department start screen when there is no active chat", () => {
+    noChat();
     renderPage();
     expect(screen.getByRole("heading", { name: "Start a live chat" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Start live chat" }));
-    expect(mocks.startMutate).toHaveBeenCalled();
+    expect(screen.getByRole("combobox", { name: "Department" })).toBeInTheDocument();
+    // no internal CRM controls/metadata on the start screen
+    expect(screen.queryByRole("combobox", { name: "Team" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Branch" })).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/priority|\bsla\b|watcher|assigned to/i);
   });
 
-  it("shows a pending start state", () => {
-    mocks.bootstrap.mockReturnValue({ data: null, isLoading: false, isError: false });
+  it("keeps Start disabled until a department is chosen, then submits the department id", async () => {
+    noChat();
+    renderPage();
+    expect(screen.getByRole("button", { name: "Start live chat" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Department" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Technical Support" }));
+
+    const startButton = screen.getByRole("button", { name: "Start live chat" });
+    await waitFor(() => expect(startButton).toBeEnabled());
+    fireEvent.click(startButton);
+    expect(mocks.startMutate).toHaveBeenCalledWith("d2");
+  });
+
+  it("shows the loading state while departments load and disables the selector", () => {
+    noChat();
+    mocks.departments.mockReturnValue({ isLoading: true, isError: false, isSuccess: false, refetch: mocks.refetch });
+    renderPage();
+    expect(screen.getByRole("combobox", { name: "Department" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Start live chat" })).toBeDisabled();
+  });
+
+  it("shows an unavailable message when there are no routable departments", () => {
+    noChat();
+    mocks.departments.mockReturnValue({ data: [], isLoading: false, isError: false, isSuccess: true, refetch: mocks.refetch });
+    renderPage();
+    expect(screen.getByText(/Live chat isn't available right now/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start live chat" })).toBeDisabled();
+  });
+
+  it("shows a departments load error with a retry", () => {
+    noChat();
+    mocks.departments.mockReturnValue({ isError: true, isLoading: false, isSuccess: false, refetch: mocks.refetch });
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(mocks.refetch).toHaveBeenCalled();
+  });
+
+  it("shows a pending start state", async () => {
+    noChat();
     mocks.start.mockReturnValue({ mutate: mocks.startMutate, isPending: true, isError: false });
     renderPage();
     expect(screen.getByRole("button", { name: "Starting…" })).toBeDisabled();
   });
 
-  it("shows a start error", () => {
-    mocks.bootstrap.mockReturnValue({ data: null, isLoading: false, isError: false });
+  it("keeps the start screen usable after a start error", () => {
+    noChat();
     mocks.start.mockReturnValue({ mutate: mocks.startMutate, isPending: false, isError: true });
     renderPage();
     expect(screen.getByRole("alert")).toHaveTextContent("We couldn't start the chat. Please try again.");
+    expect(screen.getByRole("combobox", { name: "Department" })).toBeEnabled();
   });
 
   it("renders an active chat with viewer-relative bubbles and no internal metadata", () => {
@@ -175,6 +232,16 @@ describe("LiveChatPage", () => {
     await changeAppLanguage("ar");
     renderPage();
     expect(screen.getByRole("heading", { name: "الدردشة المباشرة" })).toBeInTheDocument();
+    expect(document.documentElement.dir).toBe("rtl");
+    await changeAppLanguage("en");
+  });
+
+  it("renders the start screen in Arabic + RTL", async () => {
+    await changeAppLanguage("ar");
+    noChat();
+    renderPage();
+    expect(screen.getByRole("heading", { name: "ابدأ دردشة مباشرة" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "القسم" })).toBeInTheDocument();
     expect(document.documentElement.dir).toBe("rtl");
     await changeAppLanguage("en");
   });

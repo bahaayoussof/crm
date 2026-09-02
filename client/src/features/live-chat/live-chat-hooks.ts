@@ -7,6 +7,8 @@ import type { LiveChat } from "./live-chat.types";
 export const liveChatKeys = {
   /** The resume-or-null bootstrap query. */
   root: ["portal", "live-chat"] as const,
+  /** Routable departments for the start screen. */
+  departments: ["portal", "live-chat", "departments"] as const,
 };
 
 /**
@@ -18,10 +20,23 @@ export const liveChatKeys = {
 export const useLiveChat = () =>
   useQuery({ queryKey: liveChatKeys.root, queryFn: api.getLiveChat, retry: false });
 
+/**
+ * Departments the customer may route a new live chat to. Only fetched on the
+ * start screen (no resumable chat); the server already filters to active
+ * departments that have an active team.
+ */
+export const useLiveChatDepartments = (options?: { enabled?: boolean }) =>
+  useQuery({
+    queryKey: liveChatKeys.departments,
+    queryFn: api.getLiveChatDepartments,
+    enabled: options?.enabled ?? true,
+    staleTime: 60_000,
+  });
+
 export function useStartLiveChat() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: api.startLiveChat,
+    mutationFn: (departmentId: string) => api.startLiveChat(departmentId),
     onSuccess: async (chat: LiveChat) => {
       qc.setQueryData(liveChatKeys.root, chat);
       await Promise.all([
