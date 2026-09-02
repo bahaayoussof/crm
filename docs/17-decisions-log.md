@@ -1354,3 +1354,46 @@ ADR-049 deferred real Manager scoping because no schema relation tied a `MANAGER
 - **Intentional exception:** `customers/customer.service.ts` `listCustomerTickets` stays organization-wide (documented SUMMARY_ONLY cross-agent history design). Team-scoping it would diverge AGENT vs MANAGER behavior and needs a product decision — deferred.
 - No new runtime dependency. One additive migration. Dev-only DB reset (never production).
 - Verification: server `tsc` + `eslint` clean, vitest **750/750** (42 files, incl. `shared/team/team-scope.test.ts` + cross-team isolation blocks across ticket/manager/reports/dashboard/collaboration/ai/tasks/attachment/user-agents tests). Client `tsc -b` + `eslint` clean (2 pre-existing Fast-Refresh warnings), vitest **737/737** (63 files), production build green (~2,094 kB / gzip ~600 kB). Live multi-role browser QA (EN/AR/RTL/dark, Admin / Manager A / Manager B / Agent A / Agent B / Customer) is outstanding — no running browser in this environment.
+
+
+# ADR-051: Team-Scoped Automatic Ticket Assignment (synchronous, V1)
+
+**Status:** Accepted (implemented and verified on branch `feature/automatic-assignment`; uncommitted).
+
+## Context
+
+`SLA & Automation → Automatic assignment` was the last open item of the original Customer Support CRM requirement. A bounded cron already existed (`GET /api/internal/sla-monitor`, ADR-030) that auto-assigns unrouted tickets by DEPARTMENT/BRANCH equality every five minutes. It does not use the authoritative `Ticket.teamId` boundary introduced by ADR-050, and it only runs on a schedule — a freshly created team-owned ticket sits unassigned until the next sweep.
+
+The gap this ADR closes is narrow and deliberate:
+
+> **Team already known → choose the correct Agent automatically, at the moment the ticket becomes eligible.**
+
+It is NOT automatic Department/Team routing. A ticket without `teamId` is left unassigned for ADMIN routing — the engine never infers or invents a Team.
+
+## Decision
+
+- **One canonical policy/service** — `server/src/modules/assignment/` (`assignment.service.ts` + `assignment.types.ts` + `assignment.test.ts`). Exposes `getAgentActiveWorkload`, `getEligibleTeamAgents`, `findBestAgentForTeam`, and `autoAssignTicket(tx, input)`. Every operation runs against a caller-supplied `Prisma.TransactionClient`, so auto-assignment shares the ticket create/update transaction and its `withRealtimeOutbox` boundary.
+- **Strategy (V1):** least active workload within the ticket's existing Team. Eligible agent = `role === AGENT` **and** `isActive` **and** `User.teamId === Ticket.teamId`. Active workload = count of that agent's tickets in `OPEN | IN_PROGRESS | WAITING_CUSTOMER | ESCALATED` (terminal `RESOLVED`/`CLOSED` never count). The active-status set is shared with the SLA monitor via `assignment.types.ts` — one source of truth.
+- **Deterministic tie-break:** lowest workload, then `id` ascending (`localeCompare`). No `Math.random`, no unstable DB ordering, no new `lastAssignedAt` column.
+- **Hard invariants (schema-neutral, no migration):**
+  - `Ticket.teamId === null` → no-op (never infer a Team).
+  - `Ticket.assignedAgentId !== null` → no-op. An existing manual or automated assignment is never overwritten, even if another agent is less loaded. Auto-assignment fills empty assignments; it is not a load balancer.
+  - Terminal status → no-op.
+  - No eligible active agent → no-op, and **ticket creation/update still succeeds** (never a 5xx).
+- **Cross-team safety:** candidate selection is filtered by `teamId` in the query, and the write is a conditional `updateMany` still guarded by `assignedAgentId: null`, the same `teamId`, and an active status. The existing `assertAgentAssignableToTicket` / `CROSS_TEAM_ASSIGNMENT` / `AGENT_HAS_NO_TEAM` rules for manual assignment remain authoritative and untouched.
+- **Integration points (the shared seam, not per-channel engines):**
+  - Internal CRM ticket creation (`ticket.service.createTicket`) — when the effective team is resolved and no explicit assignee was given.
+  - Team applied after creation (`ticket.service.updateTicket`) — when an ADMIN routes a previously unrouted ticket (`teamId: null → <team>`) and leaves the assignee empty.
+  - Live Chat creation (`live-chat.service.startLiveChat`) — a live chat is created already routed to the Department-resolved Team.
+  - Customer Portal / Email / WhatsApp / SMS creation: these create tickets with `teamId = null` by design, so auto-assignment does not run at creation. They are picked up by the `updateTicket` seam once an ADMIN routes them to a Team (documented inline at each creation site).
+- **Auditability:** reuses the canonical `TicketHistory` (`action = "AUTO_ASSIGNMENT"`, `actorUserId = null`, `newValue = agent name`) and `AuditLog` (`TICKET_ASSIGNED`, `metadata.reason = "automatic_assignment"`) — the same identifiers the SLA-monitor auto-assignment already uses, so the trail reads identically from either path. No separate assignment-history system, no workload snapshot stored.
+- **Notifications:** reuses the existing pipeline — one `TICKET_AUTO_ASSIGNED` notification to the selected (in-team) agent only. No duplicate `TICKET_ASSIGNED`, nothing to agents outside the Team.
+- **Realtime:** no new event type. The existing `emitTicketUpdated` (`ticket.updated`) carries the new `assignedAgentId` + `teamId`; all dependent screens (Agent Dashboard, ticket lists/detail, Manager Console, Team workload, report caches) refresh through their existing invalidations.
+- **Configuration:** no `automaticAssignmentEnabled` flag. The project has no generic Settings/key-value model — only `Category` and `SlaRule` rows — so a flag would need a new model + migration + settings UI + API, which is disproportionate for V1 (see the task's own escape hatch). **Automatic assignment is an enabled-by-default V1 product rule.** A future ADR can add a toggle if a persisted app-settings store is introduced.
+
+## Consequences
+
+- No Prisma migration, no new dependency, no new infrastructure (no queue/lock/Redis/worker/cursor).
+- **Bounded concurrency limitation (documented, accepted):** two ticket creations racing in separate transactions can both read workload `0` for the same agent and both pick them, so a burst of N simultaneous creations can skew by up to ~N onto one agent. The conditional `updateMany` still guarantees no double-assignment, no duplicate history/audit/notification, and no cross-team assignment. Full serialization would need a distributed scheduler — explicitly out of scope for V1. The five-minute SLA monitor and normal ticket churn re-level the distribution over time.
+- The SLA-monitor cron keeps its own DEPARTMENT/BRANCH candidate policy (ADR-030). The two engines now share only the active-status set and the automatic-assignment vocabulary.
+- Verification: server `tsc` + `eslint` clean; new `assignment.test.ts` (13) + `ticket.test.ts` auto-assignment block (12) + `live-chat.test.ts` (1); full server vitest **839/839** (47 files). No client code changed. Live multi-role DB/browser QA and high-concurrency load testing are outstanding (no running DB/browser in this environment).

@@ -46,6 +46,9 @@ export async function processInboundSms(input: InboundSms) {
     const created = !ticket;
     if (!ticket) {
       const sla = await tx.slaRule.findFirst({ where: { priority: TicketPriority.MEDIUM, isActive: true } });
+      // Inbound SMS tickets have no Team at creation (teamId null), so automatic
+      // assignment does not run here — the ticket waits for ADMIN routing, then
+      // the canonical ticket update flow auto-assigns it once a Team is set.
       ticket = await tx.ticket.create({ data: { subject: `SMS: ${input.text.replace(/\s+/g, " ").slice(0, 60)}`, description: input.text, customerId: customer.id, channel: Channel.SMS, priority: TicketPriority.MEDIUM, status: TicketStatus.OPEN, firstResponseDueAt: sla ? addMinutes(input.receivedAt, sla.firstResponseMinutes) : null, resolutionDueAt: sla ? addMinutes(input.receivedAt, sla.resolutionMinutes) : null }, select: { id: true, status: true, subject: true, assignedAgentId: true, teamId: true } });
       await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorUserId: null, action: "TICKET_CREATED", newValue: TicketStatus.OPEN } });
     }

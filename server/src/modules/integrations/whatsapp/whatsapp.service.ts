@@ -123,6 +123,9 @@ async function createWhatsappTicket(
   now: Date,
 ) {
   const sla = await tx.slaRule.findFirst({ where: { priority: TicketPriority.MEDIUM, isActive: true } });
+  // Inbound WhatsApp tickets have no Team at creation (teamId null), so automatic
+  // assignment does not run here — the ticket waits for ADMIN routing, then the
+  // canonical ticket update flow auto-assigns it once a Team is set.
   const ticket = await tx.ticket.create({
     data: {
       subject: deriveSubject(firstText),

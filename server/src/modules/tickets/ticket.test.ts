@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   ticketFindMany: vi.fn(), ticketCount: vi.fn(), ticketFindFirst: vi.fn(), ticketCreate: vi.fn(), ticketUpdate: vi.fn(),
-  ticketUpdateMany: vi.fn(), messageCreate: vi.fn(), messageFindMany: vi.fn(), noteCreate: vi.fn(),
+  ticketUpdateMany: vi.fn(), ticketGroupBy: vi.fn(), ticketFindUniqueOrThrow: vi.fn(), messageCreate: vi.fn(), messageFindMany: vi.fn(), noteCreate: vi.fn(),
   historyCreate: vi.fn(), historyCreateMany: vi.fn(), customerFind: vi.fn(), userFindFirst: vi.fn(), userFindMany: vi.fn(), userFindUnique: vi.fn(),
   categoryFindFirst: vi.fn(), categoryFindMany: vi.fn(), departmentFind: vi.fn(), branchFind: vi.fn(), slaFind: vi.fn(), transaction: vi.fn(),
   watcherCreateMany: vi.fn(), watcherFindMany: vi.fn(), watcherDeleteMany: vi.fn(), watcherCount: vi.fn(), watcherFindFirst: vi.fn(),
@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../../config/prisma.js", () => {
   const prisma = {
-    ticket: { findMany: mocks.ticketFindMany, count: mocks.ticketCount, findFirst: mocks.ticketFindFirst, create: mocks.ticketCreate, update: mocks.ticketUpdate, updateMany: mocks.ticketUpdateMany },
+    ticket: { findMany: mocks.ticketFindMany, count: mocks.ticketCount, findFirst: mocks.ticketFindFirst, create: mocks.ticketCreate, update: mocks.ticketUpdate, updateMany: mocks.ticketUpdateMany, groupBy: mocks.ticketGroupBy, findUniqueOrThrow: mocks.ticketFindUniqueOrThrow },
     ticketMessage: { create: mocks.messageCreate, findMany: mocks.messageFindMany }, ticketNote: { create: mocks.noteCreate },
     ticketHistory: { create: mocks.historyCreate, createMany: mocks.historyCreateMany },
     ticketWatcher: { createMany: mocks.watcherCreateMany, findMany: mocks.watcherFindMany, deleteMany: mocks.watcherDeleteMany, count: mocks.watcherCount, findFirst: mocks.watcherFindFirst },
@@ -88,7 +88,7 @@ describe("ticket API", () => {
     vi.clearAllMocks();
     mocks.ticketFindMany.mockResolvedValue([]); mocks.ticketCount.mockResolvedValue(0);
     mocks.transaction.mockImplementation(async (value: unknown) => typeof value === "function" ? value({
-      ticket: { findFirst: mocks.ticketFindFirst, create: mocks.ticketCreate, update: mocks.ticketUpdate, updateMany: mocks.ticketUpdateMany },
+      ticket: { findFirst: mocks.ticketFindFirst, create: mocks.ticketCreate, update: mocks.ticketUpdate, updateMany: mocks.ticketUpdateMany, groupBy: mocks.ticketGroupBy, findUniqueOrThrow: mocks.ticketFindUniqueOrThrow },
       ticketMessage: { create: mocks.messageCreate, findMany: mocks.messageFindMany }, ticketNote: { create: mocks.noteCreate },
       ticketHistory: { create: mocks.historyCreate, createMany: mocks.historyCreateMany }, customer: { findUnique: mocks.customerFind },
       ticketWatcher: { createMany: mocks.watcherCreateMany, findMany: mocks.watcherFindMany, deleteMany: mocks.watcherDeleteMany, count: mocks.watcherCount, findFirst: mocks.watcherFindFirst },
@@ -104,6 +104,7 @@ describe("ticket API", () => {
     mocks.branchFind.mockResolvedValue(null); mocks.slaFind.mockResolvedValue(null); mocks.historyCreate.mockResolvedValue({});
     mocks.historyCreateMany.mockResolvedValue({ count: 1 }); mocks.ticketCreate.mockResolvedValue(summary); mocks.ticketUpdate.mockResolvedValue(summary);
     mocks.ticketUpdateMany.mockResolvedValue({ count: 1 });
+    mocks.ticketGroupBy.mockResolvedValue([]); mocks.ticketFindUniqueOrThrow.mockResolvedValue(summary);
     mocks.messageCreate.mockResolvedValue({ id: "message-1", body: "We are checking this.", createdAt: now, author: { id: admin.id, name: "Admin", role: Role.ADMIN } });
     mocks.noteCreate.mockResolvedValue({ id: "note-1", body: "Check the payment provider.", createdAt: now, author: { id: admin.id, name: "Admin", role: Role.ADMIN } });
     mocks.userFindMany.mockResolvedValue([]); mocks.categoryFindMany.mockResolvedValue([]);
@@ -750,6 +751,105 @@ describe("ticket API", () => {
     const agents = await request(app).get("/api/users/agents").set(auth());
     expect(categories.status).toBe(200); expect(agents.status).toBe(200);
     expect(agents.body.data[0]).not.toHaveProperty("passwordHash");
+  });
+
+  // -------------------------------------------------------------------------
+  // feature/automatic-assignment — team-scoped auto-assignment at the ticket seam
+  // -------------------------------------------------------------------------
+  describe("automatic assignment", () => {
+    const teamAgents = (rows: [string, number][]) => {
+      mocks.userFindMany.mockResolvedValue(rows.map(([id]) => ({ id, name: `Agent ${id}` })));
+      mocks.ticketGroupBy.mockResolvedValue(rows.map(([id, n]) => ({ assignedAgentId: id, _count: { _all: n } })));
+    };
+    const wasAutoAssigned = () =>
+      mocks.historyCreate.mock.calls.some((c) => c[0]?.data?.action === "AUTO_ASSIGNMENT");
+
+    beforeEach(() => {
+      mocks.teamFindUnique.mockResolvedValue({ id: TEAM_A, name: "Team A", isActive: true, departmentId: null });
+    });
+
+    it("assigns a team-owned unassigned new ticket to the least-loaded eligible agent", async () => {
+      teamAgents([["a", 7], ["b", 2], ["c", 4]]);
+      mocks.ticketFindUniqueOrThrow.mockResolvedValue({ ...summary, teamId: TEAM_A, assignedAgent: { id: "b", name: "Agent b", email: "b@x.com" } });
+      const response = await request(app).post("/api/tickets").set(auth()).send({ subject: "Routed", description: "x", customerId: "ce83f10dcd2c68747c3f3ba14", teamId: TEAM_A });
+      expect(response.status).toBe(201);
+      expect(mocks.ticketUpdateMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: expect.objectContaining({ id: summary.id, assignedAgentId: null, teamId: TEAM_A }),
+        data: { assignedAgentId: "b" },
+      }));
+      expect(mocks.historyCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: "AUTO_ASSIGNMENT", actorUserId: null, oldValue: null, newValue: "Agent b" }) }));
+      expect(mocks.notificationCreateMany).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ userId: "b", type: "TICKET_AUTO_ASSIGNED" })] }));
+      expect(response.body.data.assignedAgent.id).toBe("b");
+    });
+
+    it("breaks a workload tie deterministically by agent id on repeated runs", async () => {
+      // Candidates returned in the opposite order to the deterministic winner.
+      mocks.userFindMany.mockResolvedValue([{ id: "b", name: "Agent b" }, { id: "a", name: "Agent a" }]);
+      mocks.ticketGroupBy.mockResolvedValue([{ assignedAgentId: "a", _count: { _all: 2 } }, { assignedAgentId: "b", _count: { _all: 2 } }]);
+      mocks.ticketFindUniqueOrThrow.mockResolvedValue({ ...summary, teamId: TEAM_A, assignedAgent: { id: "a", name: "Agent a", email: "a@x.com" } });
+      for (let run = 0; run < 3; run += 1) {
+        const response = await request(app).post("/api/tickets").set(auth()).send({ subject: "Tie", description: "x", customerId: "ce83f10dcd2c68747c3f3ba14", teamId: TEAM_A });
+        expect(response.status).toBe(201);
+      }
+      const assigneeIds = mocks.ticketUpdateMany.mock.calls.map((c) => c[0]?.data?.assignedAgentId);
+      expect(assigneeIds).toEqual(["a", "a", "a"]);
+    });
+
+    it("does not auto-assign when an explicit assignee is chosen", async () => {
+      teamAgents([["b", 0]]);
+      mocks.userFindFirst.mockResolvedValue({ id: agent.id, name: "Chosen", teamId: TEAM_A });
+      const response = await request(app).post("/api/tickets").set(auth()).send({ subject: "Explicit", description: "x", customerId: "ce83f10dcd2c68747c3f3ba14", teamId: TEAM_A, assignedAgentId: agent.id });
+      expect(response.status).toBe(201);
+      expect(wasAutoAssigned()).toBe(false);
+      expect(mocks.ticketUpdateMany).not.toHaveBeenCalled();
+    });
+
+    it("leaves a new ticket with no team unassigned (never infers a team)", async () => {
+      teamAgents([["b", 0]]);
+      const response = await request(app).post("/api/tickets").set(auth()).send({ subject: "No team", description: "x", customerId: "ce83f10dcd2c68747c3f3ba14" });
+      expect(response.status).toBe(201);
+      expect(wasAutoAssigned()).toBe(false);
+    });
+
+    it("still creates the ticket (201) when the team has no eligible active agent", async () => {
+      mocks.userFindMany.mockResolvedValue([]);
+      const response = await request(app).post("/api/tickets").set(auth()).send({ subject: "Empty team", description: "x", customerId: "ce83f10dcd2c68747c3f3ba14", teamId: TEAM_A });
+      expect(response.status).toBe(201);
+      expect(wasAutoAssigned()).toBe(false);
+      expect(mocks.ticketUpdateMany).not.toHaveBeenCalled();
+    });
+
+    it("runs automatic assignment when an ADMIN routes a previously unrouted ticket to a team", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ ...current, teamId: null, assignedAgentId: null });
+      mocks.ticketUpdate.mockResolvedValue({ ...summary, teamId: TEAM_A, assignedAgent: null });
+      teamAgents([["a", 5], ["b", 1]]);
+      mocks.ticketFindUniqueOrThrow.mockResolvedValue({ ...summary, teamId: TEAM_A, assignedAgent: { id: "b", name: "Agent b", email: "b@x.com" } });
+      const response = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth()).send({ teamId: TEAM_A });
+      expect(response.status).toBe(200);
+      expect(mocks.ticketUpdateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { assignedAgentId: "b" } }));
+      expect(wasAutoAssigned()).toBe(true);
+      expect(response.body.data.assignedAgent.id).toBe("b");
+    });
+
+    it("never overwrites an explicit assignee when a team is applied later", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ ...current, teamId: null, assignedAgentId: agent.id, assignedAgent: { name: "Ahmed" } });
+      mocks.ticketUpdate.mockResolvedValue({ ...summary, teamId: TEAM_A, assignedAgent: { id: agent.id, name: "Ahmed", email: "a@x.com" } });
+      teamAgents([["b", 0]]);
+      const response = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth()).send({ teamId: TEAM_A });
+      expect(response.status).toBe(200);
+      expect(wasAutoAssigned()).toBe(false);
+      expect(mocks.ticketUpdateMany).not.toHaveBeenCalled();
+      expect(response.body.data.assignedAgent.id).toBe(agent.id);
+    });
+
+    it("does not auto-assign a terminal ticket when a team is applied later", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ ...current, teamId: null, status: TicketStatus.RESOLVED, assignedAgentId: null });
+      mocks.ticketUpdate.mockResolvedValue({ ...summary, teamId: TEAM_A, status: TicketStatus.RESOLVED, assignedAgent: null });
+      teamAgents([["b", 0]]);
+      const response = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth()).send({ teamId: TEAM_A });
+      expect(response.status).toBe(200);
+      expect(wasAutoAssigned()).toBe(false);
+    });
   });
 
   // -------------------------------------------------------------------------

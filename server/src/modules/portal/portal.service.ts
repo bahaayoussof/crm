@@ -82,6 +82,10 @@ export async function createTicket(input: PortalCreateTicketInput, userId: strin
       if (!category) throw new AppError(404, "CATEGORY_NOT_FOUND", "Category not found");
     }
     const sla = await tx.slaRule.findFirst({ where: { priority: TicketPriority.MEDIUM, isActive: true } });
+    // Portal-created tickets carry no Team at creation (teamId null). Per the
+    // automatic-assignment core rule, a ticket with no Team is left unassigned
+    // for ADMIN routing; auto-assignment runs later, from the canonical ticket
+    // update flow, once an ADMIN routes it to a Team.
     const ticket = await tx.ticket.create({ data: { subject: input.subject, description: input.description, categoryId: input.categoryId ?? null,
       customerId, status: TicketStatus.OPEN, priority: TicketPriority.MEDIUM, channel: Channel.WEB,
       assignedAgentId: null, departmentId: null, branchId: null, createdAt: now,

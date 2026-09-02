@@ -927,3 +927,21 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
 | 13:44 | rebuild README as diagram-first visual guide (12 mermaid diagrams, 617 lines, was 671) | README.md | done, render check pending | ~35k |
+
+## Session: 2026-09-02 14:11
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-02 15:10 — feature/automatic-assignment (ADR-051)
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 15:10 | Audited assignment/team-scope/channel-create/settings/history/realtime; branch off master | — | SLA monitor cron = dept/branch scoped only; no Settings model; TicketHistory.action/Notification.type free-text | 40k |
+| 15:20 | New canonical assignment engine | server/src/modules/assignment/{assignment.types,assignment.service,assignment.test}.ts | 13 unit tests green | 8k |
+| 15:35 | Wired autoAssignTicket into 3 seams | ticket.service.ts (createTicket + updateTicket team-applied-later), live-chat.service.ts startLiveChat | typecheck clean | 6k |
+| 15:40 | Documented no-op at Portal/Email/WhatsApp/SMS create (teamId null) | portal/whatsapp/email/sms service.ts | inline comments only | 2k |
+| 15:45 | Dedupe active-status set into assignment.types; sla-automation imports it | sla-automation.service.ts | sla tests 7/7 | 1k |
+| 15:55 | Test mock fixes (bug-135) + integration tests | live-chat.test.ts, ticket.test.ts | +12 ticket, +1 live-chat | 5k |
+| 16:05 | Full server verify | — | vitest 839/839 (47 files), tsc + eslint clean, git diff --check clean | 3k |
+| 16:15 | Docs | docs/{07,08,17,19}, ADR-051 | progress: Automatic Assignment = COMPLETE | 4k |

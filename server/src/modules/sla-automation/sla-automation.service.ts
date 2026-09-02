@@ -4,13 +4,18 @@ import { createNotifications } from "../notifications/notification.service.js";
 import { emitTicketUpdated, withRealtimeOutbox } from "../realtime/realtime.publisher.js";
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../audit-logs/audit-log.constants.js";
 import { createAuditLog } from "../audit-logs/audit-log.service.js";
+import {
+  ASSIGNMENT_ACTIVE_STATUSES,
+  AUTO_ASSIGNMENT_AUDIT_REASON,
+  AUTO_ASSIGNMENT_HISTORY_ACTION,
+  AUTO_ASSIGNMENT_NOTIFICATION_TYPE,
+} from "../assignment/assignment.types.js";
 
-const ACTIVE_STATUSES = [
-  TicketStatus.OPEN,
-  TicketStatus.IN_PROGRESS,
-  TicketStatus.WAITING_CUSTOMER,
-  TicketStatus.ESCALATED,
-] as const;
+// The bounded SLA-monitor cron keeps its own DEPARTMENT/BRANCH-scoped candidate
+// policy (see docs/08). It shares only the active-status set and the automatic-
+// assignment vocabulary with the synchronous team-scoped engine in
+// modules/assignment, so the trail reads identically from either path.
+const ACTIVE_STATUSES = ASSIGNMENT_ACTIVE_STATUSES;
 const ESCALATABLE_STATUSES = ACTIVE_STATUSES.filter((status) => status !== TicketStatus.ESCALATED);
 export const SLA_MONITOR_BATCH_SIZE = 100;
 
@@ -87,16 +92,16 @@ async function assignUnassignedTickets() {
         data: {
           ticketId: ticket.id,
           actorUserId: null,
-          action: "AUTO_ASSIGNMENT",
+          action: AUTO_ASSIGNMENT_HISTORY_ACTION,
           oldValue: null,
           newValue: agent.name,
         },
       });
-      await createAuditLog({ actorId: null, action: AUDIT_ACTIONS.TICKET_ASSIGNED, entityType: AUDIT_ENTITY_TYPES.TICKET, entityId: ticket.id, changes: { assignedAgentId: { from: null, to: agent.id } }, metadata: { reason: "automatic_assignment" } }, tx);
+      await createAuditLog({ actorId: null, action: AUDIT_ACTIONS.TICKET_ASSIGNED, entityType: AUDIT_ENTITY_TYPES.TICKET, entityId: ticket.id, changes: { assignedAgentId: { from: null, to: agent.id } }, metadata: { reason: AUTO_ASSIGNMENT_AUDIT_REASON } }, tx);
       await createNotifications(
         tx,
         [agent.id],
-        "TICKET_AUTO_ASSIGNED",
+        AUTO_ASSIGNMENT_NOTIFICATION_TYPE,
         "Ticket automatically assigned",
         `Ticket #${ticket.id}: ${ticket.subject} was automatically assigned to you`,
         ticket.id,

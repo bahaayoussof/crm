@@ -71,6 +71,12 @@ Important actions should create ticket history records:
 
 History stores the actor plus old and new values when useful. It is an operational lifecycle record, not event sourcing.
 
+Automatic assignment (ADR-051) is recorded through this same mechanism: an
+`AUTO_ASSIGNMENT` history row with `actorUserId = null` and `newValue` = the
+assigned agent's name, so the trail shows an unassigned ticket became owned by an
+agent without a human actor. The matching audit-log entry carries
+`metadata.reason = "automatic_assignment"`.
+
 ## Customer replies
 
 Customer replies create public `TicketMessage` records only. A reply changes `WAITING_CUSTOMER` to `IN_PROGRESS`; a reply to `RESOLVED` reopens as `OPEN` and clears `resolvedAt`. Both changes and their history records are atomic with the message. CLOSED returns `409 TICKET_CLOSED`; other statuses do not change automatically.

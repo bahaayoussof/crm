@@ -78,6 +78,62 @@ Preferred later automation:
 
 Manual assignment is acceptable for the core delivery.
 
+### Synchronous Team-Scoped Automatic Assignment (ADR-051)
+
+Implemented as real backend behavior, not a UI button. One canonical service —
+`server/src/modules/assignment/` — is the single source of truth for automatic
+assignment policy.
+
+**Strategy (V1): least-loaded active AGENT within the ticket's existing Team.**
+
+- Runs when a ticket is **not already assigned**, has a valid `teamId`, is not
+  terminal, and the Team has at least one eligible active agent.
+- Eligible agent = `role === AGENT` **and** active/enabled **and**
+  `User.teamId === Ticket.teamId`. Cross-team assignment is impossible; the
+  existing `CROSS_TEAM_ASSIGNMENT` / `AGENT_HAS_NO_TEAM` invariants remain
+  authoritative.
+- Active workload = the agent's tickets in `OPEN`, `IN_PROGRESS`,
+  `WAITING_CUSTOMER`, or `ESCALATED`. `RESOLVED` / `CLOSED` never count.
+- Deterministic tie-break: lowest workload, then agent `id` ascending. No random
+  ordering, no unstable DB ordering, no new schema column.
+- **`teamId = null` → the ticket is left unassigned for ADMIN routing.** The
+  engine never infers or invents a Team. Automatic Team routing is explicitly
+  NOT part of this feature.
+- **An existing `assignedAgentId` is never overwritten**, even if another agent
+  is less loaded. Automatic assignment fills empty assignments only; it is not a
+  continuous load balancer and never reassigns.
+- No eligible agent **does not fail** ticket creation or update — the ticket is
+  created/updated successfully and simply stays unassigned for the
+  Admin/Manager workflow.
+
+**Where it runs (one shared seam, not per-channel engines):**
+
+- Internal CRM ticket creation, when a Team is resolved and no explicit assignee
+  was chosen.
+- The canonical ticket update flow, when an ADMIN routes a previously unrouted
+  ticket (`teamId: null → <team>`) and leaves the assignee empty.
+- Live Chat creation (a live chat is created already routed to a Team).
+- Customer Portal / Email / WhatsApp / SMS tickets are created with
+  `teamId = null` by design, so auto-assignment runs for them later, from the
+  ticket update flow, once an ADMIN routes them to a Team.
+
+**Pipelines reused:** canonical `TicketHistory`
+(`action = "AUTO_ASSIGNMENT"`, actorless, `newValue` = agent name) and `AuditLog`
+(`TICKET_ASSIGNED`, `metadata.reason = "automatic_assignment"`) — identical to the
+SLA-monitor auto-assignment; one `TICKET_AUTO_ASSIGNED` notification to the
+selected in-team agent; the existing `ticket.updated` realtime event. No new
+event type, no schema change, no migration.
+
+**Configuration:** enabled-by-default V1 product rule. There is no
+`automaticAssignmentEnabled` flag — the project has no generic app-settings store
+(only `Category` / `SlaRule` rows), so a toggle is deferred to a future ADR.
+
+**Known V1 limitation:** two ticket creations racing in separate transactions can
+both read workload `0` for the same agent and both pick them (bounded skew up to
+the concurrency width). The conditional guarded update still guarantees no
+double-assignment and no duplicate history/audit/notification. Full
+serialization would require a distributed scheduler and is out of scope.
+
 ## Portal SLA interpretation
 
 Portal-created requests snapshot the active MEDIUM rule. Customer replies never set `firstRespondedAt`. Reopening preserves `resolutionDueAt` and does not recalculate deadlines. Portal responses never expose raw or derived SLA fields.

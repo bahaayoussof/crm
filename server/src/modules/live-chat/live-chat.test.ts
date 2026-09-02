@@ -6,11 +6,12 @@ const mocks = vi.hoisted(() => ({
   customer: { findUnique: vi.fn() },
   department: { findUnique: vi.fn(), findMany: vi.fn() },
   team: { findFirst: vi.fn() },
-  ticket: { findFirst: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
+  ticket: { findFirst: vi.fn(), findUniqueOrThrow: vi.fn(), create: vi.fn(), updateMany: vi.fn(), groupBy: vi.fn().mockResolvedValue([]) },
   ticketHistory: { create: vi.fn().mockResolvedValue({}) },
   auditLog: { create: vi.fn().mockResolvedValue({}) },
+  notification: { createMany: vi.fn().mockResolvedValue({ count: 0 }) },
   slaRule: { findFirst: vi.fn().mockResolvedValue({ firstResponseMinutes: 30, resolutionMinutes: 120 }) },
-  user: { findUnique: vi.fn().mockResolvedValue({ passwordChangedAt: null }) },
+  user: { findUnique: vi.fn().mockResolvedValue({ passwordChangedAt: null }), findMany: vi.fn().mockResolvedValue([]) },
 }));
 vi.mock("../../config/prisma.js", () => ({
   prisma: {
@@ -194,6 +195,20 @@ describe("portal live chat", () => {
     expect(emitUpdated).toHaveBeenCalledTimes(1);
     expect(emitUpdated).toHaveBeenCalledWith(expect.objectContaining({ ticketId: CHAT_ID, assignedAgentId: null, teamId: TEAM_ID }));
     expect(mocks.ticket.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("auto-assigns the new live chat to the least-loaded eligible agent on the resolved Team", async () => {
+    arrangeCreate();
+    mocks.user.findMany.mockResolvedValue([{ id: "ag1", name: "Live Agent" }]);
+    mocks.ticket.groupBy.mockResolvedValue([]); // ag1 has no active tickets
+    mocks.ticket.updateMany.mockResolvedValue({ count: 1 });
+    mocks.notification.createMany.mockResolvedValue({ count: 1 });
+    const response = await request(app).post("/api/portal/live-chat").set(auth("customer", Role.CUSTOMER)).send(startBody);
+    expect(response.status).toBe(201);
+    expect(mocks.user.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ role: "AGENT", isActive: true, teamId: TEAM_ID }) }));
+    expect(mocks.ticket.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: CHAT_ID, assignedAgentId: null, teamId: TEAM_ID }), data: { assignedAgentId: "ag1" } }));
+    expect(mocks.ticketHistory.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: "AUTO_ASSIGNMENT", actorUserId: null, newValue: "Live Agent" }) }));
+    expect(emitUpdated).toHaveBeenCalledWith(expect.objectContaining({ ticketId: CHAT_ID, assignedAgentId: "ag1", teamId: TEAM_ID }));
   });
 
   it("resolves the Team only within the selected Department, deterministically oldest-first", async () => {

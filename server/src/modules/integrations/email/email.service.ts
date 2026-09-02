@@ -105,6 +105,9 @@ async function createEmailTicket(
   now: Date,
 ) {
   const sla = await tx.slaRule.findFirst({ where: { priority: TicketPriority.MEDIUM, isActive: true } });
+  // Inbound email tickets have no Team at creation (teamId null), so automatic
+  // assignment does not run here — the ticket waits for ADMIN routing, then the
+  // canonical ticket update flow auto-assigns it once a Team is set.
   const ticket = await tx.ticket.create({
     data: {
       subject: (subject.trim() || "Email support request").slice(0, 200),

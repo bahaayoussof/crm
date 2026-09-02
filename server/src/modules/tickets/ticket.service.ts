@@ -23,6 +23,7 @@ import {
 import type { CreateTicketInput, TicketConversationInput, TicketListQuery, UpdateTicketInput } from "./ticket.schema.js";
 import { ticketListVisibilityWhere, ticketVisibilityWhere, type TeamScope, type TicketActor as Actor } from "./ticket-visibility.js";
 import { assertAgentAssignableToTicket, resolveActorTeamId, resolveActorTeamScope, ticketOperationalRecipientIds } from "../../shared/team/team-scope.js";
+import { autoAssignTicket } from "../assignment/assignment.service.js";
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../audit-logs/audit-log.constants.js";
 import { createAuditLog } from "../audit-logs/audit-log.service.js";
 import type { AuditRequestContext } from "../audit-logs/audit-request-context.js";
@@ -303,7 +304,25 @@ export async function createTicket(input: CreateTicketInput, actor: Actor, reque
         await createNotifications(tx, [assignee.id], "TICKET_ASSIGNED", "New ticket assigned", `You have been assigned ticket #${ticket.id}: ${ticket.subject}`, ticket.id);
       }
     }
-    return ticket;
+    // Automatic assignment (feature/automatic-assignment): a brand-new ticket is
+    // always OPEN and never terminal. When it already knows its Team but carries
+    // no explicit assignee, fill the assignee with the least-loaded eligible
+    // active agent on that Team. `teamId === null` -> left unassigned for ADMIN
+    // routing. An explicit assignee above short-circuits this entirely.
+    let autoAssignedAgentId: string | null = null;
+    if (!creationInput.assignedAgentId && effectiveTeamId) {
+      const outcome = await autoAssignTicket(tx, {
+        ticketId: ticket.id,
+        teamId: effectiveTeamId,
+        assignedAgentId: null,
+        status: ticket.status,
+      });
+      autoAssignedAgentId = outcome?.assignedAgentId ?? null;
+    }
+    const finalTicket = autoAssignedAgentId
+      ? await tx.ticket.findUniqueOrThrow({ where: { id: ticket.id }, select: ticketSummarySelect })
+      : ticket;
+    return finalTicket;
    });
    emitTicketUpdated({ ticketId: ticket.id, assignedAgentId: ticket.assignedAgent?.id ?? null, customerId: ticket.customer?.id ?? null, teamId: ticket.teamId });
    return ticket;
@@ -368,7 +387,7 @@ export async function updateTicket(ticketId: string, input: UpdateTicketInput, a
       data.resolutionDueAt = sla ? addMinutes(now, sla.resolutionMinutes) : null;
     }
 
-    const updated = await tx.ticket.update({ where: { id: ticketId }, data, select: ticketSummarySelect });
+    let updated = await tx.ticket.update({ where: { id: ticketId }, data, select: ticketSummarySelect });
     const events: Prisma.TicketHistoryCreateManyInput[] = [];
     if (input.status && input.status !== current.status) events.push(history(ticketId, actor.userId, "STATUS_CHANGED", current.status, input.status));
     if (input.priority && input.priority !== current.priority) events.push(history(ticketId, actor.userId, "PRIORITY_CHANGED", current.priority, input.priority));
@@ -434,7 +453,33 @@ export async function updateTicket(ticketId: string, input: UpdateTicketInput, a
       });
     }
 
+    // Team applied after creation (feature/automatic-assignment): when a ticket
+    // that had no Team is routed to one and its assignee is still empty, run
+    // automatic assignment now that the Team is authoritative. An explicit
+    // assignee in this same request (`assigningAgent`) is preserved; a ticket
+    // that already had a Team, or is now terminal, is skipped by the engine.
+    let autoAssignedAgentId: string | null = null;
+    if (
+      input.teamId !== undefined &&
+      input.teamId !== null &&
+      current.teamId === null &&
+      !assigningAgent &&
+      !updated.assignedAgent
+    ) {
+      const outcome = await autoAssignTicket(tx, {
+        ticketId,
+        teamId: input.teamId,
+        assignedAgentId: null,
+        status: updated.status,
+      });
+      if (outcome) {
+        autoAssignedAgentId = outcome.assignedAgentId;
+        updated = await tx.ticket.findUniqueOrThrow({ where: { id: ticketId }, select: ticketSummarySelect });
+      }
+    }
+
     const changed =
+      autoAssignedAgentId !== null ||
       (input.subject !== undefined && input.subject !== current.subject) ||
       (input.description !== undefined && input.description !== current.description) ||
       (input.priority !== undefined && input.priority !== current.priority) ||

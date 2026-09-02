@@ -5,6 +5,7 @@ import { emitTicketUpdated, withRealtimeOutbox } from "../realtime/realtime.publ
 import { customerIdFor, ticketDetail } from "../portal/portal.service.js";
 import { createAuditLog } from "../audit-logs/audit-log.service.js";
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../audit-logs/audit-log.constants.js";
+import { autoAssignTicket } from "../assignment/assignment.service.js";
 import type { LiveChatStartInput } from "./live-chat.schema.js";
 
 /**
@@ -191,7 +192,17 @@ export async function startLiveChat(userId: string, input: LiveChatStartInput) {
           newValue: TicketStatus.OPEN,
         },
       });
-      return ticket;
+      // A live chat is created already routed to a Team (resolved from the
+      // customer-selected Department), so automatic assignment can run
+      // immediately — least-loaded eligible active agent on that Team. No
+      // eligible agent -> the chat stays unassigned for the manager/admin.
+      const outcome = await autoAssignTicket(tx, {
+        ticketId: ticket.id,
+        teamId: ticket.teamId,
+        assignedAgentId: null,
+        status: TicketStatus.OPEN,
+      });
+      return { ...ticket, assignedAgentId: outcome?.assignedAgentId ?? null };
     });
 
     // The first public event already carries the resolved routing: with a
@@ -200,7 +211,7 @@ export async function startLiveChat(userId: string, input: LiveChatStartInput) {
     // rule.
     emitTicketUpdated({
       ticketId: created.id,
-      assignedAgentId: null,
+      assignedAgentId: created.assignedAgentId,
       customerId: created.customerId,
       teamId: created.teamId,
     });
