@@ -1573,6 +1573,9 @@
     "endedBody": "Thanks for reaching out. You can start a new chat whenever you need us.",
     "startNewChat": "Start new chat",
     "inactivityWarning": "This chat may close soon due to inactivity.",
+    "talkToPerson": "Talk to a person",
+    "backToAi": "Back to AI",
+    "liveSupport": "Live Support",
     "connection": {
       "connected": "Connected",
       "reconnecting": "Reconnecting…",

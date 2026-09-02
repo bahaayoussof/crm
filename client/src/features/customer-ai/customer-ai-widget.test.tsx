@@ -8,6 +8,8 @@ const live = vi.hoisted(() => ({
   bootstrap: { data: null as unknown, refetch: vi.fn() },
   end: { mutateAsync: vi.fn(), isPending: false, isError: false },
   send: { mutate: vi.fn(), isPending: false, isError: false },
+  start: { mutate: vi.fn(), isPending: false, isError: false },
+  departments: { data: [{ id: "d1", name: "Billing" }, { id: "d2", name: "Technical Support" }], isLoading: false, isError: false, isSuccess: true, refetch: vi.fn() },
   detail: { data: undefined as unknown },
 }));
 
@@ -20,8 +22,11 @@ vi.mock("@/features/live-chat/live-chat-hooks", () => ({
   useLiveChat: () => live.bootstrap,
   useEndLiveChat: () => live.end,
   useSendLiveChatMessage: () => live.send,
+  useStartLiveChat: () => live.start,
+  useLiveChatDepartments: () => live.departments,
 }));
 vi.mock("@/features/portal/portal-hooks", () => ({ usePortalTicket: () => live.detail }));
+vi.mock("@/features/realtime/realtime-status", () => ({ useRealtimeStatus: () => "open" }));
 
 import { CustomerAiWidget } from "./customer-ai-widget";
 
@@ -53,6 +58,8 @@ describe("CustomerAiWidget", () => {
     live.bootstrap = { data: null, refetch: vi.fn() };
     live.end = { mutateAsync: vi.fn().mockResolvedValue(liveChat({ status: "RESOLVED" })), isPending: false, isError: false };
     live.send = { mutate: vi.fn(), isPending: false, isError: false };
+    live.start = { mutate: vi.fn(), isPending: false, isError: false };
+    live.departments = { data: [{ id: "d1", name: "Billing" }, { id: "d2", name: "Technical Support" }], isLoading: false, isError: false, isSuccess: true, refetch: vi.fn() };
     live.detail = { data: undefined };
     await changeAppLanguage("en");
   });
@@ -78,6 +85,64 @@ describe("CustomerAiWidget", () => {
     expect(screen.getByRole("button", { name: "Requests" })).toBeEnabled();
   });
 
+  it("defaults to AI mode and offers a persistent path to a human", () => {
+    renderWidget();
+    openWidget();
+    expect(screen.getByRole("region", { name: "AI Support" })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Describe what you need help with/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Talk to a person" })).toBeInTheDocument();
+  });
+
+  it("escalates AI -> Live Chat department selection, and Back to AI returns without losing AI history", () => {
+    hooks.chatMutate.mockImplementation((_input, callbacks) => callbacks.onSuccess({ answer: "Grounded answer.", confidence: 0.9, canHandoff: false, suggestedArticles: [] }));
+    renderWidget();
+    openWidget();
+    fireEvent.change(screen.getByLabelText(/Describe what you need help with/i), { target: { value: "Hi" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(screen.getByText("Grounded answer.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Talk to a person" }));
+    // Live Chat onboarding inside the same widget — no navigation, no active chat yet
+    expect(screen.getByRole("region", { name: "Live Support" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Department" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start live chat" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Back to AI" }));
+    expect(screen.getByText("Grounded answer.")).toBeInTheDocument(); // AI history intact
+  });
+
+  it("Department selection starts a chat with the existing start mutation", async () => {
+    renderWidget();
+    openWidget();
+    fireEvent.click(screen.getByRole("button", { name: "Talk to a person" }));
+    expect(screen.getByRole("button", { name: "Start live chat" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("combobox", { name: "Department" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Technical Support" }));
+    const startButton = screen.getByRole("button", { name: "Start live chat" });
+    await waitFor(() => expect(startButton).toBeEnabled());
+    fireEvent.click(startButton);
+    expect(live.start.mutate).toHaveBeenCalledWith("d2");
+  });
+
+  it("resumes an existing active Live Chat inside the widget without department selection", () => {
+    live.bootstrap = { data: liveChat(), refetch: vi.fn() };
+    renderWidget();
+    openWidget();
+    expect(screen.getByRole("region", { name: "Live Support" })).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Department" })).toBeNull();
+    expect(screen.getByText("I need help")).toBeInTheDocument();
+    expect(screen.getByLabelText(/Type your message/i)).toBeInTheDocument();
+  });
+
+  it("sends a Live Chat message through the existing send mutation", () => {
+    live.bootstrap = { data: liveChat(), refetch: vi.fn() };
+    renderWidget();
+    openWidget();
+    fireEvent.change(screen.getByLabelText(/Type your message/i), { target: { value: "Any update?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(live.send.mutate).toHaveBeenCalledWith("<p>Any update?</p>", expect.any(Object));
+  });
+
   it("X only minimizes the widget and never ends a chat", () => {
     live.bootstrap = { data: liveChat(), refetch: vi.fn() };
     renderWidget();
@@ -101,7 +166,7 @@ describe("CustomerAiWidget", () => {
     live.bootstrap = { data: liveChat(), refetch: vi.fn() };
     renderWidget();
     openWidget();
-    expect(screen.getByRole("region", { name: "Live Chat" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Live Support" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /End chat/i })).toBeInTheDocument();
   });
 
@@ -187,6 +252,13 @@ describe("CustomerAiWidget", () => {
     expect(panel).toHaveClass("sm:right-4");
     expect(screen.getByRole("alert")).toHaveTextContent("طلبات الذكاء الاصطناعي");
     expect(screen.getByRole("button", { name: "التحدث مع الدعم" })).toBeInTheDocument();
+  });
+
+  it("opens straight into Live Chat from the ?support=live compatibility link", async () => {
+    await changeAppLanguage("ar");
+    renderWidget("/portal?support=live");
+    expect(screen.getByRole("region", { name: "الدعم المباشر" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "القسم" })).toBeInTheDocument();
   });
 
   it("keeps the mobile panel within the viewport width", () => {

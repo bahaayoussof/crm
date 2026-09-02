@@ -1,49 +1,74 @@
 import axios from "axios";
-import { Bot, LogOut, MessagesSquare, Send, UserRound } from "lucide-react";
+import { ArrowLeft, Bot, LogOut, MessagesSquare, Send, UserRound } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useSearchParams } from "react-router-dom";
 import { Modal } from "@/components/ui/modal";
 import { useEndLiveChat, useLiveChat } from "@/features/live-chat/live-chat-hooks";
 import { isTerminalLiveChat } from "@/features/live-chat/live-chat.types";
+import { useRealtimeStatus } from "@/features/realtime/realtime-status";
 import { useCustomerAiChat, useCustomerAiHandoff } from "./customer-ai-hooks";
-import { CustomerLiveChat } from "./customer-live-chat";
+import { CustomerLiveChat, LiveChatStart } from "./customer-live-chat";
 import { SupportWidget } from "./support-widget";
 import type { CustomerAiMessage, CustomerAiResponse } from "./customer-ai.types";
 
 type DisplayMessage = CustomerAiMessage & { response?: CustomerAiResponse };
 
+/** UI presentation channel. It is *only* presentation — switching never starts or
+ * ends anything. AI history and any active Live Chat both survive a switch. */
+type Channel = "ai" | "live";
+
 function errorCode(error: unknown) {
   return axios.isAxiosError(error) ? error.response?.data?.error?.code as string | undefined : undefined;
 }
 
+/** Small live-connection indicator for the Live Chat header (● Connected). */
+function ConnectionDot() {
+  const { t } = useTranslation();
+  const status = useRealtimeStatus();
+  const online = status === "open";
+  return (
+    <span
+      role="status"
+      className={`inline-flex shrink-0 items-center gap-1 text-[11px] font-medium ${online ? "text-success-foreground" : "text-muted-foreground"}`}
+    >
+      <span className={`size-1.5 rounded-full ${online ? "bg-success" : "bg-muted-foreground"}`} aria-hidden="true" />
+      {online ? t("liveChat.connection.connected") : t("liveChat.connection.reconnecting")}
+    </span>
+  );
+}
+
 /**
- * The customer's floating support widget. It coordinates which channel body the
- * shared, non-modal {@link SupportWidget} renders:
+ * The customer's single floating support widget. It owns the shared, non-modal
+ * {@link SupportWidget} shell and coordinates which channel body renders inside:
  *
- *  - an **active Live Chat** (`useLiveChat` returns a non-terminal chat) →
- *    {@link CustomerLiveChat} + an "End chat" control in the shared header
- *    (separate from the UI-only `X` close). Ending uses the existing
- *    `useEndLiveChat` lifecycle behind the shared confirmation {@link Modal}.
- *  - otherwise → the AI channel (all AI state lives here so it survives Portal
- *    route navigation and close/reopen while the widget stays mounted).
+ *  - **AI** (default) — all AI state lives here so the conversation survives
+ *    Portal route navigation and close/reopen while the widget stays mounted. A
+ *    persistent "Talk to a person" header action escalates to Live Chat.
+ *  - **Live** — {@link CustomerLiveChat} for an active human chat (resumed via
+ *    the existing `useLiveChat` bootstrap), or {@link LiveChatStart} for the
+ *    compact Department picker when none exists. "End chat" is a header action,
+ *    Live-only, and runs the existing `useEndLiveChat` lifecycle behind the
+ *    shared confirmation {@link Modal}.
  *
- * `X` only minimizes the widget; it never ends a conversation.
+ * `X` only minimizes the widget; it never ends a conversation. Switching channel
+ * is presentation state only.
  */
 export function CustomerAiWidget() {
   const { t, i18n } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const messagesEndRef = useRef<HTMLLIElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [open, setOpen] = useState(searchParams.get("support") === "ai");
+  const supportParam = searchParams.get("support");
+  const [open, setOpen] = useState(supportParam === "ai" || supportParam === "live");
+  const [channel, setChannel] = useState<Channel>(supportParam === "live" ? "live" : "ai");
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [failedMessage, setFailedMessage] = useState("");
   const chat = useCustomerAiChat();
   const handoff = useCustomerAiHandoff();
 
-  // Live Chat awareness. The floating widget hosts an active human chat when one
-  // exists; a RESOLVED/CLOSED bootstrap is not resumable.
+  // Live Chat awareness. A RESOLVED/CLOSED bootstrap is not resumable.
   const liveChatBootstrap = useLiveChat();
   const activeLiveChat = liveChatBootstrap.data && !isTerminalLiveChat(liveChatBootstrap.data.status)
     ? liveChatBootstrap.data
@@ -52,19 +77,27 @@ export function CustomerAiWidget() {
   const [confirmEndOpen, setConfirmEndOpen] = useState(false);
   const endLiveChat = useEndLiveChat(activeLiveChat?.id ?? "");
 
-  const mode: "live-ended" | "live" | "ai" = justEndedLiveChat ? "live-ended" : activeLiveChat ? "live" : "ai";
+  // When a Live Chat becomes active (started here, or already open on load),
+  // surface it. A later "Back to AI" sets channel back to "ai" and stays there
+  // (the chat keeps running) because this only fires on the false -> true edge.
+  const hadActiveLiveChat = useRef(false);
+  useEffect(() => {
+    if (activeLiveChat && !hadActiveLiveChat.current) setChannel("live");
+    hadActiveLiveChat.current = Boolean(activeLiveChat);
+  }, [activeLiveChat]);
 
   useEffect(() => {
-    if (searchParams.get("support") !== "ai") return;
+    if (supportParam !== "ai" && supportParam !== "live") return;
     setOpen(true);
+    setChannel(supportParam === "live" ? "live" : "ai");
     const next = new URLSearchParams(searchParams);
     next.delete("support");
     setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
+  }, [supportParam, searchParams, setSearchParams]);
 
   useEffect(() => {
-    if (open) messagesEndRef.current?.scrollIntoView({ block: "nearest" });
-  }, [messages, open, chat.isPending]);
+    if (open && channel === "ai") messagesEndRef.current?.scrollIntoView({ block: "nearest" });
+  }, [messages, open, channel, chat.isPending]);
 
   // Auto-grow the composer to a bounded maximum; resets when the draft clears.
   useEffect(() => {
@@ -106,35 +139,71 @@ export function CustomerAiWidget() {
     void liveChatBootstrap.refetch();
   };
 
+  const liveView: "active" | "ended" | "selecting" = justEndedLiveChat
+    ? "ended"
+    : activeLiveChat
+      ? "active"
+      : "selecting";
+
+  const backToAi = (
+    <button
+      type="button"
+      onClick={() => setChannel("ai")}
+      className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+    >
+      <ArrowLeft className="size-3.5 shrink-0 [[dir=rtl]_&]:-scale-x-100" aria-hidden="true" />
+      {t("liveChat.backToAi")}
+    </button>
+  );
+
   return (
     <SupportWidget
       open={open}
       onOpenChange={setOpen}
-      title={mode === "ai" ? t("customerAi.title") : t("liveChat.title")}
+      title={channel === "ai" ? t("customerAi.title") : t("liveChat.liveSupport")}
       launcherLabel={t("customerAi.open")}
       closeLabel={t("customerAi.close")}
       launcherIcon={<Bot className="size-6" aria-hidden="true" />}
-      headerAction={mode === "live" ? (
+      headerAction={channel === "ai" ? (
         <button
           type="button"
-          onClick={() => setConfirmEndOpen(true)}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-danger-soft bg-transparent px-2 py-1 text-xs font-medium text-danger-foreground transition hover:border-danger/30 hover:bg-danger-soft/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/30"
+          onClick={() => setChannel("live")}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-transparent px-2 py-1 text-xs font-medium text-foreground transition hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
         >
-          <LogOut className="size-3.5 shrink-0" aria-hidden="true" />
-          {t("liveChat.endAction")}
+          <UserRound className="size-3.5 shrink-0" aria-hidden="true" />
+          {t("liveChat.talkToPerson")}
         </button>
-      ) : undefined}
+      ) : (
+        <div className="flex min-w-0 items-center gap-1.5">
+          {liveView === "active" && <ConnectionDot />}
+          {backToAi}
+          {liveView === "active" && (
+            <button
+              type="button"
+              onClick={() => setConfirmEndOpen(true)}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-danger-soft bg-transparent px-2 py-1 text-xs font-medium text-danger-foreground transition hover:border-danger/30 hover:bg-danger-soft/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/30"
+            >
+              <LogOut className="size-3.5 shrink-0" aria-hidden="true" />
+              {t("liveChat.endAction")}
+            </button>
+          )}
+        </div>
+      )}
     >
-      {mode === "live" && activeLiveChat && <CustomerLiveChat chatId={activeLiveChat.id} initial={activeLiveChat} />}
+      {channel === "live" && liveView === "active" && activeLiveChat && (
+        <CustomerLiveChat chatId={activeLiveChat.id} initial={activeLiveChat} onStartNew={startNewLiveChat} />
+      )}
 
-      {mode === "live-ended" && <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+      {channel === "live" && liveView === "selecting" && <LiveChatStart />}
+
+      {channel === "live" && liveView === "ended" && <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
         <MessagesSquare className="size-7 text-primary" aria-hidden="true" />
         <h3 className="text-sm font-semibold">{t("liveChat.endedTitle")}</h3>
         <p className="max-w-[16rem] text-xs text-muted-foreground">{t("liveChat.endedBody")}</p>
         <button type="button" className="button-primary !w-auto" onClick={startNewLiveChat}>{t("liveChat.startNewChat")}</button>
       </div>}
 
-      {mode === "ai" && <>
+      {channel === "ai" && <>
         <p className="shrink-0 border-b border-border bg-surface-secondary px-4 py-2 text-xs text-muted-foreground">{t("customerAi.disclosure")}</p>
         <ol className="flex min-h-0 flex-1 flex-col space-y-3 overflow-y-auto overscroll-contain p-4" aria-live="polite" aria-label={t("customerAi.conversation")}>
           {messages.length === 0 && <li className="flex flex-1 flex-col items-center justify-center gap-1.5 px-6 py-8 text-center">
