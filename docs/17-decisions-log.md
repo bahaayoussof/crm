@@ -1,5 +1,11 @@
 # Architecture Decisions Log
 
+## ADR-052 — Customer AI is a separate context boundary
+
+**Decision (2026-09-02).** `Internal AI Assistant != Customer AI Chatbot`. `server/src/modules/customer-ai/` owns strict input, published-only retrieval, customer prompt construction, output validation, and customer-specific rate limiting. Reusing the generic provider adapter is safe; reusing internal ticket context, prompts, actions, or UI is prohibited. Handoff delegates to `portal.createTicket`, preserving server-owned identity and normal WEB/MEDIUM/OPEN/SLA/history defaults. No persistence or migration is introduced for V1.
+
+The customer presentation is one global floating widget owned by the authenticated Customer Portal `AppShell`. Local React state preserves the conversation across child-route navigation without a database session or new state library. `/portal/support` redirects to `/portal?support=ai` for backwards compatibility and auto-opens that same widget; the dedicated page and primary-navigation entry are removed.
+
 # ADR-051: Provider-abstracted TextBee Cloud SMS channel
 
 **Status:** Accepted on `feature/sms-integration`.

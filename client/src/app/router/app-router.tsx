@@ -119,6 +119,7 @@ export function AppRouter() {
       <Route path="/portal/tickets" element={<PortalTicketsPage />} />
       <Route path="/portal/tickets/new" element={<PortalNewTicketPage />} />
       <Route path="/portal/live-chat" element={<LiveChatPage />} />
+      <Route path="/portal/support" element={<Navigate to="/portal?support=ai" replace />} />
       <Route path="/portal/tickets/:id" element={<PortalTicketDetailPage />} />
       <Route path="/portal/profile" element={<PortalProfilePage />} />
       <Route path="/portal/knowledge-base" element={<PortalKnowledgeBasePage />} />

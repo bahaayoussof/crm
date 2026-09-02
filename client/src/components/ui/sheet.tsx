@@ -20,6 +20,7 @@ interface SheetProps {
   /** Focus is returned here after the sheet closes (usually the launcher). */
   returnFocusRef?: RefObject<HTMLElement | null>;
   className?: string;
+  bodyClassName?: string;
   children: ReactNode;
 }
 
@@ -37,7 +38,7 @@ interface SheetProps {
  * return focus to `returnFocusRef` on close. It does NOT auto-scroll or move
  * focus on any content change.
  */
-export function Sheet({ open, onClose, title, closeLabel, returnFocusRef, className, children }: SheetProps) {
+export function Sheet({ open, onClose, title, closeLabel, returnFocusRef, className, bodyClassName, children }: SheetProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const hasOpenedRef = useRef(false);
@@ -121,7 +122,7 @@ export function Sheet({ open, onClose, title, closeLabel, returnFocusRef, classN
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5">{children}</div>
+        <div className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5", bodyClassName)}>{children}</div>
       </div>
     </div>,
     document.body,

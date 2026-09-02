@@ -1,5 +1,11 @@
 # API Contract
 
+## Customer AI support
+
+`POST /api/portal/ai/chat` is authenticated, fresh-token, `CUSTOMER`-only and rate-limited per user (20 requests / 10 minutes). Its strict body is `{ message, history?: [{ role: "user" | "assistant", content }], locale?: "en" | "ar" }`; system messages and client-owned identity/context/provider fields are rejected. The response is `{ data: { answer, confidence, suggestedArticles, canHandoff } }`. Suggestions are reattached from persisted `PUBLISHED` Knowledge Base rows.
+
+`POST /api/portal/ai/handoff` accepts bounded message/history and creates a normal Portal ticket through the canonical ticket-creation service. Customer identity, status, priority, channel, assignment, SLA defaults, and history remain server-owned.
+
 Base path:
 
 ```text

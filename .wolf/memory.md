@@ -1,5 +1,7 @@
 # Memory
 
+| 11:10 | Implemented isolated customer AI chatbot, Portal UI, KB grounding, canonical handoff, tests and docs | customer-ai modules, portal routes/nav/i18n, docs | automated gates green; unstaged | ~12000 |
+
 > Chronological action log. Hooks and AI append to this file automatically.
 > Old sessions are consolidated by the daemon weekly.
 | 15:42 | Completed project foundation with client/server scaffolds, tests, builds, and startup verification | package.json, README.md, client/, server/ | checks pass; foundation only | ~9000 |
@@ -875,3 +877,15 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
 | 10:35 | Live Chat header: split passive state (title+Open+Connected) from destructive End chat; replaced PageHeader w/ local <header> flex justify-between; compact outline-danger End chat btn + LogOut icon | client/src/features/live-chat/live-chat-page.tsx, live-chat-page.test.tsx | 34 tests pass, tsc/eslint/build clean | ~9k |
+
+## Session: 2026-09-02 11:40
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 11:40 | Replaced dedicated Customer AI page/nav with one customer-only `AppShell` floating widget; added logical RTL positioning, responsive Sheet layout, anchored composer, compatibility auto-open redirect, rate-limit/provider handoff, and route-persistent local state. | app-shell, app-router, nav-config, sheet, customer-ai-widget, locales, docs 11/17/18/19 | focused 7/7; full client 787/787; typecheck/lint/build green; no backend change | ~12k |
+
+## Session: 2026-09-02 11:46
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 11:55 | Refine Customer AI widget UX pre-Live-Chat: extract non-modal `SupportWidget` shell (portal, fixed physical bottom-right, no backdrop/focus-trap/inert, Esc-close, focus return), rewrite widget to use it, WhatsApp-style single-row auto-grow composer + icon-only Send, compact centered empty state | client/src/features/customer-ai/support-widget.tsx (new), customer-ai-widget.tsx, customer-ai-widget.test.tsx | widget 8/8, portal-routing 9/9, app-shell 3/3, i18n 2/2, full client 791/791 (65 files), tsc -b clean, eslint clean, vite build green (~2,120 kB / gzip ~606 kB), git diff --check clean | ~48k |

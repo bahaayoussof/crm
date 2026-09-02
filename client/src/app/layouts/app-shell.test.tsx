@@ -11,6 +11,7 @@ vi.mock("@/features/auth/auth-state", () => ({
   }),
 }));
 vi.mock("@/features/notifications/notification-bell", () => ({ NotificationBell: () => null }));
+vi.mock("@/features/customer-ai/customer-ai-widget", () => ({ CustomerAiWidget: () => <button>Open AI Support</button> }));
 
 import { AppShell } from "./app-shell";
 
@@ -48,5 +49,13 @@ describe("AppShell layout", () => {
     expect(root.className).toMatch(/h-full/);
     expect(root.className).toMatch(/overflow-hidden/);
     expect(root.className).toMatch(/lg:grid-rows-1/);
+  });
+
+  it("mounts AI support only in the customer portal shell", () => {
+    const internal = renderShell();
+    expect(screen.queryByRole("button", { name: "Open AI Support" })).not.toBeInTheDocument();
+    internal.unmount();
+    render(<MemoryRouter><AppShell audience="customer"><div>Portal</div></AppShell></MemoryRouter>);
+    expect(screen.getByRole("button", { name: "Open AI Support" })).toBeInTheDocument();
   });
 });

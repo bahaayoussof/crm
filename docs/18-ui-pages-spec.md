@@ -1,5 +1,11 @@
 # UI Pages Specification
 
+## Customer Portal floating AI Support
+
+A customer-only launcher is fixed at the logical end of every authenticated Portal route. It opens one responsive shared-Sheet presentation without navigation: a compact floating panel on desktop and a viewport-bounded bottom sheet on mobile. The header and AI disclosure stay compact; the conversation scrolls independently from the anchored composer. Viewer-relative bubbles, loading, published-article links, retry/rate-limit handling, provider-failure handoff, and canonical Portal-ticket handoff remain available. Focus enters the dialog and returns to the launcher on close; Escape and the labelled close control dismiss it. EN/AR copy, logical positioning, safe mobile spacing, and existing light/dark tokens are required.
+
+The Portal shell owns browser-local conversation state so child-route navigation does not clear it. `/portal/support` is compatibility-only and redirects to `/portal?support=ai`, which auto-opens the single widget. There is no dedicated AI Support navigation item or duplicate full-page UI.
+
 ## 1. Purpose
 
 This document is the implementation blueprint for the application's main screens.

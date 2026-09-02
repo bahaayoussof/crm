@@ -13,10 +13,15 @@ import * as feedbackController from "../feedback/feedback.controller.js";
 import { feedbackParamsSchema, submitFeedbackSchema } from "../feedback/feedback.schema.js";
 import * as liveChatController from "../live-chat/live-chat.controller.js";
 import { liveChatEndParamsSchema, liveChatStartSchema } from "../live-chat/live-chat.schema.js";
+import * as customerAiController from "../customer-ai/customer-ai.controller.js";
+import { customerAiChatSchema, customerAiHandoffSchema } from "../customer-ai/customer-ai.schema.js";
+import { customerAiRateLimit } from "../customer-ai/customer-ai-rate-limit.js";
 
 export const portalRouter = Router();
 portalRouter.use(requireAuth, requireRole(Role.CUSTOMER), requireFreshToken);
 portalRouter.get("/overview", controller.overview);
+portalRouter.post("/ai/chat", customerAiRateLimit, validateBody(customerAiChatSchema), customerAiController.chat);
+portalRouter.post("/ai/handoff", validateBody(customerAiHandoffSchema), customerAiController.handoff);
 
 // feature/live-chat — the Live Chat channel is an ordinary LIVE_CHAT Ticket.
 // These two endpoints only bootstrap the portal experience (resume / start);

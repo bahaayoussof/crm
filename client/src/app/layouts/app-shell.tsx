@@ -13,6 +13,7 @@ import { Menu, X } from "lucide-react";
 import { LogoutIcon } from "./nav-icons";
 import { getNavigationSections, isNavItemShadowed } from "./nav-config";
 import { Sidebar } from "./sidebar/sidebar";
+import { CustomerAiWidget } from "@/features/customer-ai/customer-ai-widget";
 
 function getStoredCollapsed(): boolean {
   try {
@@ -262,6 +263,7 @@ export function AppShell({ audience, children }: PropsWithChildren<{ audience: P
           </div>,
           document.body
         )}
+      {audience === "customer" && <CustomerAiWidget />}
     </div>
   );
 }

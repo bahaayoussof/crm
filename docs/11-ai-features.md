@@ -1,5 +1,13 @@
 # AI Features
 
+## Customer-facing AI chatbot
+
+The customer chatbot is a global floating widget mounted once in the authenticated Customer Portal shell. It remains available across Portal routes and keeps browser-local conversation state while the shell remains mounted. `/portal/support` is a compatibility route that redirects to `/portal?support=ai`, where the same widget auto-opens; it is not a second presentation. The AI Support item is not part of primary navigation.
+
+The customer chatbot is a separate trust boundary from the internal ticket AI Assistant. They share only the provider-agnostic adapter/factory and normalized provider failures. The customer module never imports the internal ticket context builder, prompts, actions, or UI.
+
+The backend queries at most eight `PUBLISHED` Knowledge Base rows with an explicit public projection, sends only those sources and a validated eight-message customer/assistant window, validates provider output with Zod, drops article IDs outside the server candidate set, and reattaches article fields from the database. No ticket, note, watcher, SLA, audit, assignee, staff, admin, other-customer, or private-article query exists in this context path. With no published candidate, it fails closed without a provider call and offers handoff. Handoff uses the canonical Portal ticket service. V1 has no chat-session model, vector database, or embeddings; the in-memory limiter retains its single-instance limitation.
+
 AI is an enhancement layer, not a dependency for the core CRM.
 
 ## Priority

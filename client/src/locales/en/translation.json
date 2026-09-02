@@ -1617,6 +1617,27 @@
       "updateFailed": "Unable to save your changes. Please try again."
     }
   },
+  "customerAi": {
+    "title": "AI Support",
+    "open": "Open AI Support",
+    "close": "Close AI Support",
+    "conversation": "AI support conversation",
+    "subtitle": "Get quick answers from our published Help Center.",
+    "disclosure": "You’re chatting with AI. Answers are based on published Help Center articles and may be incomplete. You can contact a person at any time.",
+    "emptyTitle": "How can we help?",
+    "emptyBody": "Ask a support question and we’ll look for a grounded answer.",
+    "placeholder": "Describe what you need help with…",
+    "send": "Send",
+    "thinking": "Looking through the Help Center…",
+    "error": "AI support is unavailable right now. You can retry or contact support.",
+    "rateLimited": "You’ve sent too many AI requests. Please wait and try again, or contact support.",
+    "suggestedArticles": "Suggested articles",
+    "handoff": "Talk to support",
+    "creatingTicket": "Creating request…",
+    "ticketCreated": "Your support request was created.",
+    "openTicket": "Open request",
+    "handoffError": "We couldn’t create the request. Please try again."
+  },
   "auth": {
     "loginTitle": "Sign in",
     "loginDescription": "Access your customer support account.",

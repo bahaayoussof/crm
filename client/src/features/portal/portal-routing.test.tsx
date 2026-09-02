@@ -5,6 +5,8 @@ import { AuthContext, type AuthContextValue } from "@/features/auth/auth-state";
 import { ProtectedRoute } from "@/app/router/protected-route";
 import { changeAppLanguage } from "@/lib/i18n";
 
+vi.mock("@/features/customer-ai/customer-ai-widget", () => ({ CustomerAiWidget: () => <button>Open AI Support</button> }));
+
 const customer = {
   id: "customer-user",
   name: "Ahmed",
