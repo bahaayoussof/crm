@@ -2,6 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { ticketKeys } from "@/features/tickets/ticket-hooks";
 import { notificationKeys } from "@/features/notifications/notification-hooks";
 import { portalKeys } from "@/features/portal/portal-hooks";
+import { liveChatKeys } from "@/features/live-chat/live-chat-hooks";
 import { managerKeys } from "@/features/manager/manager-hooks";
 import type { RealtimeEvent } from "./realtime.types";
 
@@ -29,6 +30,9 @@ export function handleRealtimeEvent(queryClient: QueryClient, event: RealtimeEve
         if (event.visibility === "internal") return;
         void queryClient.invalidateQueries({ queryKey: portalKeys.ticket(event.ticketId) });
         void queryClient.invalidateQueries({ queryKey: portalKeys.tickets() });
+        // The Live Chat bootstrap query (resume-or-null) — refresh so a message
+        // on a chat started elsewhere is reflected.
+        void queryClient.invalidateQueries({ queryKey: liveChatKeys.root });
         return;
       }
       // The open conversation refetches; ticket lists may reorder (updatedAt).
@@ -42,6 +46,7 @@ export function handleRealtimeEvent(queryClient: QueryClient, event: RealtimeEve
         void queryClient.invalidateQueries({ queryKey: portalKeys.ticket(event.ticketId) });
         void queryClient.invalidateQueries({ queryKey: portalKeys.tickets() });
         void queryClient.invalidateQueries({ queryKey: portalKeys.overview });
+        void queryClient.invalidateQueries({ queryKey: liveChatKeys.root });
         return;
       }
       void queryClient.invalidateQueries({ queryKey: ticketKeys.detail(event.ticketId) });

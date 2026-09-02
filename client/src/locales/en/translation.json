@@ -45,6 +45,7 @@
     "openCustomers": "Open customer records",
     "portalOverview": "Overview",
     "portalRequests": "My Requests",
+    "portalLiveChat": "Live Chat",
     "portalNewRequest": "New Request",
     "portalKnowledgeBase": "Help Center",
     "portalProfile": "Profile",
@@ -1534,6 +1535,35 @@
         "EMAIL_IN_USE": "This email is already in use.",
         "updateFailed": "Unable to save your changes. Please try again."
       }
+    }
+  },
+  "liveChat": {
+    "title": "Live Chat",
+    "subtitle": "Chat with our support team in real time.",
+    "loadError": "We couldn't load your live chat. Please try again.",
+    "startTitle": "Start a live chat",
+    "startBody": "Open a conversation with our support team. We'll reply here as soon as an agent is available.",
+    "startAction": "Start live chat",
+    "starting": "Starting…",
+    "startError": "We couldn't start the chat. Please try again.",
+    "conversationHeading": "Conversation",
+    "timelineLabel": "Live chat messages",
+    "emptyTitle": "No messages yet",
+    "emptyBody": "Send a message to start the conversation.",
+    "composerLabel": "Write a message",
+    "composerHeading": "Your message",
+    "composerHelp": "Press send to deliver your message. Support replies appear here instantly.",
+    "composerPlaceholder": "Type your message…",
+    "send": "Send",
+    "sending": "Sending…",
+    "sendError": "Your message didn't send. Try again.",
+    "reopenNotice": "This chat was resolved. Sending a message will reopen it.",
+    "closedNotice": "This chat is closed. Start a new live chat if you still need help.",
+    "connection": {
+      "connected": "Connected",
+      "reconnecting": "Reconnecting…",
+      "offline": "Offline",
+      "banner": "Live updates are reconnecting. Your conversation history is safe and messages still send."
     }
   },
   "profile": {

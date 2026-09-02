@@ -9,6 +9,7 @@ import {
   FilePlus2,
   LayoutDashboard,
   LogOut,
+  MessagesSquare,
   MessageSquareQuote,
   Ticket,
   UserCog,
@@ -56,6 +57,7 @@ export function UsersNavIcon(props: LucideProps) {
 export function SettingsNavIcon(props: LucideProps) { return <Settings size={18} strokeWidth={1.75} aria-hidden="true" {...props} />; }
 export function ProfileNavIcon(props: LucideProps) { return <UserRound size={18} strokeWidth={1.75} aria-hidden="true" {...props} />; }
 export function AuditLogsNavIcon(props: LucideProps) { return <ScrollText size={18} strokeWidth={1.75} aria-hidden="true" {...props} />; }
+export function LiveChatNavIcon(props: LucideProps) { return <MessagesSquare size={18} strokeWidth={1.75} aria-hidden="true" {...props} />; }
 
 export function LogoutIcon(props: LucideProps) {
   return <LogOut size={16} strokeWidth={1.75} aria-hidden="true" {...props} />;

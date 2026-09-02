@@ -21,7 +21,7 @@ const storedStatuses: Record<PortalStatus, TicketStatus[]> = {
   WAITING_FOR_YOU: [TicketStatus.WAITING_CUSTOMER], RESOLVED: [TicketStatus.RESOLVED], CLOSED: [TicketStatus.CLOSED],
 };
 
-async function customerIdFor(userId: string) {
+export async function customerIdFor(userId: string) {
   const customer = await prisma.customer.findUnique({ where: { userId }, select: { id: true } });
   if (!customer) throw new AppError(403, "CUSTOMER_PROFILE_REQUIRED", "A linked customer profile is required");
   return customer.id;

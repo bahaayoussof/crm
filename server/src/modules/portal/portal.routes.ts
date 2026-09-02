@@ -11,10 +11,18 @@ import {
 } from "../attachments/attachment.portal.controller.js";
 import * as feedbackController from "../feedback/feedback.controller.js";
 import { feedbackParamsSchema, submitFeedbackSchema } from "../feedback/feedback.schema.js";
+import * as liveChatController from "../live-chat/live-chat.controller.js";
+import { liveChatStartSchema } from "../live-chat/live-chat.schema.js";
 
 export const portalRouter = Router();
 portalRouter.use(requireAuth, requireRole(Role.CUSTOMER), requireFreshToken);
 portalRouter.get("/overview", controller.overview);
+
+// feature/live-chat — the Live Chat channel is an ordinary LIVE_CHAT Ticket.
+// These two endpoints only bootstrap the portal experience (resume / start);
+// messages go through the shared `POST /portal/tickets/:id/messages`.
+portalRouter.get("/live-chat", liveChatController.get);
+portalRouter.post("/live-chat", validateBody(liveChatStartSchema), liveChatController.start);
 portalRouter.get("/profile", controller.profile);
 portalRouter.patch("/profile", validateBody(portalProfileUpdateSchema), controller.updateProfile);
 portalRouter.get("/categories", controller.categories);

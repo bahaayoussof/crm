@@ -61,6 +61,7 @@ describe("handleRealtimeEvent", () => {
     expect(keys(spy)).toEqual([
       JSON.stringify(["portal", "tickets", "t7"]),
       JSON.stringify(["portal", "tickets"]),
+      JSON.stringify(["portal", "live-chat"]),
     ]);
     expect(keys(spy).some((k) => k.includes('"tickets","detail"') || k.includes("notifications"))).toBe(false);
   });
@@ -72,6 +73,7 @@ describe("handleRealtimeEvent", () => {
       JSON.stringify(["portal", "tickets", "t7"]),
       JSON.stringify(["portal", "tickets"]),
       JSON.stringify(["portal", "overview"]),
+      JSON.stringify(["portal", "live-chat"]),
     ]);
   });
 

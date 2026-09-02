@@ -827,3 +827,15 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
 | 22:28 | migrate Audit Logs table → canonical shared DataTable (one DataTableSurface, columnWidths colgroup, surface=false) | client/src/features/audit-logs/audit-log-page.tsx | tsc+eslint+vitest 748/748+build all green | ~12k |
+
+## Session: 2026-09-01 00:13
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 00:36 | Live Chat channel end-to-end (LIVE_CHAT ticket + portal /live-chat + realtime reuse) | server/src/modules/live-chat/*, client/src/features/live-chat/*, portal.routes, realtime-provider/status/event-handler, nav, i18n | server 784/784, client 764/764, tsc+lint+build green | ~90k |
+
+## Session: 2026-09-02 09:14
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 09:20 | Live Chat team routing: resolve teamId from customer's newest routed ticket (active team) inside the create txn; null fallback kept. No routing engine, no agent assignment. | server/src/modules/live-chat/live-chat.service.ts (+resolveLiveChatTeamId), live-chat.test.ts (+5 tests) | server 788/788, live-chat 13/13, typecheck+eslint clean, git diff --check clean | ~35k |

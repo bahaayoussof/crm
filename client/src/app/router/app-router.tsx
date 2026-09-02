@@ -15,6 +15,7 @@ import { CustomerManageRoute } from "./customer-manage-route";
 import { PortalHomePage, PortalNewTicketPage, PortalTicketDetailPage, PortalTicketsPage } from "@/features/portal/portal-pages";
 import { PortalProfilePage } from "@/features/portal/profile/profile-page";
 import { PortalKnowledgeArticlePage, PortalKnowledgeBasePage } from "@/features/portal/portal-knowledge-pages";
+import { LiveChatPage } from "@/features/live-chat/live-chat-page";
 import { KnowledgeArticleFormPage } from "@/features/knowledge-base/knowledge-article-form-page";
 import { KnowledgeBaseDetailPage } from "@/features/knowledge-base/knowledge-base-detail-page";
 import { KnowledgeBaseListPage } from "@/features/knowledge-base/knowledge-base-list-page";
@@ -117,6 +118,7 @@ export function AppRouter() {
       <Route path="/portal" element={<PortalHomePage />} />
       <Route path="/portal/tickets" element={<PortalTicketsPage />} />
       <Route path="/portal/tickets/new" element={<PortalNewTicketPage />} />
+      <Route path="/portal/live-chat" element={<LiveChatPage />} />
       <Route path="/portal/tickets/:id" element={<PortalTicketDetailPage />} />
       <Route path="/portal/profile" element={<PortalProfilePage />} />
       <Route path="/portal/knowledge-base" element={<PortalKnowledgeBasePage />} />

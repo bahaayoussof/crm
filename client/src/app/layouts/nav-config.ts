@@ -7,6 +7,7 @@ import {
   CustomersNavIcon,
   DashboardNavIcon,
   KnowledgeBaseNavIcon,
+  LiveChatNavIcon,
   NewRequestNavIcon,
   ProfileNavIcon,
   QuickRepliesNavIcon,
@@ -41,6 +42,7 @@ export function getNavigationSections(
         items: [
           { to: "/portal", key: "portalOverview", icon: DashboardNavIcon, end: true },
           { to: "/portal/tickets", key: "portalRequests", icon: TicketsNavIcon },
+          { to: "/portal/live-chat", key: "portalLiveChat", icon: LiveChatNavIcon },
           { to: "/portal/tickets/new", key: "portalNewRequest", icon: NewRequestNavIcon },
           { to: "/portal/knowledge-base", key: "portalKnowledgeBase", icon: KnowledgeBaseNavIcon },
           { to: "/portal/profile", key: "portalProfile", icon: ProfileNavIcon },

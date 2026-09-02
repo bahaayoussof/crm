@@ -1,9 +1,11 @@
-import { type PropsWithChildren, useEffect } from "react";
+import { useEffect, useState, type PropsWithChildren } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getAuthToken } from "@/features/auth/auth-token";
 import { useAuth } from "@/features/auth/auth-state";
 import { createRealtimeClient } from "./realtime-client";
 import { handleRealtimeEvent } from "./realtime-event-handler";
+import { RealtimeStatusContext } from "./realtime-status";
+import type { RealtimeConnectionStatus } from "./realtime.types";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
 const REALTIME_URL = `${API_URL.replace(/\/$/, "")}/realtime/events`;
@@ -26,9 +28,13 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const role = user?.role ?? null;
+  const [status, setStatus] = useState<RealtimeConnectionStatus>("connecting");
 
   useEffect(() => {
-    if (!userId || !role) return;
+    if (!userId || !role) {
+      setStatus("closed");
+      return;
+    }
 
     let client: { close: () => void } | null = null;
     try {
@@ -36,10 +42,12 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
         url: REALTIME_URL,
         getToken: getAuthToken,
         onEvent: (event) => handleRealtimeEvent(queryClient, event, role),
+        onStatusChange: setStatus,
       });
     } catch (error) {
       // Realtime is an enhancement — never let it break the app shell.
       if (import.meta.env.DEV) console.warn("realtime: failed to start", error);
+      setStatus("closed");
       return;
     }
 
@@ -53,5 +61,5 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
     };
   }, [userId, role, queryClient]);
 
-  return <>{children}</>;
+  return <RealtimeStatusContext.Provider value={status}>{children}</RealtimeStatusContext.Provider>;
 }
