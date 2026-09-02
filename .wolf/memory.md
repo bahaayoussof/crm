@@ -911,3 +911,19 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 |------|--------|---------|---------|--------|
 | 13:09 | rewrote root README to spec: 4 mermaid diagrams, FE/BE stack tables, integrations, automation endpoints | README.md | done | ~9k |
 | 13:17 | README redesigned as narrative guided tour: 8 explained mermaid diagrams (journey/arch/fe-flow/be-flow/team/widget-state/ER/realtime-seq) | README.md | done | ~14k |
+
+## Session: 2026-09-02 13:35
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-02 13:37
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-02 13:37
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 13:44 | rebuild README as diagram-first visual guide (12 mermaid diagrams, 617 lines, was 671) | README.md | done, render check pending | ~35k |
