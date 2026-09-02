@@ -12,6 +12,12 @@ interface SupportWidgetProps {
   closeLabel: string;
   /** Icon rendered inside the launcher. */
   launcherIcon: ReactNode;
+  /**
+   * Optional compact control shown in the header, left of the close button —
+   * e.g. the Live Chat "End chat" action. It is deliberately separate from the
+   * close button so a UI-only minimize is never confused with ending a session.
+   */
+  headerAction?: ReactNode;
   /** Panel body — conversation area + composer. Provided by the active channel. */
   children: ReactNode;
 }
@@ -34,7 +40,7 @@ interface SupportWidgetProps {
  * header + close, Escape-to-close, focus the panel on open, return focus to the
  * launcher on close. It knows nothing about AI / Live Chat APIs.
  */
-export function SupportWidget({ open, onOpenChange, title, launcherLabel, closeLabel, launcherIcon, children }: SupportWidgetProps) {
+export function SupportWidget({ open, onOpenChange, title, launcherLabel, closeLabel, launcherIcon, headerAction, children }: SupportWidgetProps) {
   const launcherRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLElement>(null);
   const hasOpenedRef = useRef(false);
@@ -71,11 +77,12 @@ export function SupportWidget({ open, onOpenChange, title, launcherLabel, closeL
         className={
           "fixed z-40 flex flex-col overflow-hidden border border-border bg-card text-card-foreground shadow-2xl outline-none " +
           "inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-h-[calc(100dvh-1.5rem)] rounded-xl " +
-          "sm:inset-x-auto sm:right-4 sm:bottom-4 sm:w-[400px] sm:max-h-[min(680px,calc(100dvh-2rem))]"
+          "sm:inset-x-auto sm:right-4 sm:bottom-4 sm:w-[400px] sm:h-[680px] sm:max-h-[calc(100dvh-2rem)]"
         }
       >
-        <header className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3">
+        <header className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
           <h2 className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{title}</h2>
+          {headerAction}
           <button
             type="button"
             aria-label={closeLabel}
