@@ -75,8 +75,10 @@ PostgreSQL 17.5 (portable `embedded-postgres`) + the real running stack:
   ticket used to return 503 `EMAIL_NOT_CONFIGURED` and roll the message back when
   Resend was unconfigured. EMAIL/SMS delivery now runs **after** the local commit
   (ADR-052): provider failure → 201 + `delivery.status = "FAILED"` +
-  `<CHANNEL>_DELIVERY_FAILED` history, the reply is never lost. Seed Bug 2 (0
-  `SMS`-channel tickets) resolved on the same branch.
+  `<CHANNEL>_DELIVERY_FAILED` history, the reply is never lost. Follow-up on the
+  same branch: the Resend outbound send is now explicitly bounded to 20 s
+  (`AbortSignal.timeout`), a timeout classified as `PROVIDER_UNREACHABLE`. Seed
+  Bug 2 (0 `SMS`-channel tickets) resolved on the same branch.
 
 **Still NOT performed (outside local scope):**
 - Live Email (Resend) / WhatsApp (Meta) / SMS (TextBee) / AI provider delivery;
@@ -125,6 +127,61 @@ Implemented on `fix/outbound-reply-resilience` (off `master` `b11408f`, carries 
   warning). `git diff --check` clean. Live Resend/TextBee delivery and an HTTP
   smoke against a disposable Postgres: **NOT EXECUTED** (no running QA stack) —
   covered by the automated regression suite.
+
+### Follow-up — explicit Resend outbound timeout (same branch, 2026-09-02)
+
+- **Gap closed:** `email.client.sendTicketEmail` had no explicit outbound timeout
+  (SMS already used `AbortSignal.timeout(20_000)`); a hung Resend request could
+  keep the HTTP reply request waiting even though delivery is now post-commit.
+- **Fix:** new `EMAIL_DELIVERY_TIMEOUT_MS = 20_000` constant in `email.client.ts`;
+  `sendTicketEmail` wraps the Resend call in `AbortSignal.timeout(...)`. Resend
+  6.25.0 does not type `signal` on its options, but its runtime client spreads
+  options into the underlying `fetch`, so this is a **real request cancellation**,
+  not a `Promise.race`. A timeout raises `ResendEmailError("timeout")` →
+  `AppError(504, "EMAIL_DELIVERY_TIMEOUT")` → `outboundFailureReason` maps it to
+  **`PROVIDER_UNREACHABLE`** (distinct from `PROVIDER_REJECTED`). Behaviour after a
+  timeout: HTTP **201**, `delivery: { channel: "EMAIL", status: "FAILED", reason:
+  "PROVIDER_UNREACHABLE" }`, one `EMAIL_DELIVERY_FAILED` history row; the committed
+  `TicketMessage`, first-response state, notifications, and realtime event are
+  untouched. SMS and WhatsApp unchanged.
+- **Files:** `integrations/email/email.client.ts` + new `email.client.test.ts` (6);
+  `integrations/email/email.service.ts` + `email.test.ts` (+1);
+  `integrations/outbound-delivery.ts` (map `EMAIL_DELIVERY_TIMEOUT`); `docs/17`
+  (ADR-052), `docs/19`, `docs/25`.
+- **Verification:** server `tsc` + `eslint` clean; full server vitest **885 / 51**.
+  Client unchanged — `tsc` + `eslint` clean, vitest **767 / 64**. `npm run build`
+  exit 0. `git diff --check` clean. The timeout regression uses an already-aborted
+  `AbortSignal` (no fake timers, no 20 s wait).
+
+### Follow-up — SMS timeout classified as PROVIDER_UNREACHABLE (same branch, 2026-09-02)
+
+- **Gap closed:** SMS already had a real `AbortSignal.timeout(20_000)`, but
+  `textBeeProvider.sendMessage` collapsed every pre-response throw (timeout, DNS /
+  socket failure) into `AppError(502, "SMS_DELIVERY_FAILED")` →
+  `PROVIDER_REJECTED`. Inconsistent with Email and with the actual failure
+  semantics: no provider response ≠ provider rejection.
+- **Fix:** the `fetch` `try/catch` in `textbee.provider.ts` now throws
+  `AppError(504, "SMS_DELIVERY_UNREACHABLE")` for the timeout (`DOMException`
+  "TimeoutError") **and** a raw connection failure (`TypeError: fetch failed`);
+  `outboundFailureReason` maps `SMS_DELIVERY_UNREACHABLE` →
+  **`PROVIDER_UNREACHABLE`**. A TextBee that responds and rejects (non-2xx,
+  `data.success === false`, `failureCount > 0`) still throws `SMS_DELIVERY_FAILED`
+  → `PROVIDER_REJECTED`. Missing config → `INTEGRATION_NOT_CONFIGURED`, missing
+  phone → `NO_RECIPIENT_PHONE`, success → `SENT` — all unchanged. Behaviour after
+  an SMS timeout: HTTP **201**, `delivery: { channel: "SMS", status: "FAILED",
+  reason: "PROVIDER_UNREACHABLE" }`, one `SMS_DELIVERY_FAILED` history row; the
+  committed `TicketMessage`, first-response state, notifications, and realtime
+  event are untouched. Email and WhatsApp unchanged.
+- **Files:** `integrations/sms/textbee.provider.ts`;
+  `integrations/outbound-delivery.ts` (map `SMS_DELIVERY_UNREACHABLE`);
+  `integrations/sms/sms.test.ts` (+4), `integrations/outbound-delivery.test.ts`
+  (+2), `modules/tickets/ticket.test.ts` (+1); `docs/17` (ADR-052), `docs/19`,
+  `docs/25`.
+- **Verification:** server `tsc` + `eslint` clean; full server vitest **892 / 51**.
+  Client needs no change (`PROVIDER_UNREACHABLE` already in the shared reason
+  contract) — `tsc` + `eslint` clean, vitest **767 / 64**. `npm run build` exit 0.
+  `git diff --check` clean. The timeout regression rejects a mock `fetch` with a
+  `DOMException` "TimeoutError" (no fake timers, no 20 s wait).
 
 ---
 

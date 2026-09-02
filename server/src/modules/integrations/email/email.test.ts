@@ -71,6 +71,7 @@ vi.mock("../../realtime/realtime.publisher.js", () => ({
 import { app } from "../../../app.js";
 import { emitTicketMessageCreated } from "../../realtime/realtime.publisher.js";
 import { deliverOutboundEmailReply } from "./email.service.js";
+import { ResendEmailError } from "./email.client.js";
 const emitMessageMock = vi.mocked(emitTicketMessageCreated);
 
 const webhookEvent = {
@@ -301,6 +302,15 @@ describe("outbound email reply resilience (deliverOutboundEmailReply)", () => {
     const result = await deliverOutboundEmailReply(params);
     expect(result).toMatchObject({ channel: "EMAIL", status: "FAILED", reason: "PROVIDER_REJECTED" });
     expect(mocks.historyCreate).toHaveBeenCalledWith({ data: { ticketId: "ticket-1", actorUserId: null, action: "EMAIL_DELIVERY_FAILED", newValue: "PROVIDER_REJECTED" } });
+    expect(mocks.messageUpdate).not.toHaveBeenCalled();
+  });
+
+  it("classifies an outbound Resend timeout as PROVIDER_UNREACHABLE (no throw, no rollback, one failure row)", async () => {
+    mocks.send.mockRejectedValueOnce(new ResendEmailError("timeout", "Resend did not respond within the outbound email timeout"));
+    const result = await deliverOutboundEmailReply(params);
+    expect(result).toMatchObject({ channel: "EMAIL", status: "FAILED", reason: "PROVIDER_UNREACHABLE" });
+    expect(mocks.historyCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.historyCreate).toHaveBeenCalledWith({ data: { ticketId: "ticket-1", actorUserId: null, action: "EMAIL_DELIVERY_FAILED", newValue: "PROVIDER_UNREACHABLE" } });
     expect(mocks.messageUpdate).not.toHaveBeenCalled();
   });
 

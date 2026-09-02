@@ -39,6 +39,11 @@ export interface OutboundDeliveryResult {
  * Structured `AppError` codes thrown by the provider adapters → a non-secret
  * delivery-failure reason. Anything unmapped (a raw network throw, DNS failure,
  * socket hang-up, `AbortError` / timeout) falls through to `PROVIDER_UNREACHABLE`.
+ * `EMAIL_DELIVERY_TIMEOUT` and `SMS_DELIVERY_UNREACHABLE` are mapped explicitly
+ * for the same reason, so an outbound Resend / TextBee request that times out or
+ * never connects is reported as `PROVIDER_UNREACHABLE`, never `PROVIDER_REJECTED`
+ * — the latter stays reserved for a provider that responded and rejected the send
+ * (`EMAIL_DELIVERY_FAILED` / `SMS_DELIVERY_FAILED`).
  */
 const REASON_BY_ERROR_CODE: Record<string, OutboundDeliveryFailureReason> = {
   EMAIL_NOT_CONFIGURED: "INTEGRATION_NOT_CONFIGURED",
@@ -47,7 +52,9 @@ const REASON_BY_ERROR_CODE: Record<string, OutboundDeliveryFailureReason> = {
   EMAIL_RECIPIENT_INVALID: "RECIPIENT_INVALID",
   CUSTOMER_PHONE_REQUIRED: "NO_RECIPIENT_PHONE",
   EMAIL_DELIVERY_FAILED: "PROVIDER_REJECTED",
+  EMAIL_DELIVERY_TIMEOUT: "PROVIDER_UNREACHABLE",
   SMS_DELIVERY_FAILED: "PROVIDER_REJECTED",
+  SMS_DELIVERY_UNREACHABLE: "PROVIDER_UNREACHABLE",
   SMS_MESSAGE_TOO_LONG: "PROVIDER_REJECTED",
   EMPTY_MESSAGE: "PROVIDER_REJECTED",
 };

@@ -374,7 +374,15 @@ export async function deliverEmailReply(params: {
     });
     return { channel: "EMAIL", status: "SENT", externalId: `resend:${result.emailId}` };
   } catch (error) {
+    const timedOut = error instanceof ResendEmailError && error.operation === "timeout";
     console.error(`email: outbound send failed ticket=${params.ticketId} operation=${error instanceof ResendEmailError ? error.operation : "send"}`);
+    // A timeout / aborted request is a "could not reach the provider" condition,
+    // not a provider rejection — `outboundFailureReason` maps EMAIL_DELIVERY_TIMEOUT
+    // to PROVIDER_UNREACHABLE, keeping it distinct from EMAIL_DELIVERY_FAILED
+    // (PROVIDER_REJECTED). The reply is already committed either way.
+    if (timedOut) {
+      throw new AppError(504, "EMAIL_DELIVERY_TIMEOUT", "Resend did not respond within the outbound delivery timeout");
+    }
     throw new AppError(502, "EMAIL_DELIVERY_FAILED", "Resend rejected or could not deliver the email reply");
   }
 }

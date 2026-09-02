@@ -493,6 +493,19 @@ describe("ticket API", () => {
     expect(emitMessageMock).toHaveBeenCalledTimes(1); // realtime message-created still emitted after commit
   });
 
+  it("keeps the SMS reply when TextBee times out (201, delivery PROVIDER_UNREACHABLE, single side effect)", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, subject: summary.subject, assignedAgentId: agent.id, channel: "SMS", customer: { phone: "+15551230000", email: "customer@example.net" } });
+    deliverSmsReplyMock.mockResolvedValueOnce({ channel: "SMS", status: "FAILED", reason: "PROVIDER_UNREACHABLE" });
+    const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "SMS reply" });
+    expect(response.status).toBe(201);
+    expect(response.body.data.delivery).toMatchObject({ channel: "SMS", status: "FAILED", reason: "PROVIDER_UNREACHABLE" });
+    expect(response.body.data.id).toBe("message-1");
+    expect(mocks.messageCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.ticketUpdateMany).toHaveBeenCalledTimes(1);
+    expect(deliverSmsReplyMock).toHaveBeenCalledTimes(1);
+    expect(emitMessageMock).toHaveBeenCalledTimes(1);
+  });
+
   it("sends an authorized EMAIL public reply after commit and returns the provider id", async () => {
     mocks.ticketFindFirst.mockResolvedValue({
       id: summary.id,

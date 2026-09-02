@@ -982,3 +982,15 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
 | 22:45 | Outbound reply resilience: decouple EMAIL/SMS provider delivery from the ticket-message DB transaction (branch fix/outbound-reply-resilience off master + cherry-picked docs/25 commit) | server/src/modules/integrations/outbound-delivery.ts (new), outbound-delivery.test.ts (new), integrations/email/email.service.ts + email.test.ts, integrations/sms/sms.service.ts, modules/tickets/ticket.service.ts + ticket.test.ts, scripts/seed-test-data.ts + seed-test-data.helpers.test.ts, client/src/features/tickets/ticket.types.ts, client/src/locales/{en,ar}/translation.json, docs/05 + docs/17 (ADR-052) + docs/19 + docs/25, .wolf/buglog.json | addTicketMessage: $transaction now persists local durable state only; emit on commit; EMAIL/SMS/WhatsApp delivery attempted AFTER commit via non-throwing wrappers -> provider/config failure = HTTP 201 + delivery.status=FAILED + <CHANNEL>_DELIVERY_FAILED history, reply never rolled back. Bug 1 (MEDIUM) + Bug 2 (seed SMS, seedTicketChannel) RESOLVED. Server 878/50, client 767/64, tsc+eslint+build+diff-check clean. No commit/push. | ~140k |
+
+## Session: 2026-09-02 22:50
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 23:05 | Add-on: explicit 20s AbortSignal timeout on outbound Resend email (extends fix/outbound-reply-resilience) | server/src/modules/integrations/email/email.client.ts (+EMAIL_DELIVERY_TIMEOUT_MS, signal passthrough, timeout classification) + new email.client.test.ts (6), email/email.service.ts (deliverEmailReply maps timeout->AppError 504 EMAIL_DELIVERY_TIMEOUT) + email.test.ts (+1), integrations/outbound-delivery.ts (EMAIL_DELIVERY_TIMEOUT -> PROVIDER_UNREACHABLE), docs/05,17,19,25 | Resend SDK 6.25.0 does NOT type `signal` but runtime spreads options into fetch -> real cancellation. Timeout -> HTTP 201, delivery FAILED, reason PROVIDER_UNREACHABLE, one EMAIL_DELIVERY_FAILED row; committed reply/first-response/notifications/realtime untouched. Server 885/51, client 767/64, tsc+eslint+build+diff-check clean. No commit/push. | ~90k |
+
+## Session: 2026-09-02 23:06
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 23:15 | Classify SMS timeout/network as PROVIDER_UNREACHABLE (was PROVIDER_REJECTED); consistent w/ Email | textbee.provider.ts, outbound-delivery.ts, sms.test.ts, outbound-delivery.test.ts, ticket.test.ts, docs/05,17,19,25 | server 892/51 green, tc/lint/build/diff clean, client 767/64 unchanged, no commit | ~40k |

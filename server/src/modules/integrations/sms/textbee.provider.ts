@@ -13,8 +13,19 @@ export const textBeeProvider: SmsProvider = {
         body: JSON.stringify({ recipients: [to], message: text, deviceId: config.deviceId }),
         signal: AbortSignal.timeout(20_000),
       });
-    } catch {
-      throw new AppError(502, "SMS_DELIVERY_FAILED", "TextBee could not be reached");
+    } catch (error) {
+      // No HTTP response was received: either the `AbortSignal.timeout(20_000)`
+      // fired (a `DOMException` named "TimeoutError") or the request never
+      // connected — DNS / socket failure (a `TypeError: fetch failed`). Both mean
+      // the provider was never reached, so this maps to PROVIDER_UNREACHABLE,
+      // distinct from a TextBee that responded and rejected (SMS_DELIVERY_FAILED
+      // → PROVIDER_REJECTED, below). Mirrors the Email timeout classification.
+      const timedOut = error instanceof DOMException && error.name === "TimeoutError";
+      throw new AppError(
+        504,
+        "SMS_DELIVERY_UNREACHABLE",
+        timedOut ? "TextBee did not respond within the outbound SMS timeout" : "TextBee could not be reached",
+      );
     }
     const payload = await response.json().catch(() => null) as { data?: { success?: boolean; smsBatchId?: string; failureCount?: number } } | null;
     if (!response.ok || payload?.data?.success === false || (payload?.data?.failureCount ?? 0) > 0) {

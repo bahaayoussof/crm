@@ -41,6 +41,11 @@ describe("outboundFailureReason", () => {
     expect(outboundFailureReason(new AppError(502, "SMS_DELIVERY_FAILED", "x"))).toBe("PROVIDER_REJECTED");
   });
 
+  it("maps timeout / never-connected provider AppErrors to PROVIDER_UNREACHABLE", () => {
+    expect(outboundFailureReason(new AppError(504, "EMAIL_DELIVERY_TIMEOUT", "x"))).toBe("PROVIDER_UNREACHABLE");
+    expect(outboundFailureReason(new AppError(504, "SMS_DELIVERY_UNREACHABLE", "x"))).toBe("PROVIDER_UNREACHABLE");
+  });
+
   it("falls back to PROVIDER_UNREACHABLE for raw/unknown errors", () => {
     expect(outboundFailureReason(new Error("socket hang up"))).toBe("PROVIDER_UNREACHABLE");
     expect(outboundFailureReason(new AppError(500, "SOMETHING_ELSE", "x"))).toBe("PROVIDER_UNREACHABLE");
@@ -90,6 +95,17 @@ describe("deliverOutboundSmsReply", () => {
     setSmsProviderForTests({ sendMessage: vi.fn().mockRejectedValue(new AppError(502, "SMS_DELIVERY_FAILED", "rejected")) });
     const result = await deliverOutboundSmsReply(base);
     expect(result).toMatchObject({ channel: "SMS", status: "FAILED", reason: "PROVIDER_REJECTED" });
+  });
+
+  it("records a single SMS_DELIVERY_FAILED/PROVIDER_UNREACHABLE row when the send times out (no throw, no id stamp)", async () => {
+    setSmsProviderForTests({ sendMessage: vi.fn().mockRejectedValue(new AppError(504, "SMS_DELIVERY_UNREACHABLE", "timeout")) });
+    const result = await deliverOutboundSmsReply(base);
+    expect(result).toMatchObject({ channel: "SMS", status: "FAILED", reason: "PROVIDER_UNREACHABLE" });
+    expect(mocks.historyCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.historyCreate).toHaveBeenCalledWith({
+      data: { ticketId: "t1", actorUserId: null, action: "SMS_DELIVERY_FAILED", newValue: "PROVIDER_UNREACHABLE" },
+    });
+    expect(mocks.messageUpdate).not.toHaveBeenCalled();
   });
 
   it("returns FAILED NO_RECIPIENT_PHONE without calling the provider when the customer has no phone", async () => {

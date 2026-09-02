@@ -44,6 +44,34 @@ describe("SMS integration", () => {
     }));
   });
 
+  it("classifies an AbortSignal.timeout abort as SMS_DELIVERY_UNREACHABLE (no 20s wait)", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new DOMException("The operation timed out.", "TimeoutError"));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(textBeeProvider.sendMessage({ to: "+15551230000", text: "Hello" }))
+      .rejects.toMatchObject({ statusCode: 504, code: "SMS_DELIVERY_UNREACHABLE" });
+  });
+
+  it("classifies a raw connection failure as SMS_DELIVERY_UNREACHABLE", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(textBeeProvider.sendMessage({ to: "+15551230000", text: "Hello" }))
+      .rejects.toMatchObject({ statusCode: 504, code: "SMS_DELIVERY_UNREACHABLE" });
+  });
+
+  it("keeps a TextBee HTTP rejection distinct as SMS_DELIVERY_FAILED (provider responded)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 502, json: async () => ({}) });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(textBeeProvider.sendMessage({ to: "+15551230000", text: "Hello" }))
+      .rejects.toMatchObject({ statusCode: 502, code: "SMS_DELIVERY_FAILED" });
+  });
+
+  it("keeps a TextBee body-level failure distinct as SMS_DELIVERY_FAILED", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ data: { success: false, failureCount: 1 } }) });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(textBeeProvider.sendMessage({ to: "+15551230000", text: "Hello" }))
+      .rejects.toMatchObject({ statusCode: 502, code: "SMS_DELIVERY_FAILED" });
+  });
+
   it("rejects a missing customer phone before invoking a provider", async () => {
     const sendMessage = vi.fn();
     setSmsProviderForTests({ sendMessage });
