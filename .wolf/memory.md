@@ -898,3 +898,16 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | 12:20 | Unify AI + Live Chat into one floating widget: `channel` state (ai/live), "Talk to a person" escalation + in-widget Department picker (`LiveChatStart`), "Back to AI" (presentation-only, never ends), connection dot, inactivity/reconnect banners ported into `customer-live-chat.tsx`, `?support=live` deep link | customer-ai-widget.tsx, customer-live-chat.tsx, support-widget.tsx(unchanged), en/ar translation.json | done | ~15k |
 | 12:20 | Delete standalone Live Chat page — widget is the one canonical UI; `/portal/live-chat` -> `<Navigate to="/portal?support=live">`, removed portalLiveChat nav item + LiveChatNavIcon import | live-chat-page.tsx (DEL), live-chat-page.test.tsx (DEL), app-router.tsx, nav-config.ts | done | ~3k |
 | 12:25 | Gates | customer-ai-widget.test.tsx (18/18, +6 new: default-AI, escalation+back, dept-start mutation, resume, live send, ?support=live) | full client vitest 767/767 (64 files), tsc -b clean, eslint clean, vite build green (2,118kB), git diff --check clean | ~10k |
+
+## Session: 2026-09-02 13:00
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 13:02 | rewrote root README.md as public GitHub project overview | README.md | done, git diff --check clean | ~6k |
+
+## Session: 2026-09-02 13:04
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 13:09 | rewrote root README to spec: 4 mermaid diagrams, FE/BE stack tables, integrations, automation endpoints | README.md | done | ~9k |
+| 13:17 | README redesigned as narrative guided tour: 8 explained mermaid diagrams (journey/arch/fe-flow/be-flow/team/widget-state/ER/realtime-seq) | README.md | done | ~14k |
