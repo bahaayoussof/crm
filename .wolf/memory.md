@@ -970,3 +970,14 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
 | 17:20 | fix/qa-seed-data-integrity: Team seed idempotency + customer msg ownership | server/scripts/seed-test-data.ts, seed-test-data.helpers.test.ts, docs/19,24 | done — 860/49 server tests, tsc+eslint+diff-check clean; live re-seed NOT run (no disposable DB) | ~28k |
+
+## Session: 2026-09-02 20:07
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 21:40 | Fresh-DB + 3x seed + multi-role runtime QA on branch test/fresh-db-and-browser-qa (portable PG 17.5 in scratchpad, real backend+frontend, curl/SSE + Playwright) | docs/25-fresh-db-browser-qa.md (new), .wolf/buglog.json | migrate deploy 13/13 OK; seed x3 idempotent, all counts identical; 5 canonical Teams + manager rebind + conversation ownership verified vs real DB; ADMIN/2 MGR/2 AGENT/2 CUSTOMER isolation + IDOR + reopen + auto-assign + realtime SSE isolation + live-chat lifecycle all PASS; EN/AR-RTL/dark/mobile PASS; gates green (860 server / 767 client / build). Found Bug 1 (MEDIUM, not fixed): staff reply to EMAIL-channel ticket 503s + rolls back when Resend unconfigured (WhatsApp degrades gracefully). Bug 2 (LOW): seed makes 0 SMS tickets (dead branch). Recommendation: READY WITH MINOR FIXES. No code changed, no commit. | ~180k |
+
+## Session: 2026-09-02 22:19
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|

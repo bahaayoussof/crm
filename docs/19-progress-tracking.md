@@ -56,22 +56,38 @@ Server `tsc` + `eslint` clean; full server suite **854 / 48**; `git diff --check
 clean; no client changes. Details in
 `docs/24-final-qa-production-readiness.md` §8 (SEC/WF-1) and ADR-051 / ADR-030.
 
-**Manual verification still outstanding (NOT performed — no browser / no
-disposable DB / no live provider credentials in this environment):**
-- Fresh-database migration apply + seed + journey run.
-- Multi-role browser matrix (ADMIN / MANAGER A / MANAGER B / AGENT A / AGENT B /
-  CUSTOMER A / CUSTOMER B) across EN/AR, RTL, light/dark, responsive.
-- Live Email (Resend) / WhatsApp (Meta) / SMS (TextBee) / AI provider behavior;
-  real Vercel Blob round-trip. TextBee's inbound signature contract is now
-  confirmed against current TextBee docs (`X-Signature` / HMAC-SHA256 / raw body,
-  matching `sms.signature.ts`); only live webhook delivery from a real device is
-  still unverified.
-- Live 3× repeated `seed:test` on a disposable Postgres (Team count / user count
-  stability). Fixed on `fix/qa-seed-data-integrity`; verified by unit tests only
-  (no disposable DB here).
+**Manual verification — update 2026-09-02 (`test/fresh-db-and-browser-qa`,
+`docs/25-fresh-db-browser-qa.md`, no code change):** the fresh-DB / seed /
+multi-role / browser items below were **performed** against a real disposable
+PostgreSQL 17.5 (portable `embedded-postgres`) + the real running stack:
+- Fresh-database migration apply + seed + journey run — **DONE.** `prisma migrate
+  deploy` from empty = 13/13 in order, no drift; `seed:test` **x3 on the same DB**
+  = all exit 0, no `Team_departmentId_name_key`, every entity count identical;
+  seed integrity (5 Teams, manager re-bind, `ticket.teamId==agent.teamId`,
+  per-customer conversation ownership) verified vs real rows.
+- Multi-role matrix (ADMIN / MANAGER A / MANAGER B / AGENT A / AGENT B /
+  CUSTOMER A / CUSTOMER B) — **DONE** over real HTTP + SSE: cross-team isolation,
+  customer IDOR, reopen matrix, team-scoped auto-assignment, realtime audience
+  isolation, live-chat lifecycle all PASS. EN/AR + RTL, light/dark,
+  desktop/mobile browser smoke (Playwright/Chromium) all PASS.
+- **New finding (documented, not fixed — TEST-ONLY task):** staff public reply to
+  a `channel=EMAIL` ticket returns 503 `EMAIL_NOT_CONFIGURED` **and rolls back the
+  message** when Resend is unconfigured (`ticket.service.addTicketMessage` runs
+  `deliverEmailReply`/`deliverSmsReply` inside the `$transaction`; WhatsApp runs
+  post-commit and degrades gracefully). MEDIUM, pre-existing, non-isolation →
+  recommend `fix/outbound-reply-resilience`. Also: seed produces 0 `SMS`-channel
+  tickets (dead branch, `seed-test-data.ts:731`).
+
+**Still NOT performed (outside local scope):**
+- Live Email (Resend) / WhatsApp (Meta) / SMS (TextBee) / AI provider delivery;
+  real Vercel Blob round-trip. TextBee's inbound signature contract is confirmed
+  against current TextBee docs (`X-Signature` / HMAC-SHA256 / raw body, matching
+  `sms.signature.ts`); only live webhook delivery from a real device is unverified.
 - Production deployment smoke test (SPA deep-link refresh, CORS, cron auth).
 
-**Release recommendation:** READY WITH FIXES.
+**Release recommendation:** READY WITH FIXES (fresh-DB / seed / multi-role runtime
+now verified locally — `docs/25`; one MEDIUM outbound-reply resilience fix + live
+provider + prod-deploy smoke remain).
 
 ---
 
