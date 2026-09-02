@@ -64,7 +64,7 @@ run, and live Email / WhatsApp / SMS / AI provider behavior.
 | Database migrations (fresh apply) | No | Pending | **NOT VERIFIED** | – | No disposable Postgres; only a shared Neon dev DB (destructive reset prohibited) |
 | Live Email (Resend) | No | Pending | **NOT VERIFIED** | – | No credentials; adapter + inbound threading reviewed only |
 | Live WhatsApp (Meta) | No | Pending | **NOT VERIFIED** | – | No credentials; verification + signature + idempotency reviewed only |
-| Live SMS (TextBee) | No | Pending | **NOT VERIFIED** | – | No credentials; CRM-defined `x-signature` scheme must be matched to TextBee's real contract |
+| Live SMS (TextBee) | No | Pending | **NOT VERIFIED** | – | No credentials/device. Code/API contract review: **PASS** — TextBee signs webhooks with `X-Signature`, HMAC-SHA256 over the raw body using the webhook signing secret, which is exactly what `sms.signature.ts` verifies. Live webhook delivery still unverified until exercised with a real device. |
 | Live AI provider | No | Pending | **NOT VERIFIED** | – | Mock provider only in tests; missing-key/timeout/invalid-response paths covered by `ai.test.ts` |
 | Attachment blob storage | Partial | Pending | PARTIAL | `attachment.test.ts` (57) | Unset `BLOB_READ_WRITE_TOKEN` → 503; live upload/download to a real private store not exercised here |
 | Multi-role browser matrix (EN/AR, RTL, light/dark, responsive) | No | Pending | **NOT VERIFIED** | – | No browser / running stack in this environment |
@@ -114,7 +114,7 @@ None were executed end-to-end against a running stack + browser.
 | --- | --- | --- | --- |
 | **Email (Resend)** | Adapter, inbound webhook threading, dedup, customer match, ticket create/reuse, outbound-in-transaction rollback — covered by `integrations/email/email.test.ts` | **NOT VERIFIED** | Requires `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET`, `EMAIL_INBOUND_ADDRESS`, `EMAIL_FROM`. Signature = Svix headers over raw body (reviewed). Managed `*.resend.app` inbound enables dev; production needs a verified domain. |
 | **WhatsApp (Meta Cloud API)** | GET verify-token (constant-time), POST `X-Hub-Signature-256` HMAC, idempotency via external message id, phone match, ticket reuse/create, outbound reply, `WHATSAPP_DELIVERY_FAILED` history — `integrations/whatsapp/whatsapp.test.ts` | **NOT VERIFIED** | Requires `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`. Unset → 503. Webhook URL: `https://<api-domain>/api/integrations/whatsapp/webhook`, subscribe `messages` field only. |
-| **SMS (TextBee)** | Outbound send, inbound webhook, `x-signature` HMAC, idempotency by `smsId`, customer match, ticket create/reuse, rollback on provider failure, attachments intentionally unsupported — `integrations/sms/sms.test.ts` | **NOT VERIFIED** | Requires `TEXTBEE_API_KEY`, `TEXTBEE_DEVICE_ID`, `TEXTBEE_WEBHOOK_SECRET`. **The inbound `x-signature` HMAC-SHA256 scheme is CRM-defined — confirm TextBee actually signs its webhooks this way, or the inbound path will 401 in production.** |
+| **SMS (TextBee)** | Outbound send, inbound webhook, `X-Signature` HMAC, idempotency by `smsId`, customer match, ticket create/reuse, rollback on provider failure, attachments intentionally unsupported — `integrations/sms/sms.test.ts` | **NOT VERIFIED (live)** | Requires `TEXTBEE_API_KEY`, `TEXTBEE_DEVICE_ID`, `TEXTBEE_WEBHOOK_SECRET`. Code/API contract review: **PASS** — current TextBee docs confirm webhook requests carry `X-Signature` = HMAC-SHA256 of the raw request body keyed by the webhook signing secret, which matches `sms.signature.ts`. Only live delivery from a real TextBee device remains unverified. |
 | **AI provider** | Missing key → `AI_NOT_CONFIGURED`; unsupported `AI_PROVIDER` → disabled, no crash; timeout, invalid response, rate limit → structured codes; per-user bucket — `modules/ai/ai.test.ts` (47), `customer-ai/customer-ai.test.ts` | **NOT VERIFIED** | Requires `AI_PROVIDER` (`openrouter`), `AI_API_KEY`, `AI_MODEL`. Credentials server-side only; never in any response. |
 | **Attachments / Vercel Blob** | Upload/download/ownership/role-scope/customer-isolation/MIME+size/`503` when unconfigured — `attachments/attachment.test.ts` (57) | **PARTIAL** | `BLOB_READ_WRITE_TOKEN` = private store, server-side only, 4 MiB proxy cap. Live round-trip to a real store not exercised here. |
 | **Realtime SSE** | `canReceive` isolation, reconnect, outbox post-commit, dedupe/invalidation — `realtime.test.ts` (server) + `realtime-client.test.ts` (client) | PASS (automated) | Vercel serverless truncates the stream at `maxDuration` (documented); persistent Node host recommended for production. |
@@ -138,6 +138,27 @@ None were executed end-to-end against a running stack + browser.
 - **Recommended before release:** on a throwaway Postgres, run
   `prisma migrate deploy` from a clean database, then `npm --prefix server run
   seed:test`, then start the server and exercise journeys A–D.
+
+### 6.1 QA seed data integrity (`fix/qa-seed-data-integrity`)
+
+Two fixture-only defects found in `server/scripts/seed-test-data.ts` (no
+production runtime impact — the script refuses to run under
+`NODE_ENV=production`):
+
+| Issue | Before | After |
+| --- | --- | --- |
+| **Seed idempotency** | The script advertised idempotency but recreated the five canonical Teams with `prisma.team.create`. STEP 2 cleanup deletes seed Users (managers included) but never Teams, and `Team.managerId` is `ON DELETE SET NULL`, so a 2nd run hit `Team_departmentId_name_key` and aborted. | Teams are upserted on their unique key (`departmentId` + `name`) via `buildTeamUpsertArgs`. A re-run reuses the surviving Team row and rebinds `managerId` to the Manager created in STEP 3 (the row is `managerId = null` at that point, courtesy of the FK's `SET NULL`). Runs 1/2/3 all succeed; no duplicate Teams; unrelated Teams / Departments / Branches are never deleted. |
+| **Conversation fixture integrity** | Every customer-authored `TicketMessage` used `portalCustomerUsers[0]`, so a ticket owned by Customer B could show public replies "from" Customer A. | `resolveMessageAuthorId` attributes a customer turn only to `ticket.customer.userId` (that customer's own portal `User`). When the ticket's customer has no portal account (180 of 185 seed customers), the customer turn is emitted as support-authored history instead (Option A) — deterministic message volume preserved, no borrowed identities. |
+
+Regression: `server/scripts/seed-test-data.helpers.test.ts` (6 tests) — Team
+upsert keying, manager rebinding, 5-Team count + isolation-fixture shape,
+correct portal-customer author, no-portal-user fallback.
+
+**Live repeated re-seed: NOT EXECUTED** — no disposable Postgres in this
+environment (same constraint as "fresh-database apply" above). Verified by
+focused unit tests + `prisma validate` + `prisma-schema.test.ts` + full server
+suite only. The 3×-reseed count-stability check remains a pre-release step on a
+throwaway database.
 
 ---
 
@@ -192,7 +213,7 @@ None were executed end-to-end against a running stack + browser.
 | --- | --- | --- |
 | WhatsApp | `https://<api-domain>/api/integrations/whatsapp/webhook` | GET `hub.verify_token` == `WHATSAPP_VERIFY_TOKEN`; POST `X-Hub-Signature-256` |
 | Email (Resend) | `https://<api-domain>/api/integrations/email/...` (see `email.routes.ts`) | Svix signature over raw body, `RESEND_WEBHOOK_SECRET` |
-| SMS (TextBee) | `https://<api-domain>/api/integrations/sms/...` (see `sms.routes.ts`) | `x-signature` HMAC-SHA256, `TEXTBEE_WEBHOOK_SECRET` — **confirm against TextBee docs** |
+| SMS (TextBee) | `https://<api-domain>/api/integrations/sms/...` (see `sms.routes.ts`) | `X-Signature` HMAC-SHA256 over raw body, `TEXTBEE_WEBHOOK_SECRET` — matches current TextBee webhook docs |
 
 ### Environment variable reference
 
@@ -310,8 +331,9 @@ Concrete checklist — none of these could be done in this environment.
          signature rejection on a tampered body.
    - [ ] WhatsApp (Meta): GET verify handshake; signed inbound → ticket; reply
          delivered; replayed webhook id is a no-op.
-   - [ ] SMS (TextBee): outbound send; **inbound `x-signature` matches TextBee's
-         real signing** → ticket; rollback on a simulated send failure.
+   - [ ] SMS (TextBee): outbound send; live inbound webhook (`X-Signature` /
+         HMAC-SHA256 / raw body — contract already matches) → ticket; rollback
+         on a simulated send failure.
    - [ ] AI provider: real key → grounded answer citing only published KB;
          invalid key → `AI_NOT_CONFIGURED`; timeout → structured error, portal
          stays up.

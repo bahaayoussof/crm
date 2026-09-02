@@ -151,6 +151,68 @@ const SAMPLE_PARAGRAPHS = [
 ] as const;
 
 // ---------------------------------------------------------------------------
+// Team & conversation seed helpers (pure — unit-tested in
+// scripts/seed-test-data.helpers.test.ts)
+// ---------------------------------------------------------------------------
+/**
+ * Canonical seeded Teams. `departmentId + name` is the `Team` unique key, so the
+ * seed upserts on it (see {@link buildTeamUpsertArgs}) instead of blind-creating.
+ * Repeated runs therefore reuse these five rows rather than colliding on
+ * `Team_departmentId_name_key`. "Customer Support" intentionally holds TWO teams
+ * so cross-team isolation can be verified inside a single department.
+ */
+export const SEED_TEAM_DEFS = [
+  { name: "Billing Support", department: "Customer Support", managerIndex: 0 },
+  { name: "Technical Support", department: "Customer Support", managerIndex: 1 },
+  { name: "Field Operations", department: "Field Services", managerIndex: 2 },
+  { name: "Onboarding Squad", department: "Onboarding", managerIndex: 3 },
+  { name: "Payments Desk", department: "Billing Operations", managerIndex: 4 },
+] as const;
+
+/**
+ * Prisma `team.upsert` args keyed on the `Team` unique constraint
+ * (`departmentId` + `name`). The seed must be re-runnable: STEP 2 cleanup deletes
+ * seed *Users* (managers included) but never Teams, and the `Team.managerId` FK
+ * is `ON DELETE SET NULL`, so a prior run leaves the Team row in place with
+ * `managerId = null`. The UPDATE branch re-points it at the freshly created
+ * Manager and refreshes `isActive`; the CREATE branch only runs on a clean DB.
+ */
+export function buildTeamUpsertArgs(input: {
+  departmentId: string;
+  name: string;
+  managerId: string;
+}) {
+  const { departmentId, name, managerId } = input;
+  return {
+    where: { departmentId_name: { departmentId, name } },
+    create: { name, departmentId, managerId, isActive: true },
+    update: { managerId, isActive: true },
+    select: { id: true, name: true, departmentId: true },
+  } as const;
+}
+
+/**
+ * Resolves the author for a seeded `TicketMessage`.
+ *
+ * A customer-authored message must be attributed to the authenticated portal
+ * `User` of THIS ticket's own customer — never `portalCustomerUsers[0]` or any
+ * other unrelated account. When the ticket's customer has no portal `User` (the
+ * common case: only 5 of 185 seed customers have login accounts), the customer
+ * turn is emitted as support-authored history instead (Option A). This keeps the
+ * message volume and cadence deterministic while guaranteeing every
+ * customer-authored row is relationally valid.
+ */
+export function resolveMessageAuthorId(input: {
+  isCustomerTurn: boolean;
+  customerUserId: string | null;
+  staffAuthorId: string;
+}): string {
+  const { isCustomerTurn, customerUserId, staffAuthorId } = input;
+  if (isCustomerTurn && customerUserId) return customerUserId;
+  return staffAuthorId;
+}
+
+// ---------------------------------------------------------------------------
 // Seed Data Counts (Intentionally non-round to test pagination & last-page QA)
 // ---------------------------------------------------------------------------
 export const SEED_COUNTS = {
@@ -524,21 +586,25 @@ export async function seedTestData() {
   // (Billing Support vs Technical Support).
   // -------------------------------------------------------------------------
   const deptByName = new Map(departments.map((d) => [d.name, d]));
-  const teamPlan: { name: string; department: string; manager: { id: string; name: string } }[] = [
-    { name: "Billing Support", department: "Customer Support", manager: managerUsers[0] },
-    { name: "Technical Support", department: "Customer Support", manager: managerUsers[1] },
-    { name: "Field Operations", department: "Field Services", manager: managerUsers[2] },
-    { name: "Onboarding Squad", department: "Onboarding", manager: managerUsers[3] },
-    { name: "Payments Desk", department: "Billing Operations", manager: managerUsers[4] },
-  ];
+  const teamPlan = SEED_TEAM_DEFS.map((def) => ({
+    name: def.name,
+    department: def.department,
+    manager: managerUsers[def.managerIndex],
+  }));
 
+  // Idempotent Team seeding. STEP 2 cleanup deletes the seed Users (managers
+  // included) but NOT Teams; the `Team.managerId` FK is `ON DELETE SET NULL`, so
+  // on a re-run each canonical Team row still exists with `managerId = null`.
+  // Upserting on the `Team` unique key (`departmentId` + `name`) reuses that row
+  // and rebinds it to the Manager created moments ago in STEP 3 — no
+  // `Team_departmentId_name_key` collision, no duplicate Teams, and unrelated
+  // real Teams are never touched.
   const teams: { id: string; name: string; departmentId: string; branchId: string | null; managerId: string }[] = [];
   for (const plan of teamPlan) {
     const dept = deptByName.get(plan.department)!;
-    const team = await prisma.team.create({
-      data: { name: plan.name, departmentId: dept.id, managerId: plan.manager.id, isActive: true },
-      select: { id: true, name: true, departmentId: true },
-    });
+    const team = await prisma.team.upsert(
+      buildTeamUpsertArgs({ departmentId: dept.id, name: plan.name, managerId: plan.manager.id }),
+    );
     teams.push({ ...team, branchId: dept.branchId, managerId: plan.manager.id });
   }
 
@@ -772,6 +838,11 @@ export async function seedTestData() {
   let messageCount = 0;
   let noteCount = 0;
 
+  // Ticket customer → that customer's authenticated portal User (or null). Used
+  // to attribute customer-authored messages to the RIGHT account — never a
+  // universal `portalCustomerUsers[0]` fallback.
+  const customerUserById = new Map(customers.map((c) => [c.id, c.userId] as const));
+
   for (let i = 0; i < tickets.length; i++) {
     const t = tickets[i];
     // Distribution of message count:
@@ -782,7 +853,8 @@ export async function seedTestData() {
     else if (i < 280) count = randomInt(2, 4);
     else count = 1;
 
-    const customerUser = portalCustomerUsers[0];
+    // Only this ticket's own customer account may author a "customer" turn.
+    const ticketCustomerUserId = customerUserById.get(t.customerId) ?? null;
     const staffAuthor = t.assignedAgentId
       ? agentUsers.find((a) => a.id === t.assignedAgentId) ?? agentUsers[0]
       : agentUsers[0];
@@ -793,7 +865,11 @@ export async function seedTestData() {
       lastTime += randomInt(5, 60) * 60_000;
       const msgTime = new Date(lastTime);
       const isCustomer = m % 2 === 0;
-      const authorUserId = isCustomer ? (customerUser?.id ?? staffAuthor.id) : staffAuthor.id;
+      const authorUserId = resolveMessageAuthorId({
+        isCustomerTurn: isCustomer,
+        customerUserId: ticketCustomerUserId,
+        staffAuthorId: staffAuthor.id,
+      });
       const body = `<p>${SAMPLE_PARAGRAPHS[(i + m) % SAMPLE_PARAGRAPHS.length]}</p>`;
 
       await prisma.ticketMessage.create({

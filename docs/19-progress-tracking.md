@@ -62,11 +62,56 @@ disposable DB / no live provider credentials in this environment):**
 - Multi-role browser matrix (ADMIN / MANAGER A / MANAGER B / AGENT A / AGENT B /
   CUSTOMER A / CUSTOMER B) across EN/AR, RTL, light/dark, responsive.
 - Live Email (Resend) / WhatsApp (Meta) / SMS (TextBee) / AI provider behavior;
-  real Vercel Blob round-trip. TextBee's inbound `x-signature` scheme is
-  CRM-defined and must be confirmed against TextBee's real webhook contract.
+  real Vercel Blob round-trip. TextBee's inbound signature contract is now
+  confirmed against current TextBee docs (`X-Signature` / HMAC-SHA256 / raw body,
+  matching `sms.signature.ts`); only live webhook delivery from a real device is
+  still unverified.
+- Live 3× repeated `seed:test` on a disposable Postgres (Team count / user count
+  stability). Fixed on `fix/qa-seed-data-integrity`; verified by unit tests only
+  (no disposable DB here).
 - Production deployment smoke test (SPA deep-link refresh, CORS, cron auth).
 
 **Release recommendation:** READY WITH FIXES.
+
+---
+
+## QA seed data integrity — 2026-09-02
+
+Implemented on `fix/qa-seed-data-integrity` (off `master` `4777309`); changes are
+unstaged and uncommitted. Fixture-only fixes in
+`server/scripts/seed-test-data.ts` — no production code, no schema, no migration,
+no dependency change; client untouched.
+
+1. **Seed idempotency.** Before: the script claimed idempotency but recreated the
+   five canonical Teams with `prisma.team.create`; STEP 2 cleanup removes seed
+   Users (managers) but never Teams, and `Team.managerId` is `ON DELETE SET
+   NULL`, so a 2nd run collided on `Team_departmentId_name_key`. After: new pure
+   helper `buildTeamUpsertArgs` upserts each Team on its unique key
+   (`departmentId` + `name`); the UPDATE branch rebinds `managerId` to the
+   Manager freshly created in STEP 3 (the surviving Team row is `managerId =
+   null` at that point) and refreshes `isActive`. Runs 1/2/3 all succeed with
+   stable counts; no duplicate Teams; Departments / Branches / unrelated Teams
+   are never deleted. `SEED_TEAM_DEFS` is now a module-level constant (5 teams,
+   two under "Customer Support" for the same-department isolation fixture).
+2. **Conversation fixture integrity.** Before: every customer-authored
+   `TicketMessage` used `portalCustomerUsers[0]`, so a ticket owned by Customer B
+   could show public replies "from" Customer A. After: new pure helper
+   `resolveMessageAuthorId` attributes a customer turn only to
+   `ticket.customer.userId`; when that customer has no portal `User` (180 of 185
+   seed customers) the customer turn is emitted as support-authored history
+   (Option A), keeping message volume deterministic with no borrowed identities.
+
+Also: `docs/24` §1/§4 TextBee notes corrected — the inbound `X-Signature` /
+HMAC-SHA256 / raw-body contract matches current TextBee docs (code review PASS);
+only live delivery stays unverified.
+
+**Verification.** New `server/scripts/seed-test-data.helpers.test.ts` (6 tests):
+Team upsert keying, manager rebinding, 5-Team count + isolation shape, correct
+portal-customer author, no-portal-user fallback. Full server suite **860 / 49
+files** (was 854 / 48). Server `tsc --noEmit` clean, server `eslint` clean, `git
+diff --check` clean. **Live repeated `seed:test` NOT EXECUTED** — no disposable
+Postgres in this environment; the 3×-reseed count check remains a pre-release
+step on a throwaway database.
 
 ---
 

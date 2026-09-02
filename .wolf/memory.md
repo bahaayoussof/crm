@@ -964,3 +964,9 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | 16:47 | Rewrote SLA tests | server/src/modules/sla-automation/sla-automation.test.ts | 16 tests: team scope, least-loaded, deterministic tie, unrouted no-op, cross-team dept/branch rejection, guarded no-reassign, no-eligible no-op, terminal exclusion, canonical side effects, batch consistency; real autoAssignTicket driven via fake prisma | 5k |
 | 16:50 | Server gates | server | tsc clean, eslint clean, vitest 854/48, git diff --check clean, no client changes | 3k |
 | 16:52 | Docs | docs/08, docs/17 (ADR-051 + ADR-030 superseded notes), docs/19, docs/24 (SEC/WF-1 RESOLVED) | Ticket.teamId authoritative on every automatic path; automatic Team routing stays out of scope | 4k |
+
+## Session: 2026-09-02 17:00
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 17:20 | fix/qa-seed-data-integrity: Team seed idempotency + customer msg ownership | server/scripts/seed-test-data.ts, seed-test-data.helpers.test.ts, docs/19,24 | done — 860/49 server tests, tsc+eslint+diff-check clean; live re-seed NOT run (no disposable DB) | ~28k |
