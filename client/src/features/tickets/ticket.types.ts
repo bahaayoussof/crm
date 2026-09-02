@@ -17,11 +17,25 @@ export interface TicketListItem {
 export interface TicketHistory { id: string; action: string; oldValue: string | null; newValue: string | null; createdAt: string; actor: { id: string; name: string; role: string } | null }
 export type TicketConversationKind = "PUBLIC_MESSAGE" | "INTERNAL_NOTE";
 export interface TicketConversationItem { id: string; kind: TicketConversationKind; body: string; createdAt: string; author: { id: string; name: string; role: string } }
-export type WhatsappDeliveryReason = "INTEGRATION_NOT_CONFIGURED" | "NO_RECIPIENT_PHONE" | "PROVIDER_REJECTED" | "PROVIDER_UNREACHABLE";
-export type MessageDelivery =
-  | { channel: "WHATSAPP"; status: "SENT" | "FAILED"; externalId?: string; reason?: WhatsappDeliveryReason }
-  | { channel: "EMAIL"; status: "SENT"; externalId: string }
-  | { channel: "SMS"; status: "SENT"; externalId?: string };
+// Delivery-failure reasons are shared across every provider-backed channel
+// (WhatsApp, Email, SMS). A staff reply is persisted locally first; the outbound
+// provider is attempted after commit, so `status: "FAILED"` means the reply was
+// saved but not delivered externally — never that the reply was lost.
+export type OutboundDeliveryReason =
+  | "INTEGRATION_NOT_CONFIGURED"
+  | "NO_RECIPIENT_PHONE"
+  | "NO_RECIPIENT_EMAIL"
+  | "RECIPIENT_INVALID"
+  | "PROVIDER_REJECTED"
+  | "PROVIDER_UNREACHABLE";
+/** @deprecated use OutboundDeliveryReason — kept as an alias for existing imports. */
+export type WhatsappDeliveryReason = OutboundDeliveryReason;
+export type MessageDelivery = {
+  channel: "WHATSAPP" | "EMAIL" | "SMS";
+  status: "SENT" | "FAILED";
+  externalId?: string;
+  reason?: OutboundDeliveryReason;
+};
 export type TicketMessageResult = TicketConversationItem & { delivery?: MessageDelivery };
 export interface TicketDetail extends TicketListItem {
   description: string; resolvedAt: string | null; closedAt: string | null;

@@ -32,10 +32,10 @@ vi.mock("../integrations/whatsapp/whatsapp.service.js", () => ({
   deliverOutboundReply: vi.fn().mockResolvedValue({ channel: "WHATSAPP", status: "SENT", externalId: "wamid.OUT" }),
 }));
 vi.mock("../integrations/email/email.service.js", () => ({
-  deliverEmailReply: vi.fn().mockResolvedValue({ channel: "EMAIL", status: "SENT", externalId: "resend:email-out-1" }),
+  deliverOutboundEmailReply: vi.fn().mockResolvedValue({ channel: "EMAIL", status: "SENT", externalId: "resend:email-out-1" }),
 }));
 vi.mock("../integrations/sms/sms.service.js", () => ({
-  deliverSmsReply: vi.fn().mockResolvedValue({ channel: "SMS", status: "SENT", externalId: "textbee-batch-1" }),
+  deliverOutboundSmsReply: vi.fn().mockResolvedValue({ channel: "SMS", status: "SENT", externalId: "textbee-batch-1" }),
 }));
 vi.mock("../realtime/realtime.publisher.js", () => ({
   withRealtimeOutbox: (fn: () => unknown) => fn(),
@@ -47,14 +47,13 @@ vi.mock("../realtime/realtime.publisher.js", () => ({
 
 import { app } from "../../app.js";
 import { createAccessToken } from "../auth/auth-token.js";
-import { AppError } from "../../shared/errors/app-error.js";
 import { deliverOutboundReply } from "../integrations/whatsapp/whatsapp.service.js";
-import { deliverEmailReply } from "../integrations/email/email.service.js";
-import { deliverSmsReply } from "../integrations/sms/sms.service.js";
+import { deliverOutboundEmailReply } from "../integrations/email/email.service.js";
+import { deliverOutboundSmsReply } from "../integrations/sms/sms.service.js";
 import { emitTicketMessageCreated, emitTicketUpdated } from "../realtime/realtime.publisher.js";
 const deliverOutboundReplyMock = vi.mocked(deliverOutboundReply);
-const deliverEmailReplyMock = vi.mocked(deliverEmailReply);
-const deliverSmsReplyMock = vi.mocked(deliverSmsReply);
+const deliverEmailReplyMock = vi.mocked(deliverOutboundEmailReply);
+const deliverSmsReplyMock = vi.mocked(deliverOutboundSmsReply);
 const emitMessageMock = vi.mocked(emitTicketMessageCreated);
 const emitUpdatedMock = vi.mocked(emitTicketUpdated);
 
@@ -118,6 +117,7 @@ describe("ticket API", () => {
     mocks.teamFindUnique.mockResolvedValue({ id: TEAM_A, name: "Team A", isActive: true, departmentId: null });
     deliverEmailReplyMock.mockResolvedValue({ channel: "EMAIL", status: "SENT", externalId: "resend:email-out-1" });
     deliverSmsReplyMock.mockResolvedValue({ channel: "SMS", status: "SENT", externalId: "textbee-batch-1" });
+    deliverOutboundReplyMock.mockResolvedValue({ channel: "WHATSAPP", status: "SENT", externalId: "wamid.OUT" });
   });
 
   it("rejects unauthenticated and CUSTOMER access", async () => {
@@ -468,25 +468,32 @@ describe("ticket API", () => {
     expect(deliverSmsReplyMock).not.toHaveBeenCalled();
   });
 
-  it("sends SMS inside the ticket transaction and stores the TextBee batch id", async () => {
+  it("persists the SMS reply first, then delivers after commit (provider id returned in the response)", async () => {
     mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, subject: summary.subject, assignedAgentId: agent.id, channel: "SMS", customer: { phone: "+15551230000", email: "customer@example.net" } });
     const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "SMS reply" });
     expect(response.status).toBe(201);
-    expect(deliverSmsReplyMock).toHaveBeenCalledWith({ to: "+15551230000", text: "SMS reply" });
-    expect(mocks.messageCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ externalId: "textbee-batch-1" }) }));
+    // Local message committed WITHOUT waiting on the provider — the provider id
+    // is stamped by the post-commit delivery helper, not the create.
+    expect(mocks.messageCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.messageCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.not.objectContaining({ externalId: expect.anything() }) }));
+    expect(deliverSmsReplyMock).toHaveBeenCalledWith(expect.objectContaining({ ticketId: summary.id, messageId: "message-1", to: "+15551230000", text: "SMS reply" }));
     expect(response.body.data.delivery).toMatchObject({ channel: "SMS", status: "SENT", externalId: "textbee-batch-1" });
+    expect(emitMessageMock).toHaveBeenCalledTimes(1);
   });
 
-  it("rolls back SMS reply persistence when TextBee rejects the send", async () => {
+  it("keeps the SMS reply when TextBee is unconfigured or rejects the send (no rollback)", async () => {
     mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, subject: summary.subject, assignedAgentId: agent.id, channel: "SMS", customer: { phone: "+15551230000", email: "customer@example.net" } });
-    deliverSmsReplyMock.mockRejectedValueOnce(new AppError(502, "SMS_DELIVERY_FAILED", "TextBee rejected the SMS"));
+    deliverSmsReplyMock.mockResolvedValueOnce({ channel: "SMS", status: "FAILED", reason: "PROVIDER_REJECTED" });
     const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "SMS reply" });
-    expect(response.status).toBe(502);
-    expect(mocks.messageCreate).not.toHaveBeenCalled();
-    expect(mocks.ticketUpdateMany).not.toHaveBeenCalled();
+    expect(response.status).toBe(201);
+    expect(mocks.messageCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.ticketUpdateMany).toHaveBeenCalledTimes(1); // first-response stamping still committed
+    expect(response.body.data.delivery).toMatchObject({ channel: "SMS", status: "FAILED", reason: "PROVIDER_REJECTED" });
+    expect(response.body.data.id).toBe("message-1"); // the reply is in the response, not an error
+    expect(emitMessageMock).toHaveBeenCalledTimes(1); // realtime message-created still emitted after commit
   });
 
-  it("sends an authorized EMAIL public reply to the customer and persists the provider id", async () => {
+  it("sends an authorized EMAIL public reply after commit and returns the provider id", async () => {
     mocks.ticketFindFirst.mockResolvedValue({
       id: summary.id,
       subject: summary.subject,
@@ -500,18 +507,19 @@ describe("ticket API", () => {
     expect(response.status).toBe(201);
     expect(deliverEmailReplyMock).toHaveBeenCalledWith(expect.objectContaining({
       ticketId: summary.id,
+      messageId: "message-1",
       recipient: "customer@example.net",
       subject: summary.subject,
       threadToken: "thread-token",
       inReplyTo: "<inbound@example.net>",
     }));
-    expect(mocks.messageCreate).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ externalId: "resend:email-out-1" }),
-    }));
+    // Provider id is stamped by the post-commit helper (mocked here), never by the create.
+    expect(mocks.messageCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.messageCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.not.objectContaining({ externalId: expect.anything() }) }));
     expect(response.body.data.delivery).toMatchObject({ channel: "EMAIL", status: "SENT", externalId: "resend:email-out-1" });
   });
 
-  it("rolls back EMAIL reply persistence when Resend rejects the send", async () => {
+  it("keeps the EMAIL reply when Resend is unconfigured (201, delivery FAILED, no rollback)", async () => {
     mocks.ticketFindFirst.mockResolvedValue({
       id: summary.id,
       subject: summary.subject,
@@ -520,11 +528,45 @@ describe("ticket API", () => {
       emailThreadToken: "thread-token",
       customer: { email: "customer@example.net", phone: null },
     });
-    deliverEmailReplyMock.mockRejectedValueOnce(new AppError(502, "EMAIL_DELIVERY_FAILED", "Resend rejected the email"));
+    deliverEmailReplyMock.mockResolvedValueOnce({ channel: "EMAIL", status: "FAILED", reason: "INTEGRATION_NOT_CONFIGURED" });
     const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "Email reply" });
-    expect(response.status).toBe(502);
-    expect(mocks.messageCreate).not.toHaveBeenCalled();
-    expect(mocks.ticketUpdateMany).not.toHaveBeenCalled();
+    expect(response.status).toBe(201);
+    expect(mocks.messageCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.ticketUpdateMany).toHaveBeenCalledTimes(1);
+    expect(response.body.data.id).toBe("message-1");
+    expect(response.body.data.delivery).toMatchObject({ channel: "EMAIL", status: "FAILED", reason: "INTEGRATION_NOT_CONFIGURED" });
+    expect(emitMessageMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the EMAIL reply when Resend throws at runtime (delivery FAILED, single side effect)", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({
+      id: summary.id,
+      subject: summary.subject,
+      assignedAgentId: agent.id,
+      channel: "EMAIL",
+      emailThreadToken: "thread-token",
+      customer: { email: "customer@example.net", phone: null },
+    });
+    deliverEmailReplyMock.mockResolvedValueOnce({ channel: "EMAIL", status: "FAILED", reason: "PROVIDER_UNREACHABLE" });
+    const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "Email reply" });
+    expect(response.status).toBe(201);
+    expect(response.body.data.delivery).toMatchObject({ channel: "EMAIL", status: "FAILED", reason: "PROVIDER_UNREACHABLE" });
+    // Exactly one of each local side effect — no in-request retry duplicates.
+    expect(mocks.messageCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.ticketUpdateMany).toHaveBeenCalledTimes(1);
+    expect(deliverEmailReplyMock).toHaveBeenCalledTimes(1);
+    expect(emitMessageMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not attempt provider delivery when the local transaction fails before commit", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, subject: summary.subject, assignedAgentId: agent.id, channel: "EMAIL", emailThreadToken: "thread-token", customer: { email: "customer@example.net", phone: null } });
+    mocks.messageCreate.mockRejectedValueOnce(new Error("db write failed"));
+    const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "Email reply" });
+    expect(response.status).toBe(500);
+    expect(deliverEmailReplyMock).not.toHaveBeenCalled();
+    expect(deliverSmsReplyMock).not.toHaveBeenCalled();
+    expect(deliverOutboundReplyMock).not.toHaveBeenCalled();
+    expect(emitMessageMock).not.toHaveBeenCalled();
   });
 
   it("never sends an EMAIL for an internal note", async () => {

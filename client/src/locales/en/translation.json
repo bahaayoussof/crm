@@ -660,10 +660,12 @@
       "whatsappReplyHint": "This reply is sent to the customer on WhatsApp:",
       "whatsappNoPhone": "no phone number on file, delivery will fail",
       "whatsappDelivery": {
-        "INTEGRATION_NOT_CONFIGURED": "Reply saved, but WhatsApp is not configured, so it was not delivered.",
-        "NO_RECIPIENT_PHONE": "Reply saved, but the customer has no phone number, so it was not delivered on WhatsApp.",
-        "PROVIDER_REJECTED": "Reply saved, but WhatsApp rejected the message, so it was not delivered.",
-        "PROVIDER_UNREACHABLE": "Reply saved, but WhatsApp could not be reached, so it was not delivered."
+        "INTEGRATION_NOT_CONFIGURED": "Reply saved, but the messaging provider is not configured, so it was not delivered to the customer.",
+        "NO_RECIPIENT_PHONE": "Reply saved, but the customer has no phone number, so it was not delivered.",
+        "NO_RECIPIENT_EMAIL": "Reply saved, but the customer has no email address, so it was not delivered.",
+        "RECIPIENT_INVALID": "Reply saved, but the customer's contact address is invalid, so it was not delivered.",
+        "PROVIDER_REJECTED": "Reply saved, but the provider rejected the message, so it was not delivered to the customer.",
+        "PROVIDER_UNREACHABLE": "Reply saved, but the provider could not be reached, so it was not delivered to the customer."
       },
       "roles": {
         "ADMIN": "Admin",

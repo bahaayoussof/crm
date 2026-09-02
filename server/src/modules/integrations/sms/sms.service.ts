@@ -9,6 +9,11 @@ import { createNotifications } from "../../notifications/notification.service.js
 import { emitTicketMessageCreated, withRealtimeOutbox } from "../../realtime/realtime.publisher.js";
 import { getSmsProvider } from "./sms.provider.js";
 import type { InboundSms } from "./sms.types.js";
+import {
+  type OutboundDeliveryResult,
+  outboundFailureReason,
+  recordOutboundDeliveryFailure,
+} from "../outbound-delivery.js";
 
 const ACTIVE = [TicketStatus.OPEN, TicketStatus.IN_PROGRESS, TicketStatus.WAITING_CUSTOMER, TicketStatus.ESCALATED] as const;
 const SYSTEM_EMAIL = "sms-inbound@system.invalid";
@@ -23,6 +28,46 @@ export async function deliverSmsReply(input: { to: string | null; text: string }
   if (text.length > 20_000) throw new AppError(422, "SMS_MESSAGE_TOO_LONG", "SMS message must be 20,000 characters or fewer");
   const result = await (await getSmsProvider()).sendMessage({ to: phone, text });
   return { channel: "SMS" as const, status: "SENT" as const, externalId: result.externalId };
+}
+
+/**
+ * Deliver an already-persisted staff reply to the customer over SMS.
+ *
+ * The `TicketMessage` and its transactional side effects are committed by the
+ * ticket service BEFORE this runs (mirrors the WhatsApp seam), so a provider or
+ * configuration failure never rolls back the conversation. Failures are returned
+ * as `{ status: "FAILED", reason }` and recorded as an `SMS_DELIVERY_FAILED`
+ * ticket-history row. On success the TextBee batch id, when present, is written
+ * onto the committed row in a second, best-effort update.
+ */
+export async function deliverOutboundSmsReply(params: {
+  ticketId: string;
+  messageId: string;
+  to: string | null;
+  text: string;
+}): Promise<OutboundDeliveryResult> {
+  if (!params.to) {
+    return recordOutboundDeliveryFailure({ channel: "SMS", ticketId: params.ticketId, reason: "NO_RECIPIENT_PHONE" });
+  }
+  let result: { externalId?: string };
+  try {
+    // `deliverSmsReply` is the single validator/sender: it rejects a missing or
+    // non-E.164 phone (→ NO_RECIPIENT_PHONE) and an over-long / empty body before
+    // ever touching the provider, then dispatches through the configured gateway.
+    result = await deliverSmsReply({ to: params.to, text: params.text });
+  } catch (error) {
+    return recordOutboundDeliveryFailure({
+      channel: "SMS",
+      ticketId: params.ticketId,
+      reason: outboundFailureReason(error),
+    });
+  }
+  if (result.externalId) {
+    await prisma.ticketMessage
+      .update({ where: { id: params.messageId }, data: { externalId: result.externalId } })
+      .catch((error) => console.error("sms: sent reply but could not store provider id", error));
+  }
+  return { channel: "SMS", status: "SENT", externalId: result.externalId };
 }
 
 async function systemUser(tx: Prisma.TransactionClient) {

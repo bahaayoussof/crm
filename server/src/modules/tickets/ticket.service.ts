@@ -12,8 +12,8 @@ import {
   NOTIFICATION_WATCH_ACTIVITY,
 } from "../collaboration/collaboration.service.js";
 import { deliverOutboundReply } from "../integrations/whatsapp/whatsapp.service.js";
-import { deliverEmailReply } from "../integrations/email/email.service.js";
-import { deliverSmsReply } from "../integrations/sms/sms.service.js";
+import { deliverOutboundEmailReply } from "../integrations/email/email.service.js";
+import { deliverOutboundSmsReply } from "../integrations/sms/sms.service.js";
 import { replyHtmlToPlainText, sanitizeReplyHtml } from "../../shared/rich-text/reply-html.js";
 import {
   emitTicketMessageCreated,
@@ -124,95 +124,104 @@ export async function getTicket(ticketId: string, actor: Actor, now = new Date()
 }
 
 export async function addTicketMessage(ticketId: string, input: TicketConversationInput, actor: Actor) {
- return withRealtimeOutbox(async () => {
-  const createdAt = new Date();
-  const messageId = randomUUID();
   // Public replies are rich text from the Lexical composer. Sanitize to the
   // support-reply allowlist here — this is the trust boundary, not the client.
   const body = sanitizeReplyHtml(input.body);
   if (!body) throw new AppError(422, "EMPTY_MESSAGE", "Message body is required");
-  const { message, channel, customerPhone, emailExternalId, smsExternalId, assignedAgentId, customerId, teamId } = await prisma.$transaction(async (tx) => {
-    const ticket = await requireConversationMutationAccess(tx, ticketId, actor);
-    let emailExternalId: string | null = null;
-    if (ticket.channel === Channel.EMAIL) {
-      const threadToken = ticket.emailThreadToken ?? randomBytes(18).toString("base64url");
-      if (!ticket.emailThreadToken) {
-        await tx.ticket.update({ where: { id: ticketId }, data: { emailThreadToken: threadToken } });
+  const createdAt = new Date();
+  const messageId = randomUUID();
+
+  // 1) Durable local state first. Auth / access / workflow validation, the
+  //    TicketMessage, first-response stamping and watcher fan-out all commit as
+  //    one transaction. The realtime message-created event is emitted here too
+  //    (buffered by withRealtimeOutbox, flushed only after commit) so CRM users
+  //    see the reply regardless of any external provider outcome below.
+  const local = await withRealtimeOutbox(async () => {
+    const result = await prisma.$transaction(async (tx) => {
+      const ticket = await requireConversationMutationAccess(tx, ticketId, actor);
+      // EMAIL threading is local bookkeeping only — persist the thread token and
+      // gather references now; the provider is NOT called inside the transaction.
+      let emailThread: { threadToken: string; inReplyTo: string | null; references: string[] } | null = null;
+      if (ticket.channel === Channel.EMAIL) {
+        const threadToken = ticket.emailThreadToken ?? randomBytes(18).toString("base64url");
+        if (!ticket.emailThreadToken) {
+          await tx.ticket.update({ where: { id: ticketId }, data: { emailThreadToken: threadToken } });
+        }
+        const thread = await tx.ticketMessage.findMany({
+          where: { ticketId, externalMessageId: { not: null } },
+          orderBy: { createdAt: "asc" },
+          take: 100,
+          select: { externalMessageId: true },
+        });
+        const references = thread.flatMap((item) => item.externalMessageId ? [item.externalMessageId] : []);
+        emailThread = { threadToken, references, inReplyTo: references.at(-1) ?? null };
       }
-      const thread = await tx.ticketMessage.findMany({
-        where: { ticketId, externalMessageId: { not: null } },
-        orderBy: { createdAt: "asc" },
-        take: 100,
-        select: { externalMessageId: true },
+      const created = await tx.ticketMessage.create({
+        data: { id: messageId, ticketId, authorUserId: actor.userId, body, createdAt },
+        select: conversationSelect,
       });
-      const references = thread.flatMap((item) => item.externalMessageId ? [item.externalMessageId] : []);
-      const delivery = await deliverEmailReply({
+      await tx.ticket.updateMany({ where: { id: ticketId, firstRespondedAt: null }, data: { firstRespondedAt: createdAt } });
+      // Watcher fan-out: a staff reply is activity on a followed ticket.
+      await notifyWatchers(tx, {
         ticketId,
-        messageId,
-        recipient: ticket.customer.email,
-        subject: ticket.subject,
-        body,
-        threadToken,
-        inReplyTo: references.at(-1) ?? null,
-        references,
+        actorUserId: actor.userId,
+        type: NOTIFICATION_WATCH_ACTIVITY,
+        title: "New reply on a ticket you follow",
+        message: `${created.author.name} replied on ticket #${ticketId}: ${ticket.subject}`,
       });
-      emailExternalId = delivery.externalId;
-    }
-    let smsExternalId: string | null = null;
-    if (ticket.channel === Channel.SMS) {
-      const delivery = await deliverSmsReply({ to: ticket.customer.phone, text: replyHtmlToPlainText(body) });
-      smsExternalId = delivery.externalId ?? null;
-    }
-    const created = await tx.ticketMessage.create({
-      data: { id: messageId, ticketId, authorUserId: actor.userId, body, createdAt, externalId: emailExternalId ?? smsExternalId },
-      select: conversationSelect,
+      return {
+        message: { ...created, kind: "PUBLIC_MESSAGE" as const },
+        channel: ticket.channel,
+        subject: ticket.subject,
+        customerPhone: ticket.customer?.phone ?? null,
+        customerEmail: ticket.customer?.email ?? null,
+        emailThread,
+        assignedAgentId: ticket.assignedAgentId,
+        customerId: ticket.customerId,
+        teamId: ticket.teamId,
+      };
     });
-    await tx.ticket.updateMany({ where: { id: ticketId, firstRespondedAt: null }, data: { firstRespondedAt: createdAt } });
-    // Watcher fan-out: a staff reply is activity on a followed ticket.
-    await notifyWatchers(tx, {
+    // Committed — signal connected clients. A rolled-back transaction throws
+    // above and this line never runs, so no event is published for a lost reply.
+    emitTicketMessageCreated({
       ticketId,
-      actorUserId: actor.userId,
-      type: NOTIFICATION_WATCH_ACTIVITY,
-      title: "New reply on a ticket you follow",
-      message: `${created.author.name} replied on ticket #${ticketId}: ${ticket.subject}`,
+      messageId: result.message.id,
+      assignedAgentId: result.assignedAgentId,
+      customerId: result.customerId,
+      teamId: result.teamId,
+      visibility: "public",
     });
-    return {
-      message: { ...created, kind: "PUBLIC_MESSAGE" as const },
-      channel: ticket.channel,
-      customerPhone: ticket.customer?.phone ?? null,
-      emailExternalId,
-      smsExternalId,
-      assignedAgentId: ticket.assignedAgentId,
-      customerId: ticket.customerId,
-      teamId: ticket.teamId,
-    };
+    return result;
   });
 
-  // Persistence committed — signal connected clients (transaction-safe: buffered
-  // by withRealtimeOutbox, flushed when this function resolves).
-  emitTicketMessageCreated({ ticketId, messageId: message.id, assignedAgentId, customerId, teamId, visibility: "public" });
-
-  // Outbound transport for WhatsApp-originated tickets. The message is already
-  // committed above, so a delivery failure never corrupts the conversation — it
-  // is reported back to the caller and recorded as a ticket history row.
-  if (channel === Channel.WHATSAPP) {
-    // WhatsApp carries plain text only — never send reply markup to the customer.
-    const delivery = await deliverOutboundReply({
+  // 2) External delivery — ALWAYS after the local commit, for every
+  //    provider-backed channel. A provider or configuration failure never rolls
+  //    back the persisted reply: it comes back as `delivery.status = "FAILED"`
+  //    and is recorded as a `<CHANNEL>_DELIVERY_FAILED` ticket-history row. The
+  //    customer never receives reply markup — providers get plain text only.
+  const text = replyHtmlToPlainText(body);
+  if (local.channel === Channel.WHATSAPP) {
+    const delivery = await deliverOutboundReply({ ticketId, messageId: local.message.id, to: local.customerPhone, text });
+    return { ...local.message, delivery };
+  }
+  if (local.channel === Channel.EMAIL) {
+    const delivery = await deliverOutboundEmailReply({
       ticketId,
-      messageId: message.id,
-      to: customerPhone,
-      text: replyHtmlToPlainText(body),
+      messageId: local.message.id,
+      recipient: local.customerEmail,
+      subject: local.subject,
+      body,
+      threadToken: local.emailThread?.threadToken ?? "",
+      inReplyTo: local.emailThread?.inReplyTo ?? null,
+      references: local.emailThread?.references ?? [],
     });
-    return { ...message, delivery };
+    return { ...local.message, delivery };
   }
-  if (channel === Channel.EMAIL) {
-    return { ...message, delivery: { channel: "EMAIL", status: "SENT", externalId: emailExternalId! } as const };
+  if (local.channel === Channel.SMS) {
+    const delivery = await deliverOutboundSmsReply({ ticketId, messageId: local.message.id, to: local.customerPhone, text });
+    return { ...local.message, delivery };
   }
-  if (channel === Channel.SMS) {
-    return { ...message, delivery: { channel: "SMS", status: "SENT", externalId: smsExternalId ?? undefined } as const };
-  }
-  return message;
- });
+  return local.message;
 }
 
 export async function addTicketNote(ticketId: string, input: TicketConversationInput, actor: Actor) {

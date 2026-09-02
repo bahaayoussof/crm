@@ -14,7 +14,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { SEED_TEAM_DEFS, buildTeamUpsertArgs, resolveMessageAuthorId } from "./seed-test-data.js";
+import { SEED_COUNTS, SEED_TEAM_DEFS, buildTeamUpsertArgs, resolveMessageAuthorId, seedTicketChannel } from "./seed-test-data.js";
 
 describe("buildTeamUpsertArgs — Team seed idempotency", () => {
   it("keys the write on the Team unique constraint (departmentId + name), not a blind create", () => {
@@ -77,5 +77,30 @@ describe("resolveMessageAuthorId — customer message ownership", () => {
     expect(
       resolveMessageAuthorId({ isCustomerTurn: false, customerUserId: "user-B", staffAuthorId: STAFF }),
     ).toBe(STAFF);
+  });
+});
+
+describe("seedTicketChannel — deterministic channel distribution (docs/25 Bug 2)", () => {
+  const mix = Array.from({ length: SEED_COUNTS.tickets }, (_, i) => seedTicketChannel(i))
+    .reduce<Record<string, number>>((acc, channel) => ({ ...acc, [channel]: (acc[channel] ?? 0) + 1 }), {});
+
+  it("produces a non-zero count for every channel, SMS included", () => {
+    for (const channel of ["WEB", "EMAIL", "WHATSAPP", "SMS", "LIVE_CHAT"]) {
+      expect(mix[channel] ?? 0).toBeGreaterThan(0);
+    }
+  });
+
+  it("keeps the total at exactly SEED_COUNTS.tickets and the legacy WEB/EMAIL/WHATSAPP split", () => {
+    expect(Object.values(mix).reduce((a, b) => a + b, 0)).toBe(SEED_COUNTS.tickets);
+    expect(mix.WEB).toBe(195);
+    expect(mix.EMAIL).toBe(116);
+    expect(mix.WHATSAPP).toBe(38);
+    expect(mix.SMS + mix.LIVE_CHAT).toBe(38);
+  });
+
+  it("is a pure function of the index (deterministic, no PRNG)", () => {
+    expect(seedTicketChannel(9)).toBe(seedTicketChannel(9));
+    expect(seedTicketChannel(9)).toBe("SMS");
+    expect(seedTicketChannel(19)).toBe("LIVE_CHAT");
   });
 });

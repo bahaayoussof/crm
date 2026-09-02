@@ -117,7 +117,7 @@ Verified with direct SQL against the seeded disposable database.
 - Routed-unassigned: 90 (`teamId≠null`, `assignedAgentId=null`). Unrouted: 7 (`teamId=null`), **all** with `assignedAgentId=null` — ADMIN-routing only.
 - Status mix: OPEN 65 · IN_PROGRESS 65 · WAITING_CUSTOMER 65 · RESOLVED 64 · CLOSED 64 · ESCALATED 64.
 - Priority mix: LOW 76 · MEDIUM 155 · HIGH 117 · URGENT 39.
-- Channel mix: WEB 195 · EMAIL 116 · WHATSAPP 38 · LIVE_CHAT 38 · **SMS 0** — see *Bug 2* (seed fixture defect; the SMS branch is unreachable).
+- Channel mix (this QA run, pre-fix): WEB 195 · EMAIL 116 · WHATSAPP 38 · LIVE_CHAT 38 · **SMS 0** — *Bug 2* (seed fixture defect; the SMS branch was unreachable). **Fixed on `fix/outbound-reply-resilience`:** WEB 195 · EMAIL 116 · WHATSAPP 38 · SMS 19 · LIVE_CHAT 19 (total still 387).
 
 ### Seeded conversation ownership (regression from `bug-135` / the seed author fix)
 
@@ -186,9 +186,9 @@ All external providers were deliberately unconfigured for this run. Verification
 
 | Integration | Level | Result |
 | --- | --- | --- |
-| **Email (Resend)** | CODE VERIFIED + LOCAL RUNTIME (unconfigured path) | Inbound webhook → **503 `EMAIL_WEBHOOK_NOT_CONFIGURED`** (fail-closed). Outbound: staff reply on an `EMAIL`-channel ticket → **503 `EMAIL_NOT_CONFIGURED`, and the reply is rolled back** — see **Bug 1**. Live delivery: **NOT VERIFIED**. |
+| **Email (Resend)** | CODE VERIFIED + LOCAL RUNTIME (unconfigured path) | Inbound webhook → **503 `EMAIL_WEBHOOK_NOT_CONFIGURED`** (fail-closed). Outbound: staff reply on an `EMAIL`-channel ticket unconfigured → **201, reply persisted**, `delivery: { status: "FAILED", reason: "INTEGRATION_NOT_CONFIGURED" }` + `EMAIL_DELIVERY_FAILED` history row (**Bug 1 resolved**, branch `fix/outbound-reply-resilience` / ADR-052). Live delivery: **NOT VERIFIED**. |
 | **WhatsApp (Meta)** | CODE VERIFIED + LOCAL RUNTIME (unconfigured path) | GET verify → **503**; POST webhook → **503** (fail-closed). Staff reply on a `WHATSAPP`-channel ticket → **201, message persisted**, response carries `delivery: { status: "FAILED", reason: "INTEGRATION_NOT_CONFIGURED" }` (graceful — the intended pattern). Live delivery: **NOT VERIFIED**. |
-| **SMS (TextBee)** | CODE VERIFIED | POST webhook unconfigured → **503**. Inbound contract unchanged and still matches `sms.signature.ts`: `X-Signature` = HMAC-SHA256 over the raw request body keyed by the webhook secret. Outbound reply path shares Email's pre-commit design → **same rollback risk as Bug 1**; not runtime-verified (0 SMS tickets in the seed). Live delivery: **NOT VERIFIED**. |
+| **SMS (TextBee)** | CODE VERIFIED | POST webhook unconfigured → **503**. Inbound contract unchanged and still matches `sms.signature.ts`: `X-Signature` = HMAC-SHA256 over the raw request body keyed by the webhook secret. Outbound reply path now shares the post-commit seam (**Bug 1 resolved** / ADR-052): failure → **201 + `delivery.status = "FAILED"` + `SMS_DELIVERY_FAILED` history row**, reply persisted. Seed now produces SMS-channel tickets (**Bug 2 resolved**). Live delivery: **NOT VERIFIED**. |
 | **Blob (Vercel)** | LOCAL RUNTIME VERIFIED (unconfigured path) | Attachment upload → **503 `STORAGE_UNAVAILABLE`** (structured). Live private-store round-trip: **NOT VERIFIED**. |
 | **AI provider** | LOCAL RUNTIME VERIFIED (unconfigured path) | Internal endpoint → **503 `AI_NOT_CONFIGURED`**; portal AI chat → **200** graceful. Live provider response: **NOT VERIFIED**. |
 | **Realtime SSE** | LOCAL RUNTIME VERIFIED | Streamed real events for 6 roles with correct audience isolation (see Critical Journeys). |
@@ -200,23 +200,21 @@ Legend used above: **CODE VERIFIED** (reviewed in source) · **LOCAL RUNTIME VER
 
 ## Bugs Found
 
-### Bug 1 — MEDIUM — staff reply to an EMAIL-channel ticket is lost when email is unconfigured
+### Bug 1 — MEDIUM — staff reply to an EMAIL-channel ticket is lost when email is unconfigured — ✅ RESOLVED
 
 - **Role / route:** any ADMIN / MANAGER / AGENT · `POST /api/tickets/:id/messages` on a ticket whose `channel = EMAIL`.
 - **Repro:** with `RESEND_API_KEY` / `EMAIL_FROM` unset, post a public reply to an EMAIL-channel ticket.
-- **Expected:** the message is persisted and a delivery failure is recorded — exactly what the WhatsApp path does (`delivery.status = "FAILED"`, `reason = "INTEGRATION_NOT_CONFIGURED"`, HTTP 201).
-- **Actual:** HTTP **503 `EMAIL_NOT_CONFIGURED`** and **no `TicketMessage` row is created**.
-- **Root cause:** in `server/src/modules/tickets/ticket.service.ts` `addTicketMessage`, `deliverEmailReply()` (and `deliverSmsReply()`) run *inside* the `prisma.$transaction`, **before** `tx.ticketMessage.create`. `requireOutboundEmailConfig()` (`integrations/email/email.config.ts`) throws a 503, so the whole transaction rolls back. WhatsApp delivery, by contrast, runs **after** commit and its failure is caught and returned. The in-code comment "the message is already committed above, so a delivery failure never corrupts the conversation" only holds for WhatsApp.
-- **Impact:** in a deployment (or provider outage) where email is not configured, staff cannot reply to any EMAIL-channel ticket and the reply text is discarded. Not a data-isolation issue. **Not a regression** from the team-scope / automatic-assignment work — long-standing design of the outbound seam.
-- **Regression test:** none.
-- **Fix status:** **not fixed here.** Moving Email/SMS delivery outside the transaction and adding a graceful delivery record is an architectural change to the outbound seam, out of scope for this TEST-ONLY task. **Recommend a dedicated branch** (e.g. `fix/outbound-reply-resilience`): mirror the WhatsApp post-commit pattern for Email and SMS, add a `WHATSAPP_DELIVERY_FAILED`-style history row + `delivery` payload, and add regression tests for the unconfigured and provider-error paths.
+- **Was:** HTTP **503 `EMAIL_NOT_CONFIGURED`** and **no `TicketMessage` row created** — `deliverEmailReply()` / `deliverSmsReply()` ran *inside* the `prisma.$transaction` before `tx.ticketMessage.create`, so a `requireOutboundEmailConfig()` 503 (or any `502` provider error) rolled the whole transaction back. WhatsApp delivery, by contrast, runs **after** commit.
+- **Fix (branch `fix/outbound-reply-resilience`, ADR-052):** the transaction now persists local durable state only (access/workflow validation, `TicketMessage`, `firstRespondedAt`, watcher fan-out, EMAIL thread bookkeeping); the realtime `ticket.message.created` event is published on commit; then EMAIL/SMS/WhatsApp delivery is attempted **after commit** via non-throwing wrappers (`deliverOutboundEmailReply`, `deliverOutboundSmsReply`, `deliverOutboundReply`). A provider/configuration failure returns **HTTP 201** with `delivery: { channel, status: "FAILED", reason }` and records a `<CHANNEL>_DELIVERY_FAILED` ticket-history row; the local reply is never rolled back. Success still returns `status: "SENT"` + `externalId` and stores the provider id.
+- **Behaviour now — EMAIL:** unconfigured → 201 + `reason: "INTEGRATION_NOT_CONFIGURED"`; runtime provider error → 201 + `reason: "PROVIDER_REJECTED" | "PROVIDER_UNREACHABLE"`; missing/invalid customer email → 201 + `NO_RECIPIENT_EMAIL` / `RECIPIENT_INVALID`; configured + accepted → 201 + `status: "SENT"`, `externalId` stored, no failure history. **SMS/TextBee:** identical semantics.
+- **Delivery failure is still surfaced explicitly and is never treated as successful delivery.**
+- **Regression tests:** `ticket.test.ts` (EMAIL/SMS unconfigured, runtime failure, success, no-provider-call-before-commit, single-side-effect), `outbound-delivery.test.ts` (reason mapping, history-row write, SMS wrapper), `email.test.ts` outbound block. Full server vitest **878/878** (50 files); client **767/767**.
+- **Runtime:** NOT EXECUTED against a live disposable stack in this branch (no running QA Postgres); covered by the automated regression suite above.
 
-### Bug 2 — LOW (fixture only) — seed generates zero SMS-channel tickets
+### Bug 2 — LOW (fixture only) — seed generates zero SMS-channel tickets — ✅ RESOLVED
 
-- **File:** `server/scripts/seed-test-data.ts:731` — `else channel = i % 2 === 0 ? Channel.SMS : Channel.LIVE_CHAT;`
-- **Root cause:** that `else` is reached only when `i % 10 === 9`, i.e. `i` is always odd, so `i % 2 === 0` is never true and `Channel.SMS` is dead code. All 38 of those tickets become `LIVE_CHAT`.
-- **Impact:** Phase 7's requested channel mix has no SMS ticket; the SMS outbound reply path cannot be runtime-tested from seed data. Dev/test helper only (the script refuses to run under `NODE_ENV=production`).
-- **Fix status:** **not fixed here.** One-line fix, but it shifts the seeded channel distribution — do it on a dedicated branch and re-check `server/scripts/seed-test-data.helpers.test.ts` and any channel-count assertions.
+- **File:** `server/scripts/seed-test-data.ts` — `else channel = i % 2 === 0 ? Channel.SMS : Channel.LIVE_CHAT;` reached only when `i % 10 === 9` (always odd), so `Channel.SMS` was dead code and all 38 of those tickets became `LIVE_CHAT`.
+- **Fix (ADR-052):** extracted a pure, exported `seedTicketChannel(i)` helper; the last bucket now splits on `Math.floor(i / 10) % 2`. Deterministic (no PRNG), total still **387**, WEB/EMAIL/WHATSAPP split unchanged (195 / 116 / 38), last bucket → **19 SMS + 19 LIVE_CHAT**. New `seed-test-data.helpers.test.ts` block asserts every channel is non-zero and the total/legacy split hold.
 
 ### Bug 3 — INFO (fixture only) — seed writes HTML into `Ticket.description`
 
@@ -242,8 +240,8 @@ The seed treats `LIVE_CHAT` as an ordinary channel in the ticket loop, so a port
 
 **Before a production release:**
 
-1. **Bug 1** — make the Email (and SMS) outbound reply resilient when the provider is unconfigured or erroring, matching the WhatsApp post-commit pattern. Schedule on its own branch. This matters for any deployment that runs without Resend configured.
-2. **Bug 2 / Bug 3 / Bug 4** — small seed-fixture cleanups (SMS channel, description markup, concurrent live chats); non-blocking.
+1. ~~**Bug 1** — make the Email (and SMS) outbound reply resilient when the provider is unconfigured or erroring.~~ **✅ Resolved** on branch `fix/outbound-reply-resilience` (ADR-052): EMAIL/SMS delivery moved after the local commit; provider failure → 201 + `delivery.status = "FAILED"` + `<CHANNEL>_DELIVERY_FAILED` history, reply never rolled back. Live Resend/TextBee delivery still NOT VERIFIED.
+2. ~~**Bug 2**~~ **✅ Resolved** (same branch) — seed now generates SMS-channel tickets (`seedTicketChannel`). **Bug 3 / Bug 4** — small seed-fixture cleanups (description markup, concurrent live chats); non-blocking.
 3. Still **NOT VERIFIED** (outside local scope): live Resend / Meta / TextBee / AI provider delivery, a real Vercel Blob round-trip, and the production deployment smoke test (SPA deep-link refresh, prod CORS, cron on Vercel).
 
 Do not mark the project fully READY until the live external-provider behavior and the production deployment smoke have actually been performed.

@@ -15,6 +15,11 @@ import { getAttachmentStorage, StorageUnavailableError } from "../../attachments
 import { requireInboundEmailConfig, requireOutboundEmailConfig } from "./email.config.js";
 import { emailClient, ResendEmailError } from "./email.client.js";
 import type { EmailDeliveryResult, InboundEmailEvent, ReceivedEmail } from "./email.types.js";
+import {
+  type OutboundDeliveryResult,
+  outboundFailureReason,
+  recordOutboundDeliveryFailure,
+} from "../outbound-delivery.js";
 
 const SYSTEM_USER_EMAIL = "email-inbound@system.invalid";
 const SYSTEM_USER_NAME = "Email Customer";
@@ -372,6 +377,55 @@ export async function deliverEmailReply(params: {
     console.error(`email: outbound send failed ticket=${params.ticketId} operation=${error instanceof ResendEmailError ? error.operation : "send"}`);
     throw new AppError(502, "EMAIL_DELIVERY_FAILED", "Resend rejected or could not deliver the email reply");
   }
+}
+
+/**
+ * Deliver an already-persisted staff reply to the customer over email.
+ *
+ * The `TicketMessage` and its transactional side effects are committed by the
+ * ticket service BEFORE this runs (mirrors the WhatsApp seam), so a provider or
+ * configuration failure never rolls back the conversation. Failures are returned
+ * to the caller as `{ status: "FAILED", reason }` and recorded as an
+ * `EMAIL_DELIVERY_FAILED` ticket-history row. On success the Resend email id is
+ * written onto the committed row in a second, best-effort update — a failure of
+ * that write is logged and never deletes the reply.
+ */
+export async function deliverOutboundEmailReply(params: {
+  ticketId: string;
+  messageId: string;
+  recipient: string | null;
+  subject: string;
+  body: string;
+  threadToken: string;
+  inReplyTo: string | null;
+  references: string[];
+}): Promise<OutboundDeliveryResult> {
+  if (!params.recipient) {
+    return recordOutboundDeliveryFailure({ channel: "EMAIL", ticketId: params.ticketId, reason: "NO_RECIPIENT_EMAIL" });
+  }
+  let result: EmailDeliveryResult;
+  try {
+    result = await deliverEmailReply({
+      ticketId: params.ticketId,
+      messageId: params.messageId,
+      recipient: params.recipient,
+      subject: params.subject,
+      body: params.body,
+      threadToken: params.threadToken,
+      inReplyTo: params.inReplyTo,
+      references: params.references,
+    });
+  } catch (error) {
+    return recordOutboundDeliveryFailure({
+      channel: "EMAIL",
+      ticketId: params.ticketId,
+      reason: outboundFailureReason(error),
+    });
+  }
+  await prisma.ticketMessage
+    .update({ where: { id: params.messageId }, data: { externalId: result.externalId } })
+    .catch((error) => console.error("email: sent reply but could not store provider id", error));
+  return { channel: "EMAIL", status: "SENT", externalId: result.externalId };
 }
 
 export const emailInternals = { emailSubject, threadAddress, messageIds, normalizeInboundBody, SYSTEM_USER_EMAIL };

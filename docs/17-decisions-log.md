@@ -1399,3 +1399,42 @@ It is NOT automatic Department/Team routing. A ticket without `teamId` is left u
 - **Bounded concurrency limitation (documented, accepted):** two ticket creations racing in separate transactions can both read workload `0` for the same agent and both pick them, so a burst of N simultaneous creations can skew by up to ~N onto one agent. The conditional `updateMany` still guarantees no double-assignment, no duplicate history/audit/notification, and no cross-team assignment. Full serialization would need a distributed scheduler — explicitly out of scope for V1. The five-minute SLA monitor and normal ticket churn re-level the distribution over time.
 - ~~The SLA-monitor cron keeps its own DEPARTMENT/BRANCH candidate policy (ADR-030). The two engines now share only the active-status set and the automatic-assignment vocabulary.~~ **Superseded (branch `fix/sla-team-scoped-assignment`, resolves Final-QA finding SEC/WF-1):** the SLA-monitor cron no longer has its own assignment policy. Its `assignUnassignedTickets()` is now a bounded *candidate finder* — unassigned + active-status + **`teamId` not null**, oldest first — that delegates every assignment decision to `autoAssignTicket(tx, …)` here, one transaction per candidate. Department/Branch are no longer consulted anywhere; `Ticket.teamId` is the single authoritative ownership boundary, and an unrouted (`teamId = null`) ticket is left for ADMIN routing on both paths. The legacy `chooseAgent`/`EligibleAgent` dept-branch selection and the duplicated history/audit/notification writes were removed from `sla-automation.service.ts`.
 - Verification: server `tsc` + `eslint` clean; new `assignment.test.ts` (13) + `ticket.test.ts` auto-assignment block (12) + `live-chat.test.ts` (1); full server vitest **839/839** (47 files). No client code changed. Live multi-role DB/browser QA and high-concurrency load testing are outstanding (no running DB/browser in this environment).
+
+
+# ADR-052: Outbound Reply Resilience — local persistence decoupled from EMAIL/SMS provider delivery
+
+**Status:** Accepted (implemented and verified on branch `fix/outbound-reply-resilience`; uncommitted). Resolves `docs/25-fresh-db-browser-qa.md` **Bug 1** (MEDIUM) and **Bug 2** (LOW, seed fixture).
+
+## Context
+
+For `EMAIL` and `SMS` tickets, `ticket.service.addTicketMessage` called `deliverEmailReply()` / `deliverSmsReply()` **inside** the `prisma.$transaction`, before `tx.ticketMessage.create`. `requireOutboundEmailConfig()` throws `503 EMAIL_NOT_CONFIGURED` and the provider adapters throw `502` on any failure, so an unconfigured or erroring provider rolled the whole transaction back: no `TicketMessage`, no history, no realtime event — the staff reply text was discarded and the API returned `503`. WhatsApp never had this problem: `deliverOutboundReply()` runs **after** commit and records a `WHATSAPP_DELIVERY_FAILED` history row instead of throwing.
+
+## Decision
+
+Make the transaction boundary correct for every provider-backed channel — do not swallow provider errors inside the transaction.
+
+1. The `prisma.$transaction` in `addTicketMessage` now persists **local durable state only**: access/workflow validation, the `TicketMessage`, `firstRespondedAt` stamping, watcher fan-out, and (for EMAIL) the thread-token + reference bookkeeping. No network call happens inside it.
+2. `emitTicketMessageCreated` is published from inside `withRealtimeOutbox` immediately after the transaction resolves — post-commit, independent of any provider result.
+3. External delivery is attempted **after commit** for `WHATSAPP`, `EMAIL`, and `SMS` via non-throwing wrappers: `deliverOutboundReply` (unchanged), the new `deliverOutboundEmailReply`, and the new `deliverOutboundSmsReply`. Each returns `OutboundDeliveryResult` (`{ channel, status: "SENT" | "FAILED", externalId?, reason? }`) and, on failure, writes a `<CHANNEL>_DELIVERY_FAILED` `TicketHistory` row (`actorUserId = null`, `newValue = reason`) via the shared `recordOutboundDeliveryFailure` helper in `integrations/outbound-delivery.ts`. On success the provider id is stored on the already-committed row in a second best-effort `update` — a failure of that write is logged and never deletes the reply.
+4. `reason` vocabulary (shared): `INTEGRATION_NOT_CONFIGURED | NO_RECIPIENT_PHONE | NO_RECIPIENT_EMAIL | RECIPIENT_INVALID | PROVIDER_REJECTED | PROVIDER_UNREACHABLE`. A raw network throw / timeout maps to `PROVIDER_UNREACHABLE`; the DB transaction is already closed so a hanging provider call cannot hold it open.
+5. The HTTP response is unchanged in shape: `{ data: { kind: "PUBLIC_MESSAGE", …, delivery } }` with `delivery` present for the three provider channels. EMAIL/SMS may now carry `status: "FAILED"` (previously only WhatsApp could). HTTP status is `201` for both SENT and FAILED delivery.
+
+## Alternatives rejected
+
+- **Catch the provider error inside the transaction and mark `SENT`.** Rejected — hides a real delivery failure and reports success for an undelivered reply.
+- **A single shared `deliverOutboundReply(channel, …)` for all three providers.** Rejected as disproportionate — it would rewrite the working WhatsApp seam and its tests. Instead, the small shared pieces (`OutboundDeliveryResult`, `outboundFailureReason`, `recordOutboundDeliveryFailure`) live in `integrations/outbound-delivery.ts` and are used by the EMAIL and SMS wrappers; WhatsApp keeps its equivalent inline helpers unchanged.
+- **Schema change to track delivery state on `TicketMessage`.** Not needed — `TicketHistory` already carries provider-specific failure rows (the WhatsApp precedent) and `TicketMessage.externalId` already stores the provider id.
+
+## Frontend
+
+No new contract. `ticket-workspace-tabs.tsx` already surfaces `delivery.status === "FAILED"` generically for any reply channel. `MessageDelivery` on the client was widened so EMAIL/SMS can carry `status: "FAILED"` + `reason`, and the `tickets.conversation.whatsappDelivery.*` strings (EN/AR) were reworded to be channel-neutral, with `NO_RECIPIENT_EMAIL` / `RECIPIENT_INVALID` added.
+
+## Seed fixture (Bug 2)
+
+`seed-test-data.ts` extracted `seedTicketChannel(i)`. The old `i % 10 === 9` bucket read `i % 2 === 0 ? SMS : LIVE_CHAT`, but that index is always odd, so SMS was dead code (0 SMS tickets). It now splits on `Math.floor(i / 10) % 2`: deterministic, total still 387, WEB/EMAIL/WHATSAPP split unchanged (195 / 116 / 38), and the last bucket becomes 19 SMS + 19 LIVE_CHAT.
+
+## Consequences
+
+- No Prisma migration, no new dependency, no RBAC or workflow-graph change.
+- Provider calls never run inside the ticket-message transaction; a DB failure before commit means the provider is not called and no realtime event fires.
+- Verification: server `tsc` + `eslint` clean; `ticket.test.ts` (102) + new `outbound-delivery.test.ts` (12) + `email.test.ts` outbound block (4) + `seed-test-data.helpers.test.ts` channel block (3); full server vitest **878/878** (50 files). Client `tsc` + `eslint` clean; full client vitest **767/767** (64 files). `git diff --check` clean. Live external-provider delivery remains NOT VERIFIED (no real Resend/TextBee credentials).

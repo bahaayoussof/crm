@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   verify: vi.fn(), retrieve: vi.fn(), download: vi.fn(), send: vi.fn(),
-  messageFindUnique: vi.fn(), messageFindFirst: vi.fn(), messageCreate: vi.fn(),
+  messageFindUnique: vi.fn(), messageFindFirst: vi.fn(), messageCreate: vi.fn(), messageUpdate: vi.fn(),
   userFindUnique: vi.fn(), userCreate: vi.fn(), userFindMany: vi.fn(),
   customerFindFirst: vi.fn(), customerCreate: vi.fn(),
   ticketFindFirst: vi.fn(), ticketFindMany: vi.fn(), ticketFindUnique: vi.fn(), ticketCreate: vi.fn(), ticketUpdate: vi.fn(),
@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../../../config/prisma.js", () => {
   const client = {
-    ticketMessage: { findUnique: mocks.messageFindUnique, findFirst: mocks.messageFindFirst, create: mocks.messageCreate },
+    ticketMessage: { findUnique: mocks.messageFindUnique, findFirst: mocks.messageFindFirst, create: mocks.messageCreate, update: mocks.messageUpdate },
     user: { findUnique: mocks.userFindUnique, create: mocks.userCreate, findMany: mocks.userFindMany },
     customer: { findFirst: mocks.customerFindFirst, create: mocks.customerCreate },
     ticket: { findFirst: mocks.ticketFindFirst, findMany: mocks.ticketFindMany, findUnique: mocks.ticketFindUnique, create: mocks.ticketCreate, update: mocks.ticketUpdate },
@@ -70,6 +70,7 @@ vi.mock("../../realtime/realtime.publisher.js", () => ({
 
 import { app } from "../../../app.js";
 import { emitTicketMessageCreated } from "../../realtime/realtime.publisher.js";
+import { deliverOutboundEmailReply } from "./email.service.js";
 const emitMessageMock = vi.mocked(emitTicketMessageCreated);
 
 const webhookEvent = {
@@ -129,6 +130,7 @@ describe("Resend email integration", () => {
     mocks.notificationCreateMany.mockResolvedValue({ count: 1 });
     mocks.watcherFindMany.mockResolvedValue([]);
     mocks.messageCreate.mockResolvedValue({ id: "message-1" });
+    mocks.messageUpdate.mockResolvedValue({ id: "message-1" });
     mocks.attachmentCreateMany.mockResolvedValue({ count: 1 });
     mocks.storagePut.mockResolvedValue(undefined);
     mocks.storageRemove.mockResolvedValue(undefined);
@@ -265,5 +267,53 @@ describe("Resend email integration", () => {
     expect(mocks.storagePut).not.toHaveBeenCalled();
     expect(mocks.attachmentCreateMany).not.toHaveBeenCalled();
     expect(mocks.messageCreate).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("outbound email reply resilience (deliverOutboundEmailReply)", () => {
+  const params = {
+    ticketId: "ticket-1",
+    messageId: "message-1",
+    recipient: "customer@example.net",
+    subject: "Need help",
+    body: "<p>On it</p>",
+    threadToken: "token-1",
+    inReplyTo: null,
+    references: [] as string[],
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.send.mockResolvedValue({ emailId: "email-out-1" });
+    mocks.messageUpdate.mockResolvedValue({ id: "message-1" });
+    mocks.historyCreate.mockResolvedValue({});
+  });
+
+  it("delivers after commit and stamps the provider id on the already-persisted row", async () => {
+    const result = await deliverOutboundEmailReply(params);
+    expect(result).toEqual({ channel: "EMAIL", status: "SENT", externalId: "resend:email-out-1" });
+    expect(mocks.messageUpdate).toHaveBeenCalledWith({ where: { id: "message-1" }, data: { externalId: "resend:email-out-1" } });
+    expect(mocks.historyCreate).not.toHaveBeenCalled();
+  });
+
+  it("returns FAILED and records EMAIL_DELIVERY_FAILED when Resend rejects (no throw, no rollback)", async () => {
+    mocks.send.mockRejectedValueOnce(new Error("Resend 500"));
+    const result = await deliverOutboundEmailReply(params);
+    expect(result).toMatchObject({ channel: "EMAIL", status: "FAILED", reason: "PROVIDER_REJECTED" });
+    expect(mocks.historyCreate).toHaveBeenCalledWith({ data: { ticketId: "ticket-1", actorUserId: null, action: "EMAIL_DELIVERY_FAILED", newValue: "PROVIDER_REJECTED" } });
+    expect(mocks.messageUpdate).not.toHaveBeenCalled();
+  });
+
+  it("returns FAILED NO_RECIPIENT_EMAIL without calling the provider when the customer has no email", async () => {
+    const result = await deliverOutboundEmailReply({ ...params, recipient: null });
+    expect(result).toMatchObject({ channel: "EMAIL", status: "FAILED", reason: "NO_RECIPIENT_EMAIL" });
+    expect(mocks.send).not.toHaveBeenCalled();
+    expect(mocks.historyCreate).toHaveBeenCalledWith({ data: { ticketId: "ticket-1", actorUserId: null, action: "EMAIL_DELIVERY_FAILED", newValue: "NO_RECIPIENT_EMAIL" } });
+  });
+
+  it("still returns SENT when the post-send provider-id write fails (reply is not deleted)", async () => {
+    mocks.messageUpdate.mockRejectedValueOnce(new Error("db blip"));
+    const result = await deliverOutboundEmailReply(params);
+    expect(result).toEqual({ channel: "EMAIL", status: "SENT", externalId: "resend:email-out-1" });
   });
 });

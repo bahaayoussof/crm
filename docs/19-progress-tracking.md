@@ -70,13 +70,13 @@ PostgreSQL 17.5 (portable `embedded-postgres`) + the real running stack:
   customer IDOR, reopen matrix, team-scoped auto-assignment, realtime audience
   isolation, live-chat lifecycle all PASS. EN/AR + RTL, light/dark,
   desktop/mobile browser smoke (Playwright/Chromium) all PASS.
-- **New finding (documented, not fixed — TEST-ONLY task):** staff public reply to
-  a `channel=EMAIL` ticket returns 503 `EMAIL_NOT_CONFIGURED` **and rolls back the
-  message** when Resend is unconfigured (`ticket.service.addTicketMessage` runs
-  `deliverEmailReply`/`deliverSmsReply` inside the `$transaction`; WhatsApp runs
-  post-commit and degrades gracefully). MEDIUM, pre-existing, non-isolation →
-  recommend `fix/outbound-reply-resilience`. Also: seed produces 0 `SMS`-channel
-  tickets (dead branch, `seed-test-data.ts:731`).
+- **`docs/25` finding (Bug 1, MEDIUM) — RESOLVED on `fix/outbound-reply-resilience`
+  (see the dedicated section below).** Staff public reply to a `channel=EMAIL`
+  ticket used to return 503 `EMAIL_NOT_CONFIGURED` and roll the message back when
+  Resend was unconfigured. EMAIL/SMS delivery now runs **after** the local commit
+  (ADR-052): provider failure → 201 + `delivery.status = "FAILED"` +
+  `<CHANNEL>_DELIVERY_FAILED` history, the reply is never lost. Seed Bug 2 (0
+  `SMS`-channel tickets) resolved on the same branch.
 
 **Still NOT performed (outside local scope):**
 - Live Email (Resend) / WhatsApp (Meta) / SMS (TextBee) / AI provider delivery;
@@ -86,8 +86,45 @@ PostgreSQL 17.5 (portable `embedded-postgres`) + the real running stack:
 - Production deployment smoke test (SPA deep-link refresh, CORS, cron auth).
 
 **Release recommendation:** READY WITH FIXES (fresh-DB / seed / multi-role runtime
-now verified locally — `docs/25`; one MEDIUM outbound-reply resilience fix + live
-provider + prod-deploy smoke remain).
+verified locally — `docs/25`; the MEDIUM outbound-reply resilience fix is now
+**done** on `fix/outbound-reply-resilience`; live provider + prod-deploy smoke
+remain).
+
+---
+
+## Outbound reply resilience (EMAIL/SMS) — 2026-09-02
+
+Implemented on `fix/outbound-reply-resilience` (off `master` `b11408f`, carries the
+`docs/25` QA-report commit); changes **unstaged and uncommitted**. Resolves
+`docs/25` **Bug 1** (MEDIUM) and **Bug 2** (LOW, seed fixture). ADR-052.
+
+- **Root cause:** `ticket.service.addTicketMessage` invoked `deliverEmailReply` /
+  `deliverSmsReply` **inside** the `prisma.$transaction` before
+  `tx.ticketMessage.create`, so a `503 EMAIL_NOT_CONFIGURED` / `SMS_NOT_CONFIGURED`
+  or any `502` provider error rolled the whole transaction back — the staff reply
+  was discarded and the API returned 5xx. WhatsApp already delivered post-commit.
+- **Fix:** the transaction now persists local durable state only (validation,
+  `TicketMessage`, `firstRespondedAt`, watcher fan-out, EMAIL thread bookkeeping);
+  `emitTicketMessageCreated` fires on commit; then EMAIL/SMS/WhatsApp delivery is
+  attempted **after commit** via non-throwing wrappers `deliverOutboundEmailReply`
+  / `deliverOutboundSmsReply` / `deliverOutboundReply`. Failure → **HTTP 201** with
+  `delivery: { channel, status: "FAILED", reason }` + a `<CHANNEL>_DELIVERY_FAILED`
+  ticket-history row (shared `integrations/outbound-delivery.ts`). Success stores
+  the provider id on the committed row. RBAC, ticket workflow graph, transaction
+  guarantees around the local record, and the WhatsApp path are unchanged.
+- **Files:** `server/src/modules/integrations/outbound-delivery.ts` (new) +
+  `outbound-delivery.test.ts` (new); `integrations/email/email.service.ts` +
+  `email.test.ts`; `integrations/sms/sms.service.ts`;
+  `modules/tickets/ticket.service.ts` + `ticket.test.ts`;
+  `scripts/seed-test-data.ts` (`seedTicketChannel`) + `seed-test-data.helpers.test.ts`;
+  client `features/tickets/ticket.types.ts` + `locales/{en,ar}/translation.json`;
+  `docs/05` + `docs/17` (ADR-052) + `docs/25`.
+- **Verification:** server `tsc` + `eslint` clean; full server vitest **878 / 50**
+  (was 860 / 49). Client `tsc` + `eslint` clean (2 pre-existing warnings); full
+  client vitest **767 / 64**. `npm run build` exit 0 (pre-existing >500 kB chunk
+  warning). `git diff --check` clean. Live Resend/TextBee delivery and an HTTP
+  smoke against a disposable Postgres: **NOT EXECUTED** (no running QA stack) —
+  covered by the automated regression suite.
 
 ---
 

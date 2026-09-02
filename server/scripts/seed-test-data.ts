@@ -212,6 +212,24 @@ export function resolveMessageAuthorId(input: {
   return staffAuthorId;
 }
 
+/**
+ * Deterministic per-ticket channel for the main ticket loop (index `i`).
+ *
+ * WEB / EMAIL / WHATSAPP buckets are unchanged. The final `i % 10 === 9` bucket
+ * previously read `i % 2 === 0 ? SMS : LIVE_CHAT`, but that index is always odd,
+ * so `SMS` was dead code and the seed produced **zero** SMS tickets
+ * (QA `docs/25` Bug 2). Splitting on `Math.floor(i / 10) % 2` instead keeps the
+ * split deterministic, keeps the total ticket count and the WEB/EMAIL/WHATSAPP
+ * distribution identical, and makes both SMS and LIVE_CHAT reachable.
+ */
+export function seedTicketChannel(i: number): Channel {
+  const bucket = i % 10;
+  if (bucket <= 4) return Channel.WEB;
+  if (bucket <= 7) return Channel.EMAIL;
+  if (bucket === 8) return Channel.WHATSAPP;
+  return Math.floor(i / 10) % 2 === 0 ? Channel.SMS : Channel.LIVE_CHAT;
+}
+
 // ---------------------------------------------------------------------------
 // Seed Data Counts (Intentionally non-round to test pagination & last-page QA)
 // ---------------------------------------------------------------------------
@@ -723,12 +741,8 @@ export async function seedTestData() {
     else if (i % 10 <= 7) priority = TicketPriority.MEDIUM;
     else priority = TicketPriority.LOW;
 
-    // Channel distribution
-    let channel: Channel;
-    if (i % 10 <= 4) channel = Channel.WEB;
-    else if (i % 10 <= 7) channel = Channel.EMAIL;
-    else if (i % 10 === 8) channel = Channel.WHATSAPP;
-    else channel = i % 2 === 0 ? Channel.SMS : Channel.LIVE_CHAT;
+    // Channel distribution (deterministic per index — see seedTicketChannel)
+    const channel: Channel = seedTicketChannel(i);
 
     // Assignment distribution
     let assignedAgentId: string | null = null;
