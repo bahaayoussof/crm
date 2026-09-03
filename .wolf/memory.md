@@ -1039,3 +1039,9 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
 | 13:45 | Frontend Vercel preflight: harden API base URL — new `lib/api-config.ts` resolves `VITE_API_URL` once (trim trailing slash; dev-only localhost fallback; prod build throws if unset). api-client + realtime-provider consume it. `.env.example` doc expanded. vercel.json SPA rewrite already correct — unchanged. | client/src/lib/api-config.ts (new), client/src/services/api-client.ts, client/src/features/realtime/realtime-provider.tsx, client/.env.example | typecheck/lint(2 pre-existing warns)/test 772 pass/build all green; dist/ OK; no commit | ~40k |
+
+## Session: 2026-09-03 14:03
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 14:15 | Fix Vercel runtime ERR_REQUIRE_ESM (sanitize-html@2.17.7 CJS require('htmlparser2'), npm resolved ESM-only htmlparser2@12.0.0; v11 dropped CJS export). Added `overrides: { htmlparser2: "10.1.0" }` to server/package.json (10.1.0 = last dual CJS/ESM, the version sanitize-html 2.17.4/2.17.5 shipped against), regenerated lock. Verified with `node --no-experimental-require-module` (simulates Vercel's older Node): app.ts + api/index.ts import clean. | server/package.json, server/package-lock.json | typecheck/lint/build/vercel-build green; 933 tests pass; npm ci reproduces tree; no commit | ~55k |

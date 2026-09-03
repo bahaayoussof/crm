@@ -58,5 +58,8 @@
     "typescript": "~5.9.2",
     "typescript-eslint": "^8.41.0",
     "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "htmlparser2": "10.1.0"
   }
 }
