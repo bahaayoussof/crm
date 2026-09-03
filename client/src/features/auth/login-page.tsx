@@ -8,7 +8,7 @@ import { getAuthErrorMessage } from "./auth-error";
 import { AuthField } from "./auth-field";
 import { getRoleHome } from "./auth-routing";
 import { loginSchema, type LoginValues } from "./auth.schemas";
-import { DemoLoginPanel } from "./demo-login-panel";
+import { DemoRoleSelect } from "./demo-role-select";
 import { AuthLayout } from "@/app/layouts/auth-layout";
 import { PasswordInput } from "@/components/shared/password-input";
 
@@ -17,7 +17,7 @@ export function LoginPage() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
   const [apiError, setApiError] = useState<string | null>(null);
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginValues>({ resolver: zodResolver(loginSchema), defaultValues: { email: "", password: "" } });
+  const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm<LoginValues>({ resolver: zodResolver(loginSchema), defaultValues: { email: "", password: "" } });
   if (user) return <Navigate to={getRoleHome(user.role)} replace />;
 
   const onSubmit = handleSubmit(async (values) => {
@@ -38,6 +38,13 @@ export function LoginPage() {
             {apiError}
           </p>
         )}
+        <DemoRoleSelect
+          disabled={isSubmitting}
+          onSelect={(account) => {
+            setValue("email", account.email, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+            setValue("password", account.password, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+          }}
+        />
         <AuthField id="login-email" label={t("auth.email")} error={errors.email?.message ? t(errors.email.message) : undefined}>
           <input id="login-email" className="input text-start" dir="ltr" type="email" autoComplete="email" aria-invalid={Boolean(errors.email)} aria-describedby={errors.email ? "login-email-error" : undefined} {...register("email")} />
         </AuthField>
@@ -56,7 +63,6 @@ export function LoginPage() {
       <p className="mt-6 text-center text-sm text-muted-foreground">
         {t("auth.needAccount")} <Link className="font-medium text-primary hover:underline" to="/register">{t("auth.register")}</Link>
       </p>
-      <DemoLoginPanel />
     </AuthLayout>
   );
 }

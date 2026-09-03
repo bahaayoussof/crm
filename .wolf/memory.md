@@ -1024,3 +1024,14 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 |------|--------|---------|---------|--------|
 | 16:15 | brand asset swap: replace "CS" placeholder tiles with new logo PNGs; new shared `BrandLogo` (variant full/icon); `<link rel=icon>`+apple-touch pointed at `/brand/crm-icon.png` (no separate favicon file) | client/src/components/shared/brand-logo.tsx (new), app-shell.tsx, auth-layout.tsx, sidebar/sidebar.tsx, client/index.html | branch feat/brand-assets; typecheck+lint(0 err)+test(787/787)+build green; NOT committed | ~30k |
 | 16:22 | follow-up: drop duplicated `client/public/favicon.png`, point icon links straight at canonical `/brand/crm-icon.png` | client/public/favicon.png (deleted), client/index.html, docs/17+19, .wolf/{STATUS,cerebrum} | typecheck+lint(0)+test(787/787)+build green; dist/brand/crm-icon.png present, index.html refs /brand/crm-icon.png; NOT committed | ~8k |
+
+## Session: 2026-09-03 16:29
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-03 16:47
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 16:52 | Replace Demo Accounts card with compact "Sign in as" role Select in login form | login-page.tsx, demo-role-select.tsx (new), demo-role-select.test.tsx (new), deleted demo-login-panel.tsx/.test.tsx, en/ar translation.json | typecheck+lint+798 tests+build green | ~40k |
