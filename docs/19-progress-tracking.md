@@ -1,5 +1,77 @@
 # Customer Support CRM — Progress Tracking
 
+## CURRENT STATE — 2026-09-03 (`feature/demo-environment`)
+
+> Authoritative for this branch. The 2026-09-02 block below remains valid history
+> for `master` / the QA branches.
+
+**Branch:** `feature/demo-environment` (off `master` `482a568`). Unstaged,
+uncommitted — nothing staged, committed, pushed, merged, rebased, or tagged.
+
+**Scope:** public portfolio demo as an environment configuration of the existing
+app — `DEMO_MODE` (server) / `VITE_DEMO_MODE` (client). Centralized in
+`server/src/config/demo.ts` + `client/src/lib/demo.ts`. See ADR-053 and
+`docs/26-demo-environment.md`.
+
+- **Provider safety:** WhatsApp / SMS / Email outbound simulated at the adapter
+  boundary (message + history + notifications + realtime still written); AI on a
+  tight per-user rate limit in demo.
+- **Demo-account protection (backend):** `middleware/demo-guard.ts` →
+  `403 DEMO_PROTECTED_RESOURCE` for the four `@demo.local` accounts
+  (email/password/name/role/deactivate/reset) and for department/team deletes.
+  Inert when `DEMO_MODE` off.
+- **Seed / reset:** `npm run demo:seed` (baseline `seedTestData()` + demo accounts
+  + 6 demo-customer scenarios). `npm run demo:reset` (truncate + reseed) refuses
+  unless `DEMO_MODE=true` AND `DATABASE_ENV=demo`; no `prisma migrate reset`; no
+  HTTP reset route.
+- **Demo env file (`server/.env.demo`):** the three demo commands
+  (`db:demo:deploy` — new, `prisma migrate deploy` against the demo DB;
+  `demo:seed`; `demo:reset`) auto-load `server/.env.demo` via
+  `scripts/load-demo-env.js` (`scripts/demo-env.ts`) — first import, before
+  `dotenv/config` / `env.ts`. It overrides stale shell vars for
+  `DATABASE_URL`/`DATABASE_ENV`/`DEMO_MODE`/`JWT_SECRET`, refuses to read
+  `DEMO_RESET_CONFIRM` from the file, and aborts with a clear message if the file
+  is missing (no fall back to `server/.env`). `npm run dev` / `start` /
+  `db:deploy` and the deployed Vercel app are untouched. `server/.env.demo` is
+  git-ignored; `server/.env.demo.example` is committed.
+- **Frontend:** `DemoLoginPanel` (real per-role `/auth/login`) + global dismissible
+  `DemoBanner`, render only when `VITE_DEMO_MODE=true`. EN + AR `demo.*` strings.
+- **Vercel Hobby:** `server/vercel.json` `crons` array (3 × `*/5 * * * *`) removed;
+  `/api/internal/*` endpoints + SLA/task-reminder logic intact and still
+  `CRON_SECRET`-protected. `GET /api/health` gains a non-secret `demo` flag.
+- **Vercel deployment hardening (ADR-054):** new `server/api/index.ts` re-exports
+  the Express `app` as the single Vercel serverless function
+  (`server.ts` stays the persistent-host `app.listen` path — importing `app.ts`
+  starts nothing); `server/vercel.json` gains `rewrites → /api`,
+  `buildCommand: prisma generate`, `functions.maxDuration 60` (still **no
+  `crons`**); new `client/vercel.json` catch-all SPA rewrite for nested-route
+  refresh; reset guard redesigned to **three explicit signals** (`DEMO_MODE=true`
+  + `DATABASE_ENV=demo` + `DEMO_RESET_CONFIRM=RESET_DEMO_DATABASE`), independent
+  of `NODE_ENV`, so the production-hosted demo DB can be reseeded while no real DB
+  ever qualifies; CORS origin decision extracted to a pure, unit-tested
+  `isOriginAllowed`; new server scripts `db:deploy` (`prisma migrate deploy`) and
+  `vercel-build`; `tsconfig.vercel.json` type-checks `api/`.
+
+**Automated verification (this branch):**
+
+| Gate | Result |
+| --- | --- |
+| Server TypeScript (`tsc`, both tsconfigs) | PASS (exit 0) |
+| Server ESLint | PASS (exit 0) |
+| Server tests (Vitest) | PASS — **933 / 56 files** (+13 demo, +17 deployment-hardening incl. new `api/index.test.ts`, +11 `scripts/demo-env.test.ts`) |
+| Client TypeScript (`tsc -b`) | PASS (exit 0) |
+| Client ESLint | PASS (exit 0) — 2 pre-existing `react-refresh` warnings |
+| Client tests (Vitest) | PASS — **772 / 66 files** |
+| `npm run build` (client + server) | PASS (exit 0) — pre-existing >500 kB chunk warning |
+
+**Not verified:** `vercel build` / a real Vercel deploy (CLI is authenticated but
+`vercel build` needs interactive project confirmation in this environment and
+completing it would mutate the linked Vercel project — full local gates run
+instead); `demo:seed` / `demo:reset` against a real demo database (none
+provisioned); live role-by-role browser smoke test on a deployed demo; live
+external-provider non-delivery (no real credentials — the simulation path is
+unit-tested to make zero `fetch` calls).
+
 ## CURRENT STATE — 2026-09-02 (Final QA & Production Readiness Audit)
 
 > This block is the authoritative current summary. Everything below it is a

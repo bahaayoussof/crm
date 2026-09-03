@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
+import { assertDeletionAllowedInDemo } from "../../middleware/demo-guard.js";
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../audit-logs/audit-log.constants.js";
 import { changedFields, createAuditLog } from "../audit-logs/audit-log.service.js";
 import type { AuditRequestContext } from "../audit-logs/audit-request-context.js";
@@ -190,6 +191,7 @@ export async function updateDepartment(
 }
 
 export async function deleteDepartment(id: string, actorId: string, requestContext?: AuditRequestContext) {
+  assertDeletionAllowedInDemo("Department");
   const existing = await prisma.department.findUnique({
     where: { id },
     select: { id: true, name: true, _count: { select: { users: true, tickets: true } } },

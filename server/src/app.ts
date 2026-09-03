@@ -2,6 +2,7 @@
 import cors, { type CorsOptions } from "cors";
 import express from "express";
 import { env } from "./config/env.js";
+import { isDemoMode } from "./config/demo.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { notFoundHandler } from "./middleware/not-found.js";
 import { authRouter } from "./modules/auth/auth.routes.js";
@@ -34,23 +35,38 @@ import { smsIntegrationRouter } from "./modules/integrations/sms/sms.routes.js";
 import { realtimeRouter } from "./modules/realtime/realtime.routes.js";
 
 
-const allowedOrigins = new Set(env.CLIENT_URLS ?? [env.CLIENT_URL]);
 const localDevelopmentOrigin = /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/;
+
+/** The exact browser origins the API trusts, from `CLIENT_URLS` (preferred) or `CLIENT_URL`. */
+export const allowedOrigins: ReadonlySet<string> = new Set(env.CLIENT_URLS ?? [env.CLIENT_URL]);
+
+/**
+ * Pure CORS origin decision, extracted so it can be unit-tested without booting
+ * the whole app. Rules:
+ *  - a request with no `Origin` header (curl, server-to-server, same-origin) is
+ *    allowed — it is not a browser cross-origin call;
+ *  - `localhost` / loopback origins are allowed only outside production, so local
+ *    dev never needs configuring but the hosted demo does not trust them;
+ *  - every other origin must be listed explicitly in `CLIENT_URLS` / `CLIENT_URL`.
+ *    No `*`, no `.vercel.app` wildcard — a Vercel preview URL must be added to
+ *    `CLIENT_URLS` deliberately (see docs/26).
+ */
+export function isOriginAllowed(
+  origin: string | undefined,
+  options: { allowedOrigins: ReadonlySet<string>; allowLocalDev: boolean },
+): boolean {
+  if (!origin) return true;
+  if (options.allowLocalDev && localDevelopmentOrigin.test(origin)) return true;
+  return options.allowedOrigins.has(origin);
+}
 
 const corsOptions: CorsOptions = {
   origin(origin, callback) {
-    if (!origin) {
+    if (isOriginAllowed(origin, { allowedOrigins, allowLocalDev: env.NODE_ENV !== "production" })) {
       callback(null, true);
       return;
     }
-
-    const isLocalDevelopmentOrigin = env.NODE_ENV !== "production" && localDevelopmentOrigin.test(origin);
-    if (isLocalDevelopmentOrigin || allowedOrigins.has(origin)) {
-      callback(null, true);
-      return;
-    }
-
-    callback(new Error(`Origin ${origin} is not allowed by CORS`));
+    callback(new Error(`Origin ${origin ?? "(none)"} is not allowed by CORS`));
   },
   methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
@@ -70,7 +86,9 @@ app.use("/api/integrations/sms", smsIntegrationRouter);
 app.use(express.json());
 
 app.get("/api/health", (_request, response) => {
-  response.status(200).json({ status: "ok" });
+  // `demo` is a non-secret deployment flag — lets the deployed frontend and
+  // ops confirm the public-demo configuration is active without guessing.
+  response.status(200).json({ status: "ok", demo: isDemoMode() });
 });
 app.use("/api/auth", authRouter);
 app.use("/api/customers", customerRouter);
@@ -100,3 +118,11 @@ app.use("/api/portal", portalRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
+
+// The Express application is exported as both a named and the default binding.
+// `server.ts` (persistent Node host) and `api/index.ts` (Vercel serverless
+// entrypoint) both import THIS instance — there is exactly one app, one set of
+// routes, one middleware chain. This module must stay free of side effects:
+// no `app.listen`, no `setInterval`, no `process.on` — those belong in
+// `server.ts`, which is the only place a long-lived process is assumed.
+export default app;

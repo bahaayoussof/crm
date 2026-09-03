@@ -11,7 +11,10 @@
     "typecheck": "npm --prefix client run typecheck && npm --prefix server run typecheck",
     "test": "npm --prefix client run test && npm --prefix server run test",
     "seed:test": "npm --prefix server run seed:test",
-    "db:seed:test": "npm --prefix server run db:seed:test"
+    "db:seed:test": "npm --prefix server run db:seed:test",
+    "db:demo:deploy": "npm --prefix server run db:demo:deploy",
+    "demo:seed": "npm --prefix server run demo:seed",
+    "demo:reset": "npm --prefix server run demo:reset"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type PropsWithChildren, useState } from "react";
 import { AuthProvider } from "@/features/auth/auth-context";
+import { DemoBanner } from "@/components/shared/demo-banner";
 import { ThemeProvider } from "@/lib/theme-provider";
 
 export function AppProviders({ children }: PropsWithChildren) {
@@ -8,7 +9,10 @@ export function AppProviders({ children }: PropsWithChildren) {
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          {children}
+          <DemoBanner />
+        </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>
   );

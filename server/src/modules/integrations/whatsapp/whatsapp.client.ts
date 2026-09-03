@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import { isDemoMode } from "../../../config/demo.js";
 import { getSendConfig } from "./whatsapp.config.js";
 
 /**
@@ -39,6 +41,14 @@ export interface SendTextMessageResult {
 const GRAPH_HOST = "https://graph.facebook.com";
 
 export async function sendTextMessage(input: SendTextMessageInput): Promise<SendTextMessageResult> {
+  // Public demo: never call the Meta Graph API and never require an access token.
+  // The staff reply is already persisted by the ticket service; returning a
+  // synthetic wamid lets the rest of the outbound flow (history, realtime,
+  // provider-id storage) run unchanged.
+  if (isDemoMode()) {
+    return { messageId: `demo-wamid-${randomUUID()}` };
+  }
+
   const config = getSendConfig();
   if (!config) throw new WhatsappNotConfiguredError();
 

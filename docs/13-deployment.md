@@ -4,9 +4,25 @@
 Vercel.
 
 ## API
-Use a Vercel-compatible Node deployment if the Express setup supports the selected deployment pattern.
 
-Do not rewrite the backend architecture solely for deployment without documenting the change.
+The Express app is deployed as a single Vercel serverless function.
+
+- `server/src/app.ts` builds and exports the Express `app` (no listener, no
+  lifecycle side effects).
+- `server/src/server.ts` is the persistent Node host (`app.listen`, signal
+  handlers) — used by `npm run dev`, `npm start`, and any non-Vercel host.
+- `server/api/index.ts` is the Vercel entrypoint: it re-exports the same `app`
+  (`import app from "../src/app.js"; export default app;`). No routes/middleware
+  are re-declared.
+- `server/vercel.json` rewrites every path to `/api`, sets
+  `buildCommand: "prisma generate"`, and `functions["api/index.ts"].maxDuration`
+  to 60s. It contains **no `crons` array**.
+- `@vercel/node` transpiles `api/index.ts`; it is type-checked via
+  `server/tsconfig.vercel.json` (wired into `npm run typecheck`). The `src → dist`
+  build (`npm run build`) is unchanged and used only by the persistent host.
+
+See ADR-053 and ADR-054. Do not rewrite the backend architecture solely for
+deployment without documenting the change.
 
 ## Database
 Managed PostgreSQL.
@@ -24,9 +40,21 @@ Expected categories:
 - storage credentials if external attachment storage is used
 - `CRON_SECRET` for deployment-scheduler authentication
 
+### Public demo deployment (`feature/demo-environment`)
+
+The portfolio demo is this same app with `DEMO_MODE=true` / `VITE_DEMO_MODE=true`
+plus an isolated demo database (`DATABASE_ENV=demo`). It targets **Vercel Hobby**,
+so `server/vercel.json` no longer declares the `*/5 * * * *` cron jobs (Hobby
+allows cron only once per day). The `/api/internal/*` endpoints and all SLA /
+task-reminder / live-chat-inactivity logic are unchanged and still
+`CRON_SECRET`-protected — they are simply not auto-triggered. Outbound WhatsApp /
+SMS / Email are simulated at the adapter boundary (no credentials needed). Full
+detail, env-var tables and the `demo:seed` / `demo:reset` scripts:
+`docs/26-demo-environment.md`.
+
 ### SLA monitor (`feature/sla-automation`)
 
-- Deploy the server project with `server/vercel.json`; its Vercel Cron schedule calls `/api/internal/sla-monitor` every five minutes (`*/5 * * * *`).
+- Deploy the server project with `server/vercel.json`; on a **non-Hobby** plan add a Vercel Cron schedule calling `/api/internal/sla-monitor` every five minutes (`*/5 * * * *`). The public demo (Hobby) omits this — see the demo section above.
 - Set `CRON_SECRET` to a distinct random value of at least 32 characters in the server deployment. Vercel sends it as `Authorization: Bearer <CRON_SECRET>` for cron invocations.
 - Do not reuse `JWT_SECRET`, expose the value to the client, or invoke this endpoint from product UI.
 - The endpoint is idempotent and batch-bounded, but the deployment must still provide the configured PostgreSQL connection and a Vercel-compatible server entry.

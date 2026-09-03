@@ -6,13 +6,18 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "prisma generate && tsc -p tsconfig.json",
+    "vercel-build": "prisma generate",
     "start": "node dist/server.js",
     "lint": "eslint .",
-    "typecheck": "tsc -p tsconfig.json --noEmit --pretty false",
+    "typecheck": "tsc -p tsconfig.json --noEmit --pretty false && tsc -p tsconfig.vercel.json --pretty false",
     "test": "vitest run",
     "prisma:generate": "prisma generate",
+    "db:deploy": "prisma migrate deploy",
+    "db:demo:deploy": "tsx scripts/demo-migrate-deploy.ts",
     "seed:test": "tsx scripts/seed-test-data.ts",
-    "db:seed:test": "tsx scripts/seed-test-data.ts"
+    "db:seed:test": "tsx scripts/seed-test-data.ts",
+    "demo:seed": "tsx scripts/seed-demo.ts",
+    "demo:reset": "tsx scripts/demo-reset.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.15.0",

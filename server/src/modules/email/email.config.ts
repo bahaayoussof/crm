@@ -1,3 +1,4 @@
+import { isDemoMode } from "../../config/demo.js";
 import { env } from "../../config/env.js";
 import type { EmailProvider } from "./email.types.js";
 import { logEmailProvider } from "./providers/log-provider.js";
@@ -12,6 +13,12 @@ let cached: EmailProvider | null = null;
  */
 export function getEmailProvider(): EmailProvider {
   if (cached) return cached;
+  // Public demo: transactional email (password reset, notifications) is written
+  // to the server log, never sent, and no RESEND_API_KEY is needed.
+  if (isDemoMode()) {
+    cached = logEmailProvider;
+    return cached;
+  }
   if (env.RESEND_API_KEY && env.EMAIL_FROM) {
     cached = createResendProvider(env.RESEND_API_KEY, env.EMAIL_FROM);
   } else {

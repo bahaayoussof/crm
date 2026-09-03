@@ -8,6 +8,7 @@ import { getAuthErrorMessage } from "./auth-error";
 import { AuthField } from "./auth-field";
 import { getRoleHome } from "./auth-routing";
 import { loginSchema, type LoginValues } from "./auth.schemas";
+import { DemoLoginPanel } from "./demo-login-panel";
 import { AuthLayout } from "@/app/layouts/auth-layout";
 
 export function LoginPage() {
@@ -60,6 +61,7 @@ export function LoginPage() {
       <p className="mt-6 text-center text-sm text-muted-foreground">
         {t("auth.needAccount")} <Link className="font-medium text-primary hover:underline" to="/register">{t("auth.register")}</Link>
       </p>
+      <DemoLoginPanel />
     </AuthLayout>
   );
 }

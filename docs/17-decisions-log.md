@@ -1440,3 +1440,204 @@ No new contract. `ticket-workspace-tabs.tsx` already surfaces `delivery.status =
 - No Prisma migration, no new dependency, no RBAC or workflow-graph change.
 - Provider calls never run inside the ticket-message transaction; a DB failure before commit means the provider is not called and no realtime event fires.
 - Verification: server `tsc` + `eslint` clean; `ticket.test.ts` (103, +1 SMS timeout → 201 + `PROVIDER_UNREACHABLE`, single side effect) + `outbound-delivery.test.ts` (14, +`SMS_DELIVERY_UNREACHABLE` reason mapping, + SMS timeout wrapper single-history-row) + `sms.test.ts` (+4: `AbortSignal.timeout` abort → `SMS_DELIVERY_UNREACHABLE`, raw connection failure → `SMS_DELIVERY_UNREACHABLE`, HTTP 5xx / body-level failure stay `SMS_DELIVERY_FAILED`) + `email.test.ts` outbound block (5, +1 timeout→`PROVIDER_UNREACHABLE`) + `email.client.test.ts` (6, `sendTicketEmail` timeout seam — deterministic, already-aborted signal, no real wait) + `seed-test-data.helpers.test.ts` channel block (3); full server vitest **892/892** (51 files). Client `tsc` + `eslint` clean; full client vitest **767/767** (64 files). `git diff --check` clean. Live external-provider delivery remains NOT VERIFIED (no real Resend/TextBee credentials).
+
+
+# ADR-053: Public Demo Environment — same app, environment-gated
+
+**Status:** Accepted (implemented on branch `feature/demo-environment`; uncommitted).
+
+## Context
+
+The CRM needs a public portfolio demo (linked from a personal site, deployed on
+Vercel Hobby) that recruiters/developers can explore without breaking shared
+state, triggering real external messaging, or mutating the demo identities. It
+must remain the real product — not a mocked static UI — and must not weaken
+production behaviour.
+
+## Decision
+
+Introduce an explicit environment-level demo mode. **No forked app, no duplicated
+pages.**
+
+1. **Config surface.** `DEMO_MODE` (`"true"`/`"false"`, server, `config/env.ts`) +
+   `DATABASE_ENV` (`demo`, reset-guard only). Client: `VITE_DEMO_MODE` (build-time).
+   Single accessors: `server/src/config/demo.ts` (`isDemoMode`,
+   `shouldSimulateOutboundProviders`, `isDemoProtectedEmail`, `DEMO_ACCOUNT_EMAILS`,
+   `isDemoResetEnvironment`) and `client/src/lib/demo.ts` (`isDemoMode`,
+   `DEMO_ACCOUNTS`). Every check goes through these — no scattered
+   `process.env.DEMO_MODE`.
+2. **Provider simulation at the integration boundary.** `getSmsProvider()` returns
+   `demoSmsProvider`; `whatsapp.client.sendTextMessage` and
+   `email.client.sendTicketEmail` early-return a synthetic id before any network
+   call; `email/email.config.getEmailProvider` forces the log transport. The local
+   `TicketMessage`, `TicketHistory`, notifications and realtime events are still
+   written by the existing post-commit delivery wrappers (ADR-052) — the demo
+   shows the complete conversation flow, not a frontend fake. No provider
+   credentials required to boot the demo.
+3. **Demo-account protection (backend).** `middleware/demo-guard.ts`:
+   `assertNotDemoProtectedEmail` / `assertNotDemoProtectedUserId` throw
+   `AppError(403, "DEMO_PROTECTED_RESOURCE")` for the four seeded accounts
+   (`{admin,manager,agent,customer}@demo.local`) on email/password/name/role/active
+   changes and password-reset; `assertDeletionAllowedInDemo` blocks
+   department/team deletes. Wired into `user.service.updateUser`,
+   `auth.service.changePassword` / `updateSelfProfile`,
+   `password-reset.service`, `department.service.deleteDepartment`,
+   `team.service.deleteTeam`. All inert when `DEMO_MODE` is off.
+4. **AI.** Same code path; `aiRateLimit` becomes 6 req / 30 min per user in demo
+   (vs 20 / 10 min). Unconfigured AI still returns the graceful
+   `AI_NOT_CONFIGURED`. No fake AI subsystem.
+5. **Seed / reset.** `scripts/seed-demo.ts` (`npm run demo:seed`) runs
+   `seedTestData()` then upserts the demo accounts, makes the demo manager lead
+   the first seeded team with the demo agent as a member, and creates six
+   hand-written demo-customer scenarios (one per ticket status, all channels/
+   priorities, spread over ~26 days, with multi-message threads + internal notes +
+   CSAT). `scripts/demo-reset.ts` (`npm run demo:reset`) `TRUNCATE ... RESTART
+   IDENTITY CASCADE` + `seedDemo()`, **refusing to run unless `DEMO_MODE=true` AND
+   `DATABASE_ENV=demo`** and `NODE_ENV !== production`. No `prisma migrate reset`.
+   No HTTP reset endpoint.
+6. **Frontend UX.** `DemoLoginPanel` (login page, real `/auth/login` per role) and
+   `DemoBanner` (global, dismissible, bottom-centre) render only when
+   `VITE_DEMO_MODE=true`. EN + AR strings under `demo.*`. Existing design system,
+   no new visual language.
+7. **Vercel Hobby.** `server/vercel.json` `crons` array (three `*/5 * * * *` jobs)
+   removed — Hobby allows daily cron only. Endpoints + SLA/task-reminder logic
+   unchanged and still `CRON_SECRET`-protected; not auto-triggered in the demo.
+   `GET /api/health` gains a non-secret `demo` boolean.
+
+## Alternatives rejected
+
+- **Separate demo app / mocked UI.** Rejected by the brief — it would stop being
+  the real product and double maintenance.
+- **Frontend-only "fake success" for providers.** Rejected — the conversation,
+  history and realtime events would be inconsistent with the backend.
+- **Disabling AI entirely in demo.** Rejected in favour of a strict rate limit so
+  the feature is still demonstrable when a key is present; graceful-disabled when
+  not.
+- **HTTP reset endpoint.** Rejected — a CLI/CI script with a double-flag guard is
+  safer and not publicly reachable.
+
+## Consequences
+
+- No Prisma migration, no schema change, no new runtime dependency, no RBAC or
+  workflow change. `DEMO_MODE` unset → behaviour identical to before.
+- Verification: server vitest **905/905** (54 files, +13 demo tests:
+  `config/demo.test.ts`, `middleware/demo-guard.test.ts`,
+  `integrations/demo-simulation.test.ts`); client vitest **771/772** (1 unrelated
+  pre-existing flake in `phone-input.test.tsx`, passes in isolation; +5 demo tests:
+  `demo-login-panel.test.tsx`, `demo-banner.test.tsx`). `npm run build` (client +
+  server) clean; `npm run lint` 0 errors (2 pre-existing warnings). `demo:seed` /
+  `demo:reset` NOT run here (no demo database provisioned); a live role-by-role
+  browser smoke test on a deployed demo is NOT VERIFIED.
+
+---
+
+# ADR-054: Vercel deployment hardening for the public demo — app/server/serverless split, three-signal reset guard
+
+**Status:** Accepted (implemented on branch `feature/demo-environment`; uncommitted). Extends ADR-053.
+
+## Context
+
+ADR-053's `docs/26` described the server deployment as "Node service (`npm start`
+→ `node dist/server.js`)". Vercel Hobby does not run a persistent Node process —
+it runs serverless functions — so the backend as described **could not deploy on
+Vercel at all**. Three further gaps blocked a reliable public demo:
+
+1. No Vercel serverless entrypoint; `app.ts` and the persistent server were only
+   loosely separated (single `app.ts` export, `server.ts` listens).
+2. The `demo:reset` guard required `NODE_ENV !== "production"`. The hosted demo
+   runs `NODE_ENV=production`, so the real demo database could never be reseeded —
+   while the guard's actual safety (never wipe a real DB) still needed to hold.
+3. No SPA rewrite config for the client — direct navigation / refresh on a nested
+   route (`/tickets/:id`, `/portal`, …) would 404 on Vercel.
+
+## Decision
+
+1. **Three-file split, no behaviour change.**
+   - `server/src/app.ts` — constructs and exports the one Express `app` (named +
+     `export default`). Guaranteed side-effect-free: no `listen`, no
+     `setInterval`, no `process.on` (pinned by a test that greps the source).
+   - `server/src/server.ts` — unchanged; the **only** caller of `app.listen()` and
+     the only place signal handlers live. `npm run dev` / `npm start` still run
+     this persistent server locally and on any persistent Node host.
+   - `server/api/index.ts` — the Vercel entrypoint. Two lines: `import app from
+     "../src/app.js"; export default app;`. An Express app is a `(req,res)`
+     handler, exactly what `@vercel/node` expects. No routes, middleware, CORS or
+     error handling re-declared.
+   - `server/vercel.json` gains `rewrites: [{ "/(.*)" → "/api" }]` (every path
+     handled by the single function), `buildCommand: "prisma generate"`, and
+     `functions["api/index.ts"].maxDuration: 60` (Hobby max; headroom for reports
+     and the SSE stream). **No `crons` array — `*/5 * * * *` stays removed.**
+   - `api/index.ts` is TypeScript, transpiled by `@vercel/node` at deploy time
+     (not by the `src → dist` build). It is type-checked via a dedicated
+     `tsconfig.vercel.json` wired into `npm run typecheck`; ESLint already covers
+     it. One compilation pipeline for `dist`, none duplicated.
+
+2. **Reset guard redesigned around explicit demo identity, not `NODE_ENV`.**
+   `config/demo.ts#evaluateDemoResetGuard` requires **all three** of
+   `DEMO_MODE=true`, `DATABASE_ENV=demo`, `DEMO_RESET_CONFIRM=RESET_DEMO_DATABASE`
+   (new optional env var; `DEMO_RESET_CONFIRM_TOKEN` constant). `demo-reset.ts`
+   calls `assertDemoResetAllowed()` and no longer checks `NODE_ENV`. The seed
+   scripts still refuse `NODE_ENV=production` **unless** pointed at the isolated
+   demo DB (`isIsolatedDemoDatabase` = `DEMO_MODE=true` + `DATABASE_ENV=demo`), so
+   a deliberate hosted-demo reseed works while a plain production seed of a real
+   database is still blocked. Net effect: the public demo DB **can** be reset on
+   purpose; a development or production DB **cannot** — it can never satisfy all
+   three signals.
+
+3. **Environment matrix confirmed.** `assertProductionSecretsConfigured` only
+   asserts `JWT_SECRET` + `DATABASE_URL` in production — no external-provider
+   credential is ever required to boot, so `NODE_ENV=production` + `DEMO_MODE=true`
+   starts cleanly with WhatsApp / TextBee / Resend / AI / Blob all unset (pinned
+   by a new `env.test.ts` case).
+
+4. **Client SPA routing.** New `client/vercel.json` with a single catch-all
+   rewrite to `/index.html`. Vercel serves real build files (`/assets/*`) from the
+   filesystem first, so only unknown paths fall through to the SPA shell. The
+   client project has no `/api` route (the API is a separate Vercel project), so
+   there is nothing to exclude.
+
+5. **CORS.** Logic unchanged in behaviour (explicit `CLIENT_URLS` / `CLIENT_URL`
+   allow-list; loopback only when `NODE_ENV !== "production"`; no `*`, no
+   `.vercel.app` wildcard) but the origin decision is extracted to a pure
+   exported `isOriginAllowed(origin, { allowedOrigins, allowLocalDev })` so it is
+   unit-tested directly (configured origin allowed; random origin and unconfigured
+   preview URL rejected).
+
+## Alternatives rejected
+
+- **Compile `api/` into the `src → dist` build** (change `rootDir`, repoint
+  `npm start` to `dist/src/server.js`). Rejected — ripples through docs and the
+  persistent-host start path for no gain; `@vercel/node` compiles the entrypoint
+  itself.
+- **Detect Vercel at runtime and conditionally skip `listen()`** in a single
+  entry file. Rejected — the brief forbids env-sniffing hacks; the clean split is
+  simpler and testable.
+- **Weaken the reset guard to one boolean** so the hosted demo can reset.
+  Rejected — a single flag is one fat-finger from wiping a real DB. Three
+  independent, deliberate signals instead.
+- **Re-add a Vercel Cron for background jobs.** Rejected — Hobby allows daily
+  only; `*/5 * * * *` fails to deploy. Endpoints stay intact and `CRON_SECRET`-
+  protected for an external pinger or a non-Hobby plan later.
+- **Rewrite SSE to WebSockets for serverless.** Out of scope. The stream is
+  force-closed at `maxDuration` and the client auto-reconnects — documented
+  limitation, app stays usable.
+
+## Consequences
+
+- No Prisma migration, no schema change, no new runtime dependency. `DEMO_MODE`
+  unset + persistent host → behaviour byte-for-byte unchanged; `server.ts` is the
+  untouched local/persistent path.
+- New env var `DEMO_RESET_CONFIRM` (optional; only ever set for the moment of a
+  reset). `.env.example` updated.
+- New scripts: `server` `db:deploy` (`prisma migrate deploy`), `vercel-build`
+  (`prisma generate`). `demo:seed` / `demo:reset` unchanged in name.
+- Serverless limitations (unchanged, documented in `docs/13` / `docs/26`): SSE
+  reconnects at `maxDuration`; the three background sweeps are not auto-triggered;
+  in-memory realtime subscriber map and rate-limit buckets are per-instance.
+  Attachments already use Vercel Blob (no local disk) — no change needed.
+- Verification: server `tsc` (both tsconfigs) + ESLint clean; server vitest
+  **922/922** (55 files; +`api/index.test.ts`, +CORS/reset-guard/matrix cases).
+  Client `tsc -b` + ESLint (2 pre-existing warnings) clean; client vitest
+  **772/772**; `vite build` green. `npm run build` (client + server) exit 0.
+  A real Vercel deploy, `vercel build` with a linked project, and a
+  deployed-demo browser smoke test are **NOT VERIFIED** here.

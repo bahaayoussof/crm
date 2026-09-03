@@ -25,10 +25,14 @@ import {
   TicketStatus,
 } from "@prisma/client";
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../src/modules/audit-logs/audit-log.constants.js";
+import { isIsolatedDemoDatabase } from "../src/config/demo.js";
 
 const prisma = new PrismaClient();
 
-if (process.env.NODE_ENV === "production") {
+// Blocked in production EXCEPT for a deliberate reseed of the isolated public
+// demo database (DEMO_MODE=true + DATABASE_ENV=demo), which legitimately runs
+// with NODE_ENV=production because that is the Vercel demo's runtime mode.
+if (process.env.NODE_ENV === "production" && !isIsolatedDemoDatabase(process.env)) {
   throw new Error("seed-test-data is a development helper and must not run with NODE_ENV=production");
 }
 

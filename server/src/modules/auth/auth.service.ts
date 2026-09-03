@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 import { Prisma, Role } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
+import { assertNotDemoProtectedEmail } from "../../middleware/demo-guard.js";
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../audit-logs/audit-log.constants.js";
 import type { AuditRequestContext } from "../audit-logs/audit-request-context.js";
 import { changedFields, createAuditLog } from "../audit-logs/audit-log.service.js";
@@ -142,12 +143,16 @@ export async function changePassword(
 ): Promise<{ token: string }> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, role: true, isActive: true, passwordHash: true },
+    select: { id: true, email: true, role: true, isActive: true, passwordHash: true },
   });
 
   if (!user || !user.isActive) {
     throw new AppError(401, "ACCOUNT_DEACTIVATED", "This account has been deactivated");
   }
+
+  // Public demo: the shared demo accounts keep their published password so the
+  // next visitor can still sign in. Inert outside DEMO_MODE.
+  assertNotDemoProtectedEmail(user.email, "The demo account password is fixed in the public demo environment.");
 
   if (!(await bcrypt.compare(input.currentPassword, user.passwordHash))) {
     throw new AppError(401, "INVALID_PASSWORD", "The current password is incorrect");
@@ -249,6 +254,9 @@ export async function updateSelfProfile(
   if (!current || !current.isActive) {
     throw new AppError(401, "INVALID_TOKEN", "Authentication token is invalid or expired");
   }
+
+  // Public demo: the shared demo accounts have a fixed identity. Inert outside DEMO_MODE.
+  assertNotDemoProtectedEmail(current.email, "Demo account profile details are fixed in the public demo environment.");
 
   const before = toSelfProfile(current);
   const nextName = input.name !== undefined ? input.name : before.name;

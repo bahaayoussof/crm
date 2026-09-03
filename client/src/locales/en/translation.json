@@ -3,6 +3,23 @@
     "title": "Customer Support CRM",
     "foundationReady": "Project foundation is ready."
   },
+  "demo": {
+    "badge": "Demo",
+    "banner": {
+      "title": "Demo Environment",
+      "detail": "Data may reset periodically. External messaging integrations are simulated.",
+      "dismiss": "Dismiss demo notice"
+    },
+    "login": {
+      "title": "Try the demo",
+      "description": "Sign in with one click as any role. These are shared demo accounts on real authentication.",
+      "credentialHint": "All demo accounts use the password {{password}}.",
+      "asAdmin": "Continue as Admin",
+      "asManager": "Continue as Manager",
+      "asAgent": "Continue as Agent",
+      "asCustomer": "Continue as Customer"
+    }
+  },
   "notifications": {
     "title": "Notifications",
     "bellLabel": "Notifications, {{count}} unread",

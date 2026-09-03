@@ -7,6 +7,25 @@ const clientUrlsSchema = z.string()
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  // Public-demo switch. When "true" the app is the SAME CRM running in a safe
+  // portfolio-demo configuration: outbound provider transports (WhatsApp / SMS /
+  // Email) are simulated at their adapter boundary, the seeded demo accounts are
+  // protected from destructive mutation, and AI is strapped to a tight per-user
+  // rate limit. Every other behaviour — auth, RBAC, validation, workflows — is
+  // unchanged. Defaults to "false"; production/development are unaffected unless
+  // explicitly set. See config/demo.ts for the single accessor.
+  DEMO_MODE: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
+  // Names the environment a database belongs to. Only ever checked as the extra
+  // guard rail on the destructive `npm run demo:reset` script, which refuses to
+  // run unless DEMO_MODE=true AND DATABASE_ENV=demo. Never affects the app.
+  DATABASE_ENV: z.enum(["development", "test", "production", "demo"]).optional(),
+  // Third, explicit confirmation for the destructive `npm run demo:reset` script
+  // (which TRUNCATEs every table and re-seeds). Must equal the literal
+  // `DEMO_RESET_CONFIRM_TOKEN` from config/demo.ts. Never read by the running
+  // app — only by the reset script's guard. Deliberately NOT tied to NODE_ENV so
+  // the real Vercel-hosted demo (NODE_ENV=production) can still be reseeded while
+  // no development or production database can ever match all three signals.
+  DEMO_RESET_CONFIRM: z.string().optional(),
   PORT: z.coerce.number().int().positive().default(3000),
   CLIENT_URL: z.string().url().default("http://localhost:5173"),
   CLIENT_URLS: clientUrlsSchema.optional(),

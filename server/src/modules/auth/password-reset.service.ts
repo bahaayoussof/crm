@@ -3,6 +3,8 @@ import bcrypt from "bcrypt";
 import { env } from "../../config/env.js";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
+import { isDemoProtectedEmail } from "../../config/demo.js";
+import { assertNotDemoProtectedEmail } from "../../middleware/demo-guard.js";
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../audit-logs/audit-log.constants.js";
 import type { AuditRequestContext } from "../audit-logs/audit-request-context.js";
 import { createAuditLog } from "../audit-logs/audit-log.service.js";
@@ -32,6 +34,13 @@ export async function requestPasswordReset(
     where: { email },
     select: { id: true, name: true, email: true },
   });
+
+  // Public demo: never issue a reset link for a shared demo account (its password
+  // is published and fixed). Still returns the same generic result — no
+  // enumeration signal. Inert outside DEMO_MODE.
+  if (user && isDemoProtectedEmail(user.email)) {
+    return { ok: true };
+  }
 
   if (user) {
     const rawToken = randomBytes(32).toString("base64url");
@@ -68,12 +77,15 @@ export async function resetPassword(
 
   const existing = await prisma.passwordResetToken.findUnique({
     where: { tokenHash },
-    select: { id: true, userId: true, usedAt: true, expiresAt: true },
+    select: { id: true, userId: true, usedAt: true, expiresAt: true, user: { select: { email: true } } },
   });
 
   if (!existing || existing.usedAt) {
     throw new AppError(400, "TOKEN_INVALID", "This password reset link is invalid.");
   }
+  // Public demo: defence in depth — a demo account never has a live token, but
+  // reject any attempt to complete a reset against one. Inert outside DEMO_MODE.
+  assertNotDemoProtectedEmail(existing.user?.email, "The demo account password is fixed in the public demo environment.");
   if (existing.expiresAt.getTime() <= now.getTime()) {
     throw new AppError(400, "TOKEN_EXPIRED", "This password reset link has expired.");
   }

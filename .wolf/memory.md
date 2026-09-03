@@ -994,3 +994,35 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
 | 23:15 | Classify SMS timeout/network as PROVIDER_UNREACHABLE (was PROVIDER_REJECTED); consistent w/ Email | textbee.provider.ts, outbound-delivery.ts, sms.test.ts, outbound-delivery.test.ts, ticket.test.ts, docs/05,17,19,25 | server 892/51 green, tc/lint/build/diff clean, client 767/64 unchanged, no commit | ~40k |
+
+## Session: 2026-09-03 10:13
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 10:20 | Audit + build demo environment (DEMO_MODE) | server/src/config/demo.ts, middleware/demo-guard.ts, provider seams (sms/wa/email), scripts/seed-demo.ts+demo-reset.ts, client lib/demo.ts + demo-login-panel + demo-banner, vercel.json, docs/26 + ADR-053 | server 905/905, client 771/772 (1 pre-existing flake), build+lint clean | ~130k |
+
+## Session: 2026-09-03 11:52
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 12:00 | Audit deploy architecture (app.ts/server.ts/env/demo/prisma/vercel.json) | read-only | app.ts already side-effect-free; server.ts sole listener; env only asserts JWT+DB in prod; NO server serverless entrypoint existed = the blocker | ~30k |
+| 12:10 | Add Vercel serverless adapter | server/api/index.ts (new), server/src/app.ts (+`export default app`, extract `isOriginAllowed`), server/vercel.json (rewrites→/api, buildCommand prisma generate, maxDuration 60, still no crons) | thin re-export; one app, one pipeline | ~8k |
+| 12:15 | Redesign demo:reset guard — 3 explicit signals, NODE_ENV-independent | server/src/config/demo.ts (+evaluateDemoResetGuard/assertDemoResetAllowed/isIsolatedDemoDatabase/DEMO_RESET_CONFIRM_TOKEN), env.ts (+DEMO_RESET_CONFIRM), scripts/demo-reset.ts, seed-demo.ts, seed-test-data.ts, .env.example | reset needs DEMO_MODE=true+DATABASE_ENV=demo+DEMO_RESET_CONFIRM=RESET_DEMO_DATABASE; seeds allow prod only for isolated demo DB | ~10k |
+| 12:20 | Client SPA rewrite + typecheck for api/ | client/vercel.json (new), server/tsconfig.vercel.json (new), server/package.json (typecheck+db:deploy+vercel-build) | deep-link refresh; api/ typechecked | ~4k |
+| 12:30 | Tests | server/api/index.test.ts (new, 5), src/config/demo.test.ts (+7), src/app.test.ts (+CORS), src/config/env.test.ts (+1) | server 922/55 green; client unchanged 772/66 | ~12k |
+| 12:45 | Docs | docs/13, docs/26 (build table, serverless entry, SPA, API base URL, health, CORS, first-deploy checklist, custom domain, env tables +DEMO_RESET_CONFIRM), docs/17 (ADR-054), docs/19 | copy/paste deploy checklist | ~15k |
+| 12:55 | Gates: server tsc+eslint+vitest 922, client tsc+eslint+vitest 772, npm run build exit 0. vercel build NOT run (would touch linked account project). | — | ALL LOCAL GATES GREEN, not committed | ~6k |
+
+## Session: 2026-09-03 12:30
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## 2026-09-03 — Demo commands auto-load server/.env.demo
+| 12:30 | new scripts/demo-env.ts (pure applyDemoEnv+assertDemoEnvLoaded, dotenv parse, no new dep) + load-demo-env.ts side-effect | server/scripts/demo-env.ts, load-demo-env.ts | created | ~1.2k |
+| 12:31 | new scripts/demo-migrate-deploy.ts = load .env.demo then spawn `prisma migrate deploy`; npm `db:demo:deploy` (server + root passthrough) | server/scripts/demo-migrate-deploy.ts, server/package.json, package.json | created | ~0.6k |
+| 12:32 | seed-demo.ts / demo-reset.ts: first import `./load-demo-env.js` (runs before dotenv/config + env.ts) | server/scripts/{seed-demo,demo-reset}.ts | edited | ~0.3k |
+| 12:33 | .gitignore +`!server/.env.demo.example` negation; .env.demo.example rewritten to spec placeholders | .gitignore, server/.env.demo.example | edited | ~0.4k |
+| 12:34 | scripts/demo-env.test.ts (11 tests: load/override/strip-reset-confirm/missing-file/validation/reset-guard-unchanged) | server/scripts/demo-env.test.ts | created, PASS | ~1k |
+| 12:35 | docs/26 new "Local demo commands — server/.env.demo" section + reset/first-deploy blocks; docs/19 demo bullet + test count 933/56 | docs/26-demo-environment.md, docs/19-progress-tracking.md | edited | ~1k |
+| 12:36 | gates: server eslint+typecheck clean, vitest 933/56, build exit 0; git add --dry-run refuses .env.demo, accepts .env.demo.example | — | GREEN | ~0.5k |

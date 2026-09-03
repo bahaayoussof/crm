@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { Resend } from "resend";
+import { isDemoMode } from "../../../config/demo.js";
 import type { ReceivedEmail } from "./email.types.js";
 
 /**
@@ -114,6 +116,13 @@ export async function sendTicketEmail(params: {
   /** Overridable only for deterministic timeout tests; production uses the constant. */
   signal?: AbortSignal;
 }) {
+  // Public demo: never hand the message to Resend and never require an API key.
+  // The outbound ticket reply is already committed; a synthetic id keeps the
+  // "message id stored on the row" step working just like a real send.
+  if (isDemoMode()) {
+    return { emailId: `demo-email-${randomUUID()}` };
+  }
+
   const headers: Record<string, string> = {};
   if (params.inReplyTo) headers["In-Reply-To"] = params.inReplyTo;
   if (params.references.length) headers.References = params.references.join(" ");

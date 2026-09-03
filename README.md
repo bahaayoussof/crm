@@ -615,3 +615,28 @@ npm run build
 ## 16. Documentation
 
 Deeper architecture, workflows, decision records, the API contract, and per-integration notes live in [`docs/`](./docs).
+
+---
+
+## 17. Public Demo Environment
+
+The same application, booted with `DEMO_MODE=true` (server) and `VITE_DEMO_MODE=true`
+(client) — not a fork or a mocked UI. Full detail: [`docs/26-demo-environment.md`](./docs/26-demo-environment.md).
+
+- **Accounts** (password `Demo123!`, real bcrypt, no auth bypass): `admin@demo.local`,
+  `manager@demo.local`, `agent@demo.local`, `customer@demo.local`. The login page shows
+  one-click role buttons; a lightweight "Demo Environment" banner renders globally.
+- **Provider safety:** WhatsApp / SMS / Email outbound transports are simulated at the
+  adapter boundary — the ticket message, history, notifications and realtime events are
+  still written, but no external call is made and no provider credentials are needed. AI
+  runs under a tight per-user rate limit.
+- **Protected:** the four demo accounts can't have email/password/role changed, be
+  deactivated or deleted; departments/teams can't be deleted — all enforced on the
+  backend (`403 DEMO_PROTECTED_RESOURCE`). Everything else stays interactive.
+- **Seed & reset:** `npm run demo:seed` (baseline + accounts + 6 realistic
+  demo-customer scenarios). `DEMO_MODE=true DATABASE_ENV=demo npm run demo:reset`
+  truncates and re-seeds — it refuses to run without both flags and never touches
+  migrations.
+- **Vercel:** `server/vercel.json` no longer declares the `*/5 * * * *` cron jobs
+  (incompatible with Vercel Hobby); the SLA / task-reminder endpoints and logic are
+  intact and still `CRON_SECRET`-protected.

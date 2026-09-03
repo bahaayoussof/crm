@@ -1,0 +1,10 @@
+{
+  "//": "Type-check only. Covers the Vercel serverless entrypoint in api/ (which is outside the emitting build's rootDir) together with src/. The real build is still tsconfig.json (src -> dist); @vercel/node transpiles api/ itself at deploy time.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "api/**/*.ts"],
+  "exclude": ["src/**/*.test.ts", "api/**/*.test.ts", "dist"]
+}

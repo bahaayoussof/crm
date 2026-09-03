@@ -53,4 +53,21 @@ describe("assertProductionSecretsConfigured", () => {
       /JWT_SECRET.*DATABASE_URL|DATABASE_URL.*JWT_SECRET/,
     );
   });
+
+  // Production runtime + demo application mode are NOT mutually exclusive: the
+  // Vercel-hosted public demo runs NODE_ENV=production AND DEMO_MODE=true. The
+  // only production startup assertion is JWT_SECRET + DATABASE_URL — external
+  // provider credentials (WhatsApp / TextBee / Resend / AI / Blob) are never
+  // required to boot, in demo mode or otherwise, because those transports fail
+  // closed with a structured error (and are simulated in demo mode). This test
+  // pins that: a production env with real JWT/DB and zero provider creds boots.
+  it("does not require any external provider credential to start in production (demo-safe)", () => {
+    expect(() =>
+      assertProductionSecretsConfigured("production", {
+        JWT_SECRET: goodSecret,
+        DATABASE_URL: goodDbUrl,
+        // no RESEND_API_KEY / WHATSAPP_* / TEXTBEE_* / AI_API_KEY / BLOB_READ_WRITE_TOKEN
+      }),
+    ).not.toThrow();
+  });
 });

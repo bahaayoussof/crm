@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 import { Prisma, Role } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
+import { assertNotDemoProtectedEmail } from "../../middleware/demo-guard.js";
 import type { CreateUserInput, UpdateUserInput, UserListQuery } from "./user.schema.js";
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../audit-logs/audit-log.constants.js";
 import { changedFields, createAuditLog } from "../audit-logs/audit-log.service.js";
@@ -204,6 +205,10 @@ export async function updateUser(id: string, input: UpdateUserInput, actor: { us
       select: { id: true, name: true, email: true, phone: true, role: true, isActive: true, departmentId: true, branchId: true, teamId: true },
     });
     if (!target) throw notFound();
+
+    // Public demo: the shared demo accounts cannot be renamed, have their email
+    // or role changed, or be deactivated. Inert outside DEMO_MODE.
+    assertNotDemoProtectedEmail(target.email);
 
     const roleChanges = input.role !== undefined && input.role !== target.role;
     const deactivating = input.isActive === false && target.isActive;
