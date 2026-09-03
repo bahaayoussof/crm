@@ -34,8 +34,14 @@ app — `DEMO_MODE` (server) / `VITE_DEMO_MODE` (client). Centralized in
   is missing (no fall back to `server/.env`). `npm run dev` / `start` /
   `db:deploy` and the deployed Vercel app are untouched. `server/.env.demo` is
   git-ignored; `server/.env.demo.example` is committed.
-- **Frontend:** `DemoLoginPanel` (real per-role `/auth/login`) + global dismissible
-  `DemoBanner`, render only when `VITE_DEMO_MODE=true`. EN + AR `demo.*` strings.
+- **Frontend:** `DemoLoginPanel` — one "Demo Accounts" card, four compact role
+  rows (role label / `…@demo.local` email / "Use account" button, subtle
+  dividers) and one shared `Demo123!` password section; every button runs the
+  real per-role `/auth/login` flow (real JWT + role redirect), and the row emails
+  double as copy-by-hand credentials for the main form. Plus the global
+  dismissible `DemoBanner`. Both render only when `VITE_DEMO_MODE=true`. EN + AR
+  `demo.*` strings (`demo.login.title/description/useAccount/useAccountFor/`
+  `sharedPasswordLabel/roleAdmin|Manager|Agent|Customer`).
 - **Vercel Hobby:** `server/vercel.json` `crons` array (3 × `*/5 * * * *`) removed;
   `/api/internal/*` endpoints + SLA/task-reminder logic intact and still
   `CRON_SECRET`-protected. `GET /api/health` gains a non-secret `demo` flag.
@@ -61,7 +67,7 @@ app — `DEMO_MODE` (server) / `VITE_DEMO_MODE` (client). Centralized in
 | Server tests (Vitest) | PASS — **933 / 56 files** (+13 demo, +17 deployment-hardening incl. new `api/index.test.ts`, +11 `scripts/demo-env.test.ts`) |
 | Client TypeScript (`tsc -b`) | PASS (exit 0) |
 | Client ESLint | PASS (exit 0) — 2 pre-existing `react-refresh` warnings |
-| Client tests (Vitest) | PASS — **772 / 66 files** |
+| Client tests (Vitest) | PASS — **780 / 66 files** (+8 `demo-login-panel.test.tsx`, one-card/four-row/shared-password/per-role-login/duplicate-submit coverage) |
 | `npm run build` (client + server) | PASS (exit 0) — pre-existing >500 kB chunk warning |
 
 **Not verified:** `vercel build` / a real Vercel deploy (CLI is authenticated but

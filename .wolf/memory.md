@@ -1045,3 +1045,9 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
 | 14:15 | Fix Vercel runtime ERR_REQUIRE_ESM (sanitize-html@2.17.7 CJS require('htmlparser2'), npm resolved ESM-only htmlparser2@12.0.0; v11 dropped CJS export). Added `overrides: { htmlparser2: "10.1.0" }` to server/package.json (10.1.0 = last dual CJS/ESM, the version sanitize-html 2.17.4/2.17.5 shipped against), regenerated lock. Verified with `node --no-experimental-require-module` (simulates Vercel's older Node): app.ts + api/index.ts import clean. | server/package.json, server/package-lock.json | typecheck/lint/build/vercel-build green; 933 tests pass; npm ci reproduces tree; no commit | ~55k |
+
+## Session: 2026-09-03 14:53
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 15:05 | Rewrite DemoLoginPanel → one "Demo Accounts" card, 4 divider rows (role/email/Use account), one shared Demo123! section; real /auth/login unchanged; pending guard; new demo.login.* keys EN+AR; labelKey→roleLabelKey | client/src/features/auth/demo-login-panel.tsx, client/src/lib/demo.ts, client/src/locales/{en,ar}/translation.json, client/src/features/auth/demo-login-panel.test.tsx, docs/{19,26} | typecheck+lint+build exit 0; client vitest 780/66 (was 772) | ~40k |

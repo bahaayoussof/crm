@@ -11,13 +11,15 @@
       "dismiss": "Dismiss demo notice"
     },
     "login": {
-      "title": "Try the demo",
-      "description": "Sign in with one click as any role. These are shared demo accounts on real authentication.",
-      "credentialHint": "All demo accounts use the password {{password}}.",
-      "asAdmin": "Continue as Admin",
-      "asManager": "Continue as Manager",
-      "asAgent": "Continue as Agent",
-      "asCustomer": "Continue as Customer"
+      "title": "Demo Accounts",
+      "description": "Use any account below to explore the CRM by role.",
+      "useAccount": "Use account",
+      "useAccountFor": "Use {{role}} demo account",
+      "sharedPasswordLabel": "Password for all demo accounts",
+      "roleAdmin": "Admin",
+      "roleManager": "Manager",
+      "roleAgent": "Agent",
+      "roleCustomer": "Customer"
     }
   },
   "notifications": {

@@ -109,8 +109,12 @@ Seeded by `npm run demo:seed`. Credentials are **public by design**.
 `@demo.local` matches the existing seed convention (`crm.local`) and passes the
 project's `zod` `.email()` validation on both sides. Passwords are stored with the
 application's normal `bcrypt` hashing (cost 12) — there is **no auth bypass**. The
-login page shows one-click "Continue as …" buttons that call the real
-`/auth/login` endpoint.
+login page shows a single "Demo Accounts" card: four compact rows (role label,
+`…@demo.local` email, "Use account" button) with subtle dividers, and one shared
+`Demo123!` password section at the bottom. Every "Use account" button calls the
+real `/auth/login` endpoint through the normal `login()` flow (real JWT, real
+role redirect); credentials are shown for anyone who prefers to type them into
+the main form. The card renders only when `VITE_DEMO_MODE=true`.
 
 The demo manager is made the manager of the first seeded team; the demo agent is
 a member of that team. The demo customer owns six hand-written support scenarios
@@ -400,8 +404,10 @@ Never commit real secret values; `.env.example` files carry placeholders only.
 6. **Wire CORS:** set the server project's `CLIENT_URL` (or `CLIENT_URLS`) to the
    exact client domain from step 5, e.g. `https://crm-demo-bahaa.vercel.app`.
    Redeploy the server project (env change).
-7. **Smoke test:** open the client URL → the demo login panel shows four
-   role buttons. Log in as each of ADMIN / MANAGER / AGENT / CUSTOMER. Check the
+7. **Smoke test:** open the client URL → the demo login panel shows one
+   "Demo Accounts" card with four role rows (each showing role, `…@demo.local`
+   email and a "Use account" button) plus one shared-password section
+   (`Demo123!`). Log in as each of ADMIN / MANAGER / AGENT / CUSTOMER. Check the
    dashboard, a ticket detail, reports, and `/portal`. Refresh on a nested route
    (`/tickets/<id>`) — it must load, not 404. Confirm the "Demo Environment"
    banner renders.

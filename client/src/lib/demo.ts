@@ -18,8 +18,8 @@ export interface DemoAccount {
   email: string;
   /** Public, intentionally non-personal. Safe to show in the UI. */
   password: string;
-  /** i18n key for the button / label copy. */
-  labelKey: string;
+  /** i18n key for the neutral role label shown on the demo card row. */
+  roleLabelKey: string;
 }
 
 /**
@@ -28,10 +28,10 @@ export interface DemoAccount {
  * list in sync with `server/src/config/demo.ts#DEMO_ACCOUNT_EMAILS`.
  */
 export const DEMO_ACCOUNTS: readonly DemoAccount[] = [
-  { role: "ADMIN", email: "admin@demo.local", password: "Demo123!", labelKey: "demo.login.asAdmin" },
-  { role: "MANAGER", email: "manager@demo.local", password: "Demo123!", labelKey: "demo.login.asManager" },
-  { role: "AGENT", email: "agent@demo.local", password: "Demo123!", labelKey: "demo.login.asAgent" },
-  { role: "CUSTOMER", email: "customer@demo.local", password: "Demo123!", labelKey: "demo.login.asCustomer" },
+  { role: "ADMIN", email: "admin@demo.local", password: "Demo123!", roleLabelKey: "demo.login.roleAdmin" },
+  { role: "MANAGER", email: "manager@demo.local", password: "Demo123!", roleLabelKey: "demo.login.roleManager" },
+  { role: "AGENT", email: "agent@demo.local", password: "Demo123!", roleLabelKey: "demo.login.roleAgent" },
+  { role: "CUSTOMER", email: "customer@demo.local", password: "Demo123!", roleLabelKey: "demo.login.roleCustomer" },
 ] as const;
 
 /** True when `user` is one of the shared demo accounts (used to soften some UI copy). */
