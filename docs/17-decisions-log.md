@@ -1440,3 +1440,32 @@ No new contract. `ticket-workspace-tabs.tsx` already surfaces `delivery.status =
 - No Prisma migration, no new dependency, no RBAC or workflow-graph change.
 - Provider calls never run inside the ticket-message transaction; a DB failure before commit means the provider is not called and no realtime event fires.
 - Verification: server `tsc` + `eslint` clean; `ticket.test.ts` (103, +1 SMS timeout → 201 + `PROVIDER_UNREACHABLE`, single side effect) + `outbound-delivery.test.ts` (14, +`SMS_DELIVERY_UNREACHABLE` reason mapping, + SMS timeout wrapper single-history-row) + `sms.test.ts` (+4: `AbortSignal.timeout` abort → `SMS_DELIVERY_UNREACHABLE`, raw connection failure → `SMS_DELIVERY_UNREACHABLE`, HTTP 5xx / body-level failure stay `SMS_DELIVERY_FAILED`) + `email.test.ts` outbound block (5, +1 timeout→`PROVIDER_UNREACHABLE`) + `email.client.test.ts` (6, `sendTicketEmail` timeout seam — deterministic, already-aborted signal, no real wait) + `seed-test-data.helpers.test.ts` channel block (3); full server vitest **892/892** (51 files). Client `tsc` + `eslint` clean; full client vitest **767/767** (64 files). `git diff --check` clean. Live external-provider delivery remains NOT VERIFIED (no real Resend/TextBee credentials).
+
+# ADR-053: Brand asset replacement — static logo/favicon swap (not configurable branding)
+
+**Status:** accepted — 2026-09-03, branch `feat/brand-assets` (off `master` `3eaf0c5`), uncommitted.
+
+## Context
+
+The app shipped with no image brand asset: the logo was a hand-rolled `"CS"` letter tile plus the localized `app.title` string, duplicated in `auth-layout.tsx`, `sidebar.tsx` (expanded + collapsed) and `app-shell.tsx` (mobile header + drawer). `client/index.html` declared no favicon. New static PNGs (`crm-logo.png` 3:1 wordmark, `crm-icon.png` 1:1) were added under `client/public/brand/`.
+
+Configurable, persisted, ADMIN-editable branding is a separate `PLANNED` feature (`feature/custom-branding`, docs/14 / docs/18). This decision only covers replacing the placeholder mark with the fixed shipped assets.
+
+## Decision
+
+1. One shared presentational component `client/src/components/shared/brand-logo.tsx` — `BrandLogo({ variant: "full" | "icon", className, alt })`, a plain `<img>` with `object-contain`; callers control size via `className` only; `alt` defaults to i18n `app.title`; no RTL transform is ever applied to the mark.
+2. `variant="full"` (`/brand/crm-logo.png`) is used where the wordmark has horizontal room: auth top bar, expanded sidebar, mobile drawer header. `variant="icon"` (`/brand/crm-icon.png`) is used in compact chrome: collapsed sidebar, mobile header.
+3. Favicon: no separate favicon asset. `crm-icon.png` is the single canonical compact icon; `index.html` points `rel="icon"` + `rel="apple-touch-icon"` directly at `/brand/crm-icon.png`. The existing `<title>` ("Customer Support CRM") is kept. (An earlier revision of this branch added a byte-copy `client/public/favicon.png`; it was removed to avoid duplicating the same bytes under two paths.)
+4. The expanded sidebar keeps an `sr-only` `app.title` span next to the wordmark image because `sidebar.test.tsx` pins that text node (present expanded / absent collapsed).
+
+## Alternatives rejected
+
+- **Keep a byte-copy `client/public/favicon.png` for the conventional `/favicon.png` path.** Rejected — two identical files, one asset. The `<link rel="icon">` is explicit, so the conventional path is not needed; `crm-icon.png` serves every icon context.
+- **Inline per-site `<img>` in each of the four call sites.** Rejected — that is the duplication being removed; a 4-line shared component is proportionate.
+- **Separate dark-mode logo files.** Rejected — the supplied PNGs are transparent and legible on both themes; no evidence a variant is needed.
+- **Building configurable branding now.** Out of scope — that is `feature/custom-branding`.
+
+## Consequences
+
+- No backend, schema, RBAC, dependency, color, or typography change. Client `tsc` + `eslint` (0 errors) + vitest (787/65) + `vite build` all green; `git diff --check` clean.
+- When `feature/custom-branding` lands, `BrandLogo` is the single seam to make asset sources dynamic.

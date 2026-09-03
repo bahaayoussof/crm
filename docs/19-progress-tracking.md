@@ -94,6 +94,56 @@ remain).
 
 ---
 
+## Brand asset replacement — 2026-09-03
+
+**Branch:** `feat/brand-assets` (off `master` `3eaf0c5`) — unstaged / uncommitted;
+nothing staged, committed, pushed, merged, rebased, or tagged.
+
+**Scope:** frontend-only static brand asset swap. No backend, schema, RBAC, API,
+color-system, or typography change. This is **not** the `PLANNED`
+`feature/custom-branding` (configurable/persisted branding, ADMIN settings) — the
+assets here are fixed files under `client/public/`.
+
+**Problem:** the app had no image logo or favicon. The brand mark was a hand-rolled
+`"CS"` letter tile + `t("app.title")` text duplicated across four places
+(`auth-layout.tsx` top bar, `sidebar.tsx` expanded + collapsed, `app-shell.tsx`
+mobile header + mobile drawer). `client/index.html` had no `<link rel="icon">` at
+all (no `vite.svg`, no prior logo file — `client/public/` is new this cycle).
+
+**Change:**
+- Assets: `client/public/brand/crm-logo.png` (2172×724, 3:1 wordmark — pre-staged)
+  and `client/public/brand/crm-icon.png` (1254×1254 — pre-staged). No separate
+  favicon file — `crm-icon.png` is the single canonical compact icon, referenced
+  directly for the browser favicon and Apple touch icon as well as the collapsed
+  sidebar and mobile brand contexts.
+- New shared component `client/src/components/shared/brand-logo.tsx` —
+  `BrandLogo({ variant: "full" | "icon", className, alt })`, a plain `<img>` with
+  `object-contain`; display size is class-driven only, `alt` defaults to i18n
+  `app.title`, no RTL transform.
+- `client/index.html`: added `<link rel="icon" type="image/png" href="/brand/crm-icon.png">`
+  + `<link rel="apple-touch-icon" href="/brand/crm-icon.png">`. `<title>` was
+  already `Customer Support CRM` — kept.
+- `auth-layout.tsx`: top-bar brand → `<BrandLogo variant="full" className="h-8 sm:h-9" />`,
+  redundant app-title `<p>` removed. Card title/subtitle untouched.
+- `sidebar.tsx`: expanded → `<BrandLogo variant="full" />` + an `sr-only`
+  `t("app.title")` span (kept because `sidebar.test.tsx` asserts that text node is
+  present when expanded / absent when collapsed); collapsed →
+  `<BrandLogo variant="icon" className="size-8" />`.
+- `app-shell.tsx`: mobile header → `<BrandLogo variant="icon" className="size-7" />`
+  + existing truncating title text; mobile drawer header →
+  `<BrandLogo variant="full" className="h-7" />`.
+
+**Old assets removed:** none — no prior logo/favicon/`vite.svg` ever existed.
+
+**Verification (from `client/`):** `npm run typecheck` PASS (exit 0); `npm run lint`
+PASS — 0 errors (2 pre-existing non-failing `react-refresh` warnings in
+`breakdown-chart.tsx` / `theme-provider.tsx`); `npm test` PASS — **787 / 65 files**;
+`npm run build` PASS (exit 0, pre-existing single-chunk >500 kB warning).
+`git diff --check` clean. Browser tab / EN-AR / light-dark / mobile visual smoke
+described but not run in this environment. Not committed / pushed / merged.
+
+---
+
 ## Password visibility toggle — shared component — 2026-09-03
 
 **Branch:** `fix/password-visibility-toggle` (off `master` `482a568`) — unstaged /
