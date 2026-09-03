@@ -2,13 +2,13 @@ import { useEffect, useState, type PropsWithChildren } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getAuthToken } from "@/features/auth/auth-token";
 import { useAuth } from "@/features/auth/auth-state";
+import { REALTIME_EVENTS_URL } from "@/lib/api-config";
 import { createRealtimeClient } from "./realtime-client";
 import { handleRealtimeEvent } from "./realtime-event-handler";
 import { RealtimeStatusContext } from "./realtime-status";
 import type { RealtimeConnectionStatus } from "./realtime.types";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
-const REALTIME_URL = `${API_URL.replace(/\/$/, "")}/realtime/events`;
+const REALTIME_URL = REALTIME_EVENTS_URL;
 
 /**
  * Maintains exactly one application-level SSE connection for any authenticated

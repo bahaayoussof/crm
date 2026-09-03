@@ -1033,3 +1033,9 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 |------|--------|---------|---------|--------|
 
 | 13:35 | Fix Vercel server build: npm 11.17 allowScripts gate skipped prisma/bcrypt/esbuild install scripts + raw `buildCommand: prisma generate` = 127 (no .bin on PATH) | server/package.json (+allowScripts, pin prisma/@prisma/client 6.19.3), server/vercel.json (buildCommand -> `npm run vercel-build`), .wolf/{buglog(bug-182),cerebrum,memory,STATUS} | clean `npm ci` no warning; prisma generate OK; bcrypt hash/compare OK; server typecheck/lint/build/vitest 933/56 green | ~55k |
+
+## Session: 2026-09-03 13:42
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 13:45 | Frontend Vercel preflight: harden API base URL — new `lib/api-config.ts` resolves `VITE_API_URL` once (trim trailing slash; dev-only localhost fallback; prod build throws if unset). api-client + realtime-provider consume it. `.env.example` doc expanded. vercel.json SPA rewrite already correct — unchanged. | client/src/lib/api-config.ts (new), client/src/services/api-client.ts, client/src/features/realtime/realtime-provider.tsx, client/.env.example | typecheck/lint(2 pre-existing warns)/test 772 pass/build all green; dist/ OK; no commit | ~40k |
