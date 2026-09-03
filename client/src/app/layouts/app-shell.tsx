@@ -2,6 +2,7 @@ import { useEffect, useState, type PropsWithChildren } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { NavLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { BrandLogo } from "@/components/shared/brand-logo";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { useAuth } from "@/features/auth/auth-state";
@@ -91,9 +92,7 @@ export function AppShell({ audience, children }: PropsWithChildren<{ audience: P
                 <Menu className="size-5" strokeWidth={1.75} aria-hidden="true" />
               </button>
               <div className="flex items-center gap-2 overflow-hidden">
-                <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-foreground text-background font-bold text-xs">
-                  CS
-                </div>
+                <BrandLogo variant="icon" className="size-7 shrink-0" alt="" />
                 <span className="truncate text-sm font-semibold tracking-tight text-foreground">
                   {t("app.title")}
                 </span>
@@ -140,12 +139,7 @@ export function AppShell({ audience, children }: PropsWithChildren<{ audience: P
               <div>
                 <div className="flex items-center justify-between gap-2 border-b border-border-subtle pb-3 mb-3">
                   <div className="flex items-center gap-2.5 overflow-hidden">
-                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-foreground text-background font-bold text-xs shadow-2xs">
-                      CS
-                    </div>
-                    <span className="truncate text-sm font-bold tracking-tight text-foreground">
-                      {t("app.title")}
-                    </span>
+                    <BrandLogo variant="full" className="h-7 max-w-[190px]" />
                   </div>
                   <button
                     type="button"

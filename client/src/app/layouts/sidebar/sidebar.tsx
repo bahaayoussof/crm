@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, useLocation, useSearchParams } from "react-router-dom";
 import { Tooltip } from "@/components/ui/tooltip";
+import { BrandLogo } from "@/components/shared/brand-logo";
 import type { AuthUser } from "@/features/auth/auth.types";
 import type { ProtectedAudience } from "@/features/auth/auth-routing";
 import { createReportNavTarget } from "@/features/reports/hooks/use-reports-range-params";
@@ -66,16 +67,13 @@ export function Sidebar({ user, audience, collapsed, onToggleCollapsed, onLogout
         )}
       >
         <div className={cn("flex items-center overflow-hidden", collapsed ? "justify-center" : "gap-2.5")}>
-          <div
-            className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-foreground text-background font-bold text-xs shadow-2xs"
-            title={collapsed ? t("app.title") : undefined}
-          >
-            CS
-          </div>
-          {!collapsed && (
-            <span className="truncate text-sm font-semibold tracking-tight text-foreground">
-              {t("app.title")}
-            </span>
+          {collapsed ? (
+            <BrandLogo variant="icon" className="size-8 shrink-0" />
+          ) : (
+            <>
+              <BrandLogo variant="full" className="h-7 max-w-[168px]" alt="" />
+              <span className="sr-only">{t("app.title")}</span>
+            </>
           )}
         </div>
       </div>

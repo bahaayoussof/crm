@@ -47,6 +47,15 @@
 > - **Gates:** server `tsc` (both configs) + `eslint` clean; server vitest **922 / 55 files** (was 892/51). Client `tsc -b` + `eslint` clean (2 pre-existing warns); client vitest **772 / 66** (no client app-code change). `npm run build` (client+server) exit 0.
 > - **NOT verified:** `vercel build` / real deploy (Vercel CLI IS authenticated as `ibahaa`/`bahaa-projects` with an existing linked `crm` project, but `vercel build` needs interactive project confirmation here and finishing it would mutate that linked project — ran full local gates instead); `demo:seed`/`demo:reset` vs a real Neon demo DB (none provisioned); deployed-demo browser smoke. **Not committed / pushed / merged.**
 
+> **Brand asset replacement (2026-09-03, branch `feat/brand-assets` off `master` `3eaf0c5`, NOT committed): DONE + ALL GATES GREEN. Frontend-only, no backend/schema/RBAC touch.**
+>
+> - **Scope:** swap the placeholder `"CS"` letter-tile + `t("app.title")` brand mark for the new static PNGs already in the repo. No configurable/persisted branding — that stays `feature/custom-branding` (PLANNED).
+> - **Assets:** `client/public/brand/crm-logo.png` (2172×724 wordmark, pre-staged) + `client/public/brand/crm-icon.png` (1254×1254, pre-staged). NO separate favicon file — `crm-icon.png` is the single canonical compact icon and serves favicon + apple-touch-icon + collapsed sidebar + mobile brand directly.
+> - **New shared component** `client/src/components/shared/brand-logo.tsx` — `BrandLogo({variant:"full"|"icon", className, alt})`, `<img>` + `object-contain`, alt defaults to i18n `app.title`, never RTL-flips.
+> - **Updated:** `index.html` (`<link rel="icon" type="image/png" href="/brand/crm-icon.png">` + `apple-touch-icon` same href; `<title>` already "Customer Support CRM", kept). `auth-layout.tsx` (top-bar → `BrandLogo full h-8/sm:h-9`, dropped redundant text `<p>`). `sidebar.tsx` (expanded → `BrandLogo full` + `sr-only` app.title span [sidebar.test.tsx needs that text node]; collapsed → `BrandLogo icon size-8`). `app-shell.tsx` (mobile header → `BrandLogo icon size-7` + kept truncating title; drawer header → `BrandLogo full h-7`).
+> - **Old assets removed:** none — repo never had `vite.svg` / any prior logo file (`client/public/` itself is new this cycle).
+> - **Gates (from `client/`):** `npm run typecheck` clean; `npm run lint` 0 errors (2 pre-existing warnings, unrelated files); `npm test` **787/787** (65 files); `npm run build` exit 0 (pre-existing >500 kB chunk warn). `git diff --check` clean. **Not committed / pushed / merged.**
+
 > **Add-on: SMS timeout → PROVIDER_UNREACHABLE (2026-09-02, same branch `fix/outbound-reply-resilience`, HEAD `16e2179`, NOT committed): DONE + ALL GATES GREEN.**
 >
 > - **Gap:** SMS had a real `AbortSignal.timeout(20_000)` but `textBeeProvider.sendMessage`'s bare `catch {}` around `fetch` rethrew every pre-response error as `AppError(502,"SMS_DELIVERY_FAILED")` → `PROVIDER_REJECTED`. Inconsistent with Email; "no provider response" ≠ "provider rejected".
