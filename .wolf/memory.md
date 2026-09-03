@@ -1011,3 +1011,9 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
+
+## Session: 2026-09-03 15:33
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 15:36 | phone selector always left in RTL+LTR | client/src/components/shared/phone-input/phone-input.tsx, phone-input.test.tsx | dir="ltr" on wrapper + flex-row; +5 placement tests; typecheck/lint/test(787)/build green | ~9k |
