@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Link, useSearchParams } from "react-router-dom";
 import { AuthLayout } from "@/app/layouts/auth-layout";
+import { PasswordInput } from "@/components/shared/password-input";
 import { resetPasswordRequest } from "./auth-api";
 import { getAuthErrorMessage } from "./auth-error";
 import { AuthField } from "./auth-field";
@@ -20,7 +21,6 @@ export function ResetPasswordPage() {
   const { t } = useTranslation();
   const [params] = useSearchParams();
   const token = params.get("token") ?? "";
-  const [showPassword, setShowPassword] = useState(false);
   const [status, setStatus] = useState<"form" | "success" | "invalid">(token ? "form" : "invalid");
   const [apiError, setApiError] = useState<string | null>(null);
   const {
@@ -95,36 +95,21 @@ export function ResetPasswordPage() {
           label={t("auth.resetPassword.newPassword")}
           error={errors.password?.message ? t(errors.password.message) : undefined}
         >
-          <div className="relative">
-            <input
-              id="reset-password"
-              className="input pe-16 text-start"
-              dir="ltr"
-              type={showPassword ? "text" : "password"}
-              autoComplete="new-password"
-              aria-invalid={Boolean(errors.password)}
-              aria-describedby={errors.password ? "reset-password-error" : undefined}
-              {...register("password")}
-            />
-            <button
-              className="absolute inset-y-0 end-1 my-1 min-h-8 rounded px-2.5 text-xs font-medium text-primary hover:bg-primary-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-              type="button"
-              onClick={() => setShowPassword((value) => !value)}
-            >
-              {showPassword ? t("auth.hide") : t("auth.show")}
-            </button>
-          </div>
+          <PasswordInput
+            id="reset-password"
+            autoComplete="new-password"
+            aria-invalid={Boolean(errors.password)}
+            aria-describedby={errors.password ? "reset-password-error" : undefined}
+            {...register("password")}
+          />
         </AuthField>
         <AuthField
           id="reset-confirm-password"
           label={t("auth.resetPassword.confirmPassword")}
           error={errors.confirmPassword?.message ? t(errors.confirmPassword.message) : undefined}
         >
-          <input
+          <PasswordInput
             id="reset-confirm-password"
-            className="input text-start"
-            dir="ltr"
-            type={showPassword ? "text" : "password"}
             autoComplete="new-password"
             aria-invalid={Boolean(errors.confirmPassword)}
             aria-describedby={errors.confirmPassword ? "reset-confirm-password-error" : undefined}

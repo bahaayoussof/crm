@@ -2,6 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { PasswordInput } from "@/components/shared/password-input";
 import { AppSelectField } from "@/components/ui/app-select";
 import { Modal } from "@/components/ui/modal";
 import { getLocalizedUserError } from "./user-error";
@@ -124,11 +125,9 @@ export function UserCreateModal({
           <label htmlFor="modal-user-password" className="block text-xs font-medium text-foreground">
             {t("users.fieldPassword")} <span className="text-danger">*</span>
           </label>
-          <input
+          <PasswordInput
             id="modal-user-password"
-            className="input mt-1 text-start"
-            dir="ltr"
-            type="password"
+            className="mt-1"
             autoComplete="new-password"
             aria-invalid={Boolean(errors.password)}
             aria-describedby={errors.password ? "modal-user-password-error" : undefined}

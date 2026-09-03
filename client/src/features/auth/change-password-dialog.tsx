@@ -6,6 +6,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { PasswordInput } from "@/components/shared/password-input";
 import { changePasswordRequest } from "./auth-api";
 import { getAuthErrorMessage } from "./auth-error";
 import { AuthField } from "./auth-field";
@@ -37,7 +38,6 @@ export function ChangePasswordDialog({ open, onOpenChange, returnFocusRef }: Cha
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const hasOpenedRef = useRef(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
@@ -61,7 +61,6 @@ export function ChangePasswordDialog({ open, onOpenChange, returnFocusRef }: Cha
     reset();
     setApiError(null);
     setDone(false);
-    setShowPassword(false);
     if (!hasOpenedRef.current) return;
     const target = returnFocusRef?.current;
     if (target && document.body.contains(target)) target.focus();
@@ -170,11 +169,8 @@ export function ChangePasswordDialog({ open, onOpenChange, returnFocusRef }: Cha
                 label={t("auth.changePassword.currentPassword")}
                 error={errors.currentPassword?.message ? t(errors.currentPassword.message) : undefined}
               >
-                <input
+                <PasswordInput
                   id="cp-current"
-                  className="input text-start"
-                  dir="ltr"
-                  type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
                   aria-invalid={Boolean(errors.currentPassword)}
                   {...register("currentPassword")}
@@ -185,35 +181,20 @@ export function ChangePasswordDialog({ open, onOpenChange, returnFocusRef }: Cha
                 label={t("auth.changePassword.newPassword")}
                 error={errors.newPassword?.message ? t(errors.newPassword.message) : undefined}
               >
-                <div className="relative">
-                  <input
-                    id="cp-new"
-                    className="input pe-16 text-start"
-                    dir="ltr"
-                    type={showPassword ? "text" : "password"}
-                    autoComplete="new-password"
-                    aria-invalid={Boolean(errors.newPassword)}
-                    {...register("newPassword")}
-                  />
-                  <button
-                    className="absolute inset-y-0 end-1 my-1 min-h-8 rounded px-2.5 text-xs font-medium text-primary hover:bg-primary-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-                    type="button"
-                    onClick={() => setShowPassword((value) => !value)}
-                  >
-                    {showPassword ? t("auth.hide") : t("auth.show")}
-                  </button>
-                </div>
+                <PasswordInput
+                  id="cp-new"
+                  autoComplete="new-password"
+                  aria-invalid={Boolean(errors.newPassword)}
+                  {...register("newPassword")}
+                />
               </AuthField>
               <AuthField
                 id="cp-confirm"
                 label={t("auth.changePassword.confirmPassword")}
                 error={errors.confirmPassword?.message ? t(errors.confirmPassword.message) : undefined}
               >
-                <input
+                <PasswordInput
                   id="cp-confirm"
-                  className="input text-start"
-                  dir="ltr"
-                  type={showPassword ? "text" : "password"}
                   autoComplete="new-password"
                   aria-invalid={Boolean(errors.confirmPassword)}
                   {...register("confirmPassword")}

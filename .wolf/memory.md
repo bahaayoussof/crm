@@ -994,3 +994,20 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
 | 23:15 | Classify SMS timeout/network as PROVIDER_UNREACHABLE (was PROVIDER_REJECTED); consistent w/ Email | textbee.provider.ts, outbound-delivery.ts, sms.test.ts, outbound-delivery.test.ts, ticket.test.ts, docs/05,17,19,25 | server 892/51 green, tc/lint/build/diff clean, client 767/64 unchanged, no commit | ~40k |
+
+## Session: 2026-09-03 15:11
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 15:30 | Shared PasswordInput: icon-only Eye/EyeOff visibility toggle on logical inline-end, replaces textual Show/Hide (fixes RTL إظهار overlap on Arabic login); migrated 6 auth/user forms (11 inputs), swapped auth.show/hide -> auth.showPassword/hidePassword | client/src/components/shared/password-input.{tsx,test.tsx} + 6 forms + 2 locales + docs/19 | client tsc/eslint/build clean, vitest 778/65 | ~45k |
+
+## Session: 2026-09-03 15:28
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 15:29 | pin password eye icon to physical right (pr-11/right-0, drop pe-11/end-0) so RTL no longer mirrors it | client/src/components/shared/password-input.tsx, password-input.test.tsx | typecheck+lint+test(12)+build pass | ~9k |
+
+## Session: 2026-09-03 15:33
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|

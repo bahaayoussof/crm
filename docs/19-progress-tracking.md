@@ -94,6 +94,42 @@ remain).
 
 ---
 
+## Password visibility toggle — shared component — 2026-09-03
+
+**Branch:** `fix/password-visibility-toggle` (off `master` `482a568`) — unstaged /
+uncommitted; nothing staged, committed, pushed, merged, rebased, or tagged.
+
+**Scope:** frontend-only UI consistency. No backend, no schema, no auth logic.
+
+**Problem:** every password field used a per-page textual `Show` / `Hide`
+(`إظهار` / `إخفاء`) button rendered inside the input. In the Arabic (RTL) login
+page the wide Arabic label overlapped the password content.
+
+**Fix:** new shared `client/src/components/shared/password-input.tsx`
+(`PasswordInput`, `forwardRef`, presentation-only) — renders the standard `.input`,
+toggles `password` ⇄ `text`, and shows an icon-only `lucide-react` `Eye` /
+`EyeOff` button on the logical inline-end (`end-0` + `me-1`, input `pe-11`), so the
+control sits on the right in LTR and the left in RTL with no text overlap. Button
+is `type="button"`, `aria-pressed`, translated `aria-label`
+(`auth.showPassword` / `auth.hidePassword`), disabled with the input, keyboard-
+reachable with the project focus-visible ring. Each instance owns its own
+visibility state (independent multi-password fields). Input stays `dir="ltr"`.
+
+**Migrated (6 files, 11 password inputs):** `auth/login-page.tsx`,
+`auth/register-page.tsx` (password + confirm), `auth/reset-password-page.tsx`
+(password + confirm), `auth/change-password-dialog.tsx` (current + new + confirm),
+`users/user-form-page.tsx`, `users/user-create-modal.tsx`. Per-page `showPassword`
+state and textual toggles removed; obsolete `auth.show` / `auth.hide` translation
+keys replaced by `auth.showPassword` / `auth.hidePassword` (en + ar).
+
+**Verification (client gates, this branch):** TypeScript PASS (exit 0); ESLint
+PASS (exit 0, 2 pre-existing `react-refresh` warnings only); Vitest **778 / 65
+files** (was 767 / 64 — new `password-input.test.tsx`, 11 tests); production build
+PASS (exit 0, pre-existing >500 kB chunk warning). Server untouched — gates not
+re-run. No browser/visual verification performed this task.
+
+---
+
 ## Outbound reply resilience (EMAIL/SMS) — 2026-09-02
 
 Implemented on `fix/outbound-reply-resilience` (off `master` `b11408f`, carries the
