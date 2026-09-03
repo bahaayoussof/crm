@@ -1026,3 +1026,10 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | 12:34 | scripts/demo-env.test.ts (11 tests: load/override/strip-reset-confirm/missing-file/validation/reset-guard-unchanged) | server/scripts/demo-env.test.ts | created, PASS | ~1k |
 | 12:35 | docs/26 new "Local demo commands — server/.env.demo" section + reset/first-deploy blocks; docs/19 demo bullet + test count 933/56 | docs/26-demo-environment.md, docs/19-progress-tracking.md | edited | ~1k |
 | 12:36 | gates: server eslint+typecheck clean, vitest 933/56, build exit 0; git add --dry-run refuses .env.demo, accepts .env.demo.example | — | GREEN | ~0.5k |
+
+## Session: 2026-09-03 13:20
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+| 13:35 | Fix Vercel server build: npm 11.17 allowScripts gate skipped prisma/bcrypt/esbuild install scripts + raw `buildCommand: prisma generate` = 127 (no .bin on PATH) | server/package.json (+allowScripts, pin prisma/@prisma/client 6.19.3), server/vercel.json (buildCommand -> `npm run vercel-build`), .wolf/{buglog(bug-182),cerebrum,memory,STATUS} | clean `npm ci` no warning; prisma generate OK; bcrypt hash/compare OK; server typecheck/lint/build/vitest 933/56 green | ~55k |
