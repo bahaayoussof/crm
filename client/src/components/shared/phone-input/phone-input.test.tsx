@@ -125,6 +125,78 @@ describe("PhoneInput", () => {
     document.documentElement.dir = "ltr";
   });
 
+  describe("country selector stays physically on the left (LTR + RTL)", () => {
+    function renderAt(dir: "ltr" | "rtl") {
+      document.documentElement.dir = dir;
+      return render(<PhoneInput id="test-phone" value="+201001234567" onChange={() => {}} />);
+    }
+
+    afterEach(() => {
+      document.documentElement.dir = "ltr";
+    });
+
+    it.each(["ltr", "rtl"] as const)(
+      "renders the country selector before the phone-number input in DOM order (%s)",
+      (dir) => {
+        const { container } = renderAt(dir);
+        const wrapper = container.firstElementChild as HTMLElement;
+        const button = screen.getByRole("combobox", { name: "Country selector" });
+        const input = screen.getByRole("textbox");
+
+        expect(wrapper.children[0]).toBe(button);
+        expect(wrapper.children[1]).toBe(input);
+        expect(
+          button.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
+      },
+    );
+
+    it.each(["ltr", "rtl"] as const)(
+      "pins the wrapper to an LTR layout context so the selector never mirrors (%s)",
+      (dir) => {
+        const { container } = renderAt(dir);
+        const wrapper = container.firstElementChild as HTMLElement;
+        expect(wrapper).toHaveAttribute("dir", "ltr");
+        expect(wrapper.className).toContain("flex-row");
+        expect(wrapper.className).not.toContain("flex-row-reverse");
+      },
+    );
+
+    it.each(["ltr", "rtl"] as const)(
+      "selector owns the left outer corners, phone input owns the right (%s)",
+      (dir) => {
+        renderAt(dir);
+        const button = screen.getByRole("combobox", { name: "Country selector" });
+        const input = screen.getByRole("textbox");
+
+        // rounded-s-* / rounded-e-* resolve physically because the wrapper is dir="ltr"
+        expect(button.className).toContain("rounded-s-md");
+        expect(button.className).toContain("border-e-0");
+        expect(input.className).toContain("rounded-s-none");
+        expect(input.className).toContain("rounded-e-md");
+      },
+    );
+
+    it.each(["ltr", "rtl"] as const)(
+      "keeps phone digits and dial code LTR-readable (%s)",
+      (dir) => {
+        renderAt(dir);
+        const input = screen.getByRole("textbox");
+        expect(input).toHaveAttribute("dir", "ltr");
+
+        fireEvent.click(screen.getByRole("combobox", { name: "Country selector" }));
+        const dialCodes = screen
+          .getAllByRole("option")
+          .map((o) => o.querySelector("span[dir='ltr']"))
+          .filter(Boolean);
+        expect(dialCodes.length).toBeGreaterThan(0);
+        for (const el of dialCodes) {
+          expect(el).toHaveAttribute("dir", "ltr");
+        }
+      },
+    );
+  });
+
   describe("searchable country dropdown", () => {
     function openDropdown() {
       render(<PhoneInput id="test-phone" value="" onChange={() => {}} />);

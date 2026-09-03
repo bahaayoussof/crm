@@ -188,8 +188,9 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(
     return (
       <div
         ref={rootRef}
+        dir="ltr"
         className={cn(
-          "relative flex w-full items-center",
+          "relative flex w-full flex-row items-center",
           disabled && "cursor-not-allowed opacity-75",
           containerClassName,
         )}

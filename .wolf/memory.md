@@ -995,59 +995,25 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 |------|--------|---------|---------|--------|
 | 23:15 | Classify SMS timeout/network as PROVIDER_UNREACHABLE (was PROVIDER_REJECTED); consistent w/ Email | textbee.provider.ts, outbound-delivery.ts, sms.test.ts, outbound-delivery.test.ts, ticket.test.ts, docs/05,17,19,25 | server 892/51 green, tc/lint/build/diff clean, client 767/64 unchanged, no commit | ~40k |
 
-## Session: 2026-09-03 10:13
+## Session: 2026-09-03 15:11
 
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
-| 10:20 | Audit + build demo environment (DEMO_MODE) | server/src/config/demo.ts, middleware/demo-guard.ts, provider seams (sms/wa/email), scripts/seed-demo.ts+demo-reset.ts, client lib/demo.ts + demo-login-panel + demo-banner, vercel.json, docs/26 + ADR-053 | server 905/905, client 771/772 (1 pre-existing flake), build+lint clean | ~130k |
+| 15:30 | Shared PasswordInput: icon-only Eye/EyeOff visibility toggle on logical inline-end, replaces textual Show/Hide (fixes RTL إظهار overlap on Arabic login); migrated 6 auth/user forms (11 inputs), swapped auth.show/hide -> auth.showPassword/hidePassword | client/src/components/shared/password-input.{tsx,test.tsx} + 6 forms + 2 locales + docs/19 | client tsc/eslint/build clean, vitest 778/65 | ~45k |
 
-## Session: 2026-09-03 11:52
+## Session: 2026-09-03 15:28
 
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
-| 12:00 | Audit deploy architecture (app.ts/server.ts/env/demo/prisma/vercel.json) | read-only | app.ts already side-effect-free; server.ts sole listener; env only asserts JWT+DB in prod; NO server serverless entrypoint existed = the blocker | ~30k |
-| 12:10 | Add Vercel serverless adapter | server/api/index.ts (new), server/src/app.ts (+`export default app`, extract `isOriginAllowed`), server/vercel.json (rewrites→/api, buildCommand prisma generate, maxDuration 60, still no crons) | thin re-export; one app, one pipeline | ~8k |
-| 12:15 | Redesign demo:reset guard — 3 explicit signals, NODE_ENV-independent | server/src/config/demo.ts (+evaluateDemoResetGuard/assertDemoResetAllowed/isIsolatedDemoDatabase/DEMO_RESET_CONFIRM_TOKEN), env.ts (+DEMO_RESET_CONFIRM), scripts/demo-reset.ts, seed-demo.ts, seed-test-data.ts, .env.example | reset needs DEMO_MODE=true+DATABASE_ENV=demo+DEMO_RESET_CONFIRM=RESET_DEMO_DATABASE; seeds allow prod only for isolated demo DB | ~10k |
-| 12:20 | Client SPA rewrite + typecheck for api/ | client/vercel.json (new), server/tsconfig.vercel.json (new), server/package.json (typecheck+db:deploy+vercel-build) | deep-link refresh; api/ typechecked | ~4k |
-| 12:30 | Tests | server/api/index.test.ts (new, 5), src/config/demo.test.ts (+7), src/app.test.ts (+CORS), src/config/env.test.ts (+1) | server 922/55 green; client unchanged 772/66 | ~12k |
-| 12:45 | Docs | docs/13, docs/26 (build table, serverless entry, SPA, API base URL, health, CORS, first-deploy checklist, custom domain, env tables +DEMO_RESET_CONFIRM), docs/17 (ADR-054), docs/19 | copy/paste deploy checklist | ~15k |
-| 12:55 | Gates: server tsc+eslint+vitest 922, client tsc+eslint+vitest 772, npm run build exit 0. vercel build NOT run (would touch linked account project). | — | ALL LOCAL GATES GREEN, not committed | ~6k |
+| 15:29 | pin password eye icon to physical right (pr-11/right-0, drop pe-11/end-0) so RTL no longer mirrors it | client/src/components/shared/password-input.tsx, password-input.test.tsx | typecheck+lint+test(12)+build pass | ~9k |
 
-## Session: 2026-09-03 12:30
+## Session: 2026-09-03 15:33
 
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
 
-## 2026-09-03 — Demo commands auto-load server/.env.demo
-| 12:30 | new scripts/demo-env.ts (pure applyDemoEnv+assertDemoEnvLoaded, dotenv parse, no new dep) + load-demo-env.ts side-effect | server/scripts/demo-env.ts, load-demo-env.ts | created | ~1.2k |
-| 12:31 | new scripts/demo-migrate-deploy.ts = load .env.demo then spawn `prisma migrate deploy`; npm `db:demo:deploy` (server + root passthrough) | server/scripts/demo-migrate-deploy.ts, server/package.json, package.json | created | ~0.6k |
-| 12:32 | seed-demo.ts / demo-reset.ts: first import `./load-demo-env.js` (runs before dotenv/config + env.ts) | server/scripts/{seed-demo,demo-reset}.ts | edited | ~0.3k |
-| 12:33 | .gitignore +`!server/.env.demo.example` negation; .env.demo.example rewritten to spec placeholders | .gitignore, server/.env.demo.example | edited | ~0.4k |
-| 12:34 | scripts/demo-env.test.ts (11 tests: load/override/strip-reset-confirm/missing-file/validation/reset-guard-unchanged) | server/scripts/demo-env.test.ts | created, PASS | ~1k |
-| 12:35 | docs/26 new "Local demo commands — server/.env.demo" section + reset/first-deploy blocks; docs/19 demo bullet + test count 933/56 | docs/26-demo-environment.md, docs/19-progress-tracking.md | edited | ~1k |
-| 12:36 | gates: server eslint+typecheck clean, vitest 933/56, build exit 0; git add --dry-run refuses .env.demo, accepts .env.demo.example | — | GREEN | ~0.5k |
-
-## Session: 2026-09-03 13:20
+## Session: 2026-09-03 15:33
 
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
-
-| 13:35 | Fix Vercel server build: npm 11.17 allowScripts gate skipped prisma/bcrypt/esbuild install scripts + raw `buildCommand: prisma generate` = 127 (no .bin on PATH) | server/package.json (+allowScripts, pin prisma/@prisma/client 6.19.3), server/vercel.json (buildCommand -> `npm run vercel-build`), .wolf/{buglog(bug-182),cerebrum,memory,STATUS} | clean `npm ci` no warning; prisma generate OK; bcrypt hash/compare OK; server typecheck/lint/build/vitest 933/56 green | ~55k |
-
-## Session: 2026-09-03 13:42
-
-| Time | Action | File(s) | Outcome | ~Tokens |
-|------|--------|---------|---------|--------|
-| 13:45 | Frontend Vercel preflight: harden API base URL — new `lib/api-config.ts` resolves `VITE_API_URL` once (trim trailing slash; dev-only localhost fallback; prod build throws if unset). api-client + realtime-provider consume it. `.env.example` doc expanded. vercel.json SPA rewrite already correct — unchanged. | client/src/lib/api-config.ts (new), client/src/services/api-client.ts, client/src/features/realtime/realtime-provider.tsx, client/.env.example | typecheck/lint(2 pre-existing warns)/test 772 pass/build all green; dist/ OK; no commit | ~40k |
-
-## Session: 2026-09-03 14:03
-
-| Time | Action | File(s) | Outcome | ~Tokens |
-|------|--------|---------|---------|--------|
-| 14:15 | Fix Vercel runtime ERR_REQUIRE_ESM (sanitize-html@2.17.7 CJS require('htmlparser2'), npm resolved ESM-only htmlparser2@12.0.0; v11 dropped CJS export). Added `overrides: { htmlparser2: "10.1.0" }` to server/package.json (10.1.0 = last dual CJS/ESM, the version sanitize-html 2.17.4/2.17.5 shipped against), regenerated lock. Verified with `node --no-experimental-require-module` (simulates Vercel's older Node): app.ts + api/index.ts import clean. | server/package.json, server/package-lock.json | typecheck/lint/build/vercel-build green; 933 tests pass; npm ci reproduces tree; no commit | ~55k |
-
-## Session: 2026-09-03 14:53
-
-| Time | Action | File(s) | Outcome | ~Tokens |
-|------|--------|---------|---------|--------|
-| 15:05 | Rewrite DemoLoginPanel → one "Demo Accounts" card, 4 divider rows (role/email/Use account), one shared Demo123! section; real /auth/login unchanged; pending guard; new demo.login.* keys EN+AR; labelKey→roleLabelKey | client/src/features/auth/demo-login-panel.tsx, client/src/lib/demo.ts, client/src/locales/{en,ar}/translation.json, client/src/features/auth/demo-login-panel.test.tsx, docs/{19,26} | typecheck+lint+build exit 0; client vitest 780/66 (was 772) | ~40k |
+| 15:36 | phone selector always left in RTL+LTR | client/src/components/shared/phone-input/phone-input.tsx, phone-input.test.tsx | dir="ltr" on wrapper + flex-row; +5 placement tests; typecheck/lint/test(787)/build green | ~9k |

@@ -4,6 +4,7 @@ import { Controller, useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { AuthLayout } from "@/app/layouts/auth-layout";
+import { PasswordInput } from "@/components/shared/password-input";
 import { PhoneInput } from "@/components/shared/phone-input";
 import { getAuthErrorMessage } from "./auth-error";
 import { AuthField } from "./auth-field";
@@ -15,7 +16,6 @@ export function RegisterPage() {
   const { t } = useTranslation();
   const { user, register: registerCustomer } = useAuth();
   const navigate = useNavigate();
-  const [showPassword, setShowPassword] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const { register, control, handleSubmit, formState: { errors, isSubmitting } } = useForm<RegistrationValues>({ resolver: zodResolver(registrationSchema), defaultValues: { name: "", email: "", phone: "", password: "", confirmPassword: "" } });
   if (user) return <Navigate to={getRoleHome(user.role)} replace />;
@@ -61,15 +61,10 @@ export function RegisterPage() {
           />
         </AuthField>
         <AuthField id="register-password" label={t("auth.password")} error={errors.password?.message ? t(errors.password.message) : undefined}>
-          <div className="relative">
-            <input id="register-password" className="input pe-16 text-start" dir="ltr" type={showPassword ? "text" : "password"} autoComplete="new-password" aria-invalid={Boolean(errors.password)} aria-describedby={errors.password ? "register-password-error" : "register-password-help"} {...register("password")} />
-            <button className="absolute inset-y-0 end-1 my-1 min-h-8 rounded px-2.5 text-xs font-medium text-primary hover:bg-primary-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" type="button" onClick={() => setShowPassword((value) => !value)}>
-              {showPassword ? t("auth.hide") : t("auth.show")}
-            </button>
-          </div>
+          <PasswordInput id="register-password" autoComplete="new-password" aria-invalid={Boolean(errors.password)} aria-describedby={errors.password ? "register-password-error" : "register-password-help"} {...register("password")} />
         </AuthField>
         <AuthField id="register-confirm-password" label={t("auth.confirmPassword")} error={errors.confirmPassword?.message ? t(errors.confirmPassword.message) : undefined}>
-          <input id="register-confirm-password" className="input text-start" dir="ltr" type={showPassword ? "text" : "password"} autoComplete="new-password" aria-invalid={Boolean(errors.confirmPassword)} aria-describedby={errors.confirmPassword ? "register-confirm-password-error" : undefined} {...register("confirmPassword")} />
+          <PasswordInput id="register-confirm-password" autoComplete="new-password" aria-invalid={Boolean(errors.confirmPassword)} aria-describedby={errors.confirmPassword ? "register-confirm-password-error" : undefined} {...register("confirmPassword")} />
         </AuthField>
         <button className="button-primary" type="submit" disabled={isSubmitting}>
           {isSubmitting ? t("auth.creatingAccount") : t("auth.createAccount")}

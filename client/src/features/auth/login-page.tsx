@@ -10,12 +10,12 @@ import { getRoleHome } from "./auth-routing";
 import { loginSchema, type LoginValues } from "./auth.schemas";
 import { DemoLoginPanel } from "./demo-login-panel";
 import { AuthLayout } from "@/app/layouts/auth-layout";
+import { PasswordInput } from "@/components/shared/password-input";
 
 export function LoginPage() {
   const { t } = useTranslation();
   const { user, login } = useAuth();
   const navigate = useNavigate();
-  const [showPassword, setShowPassword] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginValues>({ resolver: zodResolver(loginSchema), defaultValues: { email: "", password: "" } });
   if (user) return <Navigate to={getRoleHome(user.role)} replace />;
@@ -42,12 +42,7 @@ export function LoginPage() {
           <input id="login-email" className="input text-start" dir="ltr" type="email" autoComplete="email" aria-invalid={Boolean(errors.email)} aria-describedby={errors.email ? "login-email-error" : undefined} {...register("email")} />
         </AuthField>
         <AuthField id="login-password" label={t("auth.password")} error={errors.password?.message ? t(errors.password.message) : undefined}>
-          <div className="relative">
-            <input id="login-password" className="input pe-16 text-start" dir="ltr" type={showPassword ? "text" : "password"} autoComplete="current-password" aria-invalid={Boolean(errors.password)} aria-describedby={errors.password ? "login-password-error" : undefined} {...register("password")} />
-            <button className="absolute inset-y-0 end-1 my-1 min-h-8 rounded px-2.5 text-xs font-medium text-primary hover:bg-primary-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" type="button" onClick={() => setShowPassword((value) => !value)}>
-              {showPassword ? t("auth.hide") : t("auth.show")}
-            </button>
-          </div>
+          <PasswordInput id="login-password" autoComplete="current-password" aria-invalid={Boolean(errors.password)} aria-describedby={errors.password ? "login-password-error" : undefined} {...register("password")} />
           <div className="mt-1.5 text-end">
             <Link className="text-xs font-medium text-primary hover:underline" to="/forgot-password">
               {t("auth.forgotPassword.link")}

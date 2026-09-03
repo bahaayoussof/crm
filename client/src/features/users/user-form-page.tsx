@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { PasswordInput } from "@/components/shared/password-input";
 import { PhoneInput } from "@/components/shared/phone-input";
 import { AppSelectField } from "@/components/ui/app-select";
 import { useAuth } from "@/features/auth/auth-state";
@@ -65,7 +66,7 @@ function CreateUserForm() {
             </Field>
 
             <Field id="user-password" label={t("users.fieldPassword")} required error={errors.password?.message ? t(errors.password.message) : undefined}>
-              <input id="user-password" type="password" className="input" dir="ltr" autoComplete="new-password" aria-invalid={Boolean(errors.password)} aria-describedby={errors.password ? "user-password-error" : "user-password-help"} {...register("password")} />
+              <PasswordInput id="user-password" autoComplete="new-password" aria-invalid={Boolean(errors.password)} aria-describedby={errors.password ? "user-password-error" : "user-password-help"} {...register("password")} />
               <span className="mt-1.5 block text-xs text-muted-foreground" id="user-password-help">{t("users.passwordHelp")}</span>
             </Field>
 
