@@ -1,12 +1,26 @@
 # Architecture Decisions Log
 
-## ADR-052 — Customer AI is a separate context boundary
+## ADR-054 — Customer AI is a separate context boundary
+
+> **Renumbered ADR-052 → ADR-054 (2026-09-09).** The identifier `ADR-052` was
+> used twice — here and by "ADR-052: Outbound Reply Resilience" further down this
+> log. Outbound Reply Resilience keeps `ADR-052` (it is referenced across
+> `docs/05`, `docs/19`, `docs/25`, `specs/architecture.md`, and server code
+> comments); this Customer AI decision took the next free number, `ADR-054`
+> (`ADR-053` is Brand asset replacement).
 
 **Decision (2026-09-02).** `Internal AI Assistant != Customer AI Chatbot`. `server/src/modules/customer-ai/` owns strict input, published-only retrieval, customer prompt construction, output validation, and customer-specific rate limiting. Reusing the generic provider adapter is safe; reusing internal ticket context, prompts, actions, or UI is prohibited. Handoff delegates to `portal.createTicket`, preserving server-owned identity and normal WEB/MEDIUM/OPEN/SLA/history defaults. No persistence or migration is introduced for V1.
 
 The customer presentation is one global floating widget owned by the authenticated Customer Portal `AppShell`. Local React state preserves the conversation across child-route navigation without a database session or new state library. `/portal/support` redirects to `/portal?support=ai` for backwards compatibility and auto-opens that same widget; the dedicated page and primary-navigation entry are removed.
 
-# ADR-051: Provider-abstracted TextBee Cloud SMS channel
+# ADR-056: Provider-abstracted TextBee Cloud SMS channel
+
+> **Renumbered ADR-051 → ADR-056 (2026-09-09).** The identifier `ADR-051` was
+> used twice — here and by "ADR-051: Team-Scoped Automatic Ticket Assignment"
+> further down this log. Automatic Assignment keeps `ADR-051` (every `ADR-051`
+> reference in `docs/07`, `docs/08`, `docs/19`, `docs/23`, and server code
+> comments points to it); this SMS-channel decision, which nothing referenced by
+> id, took the next free number after `ADR-055`.
 
 **Status:** Accepted on `feature/sms-integration`.
 
@@ -75,7 +89,14 @@ intentionally stricter than the established WhatsApp persist-then-report-failure
 policy. No custom domain is required for development; moving to a verified
 domain is configuration-only.
 
-### ADR-039: Customer Portal Ticket Details — 2-Column Workspace Redesign & Workspace Tabs
+### ADR-055: Customer Portal Ticket Details — 2-Column Workspace Redesign & Workspace Tabs
+
+> **Renumbered ADR-039 → ADR-055 (2026-09-09).** The identifier `ADR-039` was
+> used twice — here and by "ADR-039: System-wide audit logging" further down this
+> log. System-wide audit logging keeps `ADR-039` (it sits in the canonical
+> sequential run ADR-038 → ADR-039 → ADR-040 and is the entry referenced as the
+> audit-logging decision); this presentation-only portal redesign, which nothing
+> referenced by id, took the next free number.
 
 **Date:** 2026-08-30
 
@@ -813,7 +834,16 @@ All UI components (buttons, badges, inputs, selects, cards, tables, popovers, mo
 
 ---
 
-## ADR-029: Tasks & Reminders — new `Task` model, internal-only, due-date reminder sweep reuses `CRON_SECRET`
+## ADR-027: Tasks & Reminders — new `Task` model, internal-only, due-date reminder sweep reuses `CRON_SECRET`
+
+> **Renumbered ADR-029 → ADR-027 (2026-09-09).** The identifier `ADR-029` was
+> used twice — here and by "ADR-029: Bounded internal in-app notifications" in the
+> digest block above. The notifications decision keeps `ADR-029` (it is the one
+> cited for the transactional in-app-notification pattern in `docs/17`, `docs/18`,
+> and `server/src/modules/collaboration/collaboration.service.ts`); this
+> Tasks & Reminders decision took the previously unused `ADR-027`, which fits its
+> `20260827…_add_tasks` migration date. References in `docs/17` and `docs/18` that
+> named `ADR-029` for Tasks were updated.
 
 **Status:** Accepted (implemented on `feature/tasks-reminders`, uncommitted; automated-verified only)
 
@@ -884,7 +914,7 @@ Empty/"unavailable" state with no backend change (rejected — leaves the redesi
 
 **Context**
 
-Roadmap order 11. `docs/06` and `docs/18` §"Team Collaboration" left the scope as an explicit product decision: "@mentions, watchers/followers, explicit handoff, shared comments, or task delegation". Task delegation already exists (`feature/tasks-reminders`, ADR-029) and internal notes already exist (`TicketNote`). The developer fixed the scope for this cycle to **mentions + watchers, internal-only**.
+Roadmap order 11. `docs/06` and `docs/18` §"Team Collaboration" left the scope as an explicit product decision: "@mentions, watchers/followers, explicit handoff, shared comments, or task delegation". Task delegation already exists (`feature/tasks-reminders`, ADR-027) and internal notes already exist (`TicketNote`). The developer fixed the scope for this cycle to **mentions + watchers, internal-only**.
 
 **Decision**
 

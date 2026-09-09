@@ -71,11 +71,19 @@ A real `Team` model now ties a `MANAGER` to exactly one team (`Team.managerId`, 
 - **Intentional exception:** the Customer Management support-history list (`GET /api/customers/:id/tickets`, `listCustomerTickets`) still returns non-actionable ticket *summaries* for every ticket of the opened customer regardless of team — it matches the documented SUMMARY_ONLY cross-agent history design and grants no ticket detail / conversation / mutation route. Team-scoping it would make AGENT (sees all, summary-only) and MANAGER (team-only) diverge and is deferred pending a product decision.
 - **Frontend** mirrors this for UX only (Team Management page under Settings, Department→Team on user forms, Department→Team→Agent on the ADMIN ticket form, a MANAGER's team name shown as page context, a "no team assigned" state) — backend middleware/queries remain authoritative.
 
+### Audit logging — `AuditLog` and `TicketHistory` (`feature/audit-logs`, implemented on branch)
+
+Two distinct audit trails exist and are both actively written; neither replaces the other.
+
+- **`TicketHistory`** is the append-only, per-ticket lifecycle trail: one row per ticket status / priority / category / assignment change, plus `TICKET_CREATED` and `<CHANNEL>_DELIVERY_FAILED` markers. Rows carry `ticketId`, a nullable `actorUserId` (null for system-driven changes such as SLA auto-escalation and automatic assignment) and `oldValue` / `newValue` strings. It is read wherever the caller may already view the ticket — it appears in the Ticket Details history panel and follows the ticket-visibility predicate, not a separate permission.
+- **`AuditLog`** is the general-purpose, cross-entity administrative trail: one row per significant create / update / activate / deactivate / delete across `USER`, `CUSTOMER`, `TICKET`, `CATEGORY`, `SLA_RULE`, `DEPARTMENT`, `BRANCH`, and `TEAM` (see `AUDIT_ACTIONS` / `AUDIT_ENTITY_TYPES` in `server/src/modules/audit-logs/`). Rows carry a nullable `actorId` (null with `metadata.actorType = "SYSTEM"` for cron-driven changes), `action`, `entityType`, `entityId`, a structured `metadata.changes` (`from` / `to` per field), and best-effort request `ipAddress` / `userAgent`. Ticket changes are recorded in *both* trails — e.g. an assignment writes a `TicketHistory` row and an `AuditLog` `TICKET_ASSIGNED` row.
+
+**Who reads it:** `GET /api/audit-logs` is **`ADMIN` only** (`auditLogRouter` = `requireAuth` + `requireRole(ADMIN)`); `MANAGER`, `AGENT`, and `CUSTOMER` receive `403`, unauthenticated callers `401`. Query filters are `actorId`, `action`, `entityType`, `entityId`, and a `from` / `to` date range; the response projection is safe (no `passwordHash`, no raw metadata beyond the `from → to` diffs and IP/UA). There is no Customer Portal audit surface. The client exposes `/audit-logs` and its navigation entry to `ADMIN` only (`AuditLogRoute`); that guard is UX only and the router is authoritative.
+
 ### Unresolved — require a product decision before a permission can be written
 
 - Settings is ADMIN-only: Category and SLA Rule management plus a link to the existing Quick Replies workspace. MANAGER, AGENT, and CUSTOMER receive `403` from `/api/settings/*` and cannot access `/settings`. Existing Quick Replies authorization remains unchanged.
 - Custom Branding: who may change application/Portal branding and within what bounds (`feature/custom-branding`).
-- General Audit Logs: whether a dedicated `AuditLog` beyond `TicketHistory` is introduced, and who reads it.
 
 Do not describe Settings permissions as implemented in `master`. Knowledge Base management (`feature/knowledge-base`), Quick Replies management (`feature/quick-replies`), `CUSTOMER` feedback submission (`feature/customer-feedback`, integrated at `12a0c12`), `ADMIN`/`MANAGER` Reports read access (`feature/reports`, on branch), `ADMIN`-only Users administration (`feature/user-management`, on branch), and Tasks & Reminders (`feature/tasks-reminders`, on branch) are implemented; the other role-list items below remain the target model.
 

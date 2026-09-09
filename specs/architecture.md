@@ -250,23 +250,15 @@ product JWT) — there is no in-process scheduler.
   bell dropdown (`features/notifications/`) plus inline alert banners — not
   a toast library. Any doc assuming toasts should be corrected.
 - **`AuditLog` is a fully implemented, separate model from `TicketHistory`**
-  and is actively written across many services. `docs/06-auth-rbac.md`
-  (line 78) still frames a dedicated audit log beyond `TicketHistory` as an
-  open/unresolved question — code has moved ahead of that doc; it should be
-  updated to reflect that `AuditLog` already exists.
-- **Escalation-notification audience wording is inconsistent between
-  docs.** `docs/06-auth-rbac.md` states escalation alerts go to every
-  active ADMIN plus only the ticket's *own team* manager (team-scoped,
-  post-ADR-050). `docs/08-sla-automation.md`'s automation section describes
-  it more broadly as "active ADMIN/MANAGER users" without repeating the
-  team-scoping qualifier. The code (`sla-automation.service.ts`) implements
-  the team-scoped version — `docs/06` is accurate; `docs/08`'s phrasing on
-  this specific point is stale and should be reconciled.
-- **`docs/23-sms-integration.md` is far shorter (~29 lines) than the
-  WhatsApp/Email docs (~150–200 lines) despite SMS having equally complete
-  code** (provider, signature verification, config, full webhook + outbound
-  flow, dedicated tests). Treat SMS as a fully implemented channel, not a
-  minor one, regardless of its thin doc.
+  and is actively written across many services (reconciled 2026-09-09).
+  `docs/06-auth-rbac.md` now documents the two trails and their `ADMIN`-only
+  read path under "Audit logging — `AuditLog` and `TicketHistory`"; it no
+  longer treats a dedicated audit log as an open question.
+- **Escalation-notification audience** (reconciled 2026-09-09):
+  `docs/06-auth-rbac.md` and `docs/08-sla-automation.md` now state the same
+  team-scoped rule — every active `ADMIN` plus only the escalated ticket's
+  own-team manager, `ADMIN`-only for an unrouted ticket — which is what
+  `sla-automation.service.ts` implements.
 - **No dedicated `migrate` npm script** exists in `server/package.json`
   (only `prisma:generate`, `seed:test`). If `docs/13-deployment.md` implies
   an `npm run migrate` script, that could not be verified in code — this

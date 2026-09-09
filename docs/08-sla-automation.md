@@ -166,7 +166,7 @@ Automatic escalation:
 - changes the status to `ESCALATED`, but never re-escalates an already `ESCALATED` ticket
 - does not use the first-response deadline as an escalation trigger
 
-Both actions use conditional updates inside transactions. History and notifications are inserted only after the guarded update affects exactly one row. Repeated or overlapping executions therefore create no duplicate mutation, history, or notification for unchanged state. Automated history has `actorUserId: null`; assignment alerts target the selected agent and escalation alerts target active `ADMIN`/`MANAGER` users. No `isBreached`, `slaStatus`, or other derived state is stored.
+Both actions use conditional updates inside transactions. History and notifications are inserted only after the guarded update affects exactly one row. Repeated or overlapping executions therefore create no duplicate mutation, history, or notification for unchanged state. Automated history has `actorUserId: null`; assignment alerts target the selected agent. Escalation alerts target every active `ADMIN` plus **only the manager of the escalated ticket's owning team** (`Ticket.teamId`); an unrouted ticket (`teamId = null`) alerts active `ADMIN` users only, never every manager. This is the team-scoped recipient rule documented in `docs/06-auth-rbac.md` and `specs/domain-model.md` — the SLA monitor does not broadcast to all `MANAGER` users. No `isBreached`, `slaStatus`, or other derived state is stored.
 
 ## Basic Tracking Versus Bounded Automation
 

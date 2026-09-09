@@ -1888,7 +1888,7 @@ The following original-assignment areas have no implementation and no complete s
 
 # 24. Tasks & Reminders
 
-Status: IMPLEMENTED on `feature/tasks-reminders` (uncommitted, automated-verified only). ADR-029. Resolutions to the former decision points:
+Status: IMPLEMENTED on `feature/tasks-reminders` (uncommitted, automated-verified only). ADR-027 (renumbered from ADR-029; see `docs/17-decisions-log.md`). Resolutions to the former decision points:
 
 - **Data model:** new `Task` model (`title`, `description?`, `status` OPEN/DONE, `dueAt?`, `remindedAt?`, `ticketId?`, `creatorId`, `assigneeId`) + nullable `Notification.taskId`.
 - **Ownership / assignment:** creator + assignee are separate. `AGENT` may only self-assign; `ADMIN`/`MANAGER` may assign to any active `AGENT`. Cross-user assignment sends a `TASK_ASSIGNED` in-app notification.

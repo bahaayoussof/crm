@@ -165,21 +165,19 @@ Enforced server-side, not just hidden in the UI:
 - The customer-facing AI assistant (`customer-ai` module) is an explicitly
   separate context boundary from the internal AI assistant — it only
   retrieves published knowledge-base content, never internal ticket
-  context, prompts, or actions (ADR-052).
+  context, prompts, or actions (ADR-054).
 
 ## Review Notes
 
-- **`AuditLog` vs `TicketHistory`**: `docs/06-auth-rbac.md` still lists a
-  dedicated audit log beyond `TicketHistory` as an open/unresolved
-  question. The `AuditLog` model already exists in the schema and is
-  actively written across services — this doc is behind the implementation
-  and should be updated rather than treated as a still-open question.
-- **Escalation-notification audience**: `docs/08-sla-automation.md`'s
-  automation section describes escalation alerts going to "active
-  ADMIN/MANAGER users" without the team-scoping qualifier that
-  `docs/06-auth-rbac.md` and the actual code (team-owning manager only)
-  apply. Treat the team-scoped behavior above as current; `docs/08`'s
-  wording on this point needs reconciling.
+- **`AuditLog` vs `TicketHistory`** (reconciled 2026-09-09): both models exist
+  and are actively written; the distinction is stated in `## Core Entities`
+  above and matches `docs/06-auth-rbac.md` ("Audit logging — `AuditLog` and
+  `TicketHistory`") and `docs/04-database-design.md`'s `### AuditLog` model
+  entry, neither of which frames a dedicated audit log as an open question.
+- **Escalation-notification audience** (reconciled 2026-09-09): the team-scoped
+  rule above (every active `ADMIN` + only the owning-team manager; unrouted →
+  `ADMIN` only) is now stated the same way in `docs/06-auth-rbac.md` and
+  `docs/08-sla-automation.md`.
 - **No legacy ticket statuses were found** in `schema.prisma` — all six
   `TicketStatus` values are currently valid and in active use. If a future
   migration or historical data reveals a retired status value, it should be

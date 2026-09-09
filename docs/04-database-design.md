@@ -174,8 +174,21 @@ Department names are unique within a branch through the compound `(branchId, nam
 
 Branches are retired via `isActive = false`; hard delete is refused with 409 `BRANCH_IN_USE` while any department, user or ticket references the row. `code` is matched case-insensitively at the service (409 `BRANCH_CODE_ALREADY_EXISTS`).
 
-### AuditLog
-P2 unless time allows.
+### AuditLog (`feature/audit-logs`, migration `20260830120000_add_audit_logs`)
+General-purpose, cross-entity administrative/security trail. Distinct from `TicketHistory` (per-ticket lifecycle) — both models exist and are actively written. `docs/06-auth-rbac.md` §"Audit logging — `AuditLog` and `TicketHistory`" is the source of truth for read access and behavior.
+
+- id — cuid
+- actorId optional — FK to `User`, `onDelete: SetNull`. Null for system/cron events; the row then carries `metadata.actorType = "SYSTEM"` (a real user id is never fabricated). A human event stores `actorType = "USER"`.
+- action — string (canonical values in `AUDIT_ACTIONS`, `server/src/modules/audit-logs/audit-log.constants.ts`; not a database enum)
+- entityType — string (canonical values in `AUDIT_ENTITY_TYPES`: `USER`, `CUSTOMER`, `TICKET`, `CATEGORY`, `SLA_RULE`, `DEPARTMENT`, `BRANCH`, `TEAM`)
+- entityId optional — id of the affected row
+- metadata optional — JSON. Holds `actorType` and, for updates, a `changes` map of `{ from, to }` per safe field. Never stores secrets, hashes, tokens, auth headers, message/note bodies, or whole request bodies.
+- ipAddress optional — best-effort, first `X-Forwarded-For` hop or `req.ip`, capped at 64 chars. A missing value never blocks the audited mutation.
+- userAgent optional — best-effort request `User-Agent`, capped at 512 chars
+- createdAt
+- Indexes: `createdAt`, `(actorId, createdAt)`, `(entityType, entityId)`, `action`
+
+Security-sensitive mutations write the domain change and the audit row in the same Prisma transaction (`createAuditLog(input, tx)`).
 
 ### PasswordResetToken (`feature/account-management`, migration `20260830190000_add_password_reset`)
 - id
