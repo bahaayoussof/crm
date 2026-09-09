@@ -614,4 +614,4 @@ npm run build
 
 ## 16. Documentation
 
-Deeper architecture, workflows, decision records, the API contract, and per-integration notes live in [`docs/`](./docs).
+Deeper architecture, workflows, decision records, the API contract, and per-integration notes live in [`docs/`](./docs). Engineering specifications and a lightweight Spec-Driven Development workflow for future features are maintained under [`specs/`](./specs).

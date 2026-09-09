@@ -2,6 +2,30 @@
 
 This repository is a time-boxed Customer Support CRM assessment.
 
+## Spec-Driven Development (SDD)
+
+This repository also maintains a small `specs/` layer on top of `docs/`
+(see `specs/README.md`). It does not replace the preflight below — it adds
+a lightweight lifecycle for larger features. Workflow:
+
+1. Read this file (`AGENTS.md`).
+2. Read `specs/constitution.md` (stable engineering rules/constraints).
+3. Read the relevant project architecture/domain documentation —
+   `specs/architecture.md`, `specs/domain-model.md`, and the `docs/*` files
+   required by the preflight below.
+4. Read the relevant feature spec under `specs/features/<name>/` when one
+   exists for the task at hand.
+5. Inspect the current implementation before modifying any code — do not
+   implement from memory of the docs alone.
+6. Implement only the requested scope.
+7. Verify changes (typecheck/lint/tests/build as applicable) before
+   declaring the task complete.
+
+`specs/features/README.md` explains when a task needs a full
+spec/plan/tasks package versus when it doesn't (most small fixes don't).
+The Git Safety Rules below apply identically to SDD work: no commit, push,
+merge, rebase, or history rewrite by the AI under any circumstance.
+
 ## Mandatory Documentation Preflight
 
 Documentation is the repository's source of truth.
