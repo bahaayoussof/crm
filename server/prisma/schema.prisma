@@ -352,6 +352,12 @@ model KnowledgeArticle {
   id          String                 @id @default(cuid())
   title       String
   content     String
+  // Deterministic human-readable plain-text projection of `content`, derived on
+  // every write via articleHtmlToPlainText(). Nullable + additive: legacy rows
+  // are backfilled `= content` (all plain text at launch). Powers search,
+  // portal excerpts, and AI grounding; never returned in an API response or an
+  // AuditLog row.
+  contentText String?
   category    String?
   status      KnowledgeArticleStatus @default(DRAFT)
   createdById String

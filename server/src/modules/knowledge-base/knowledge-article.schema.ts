@@ -17,16 +17,22 @@ export const knowledgeArticleListQuerySchema = z.object({
 
 export const knowledgeArticleParamsSchema = z.object({ id: databaseIdSchema }).strict();
 
+// `content` is now server-sanitized rich HTML (KB-RICH). The transport bound is
+// raised to give markup headroom over a ~50 000-char readable body; the real
+// ceiling (non-empty, <= 50 000 readable chars after sanitize) is enforced in
+// the service against the derived plain text.
+const RICH_CONTENT_MAX = 200_000;
+
 export const createKnowledgeArticleSchema = z.object({
   title: z.string().trim().min(3).max(200),
-  content: z.string().trim().min(1).max(50_000),
+  content: z.string().trim().min(1).max(RICH_CONTENT_MAX),
   category: optionalCategory,
   status: z.nativeEnum(KnowledgeArticleStatus).default(KnowledgeArticleStatus.DRAFT),
 }).strict();
 
 export const updateKnowledgeArticleSchema = z.object({
   title: z.string().trim().min(3).max(200).optional(),
-  content: z.string().trim().min(1).max(50_000).optional(),
+  content: z.string().trim().min(1).max(RICH_CONTENT_MAX).optional(),
   category: optionalCategory,
   status: z.nativeEnum(KnowledgeArticleStatus).optional(),
 }).strict().refine(hasAtLeastOneField, { message: "At least one knowledge article field is required" });

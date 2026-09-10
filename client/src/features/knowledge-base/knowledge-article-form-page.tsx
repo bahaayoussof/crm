@@ -1,10 +1,11 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AppSelectField } from "@/components/ui/app-select";
 import { getKnowledgeArticleError, getLocalizedKnowledgeArticleError } from "./knowledge-article-error";
+import { KnowledgeArticleEditor, type KnowledgeArticleEditorHandle } from "./knowledge-article-editor";
 import { useCreateKnowledgeArticle, useKnowledgeArticle, useUpdateKnowledgeArticle } from "./knowledge-article-hooks";
 import { knowledgeArticleFormSchema, type KnowledgeArticleFormValues } from "./knowledge-article.schemas";
 import { KnowledgeBasePage, LoadingRows, PageHeader, StatePanel } from "./knowledge-base-ui";
@@ -20,6 +21,8 @@ export function KnowledgeArticleFormPage() {
   const update = useUpdateKnowledgeArticle(id);
   const navigate = useNavigate();
   const [apiError, setApiError] = useState<string | null>(null);
+  const editorRef = useRef<KnowledgeArticleEditorHandle>(null);
+  const hydratedRef = useRef<string | null>(null);
 
   const { register, control, handleSubmit, formState: { errors, isSubmitting } } = useForm<KnowledgeArticleFormValues>({
     resolver: zodResolver(knowledgeArticleFormSchema),
@@ -37,6 +40,16 @@ export function KnowledgeArticleFormPage() {
           status: "DRAFT",
         },
   });
+
+  // Hydrate the editor from the loaded article body exactly once (rich HTML or
+  // legacy plain text — the editor handles both). User edits after this flow
+  // through `field.onChange` and are never overwritten.
+  useEffect(() => {
+    if (!isEditing || !article.data) return;
+    if (hydratedRef.current === article.data.id) return;
+    hydratedRef.current = article.data.id;
+    editorRef.current?.setHtml(article.data.content);
+  }, [isEditing, article.data]);
 
   const statusOptions = STATUSES.map((value) => ({
     value,
@@ -82,7 +95,20 @@ export function KnowledgeArticleFormPage() {
             </Field>
 
             <Field id="kb-content" label={t("knowledgeBase.articleContent")} required error={errors.content?.message ? t(errors.content.message) : undefined}>
-              <textarea id="kb-content" className="input min-h-64 resize-y" dir="auto" aria-invalid={Boolean(errors.content)} aria-describedby={errors.content ? "kb-content-error" : undefined} {...register("content")} />
+              <Controller
+                name="content"
+                control={control}
+                render={({ field }) => (
+                  <KnowledgeArticleEditor
+                    ref={editorRef}
+                    id="kb-content"
+                    ariaLabel={t("knowledgeBase.editor.ariaLabel")}
+                    ariaDescribedBy={errors.content ? "kb-content-error" : undefined}
+                    ariaInvalid={Boolean(errors.content)}
+                    onChange={(html) => field.onChange(html)}
+                  />
+                )}
+              />
             </Field>
 
             <Controller

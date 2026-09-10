@@ -2,11 +2,13 @@ import { KnowledgeArticleStatus, Role } from "@prisma/client";
 import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ findMany: vi.fn(), count: vi.fn(), findFirst: vi.fn() }));
+const mocks = vi.hoisted(() => ({ findMany: vi.fn(), count: vi.fn(), findFirst: vi.fn(), auditCreate: vi.fn() }));
 
 vi.mock("../../config/prisma.js", () => ({
   prisma: {
     knowledgeArticle: { findMany: mocks.findMany, count: mocks.count, findFirst: mocks.findFirst },
+    // Exposed only so a portal read that unexpectedly wrote an audit row would be observable.
+    auditLog: { create: mocks.auditCreate },
     $transaction: vi.fn(async (value: unknown) =>
       typeof value === "function" ? (value as (tx: unknown) => unknown)(mocks) : Promise.all(value as Promise<unknown>[])),
   },
@@ -19,7 +21,8 @@ const token = (id: string, role: Role) => createAccessToken({ id, role });
 const customerToken = token("ce83f10dcd2c68747c3f3ba14", Role.CUSTOMER);
 const auth = (value: string) => ({ Authorization: `Bearer ${value}` });
 const now = new Date("2026-08-26T12:00:00.000Z");
-const publishedRow = { id: "c4fdccb99802ca0574c1ecf12", title: "Billing FAQ", category: "Billing", content: "  How billing   works in detail.  ", updatedAt: now };
+// The portal list projects the derived plain-text column for its excerpt.
+const publishedRow = { id: "c4fdccb99802ca0574c1ecf12", title: "Billing FAQ", category: "Billing", contentText: "  How billing   works in detail.  ", updatedAt: now };
 
 describe("customer portal knowledge base API", () => {
   beforeEach(() => {
@@ -35,6 +38,7 @@ describe("customer portal knowledge base API", () => {
     expect(response.status).toBe(200);
     expect(response.body.data[0]).toEqual({ id: "c4fdccb99802ca0574c1ecf12", title: "Billing FAQ", category: "Billing", updatedAt: now.toISOString(), excerpt: "How billing works in detail." });
     expect(response.body.meta).toEqual({ page: 1, limit: 20, total: 1, totalPages: 1 });
+    expect(mocks.auditCreate).not.toHaveBeenCalled(); // portal list is a read — never audited
   });
 
   it("always enforces PUBLISHED status and never accepts a requested status", async () => {
@@ -51,10 +55,11 @@ describe("customer portal knowledge base API", () => {
     expect(call.where.category).toBe("Billing");
     expect(call.where.AND[0].OR).toEqual([
       { title: { contains: "refund", mode: "insensitive" } },
-      { content: { contains: "refund", mode: "insensitive" } },
+      { contentText: { contains: "refund", mode: "insensitive" } },
       { category: { contains: "refund", mode: "insensitive" } },
     ]);
     expect(call.orderBy).toEqual([{ updatedAt: "desc" }, { id: "asc" }]);
+    expect(mocks.auditCreate).not.toHaveBeenCalled(); // portal search + category filter are reads
   });
 
   it("returns a published portal article with a status-free author-free projection", async () => {
@@ -64,6 +69,7 @@ describe("customer portal knowledge base API", () => {
     expect(response.body.data).toEqual({ id: "c4fdccb99802ca0574c1ecf12", title: "Billing FAQ", content: "Body", category: "Billing", updatedAt: now.toISOString() });
     expect(mocks.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "c4fdccb99802ca0574c1ecf12", status: KnowledgeArticleStatus.PUBLISHED } }));
     for (const field of ["status", "createdBy", "author", "createdById", "createdAt"]) expect(response.body.data).not.toHaveProperty(field);
+    expect(mocks.auditCreate).not.toHaveBeenCalled(); // portal detail is a read — never audited
   });
 
   it("returns the same structured 404 for a draft and for a missing portal article", async () => {
@@ -74,6 +80,7 @@ describe("customer portal knowledge base API", () => {
     expect(missing.status).toBe(404);
     expect(draft.body).toEqual(missing.body);
     expect(draft.body.error.code).toBe("KNOWLEDGE_ARTICLE_NOT_FOUND");
+    expect(mocks.auditCreate).not.toHaveBeenCalled(); // a draft-id / missing-id portal lookup writes nothing
   });
 
   it("rejects unauthenticated and internal-role access to portal knowledge base routes", async () => {

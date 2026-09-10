@@ -19,7 +19,14 @@ Verified against `client/package.json`, `server/package.json`, and
 - Tailwind CSS 4 (styling, full RTL support)
 - Axios 1 (HTTP client, auth header injection)
 - i18next / react-i18next (EN/AR localization + RTL)
-- Lexical (rich text editor for replies + KB articles)
+- Lexical (rich text editor for ticket replies/notes and, since
+  `KB-RICH-*` / ADR-057, Knowledge Base article bodies — a bounded Rich
+  Text set on the same Lexical + `sanitize-html` infra, stored as
+  server-sanitized HTML in the existing `content` field; legacy
+  plain-text articles still render and are lazily converted on edit. See
+  `specs/features/knowledge-base/spec.md` "Knowledge Base Rich Text
+  Content" and ADR-057, which supersedes ADR-020's "no rich text"
+  consequence)
 - Recharts (report charts)
 - DOMPurify (sanitize rich HTML before render)
 - react-international-phone (phone input)

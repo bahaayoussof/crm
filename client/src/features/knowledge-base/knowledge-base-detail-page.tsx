@@ -7,6 +7,7 @@ import { formatArticleDate } from "./knowledge-article-format";
 import { getKnowledgeArticleError, getLocalizedKnowledgeArticleError } from "./knowledge-article-error";
 import { useDeleteKnowledgeArticle, useKnowledgeArticle } from "./knowledge-article-hooks";
 import { canManageKnowledgeArticles } from "./knowledge-article-permissions";
+import { ArticleContent } from "./knowledge-article-content";
 import { ArticleStatusBadge, KnowledgeBasePage, LoadingRows, PageHeader, StatePanel } from "./knowledge-base-ui";
 
 export function KnowledgeBaseDetailPage() {
@@ -90,8 +91,8 @@ export function KnowledgeBaseDetailPage() {
           </section>
         )}
 
-        <article className="rounded-xl border border-border bg-surface p-6 sm:p-8 max-w-3xl whitespace-pre-wrap break-words text-sm leading-7 text-foreground shadow-subtle" dir="auto">
-          {data.content}
+        <article className="rounded-xl border border-border bg-surface p-6 sm:p-8 max-w-3xl shadow-subtle" dir="auto">
+          <ArticleContent content={data.content} />
         </article>
       </div>
     </KnowledgeBasePage>

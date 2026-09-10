@@ -851,6 +851,21 @@
     "statusLabel": "الحالة",
     "statusHelp": "المسودات داخلية فقط. أما المقالات المنشورة فتظهر أيضًا في مركز مساعدة العملاء.",
     "saveError": "تعذر حفظ المقالة.",
+    "editor": {
+      "ariaLabel": "نص المقالة",
+      "toolbarLabel": "تنسيق المقالة",
+      "paragraph": "فقرة",
+      "heading2": "عنوان 2",
+      "heading3": "عنوان 3",
+      "bold": "غامق",
+      "italic": "مائل",
+      "underline": "تسطير",
+      "bulletList": "قائمة نقطية",
+      "numberList": "قائمة رقمية",
+      "link": "رابط",
+      "undo": "تراجع",
+      "redo": "إعادة"
+    },
     "columns": {
       "title": "العنوان",
       "category": "التصنيف",

@@ -19,14 +19,20 @@ export async function buildCustomerAiContext(message: string): Promise<CustomerA
     .filter((term) => !STOPWORDS.has(term)))].slice(0, 8);
   const or: Prisma.KnowledgeArticleWhereInput[] = terms.flatMap((term) => [
     { title: { contains: term, mode: "insensitive" as const } },
-    { content: { contains: term, mode: "insensitive" as const } },
+    // Human-readable projection only — no HTML markup reaches a model (RT-6.2).
+    { contentText: { contains: term, mode: "insensitive" as const } },
     { category: { contains: term, mode: "insensitive" as const } },
   ]);
   const rows = await prisma.knowledgeArticle.findMany({
     where: { status: KnowledgeArticleStatus.PUBLISHED, ...(or.length ? { OR: or } : {}) },
     orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
     take: MAX_CUSTOMER_AI_ARTICLES,
-    select: { id: true, title: true, category: true, content: true },
+    select: { id: true, title: true, category: true, contentText: true },
   });
-  return rows.map((row) => ({ ...row, excerpt: deriveExcerpt(row.content) }));
+  // `content` on the returned shape is the derived plain text, so the SOURCES
+  // block in customer-ai.service never carries raw article HTML.
+  return rows.map(({ contentText, ...row }) => {
+    const content = contentText ?? "";
+    return { ...row, content, excerpt: deriveExcerpt(content) };
+  });
 }

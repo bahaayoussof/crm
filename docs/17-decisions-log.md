@@ -26,6 +26,123 @@ The customer presentation is one global floating widget owned by the authenticat
 
 SMS uses the existing Ticket/TicketMessage, authorization, workflow, notifications, and realtime systems. A small `SmsProvider` contract isolates TextBee request details. Outbound delivery occurs inside the ticket transaction so a provider failure cannot commit a successful-looking message; the accepted TextBee `smsBatchId` is stored in `TicketMessage.externalId`. Inbound callbacks require raw-body HMAC-SHA256 `X-Signature` verification and use TextBee `smsId` for idempotency. Phone/customer/ticket matching and automatic placeholder-customer behavior follow the existing WhatsApp precedent. SMS is text-only and attachment sending is disabled.
 
+## ADR-057 — Knowledge Base Rich Text on the existing Lexical + `sanitize-html` infrastructure
+
+**Status:** Accepted — 2026-09-09, branch `chore/sdd-foundation` (SDD package
+`specs/features/knowledge-base/`, tasks `KB-RICH-001`…`KB-RICH-015`).
+Implemented and verified; uncommitted. Supersedes ADR-020's "Knowledge Base
+bodies are plain text / no rich-text migration" consequence (the KB-AUDIT
+pilot carried that constraint; it is lifted here). Does **not** re-open any
+`ADR-055` / KB-AUDIT audit requirement.
+
+### Context
+
+The article body was a plain `<textarea>` / plain-text `String`. Support
+content needs structure (steps, sub-headings, emphasis, links). The
+repository already runs a Lexical composer for ticket replies, a
+server-authoritative `sanitize-html` sanitizer
+(`server/src/shared/rich-text/reply-html.ts`), a client DOMPurify re-sanitize
+render guard (`MessageBody`), and an HTML→plain-text flattener for AI/outbound
+channels — the exact stack ADR-035 used to move `TicketMessage.body` from
+plain text to sanitized HTML.
+
+### Decision
+
+1. **Editor — reuse Lexical, new sibling component.** A KB-owned
+   `knowledge-article-editor.tsx` + `knowledge-article-editor-toolbar.tsx`
+   built on the already-installed `lexical` / `@lexical/*` packages
+   (namespace `"knowledge-article"`). No new dependency. `TicketReplyEditor`
+   itself is not reused (ticket-only length guards, i18n keys, AI/Quick-Reply
+   bridges). The ticket link popover + link utils
+   (`ticket-reply-link-popover.tsx`, `ticket-reply-link.utils.ts`) **are**
+   reused by import — their graph is clean (only a shared anchored-popover
+   hook + pure URL validation) and presentation-only; no ticket file is
+   modified.
+2. **V1 formatting set (bounded):** paragraph, H2, H3, bold, italic,
+   underline, ordered/unordered list, link, undo/redo. Nothing else — no
+   images, media, tables, code, quotes, colour, alignment, raw HTML,
+   templates, or collaboration.
+3. **Storage — sanitized HTML in the existing `content` column.** No column
+   change for the body itself (ADR-035 precedent). `content`'s JSON type
+   stays `string`; its representation changes from plain text to
+   server-sanitized rich HTML.
+4. **One additive schema change — `KnowledgeArticle.contentText String?`.**
+   The canonical human-readable plain-text projection, derived on every write
+   via `articleHtmlToPlainText(sanitizedContent)`. It backs search, the
+   portal list excerpt, and AI grounding — a query-time `WHERE` cannot strip
+   HTML per row, so a stored column is required. Nullable, no default, no
+   index. Migration `20260909120000_kb_article_content_text`:
+   `ALTER TABLE "KnowledgeArticle" ADD COLUMN "contentText" TEXT;` then
+   `UPDATE "KnowledgeArticle" SET "contentText" = "content";` — valid because
+   every row is plain text at launch. Additive, non-destructive, reversible
+   (drop column). `content` is never rewritten by the migration.
+5. **Backward compatibility — normalize-on-write + a content-shape sniff.**
+   Every saved body is run through `sanitizeArticleHtml` and always emits at
+   least `<p>…</p>`, so post-enhancement rows reliably match the
+   `LOOKS_LIKE_ARTICLE_HTML` tag sniff and every not-yet-re-edited row
+   (plain text) reliably fails it. A false positive still renders safely
+   through the sanitizer; a false negative renders as preformatted text
+   (current behaviour). No version column, no format flag. A legacy article
+   opened in the editor hydrates into paragraphs; saving it lazily converts
+   it to HTML and is audited as one normal `KNOWLEDGE_ARTICLE_UPDATED`.
+6. **Security — server is the trust boundary.** `sanitizeArticleHtml`
+   (reply allowlist + `h2`/`h3`; `a` limited to `http`/`https`/`mailto` with
+   forced `rel="noopener noreferrer nofollow" target="_blank"`; everything
+   else discarded, empty-after-sanitize rejected `400 VALIDATION_ERROR`) is
+   the only trusted transform. The client editor's output is untrusted; the
+   client re-sanitizes on render via `client/src/lib/rich-text/article-html.ts`
+   feeding one `<ArticleContent>` guard used by the internal and portal
+   detail views. No new sanitization dependency (`sanitize-html` server,
+   `dompurify` client — both already present).
+7. **Search & AI derivation** run over `contentText`
+   (`articleHtmlToPlainText` = the extended `replyHtmlToPlainText`, block
+   boundaries now also break on `</h1>`…`</h6>`; reply behaviour byte-identical
+   since replies have no headings). Search API surface, status scoping
+   (internal all-status, portal + AI `PUBLISHED`-only), pagination, ordering,
+   and the `{ data, meta }` envelope are unchanged. The `content` schema
+   `.max()` is raised `50_000 → 200_000` for markup headroom; the real
+   ≤ 50 000 readable-char ceiling is enforced in the service against the
+   flattened text.
+8. **Audit unchanged (RT-9 / KB-AUDIT frozen).** No change to
+   `audit-log.constants.ts` / `audit-log.service.ts` or the KB
+   `createAuditLog` call sites. `changedFields` still only `title` /
+   `category` / `status`; a body change is still the flat
+   `metadata.contentChanged = true`. `content` / `contentText` / excerpt /
+   diff / length / hash never enter `changes` or `metadata`. Exactly-once,
+   transactional atomicity, and no-op suppression are unchanged.
+
+### Alternatives rejected
+
+- **Lexical JSON in `content`.** Search and AI would run over serialized
+  node markup and every render (incl. server-side AI text) would need a
+  Lexical runtime; no repo precedent.
+- **Plain text + a separate non-null rich column.** A new column + migration
+  + dual-write with two sources of truth for "the body" — more moving parts
+  than sanitized HTML in `content` for no rendering or safety gain.
+- **No `contentText`, narrow search to `title` + `category`.** A regression
+  against `RT-5.1` / `RT-5.3` (legacy matches lost). The additive nullable
+  column is the smaller cost.
+- **Reusing `TicketReplyEditor` directly.** Risks regressing the ticket
+  composer (critical path, out of scope).
+
+### Consequences
+
+- One additive nullable column + one additive migration; no other schema,
+  enum, index, relation, RBAC, route, status/error-code, lifecycle, or
+  portal-visibility change; no new runtime/dev dependency or lockfile change.
+- `docs/05-api-contract.md` and `docs/18-ui-pages-spec.md` updated for the
+  `content` representation change and the rich editor. `docs/06-auth-rbac.md`
+  notes authoring uses a rich editor (RBAC identical).
+- Verification: server `tsc` + `eslint` clean, full server vitest green
+  (incl. `knowledge-base`, `ai`, `customer-ai`, `audit-logs`,
+  `shared/rich-text`), `npm run build` green; client `tsc -b` + `eslint`
+  clean, full client vitest green, `vite build` green; `prisma validate` +
+  `migrate diff` confirm the migration matches the schema delta;
+  `git diff --check` clean. Migration apply/rollback on a disposable
+  database is left to the human review step (no local Postgres in the
+  implementation environment; the additive DDL is verified against the live
+  schema via `prisma migrate diff --from-url`).
+
 Use this file for decisions not already fixed by the project documentation.
 
 Do not record trivial implementation details.
@@ -1129,6 +1246,10 @@ Introduce a first-class `AuditLog` administrative/security trail separate from `
 Audited mutations use one central service and explicit per-domain safe-field allowlists. No arbitrary DTO or Prisma record serialization is allowed. Passwords/hashes, tokens, API keys, provider credentials, authorization/cookie headers, message/note bodies, and whole request bodies are never stored. Security-sensitive existing mutations write the domain change and audit row in the same Prisma transaction; missing IP/User-Agent never blocks a mutation.
 
 The list API and `/audit-logs` workspace are `ADMIN` only. Navigation visibility is presentation-only and an independent route guard plus backend RBAC remains authoritative. The Customer Portal has no route, navigation, API authorization, or audit data access. Export, retention, signing, SIEM/webhooks, alerting, and external append-only storage remain deferred.
+
+### Progress note (2026-09-09): Knowledge Base coverage
+
+SDD pilot `specs/features/knowledge-base/` applied this ADR's established pattern to one more existing module — no new architectural decision. New entity type `KNOWLEDGE_ARTICLE`; new audit actions `KNOWLEDGE_ARTICLE_CREATED` / `_UPDATED` / `_PUBLISHED` / `_UNPUBLISHED` / `_DELETED` (dedicated lifecycle actions mirroring `DEPARTMENT_*`). Each internal KB management mutation writes exactly one row transactionally with the mutation; `actorId` is server-derived; the safe-field allowlist is `title` / `category` / `status`, and the article body is never stored (a body change is a flat `metadata.contentChanged = true`). No schema change, no migration, no RBAC change, no new audit-read surface.
 
 ---
 

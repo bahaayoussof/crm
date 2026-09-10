@@ -851,6 +851,21 @@
     "statusLabel": "Status",
     "statusHelp": "Draft articles are internal only. Published articles also appear in the customer Help Center.",
     "saveError": "Unable to save the article.",
+    "editor": {
+      "ariaLabel": "Article body",
+      "toolbarLabel": "Article formatting",
+      "paragraph": "Paragraph",
+      "heading2": "Heading 2",
+      "heading3": "Heading 3",
+      "bold": "Bold",
+      "italic": "Italic",
+      "underline": "Underline",
+      "bulletList": "Bulleted list",
+      "numberList": "Numbered list",
+      "link": "Link",
+      "undo": "Undo",
+      "redo": "Redo"
+    },
     "columns": {
       "title": "Title",
       "category": "Category",

@@ -15,6 +15,51 @@ vi.mock("@/features/auth/auth-state", () => ({
 }));
 vi.mock("@/features/notifications/notification-bell", () => ({ NotificationBell: () => null }));
 
+// The real Lexical editor is covered by knowledge-article-editor.test.tsx. Here
+// we stub it with a textarea that mirrors its handle + onChange contract so the
+// form's wiring (hydrate on edit, serialize on submit, validation) is testable
+// without driving a contenteditable in jsdom.
+vi.mock("./knowledge-article-editor", async () => {
+  const { forwardRef, useImperativeHandle, useRef } = await import("react");
+  type StubProps = {
+    id: string;
+    ariaLabel: string;
+    ariaDescribedBy?: string;
+    ariaInvalid?: boolean;
+    onChange?: (html: string, plainText: string) => void;
+  };
+  const KnowledgeArticleEditor = forwardRef<unknown, StubProps>(function KnowledgeArticleEditor(
+    { id, ariaLabel, ariaDescribedBy, ariaInvalid, onChange },
+    ref,
+  ) {
+    const areaRef = useRef<HTMLTextAreaElement>(null);
+    useImperativeHandle(ref, () => ({
+      hasText: () => (areaRef.current?.value.trim().length ?? 0) > 0,
+      getPlainText: () => areaRef.current?.value ?? "",
+      getHtml: () => areaRef.current?.value ?? "",
+      setHtml: (value: string) => {
+        if (areaRef.current) {
+          const html = /<[a-z]/i.test(value) ? value : `<p>${value}</p>`;
+          areaRef.current.value = html;
+          onChange?.(html, value);
+        }
+      },
+      focus: () => areaRef.current?.focus(),
+    }));
+    return (
+      <textarea
+        ref={areaRef}
+        id={id}
+        aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
+        aria-invalid={ariaInvalid}
+        onChange={(event) => onChange?.(`<p>${event.target.value}</p>`, event.target.value)}
+      />
+    );
+  });
+  return { KnowledgeArticleEditor };
+});
+
 vi.mock("./knowledge-article-hooks", () => ({
   useKnowledgeArticles: mocks.useKnowledgeArticles,
   useKnowledgeArticle: mocks.useKnowledgeArticle,
@@ -41,6 +86,11 @@ function renderAt(path: string, route: React.ReactNode) {
 }
 function LocationProbe() {
   return <span data-testid="location">{useLocation().pathname}</span>;
+}
+
+/** Type into the stubbed article editor (see the vi.mock above). */
+function typeInEditor(text: string) {
+  fireEvent.change(screen.getByLabelText("Article body"), { target: { value: text } });
 }
 
 describe("knowledge base", () => {
@@ -150,14 +200,19 @@ describe("knowledge base", () => {
     </>);
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByText("Title must be at least 3 characters")).toBeInTheDocument();
+    expect(await screen.findByText("Content is required")).toBeInTheDocument();
     expect(mocks.create).not.toHaveBeenCalled();
 
     fireEvent.change(screen.getByLabelText(/Article title/), { target: { value: "Reset your password" } });
-    fireEvent.change(screen.getByLabelText(/Article content/), { target: { value: "Detailed steps." } });
+    typeInEditor("Detailed steps.");
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1));
     const payload = mocks.create.mock.calls[0][0];
-    expect(payload).toMatchObject({ title: "Reset your password", content: "Detailed steps.", status: "DRAFT" });
+    // `content` is now serialized editor HTML, not the raw string.
+    expect(payload.title).toBe("Reset your password");
+    expect(payload.status).toBe("DRAFT");
+    expect(payload.content).toMatch(/<p[\s>]/);
+    expect(payload.content).toContain("Detailed steps.");
     expect(payload).not.toHaveProperty("createdById");
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/knowledge-base/new-article"));
   });
@@ -170,6 +225,41 @@ describe("knowledge base", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
     expect(Object.keys(mocks.update.mock.calls[0][0]).sort()).toEqual(["category", "content", "status", "title"]);
+  });
+
+  it("hydrates a legacy plain-text article into the editor and re-serializes it to HTML on save", async () => {
+    mocks.useKnowledgeArticle.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: { ...detailArticle, content: "Legacy line one.\n\nLegacy line two." },
+      refetch: vi.fn(),
+    });
+    mocks.update.mockResolvedValue({ id: "article-1" });
+    renderAt("/knowledge-base/article-1/edit", <Route path="/knowledge-base/:id/edit" element={<KnowledgeArticleFormPage />} />);
+    // The stubbed editor's setHtml wraps a plain body as HTML (mirrors the real
+    // editor's legacy-hydration → serialize contract).
+    await waitFor(() =>
+      expect((screen.getByLabelText("Article body") as HTMLTextAreaElement).value).toMatch(/^<p>/),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
+    expect(mocks.update.mock.calls[0][0].content).toMatch(/<p>Legacy line one\./);
+  });
+
+  it("renders a rich article body formatted and never executes embedded markup", () => {
+    mocks.useKnowledgeArticle.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: {
+        ...detailArticle,
+        content: '<h2>Overview</h2><p>Do <strong>this</strong>.</p><script>alert(1)</script>',
+      },
+      refetch: vi.fn(),
+    });
+    const view = renderAt("/knowledge-base/article-1", <Route path="/knowledge-base/:id" element={<KnowledgeBaseDetailPage />} />);
+    expect(view.container.querySelector("article h2")?.textContent).toBe("Overview");
+    expect(view.container.querySelector("article strong")?.textContent).toBe("this");
+    expect(view.container.querySelector("script")).toBeNull();
   });
 
   it("prevents duplicate submissions while a save is pending", () => {

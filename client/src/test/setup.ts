@@ -16,6 +16,20 @@ if (typeof Range !== "undefined") {
   }
 }
 
+// jsdom does not implement DragEvent; Lexical references it while wiring its
+// clipboard/drag handlers, so a `paste` fired at a Lexical editor throws
+// without this shim. A plain Event subclass is enough for the code paths tests
+// exercise.
+if (typeof (globalThis as { DragEvent?: unknown }).DragEvent === "undefined") {
+  class DragEventPolyfill extends Event {
+    dataTransfer: unknown = null;
+    constructor(type: string, init?: EventInit) {
+      super(type, init);
+    }
+  }
+  (globalThis as { DragEvent?: unknown }).DragEvent = DragEventPolyfill;
+}
+
 if (typeof Element !== "undefined") {
   if (!Element.prototype.scrollIntoView) {
     Element.prototype.scrollIntoView = () => {};

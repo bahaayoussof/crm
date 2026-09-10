@@ -83,9 +83,23 @@ No queue library (bull/bullmq/agenda) and no in-process cron library exist.
   resume, and a hard stop (no retry) on 401/403. Mounted once around the
   whole route tree via `RealtimeProvider`; a dropped stream never blocks
   the UI — REST + TanStack Query remain the source of truth.
-- **Rich text**: Lexical-based composer for ticket replies/notes and
-  knowledge-base article bodies, with DOMPurify sanitizing rendered HTML on
-  the client (server also sanitizes on write — see Backend).
+- **Rich text**: Lexical-based composer for ticket replies/notes, with
+  DOMPurify sanitizing rendered HTML on the client (server also sanitizes on
+  write — see Backend). Knowledge Base article bodies use a **bounded Rich
+  Text** model since `KB-RICH-*` / ADR-057: a Lexical editor (V1 set —
+  paragraphs, H2/H3, bold/italic/underline, lists, links, undo/redo) on the
+  same `sanitize-html` + DOMPurify infrastructure as ticket replies, stored
+  as **server-sanitized HTML in the existing `content` field**, rendered
+  through a shared client-re-sanitizing `<ArticleContent>` guard on both the
+  internal and portal detail views. A deterministic plain-text projection is
+  stored in an additive nullable `contentText` column and drives search, the
+  portal excerpt, and AI grounding. **Legacy plain-text articles keep
+  rendering unchanged** (`whitespace-pre-wrap` + `dir="auto"`, no
+  `dangerouslySetInnerHTML`) via a content-shape sniff, and are lazily
+  converted to sanitized HTML the first time they are re-edited — no
+  destructive migration. ADR-057 supersedes ADR-020's "no rich text"
+  consequence; the KB-AUDIT audit behavior is unchanged (no article body in
+  `AuditLog`).
 - **i18n / RTL**: i18next, two languages (`en`, `ar`) with translation files
   kept in lockstep. Document `lang`/`dir` are synced at the document root
   off the persisted language choice (`crm-language` in `localStorage`), so

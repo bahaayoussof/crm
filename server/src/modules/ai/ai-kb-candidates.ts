@@ -43,7 +43,8 @@ export async function listKbCandidates(ctx: AiTicketContext): Promise<KbCandidat
   const or: Prisma.KnowledgeArticleWhereInput[] = [];
   for (const keyword of keywords) {
     or.push({ title: { contains: keyword, mode: "insensitive" } });
-    or.push({ content: { contains: keyword, mode: "insensitive" } });
+    // Match human-readable text, never raw article markup (RT-5.1 / RT-6.2).
+    or.push({ contentText: { contains: keyword, mode: "insensitive" } });
   }
   if (ctx.ticket.category) {
     or.push({ category: { contains: ctx.ticket.category.name, mode: "insensitive" } });
@@ -56,12 +57,12 @@ export async function listKbCandidates(ctx: AiTicketContext): Promise<KbCandidat
     },
     orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
     take: MAX_KB_CANDIDATES,
-    select: { id: true, title: true, content: true },
+    select: { id: true, title: true, contentText: true },
   });
 
   return rows.map((row) => ({
     id: row.id,
     title: row.title,
-    excerpt: deriveExcerpt(row.content),
+    excerpt: deriveExcerpt(row.contentText),
   }));
 }

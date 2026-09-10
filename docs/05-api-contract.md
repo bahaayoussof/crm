@@ -272,6 +272,23 @@ None of these are registered. Assignment and status changes are already implemen
 
 ## Knowledge Base — LIVE
 
+**Article body representation (ADR-057, `KB-RICH-*`).** `content` is now
+**server-sanitized rich text (HTML)** authored in a bounded Lexical editor
+(V1 set: paragraphs, `h2`, `h3`, bold, italic, underline, ordered/unordered
+list, link, undo/redo). It is sanitized server-side on write to that
+allowlist (`a[href]` limited to `http`/`https`/`mailto`, links forced to
+`rel="noopener noreferrer nofollow" target="_blank"`; scripts, styles,
+classes, ids, event handlers, media, iframes, data URIs discarded); a body
+that is empty once sanitized, or whose readable text exceeds 50 000
+characters, is rejected with `400 VALIDATION_ERROR`. The field name and JSON
+type (`string`) are unchanged — this is the same representation change
+`Message.body` underwent (ADR-035). Legacy plain-text rows remain valid and
+render unchanged until re-edited (lazy conversion). A deterministic
+plain-text projection is stored in the additive nullable `contentText`
+column and used for search, the portal list `excerpt`, and AI grounding;
+`contentText` is **never** returned in any API response and never written to
+`AuditLog`.
+
 ```text
 GET    /knowledge-articles          LIVE
 GET    /knowledge-articles/:id      LIVE
@@ -286,7 +303,7 @@ All internal routes require authentication; `CUSTOMER` and unauthenticated calle
 
 ### Internal list
 
-`GET /knowledge-articles` (`ADMIN`/`MANAGER`/`AGENT`). Query: `page` (int ≥ 1, default 1), `limit` (int 1–100, default 20), `search` (trimmed, ≤ 100), `status` (`DRAFT` | `PUBLISHED`), `category` (trimmed, 1–100, exact match). `search` is case-insensitive (PostgreSQL `mode: "insensitive"`) across `title`, `content`, and `category`. Ordering is `updatedAt DESC`, then `id ASC`. Response: `{ data, meta: { page, limit, total, totalPages } }`. Row projection is `{ id, title, category, status, createdAt, updatedAt, createdBy: { id, name, role } }` — no `content`, no author email.
+`GET /knowledge-articles` (`ADMIN`/`MANAGER`/`AGENT`). Query: `page` (int ≥ 1, default 1), `limit` (int 1–100, default 20), `search` (trimmed, ≤ 100), `status` (`DRAFT` | `PUBLISHED`), `category` (trimmed, 1–100, exact match). `search` is case-insensitive (PostgreSQL `mode: "insensitive"`) across `title`, the derived `contentText` plain text, and `category`. Ordering is `updatedAt DESC`, then `id ASC`. Response: `{ data, meta: { page, limit, total, totalPages } }`. Row projection is `{ id, title, category, status, createdAt, updatedAt, createdBy: { id, name, role } }` — no `content`, no author email.
 
 ### Internal detail
 
@@ -294,7 +311,7 @@ All internal routes require authentication; `CUSTOMER` and unauthenticated calle
 
 ### Create
 
-`POST /knowledge-articles` (`ADMIN`/`MANAGER`). Strict body `{ title, content, category?: string | null, status?: "DRAFT" | "PUBLISHED" }`. `title` trimmed 3–200, `content` trimmed 1–50000, `category` trimmed ≤ 100 with empty/whitespace normalized to `null`, `status` defaults to `DRAFT`. `createdById` is derived from the authenticated user server-side; a client-supplied `createdById` or any unknown field is rejected with `400 VALIDATION_ERROR`. Returns `201 { data: <detail projection> }`.
+`POST /knowledge-articles` (`ADMIN`/`MANAGER`). Strict body `{ title, content, category?: string | null, status?: "DRAFT" | "PUBLISHED" }`. `title` trimmed 3–200, `content` accepted up to 200000 raw characters (markup headroom; the sanitized readable body must be non-empty and <= 50000 characters), `category` trimmed ≤ 100 with empty/whitespace normalized to `null`, `status` defaults to `DRAFT`. `createdById` is derived from the authenticated user server-side; a client-supplied `createdById` or any unknown field is rejected with `400 VALIDATION_ERROR`. Returns `201 { data: <detail projection> }`.
 
 ### Update
 
@@ -303,6 +320,10 @@ All internal routes require authentication; `CUSTOMER` and unauthenticated calle
 ### Delete
 
 `DELETE /knowledge-articles/:id` (`ADMIN`/`MANAGER`). Permanent delete (no soft-delete field, no dependent Knowledge Base records). Returns `204` with no body. Missing article → `404 KNOWLEDGE_ARTICLE_NOT_FOUND`.
+
+### Audit side effects
+
+Each successful internal mutation writes exactly one `AuditLog` row (`entityType: KNOWLEDGE_ARTICLE`) inside the same transaction as the mutation: `POST` → `KNOWLEDGE_ARTICLE_CREATED`; `PATCH` → `KNOWLEDGE_ARTICLE_PUBLISHED` / `KNOWLEDGE_ARTICLE_UNPUBLISHED` for a `DRAFT ⇄ PUBLISHED` transition, otherwise `KNOWLEDGE_ARTICLE_UPDATED`; `DELETE` → `KNOWLEDGE_ARTICLE_DELETED`. `metadata.changes` carries only `title` / `category` / `status`; a body change is recorded as `metadata.contentChanged = true` and the article `content` is never stored. A no-op `PATCH`, a read, and a rejected mutation (`400` / `403` / `404`) write no row. Portal read endpoints never write audit rows.
 
 ### Portal Knowledge Base
 
@@ -313,7 +334,7 @@ GET /portal/knowledge-articles/:id      LIVE
 
 Registered at `/api/portal/knowledge-articles` (`feature/knowledge-base`), `CUSTOMER` only; internal roles and unauthenticated callers are rejected, matching the established Portal boundary. `status = PUBLISHED` is always enforced server-side and a requested `status` is not accepted (`400`).
 
-`GET /portal/knowledge-articles` query: `page`, `limit` (1–100), `search` (≤ 100), `category` (1–100, exact). Search/category filtering stay published-only. Ordering is `updatedAt DESC`, then `id ASC`. Row projection: `{ id, title, category, updatedAt, excerpt }`; `excerpt` is derived server-side from `content` (whitespace-collapsed, ≤ 200 chars, ellipsis when truncated) — there is no `excerpt` column. Internal status and author data are omitted.
+`GET /portal/knowledge-articles` query: `page`, `limit` (1–100), `search` (≤ 100), `category` (1–100, exact). Search/category filtering stay published-only. Ordering is `updatedAt DESC`, then `id ASC`. Row projection: `{ id, title, category, updatedAt, excerpt }`; `excerpt` is derived server-side from the plain-text `contentText` projection (whitespace-collapsed, ≤ 200 chars, ellipsis when truncated) — there is no `excerpt` column. Internal status and author data are omitted.
 
 `GET /portal/knowledge-articles/:id` returns only `{ id, title, content, category, updatedAt }`. A `DRAFT` id and a nonexistent id both return the identical `404 KNOWLEDGE_ARTICLE_NOT_FOUND`, so a customer cannot distinguish a hidden draft from a missing article.
 

@@ -62,6 +62,27 @@ describe("portal knowledge base", () => {
     expect(screen.queryByText(/Author/)).not.toBeInTheDocument();
   });
 
+  it("renders a rich published article body safely in the portal", () => {
+    mocks.useArticle.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: {
+        ...detail,
+        content:
+          '<h2>Billing cycle</h2><p>Charged <strong>monthly</strong>.</p>' +
+          '<ul><li>invoice emailed</li></ul><script>alert(1)</script>' +
+          '<a href="javascript:alert(1)">x</a>',
+      },
+      refetch: vi.fn(),
+    });
+    const view = renderAt("/portal/knowledge-base/article-1", <Route path="/portal/knowledge-base/:id" element={<PortalKnowledgeArticlePage />} />);
+    expect(view.container.querySelector("article h2")?.textContent).toBe("Billing cycle");
+    expect(view.container.querySelector("article strong")?.textContent).toBe("monthly");
+    expect(view.container.querySelector("article ul li")?.textContent).toBe("invoice emailed");
+    expect(view.container.querySelector("script")).toBeNull();
+    expect(view.container.querySelector('a[href^="javascript:"]')).toBeNull();
+  });
+
   it("shows a not-found state for an unpublished or missing article", () => {
     mocks.useArticle.mockReturnValue({ isLoading: false, isError: true, error: { isAxiosError: true, response: { data: { error: { code: "KNOWLEDGE_ARTICLE_NOT_FOUND" } } } }, refetch: vi.fn() });
     renderAt("/portal/knowledge-base/missing", <Route path="/portal/knowledge-base/:id" element={<PortalKnowledgeArticlePage />} />);

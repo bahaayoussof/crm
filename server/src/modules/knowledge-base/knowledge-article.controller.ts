@@ -1,5 +1,6 @@
 import type { RequestHandler, Response } from "express";
 import { AppError } from "../../shared/errors/app-error.js";
+import { getAuditRequestContext } from "../audit-logs/audit-request-context.js";
 import type {
   CreateKnowledgeArticleInput,
   KnowledgeArticleListQuery,
@@ -31,13 +32,22 @@ export const detail: RequestHandler = async (_request, response) =>
   response.status(200).json({ data: await getKnowledgeArticle(params(response).id) });
 
 export const create: RequestHandler<unknown, unknown, CreateKnowledgeArticleInput> = async (request, response) =>
-  response.status(201).json({ data: await createKnowledgeArticle(request.body, actor(request)) });
+  response
+    .status(201)
+    .json({ data: await createKnowledgeArticle(request.body, actor(request), getAuditRequestContext(request)) });
 
 export const update: RequestHandler<unknown, unknown, UpdateKnowledgeArticleInput> = async (request, response) =>
-  response.status(200).json({ data: await updateKnowledgeArticle(params(response).id, request.body) });
+  response.status(200).json({
+    data: await updateKnowledgeArticle(
+      params(response).id,
+      request.body,
+      actor(request).userId,
+      getAuditRequestContext(request),
+    ),
+  });
 
-export const remove: RequestHandler = async (_request, response) => {
-  await deleteKnowledgeArticle(params(response).id);
+export const remove: RequestHandler = async (request, response) => {
+  await deleteKnowledgeArticle(params(response).id, actor(request).userId, getAuditRequestContext(request));
   response.status(204).send();
 };
 

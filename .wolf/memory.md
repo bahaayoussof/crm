@@ -1034,3 +1034,98 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
+
+## Session: 2026-09-09 14:06
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 14:20 | SDD pilot: wrote first feature spec for Knowledge Base (brownfield — KB already ships end-to-end). Reverse-spec'd current behavior + 7 open questions (localization model, AGENT authoring, MANAGER team-scope, public KB, archive vs hard-delete, category model, audit logging). No prod/schema/dep change. | specs/features/knowledge-base/spec.md (new) | done — DRAFT, needs human clarification pass | ~46k |
+| 15:10 | SDD pilot clarification pass: resolved all 7 open questions conservatively — #1-6 = keep current behavior (no localization/lifecycle/category/scope/access change), #7 = APPROVED: AuditLog coverage for KB management mutations is the sole pilot enhancement. Reworked spec into "Existing Behavior to Preserve" (non-regression baseline) vs "Pilot Enhancement" (audit only) + regression + audit acceptance criteria + Future Enhancements. Anchored audit reqs to real conventions (createAuditLog, AUDIT_ACTIONS/AUDIT_ENTITY_TYPES, getAuditRequestContext). Fixed specs/constitution.md line 22 (Lexical falsely claimed for KB bodies → plain text, ADR-020). Status → READY FOR PLAN. No plan/tasks created. | specs/features/knowledge-base/spec.md, specs/constitution.md | done — READY FOR PLAN | ~34k |
+
+## Session: 2026-09-09 14:47
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-09 15:03
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-09 15:09
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 15:11 | Implement KB-AUDIT-001: add KNOWLEDGE_ARTICLE entity type + 5 KNOWLEDGE_ARTICLE_* actions | server/src/modules/audit-logs/audit-log.constants.ts | typecheck+lint clean, 37 KB tests green; tasks.md KB-AUDIT-001 checked | ~30k |
+
+## Session: 2026-09-09 15:17
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 15:20 | Implement KB-AUDIT-002: wire server-derived actor id + getAuditRequestContext(request) from KB controller into create/update/delete service signatures (added `requestContext?: AuditRequestContext`; `actorId: string` on update/delete). No createAuditLog call, no transaction, no behavior change — params `void`-referenced with "wired for KB-AUDIT-003+" comment. Sole mutation caller confirmed = controller (customer-ai/ai import only deriveExcerpt). | knowledge-article.controller.ts, knowledge-article.service.ts | typecheck+lint clean, 37 KB tests green; tasks.md KB-AUDIT-002 checked | ~40k |
+
+## Session: 2026-09-09 15:27
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 15:32 | Implement KB-AUDIT-003: transactional AuditLog for createKnowledgeArticle (KNOWLEDGE_ARTICLE_CREATED, body excluded), port KB test mock + focused test, check tasks.md | knowledge-article.service.ts, knowledge-article.test.ts, tasks.md, STATUS.md | typecheck+lint clean, KB vitest 38/38 pass | ~45k |
+
+## Session: 2026-09-09 15:46
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 15:50 | KB-AUDIT-004: audit meaningful KB article edits (title/category via changedFields, content as contentChanged marker only, no-op suppressed, txn-atomic) + 6 focused tests | knowledge-article.service.ts, knowledge-article.test.ts, tasks.md | tsc+lint clean, 45 KB tests + 5 audit-log tests green | ~45k |
+| 15:57 | KB-AUDIT-005: lifecycle audit in updateKnowledgeArticle — status added to changedFields; changes.status genuine transition selects KNOWLEDGE_ARTICLE_PUBLISHED/_UNPUBLISHED, wins over UPDATED on combined PATCH; same-status no-op falls through; one row per PATCH | knowledge-article.service.ts, knowledge-article.test.ts, tasks.md | tsc+lint clean, 45 KB + 6 portal + 5 audit-log tests green | ~30k |
+
+## Session: 2026-09-09 16:11
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 16:15 | KB-AUDIT-006: audit KB hard delete transactionally (tx delete + createAuditLog, safe from-scalars, no body) | knowledge-article.service.ts, knowledge-article.test.ts, tasks.md | typecheck+lint+53 KB tests+5 audit tests green | ~12k |
+
+## Session: 2026-09-09 16:49
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 16:55 | KB-AUDIT-007 mutation audit test hardening: inventory + additive assertions only (no new tests, no prod change) — explicit action/entity on combined edit, no content key on create, explicit no-lifecycle / lifecycle-wins assertions | server/src/modules/knowledge-base/knowledge-article.test.ts, specs/features/knowledge-base/tasks.md | 47 KB + 6 portal + 5 audit tests green; typecheck+lint clean; KB-AUDIT-007 [x] | ~45k |
+
+## Session: 2026-09-09 16:58
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 17:05 | KB-AUDIT-008 negative/no-audit tests: additive `auditCreate` not-called assertions on RBAC(403)/auth(401)/validation(400)/404/read paths in knowledge-article.test.ts + portal test (mock gained auditLog.create) + AI grounding (customer-ai.test.ts, ai.test.ts direct listKbCandidates test). No production change. tasks.md 008 -> [x]. | server/src/modules/knowledge-base/knowledge-article.test.ts, knowledge-article.portal.test.ts, server/src/modules/ai/ai.test.ts, server/src/modules/customer-ai/customer-ai.test.ts, specs/features/knowledge-base/tasks.md | typecheck+lint clean, 117 tests green | ~45k |
+
+## Session: 2026-09-09 17:07
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-09 17:16
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 17:10 | KB-AUDIT-009: transaction atomicity / audit-failure test (parameterized create/update/delete, audit throw → 500, no success contract) | server/src/modules/knowledge-base/knowledge-article.test.ts | 50 KB tests green; tsc+lint clean; tasks.md [x] | ~60k |
+| 17:14 | KB-AUDIT-010: doc reconciliation — audit side-effects note (05), entity-type + KB paragraph (06), ADR-039 progress note (17), "Implemented as" note (spec.md); plan.md untouched; 19 not updated (uncommitted, status-neutral) | docs/05-api-contract.md, docs/06-auth-rbac.md, docs/17-decisions-log.md, specs/features/knowledge-base/spec.md, tasks.md | additive only; git diff --check clean | ~15k |
+| 17:16 | KB-AUDIT-011: final gate — typecheck/lint/build clean, server vitest 912/912, KB+audit+ai 120/120; scope review clean (no client/prisma/pkg/SSE/contract/RBAC change) | specs/features/knowledge-base/tasks.md, .wolf/STATUS.md | PILOT READY FOR HUMAN REVIEW / MERGE; 001–011 all [x] | ~40k |
+
+## Session: 2026-09-09 17:49
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 2026-09-09 18:05 | KB Rich Text SDD: extended specs/features/knowledge-base/ spec+plan+tasks with Rich Text capability (RT-1..9, BC, SEC), KB-RICH-001..015; reuse Lexical+sanitize-html, HTML in content, additive contentText col; minimal pointers in specs/constitution.md + specs/architecture.md | spec.md plan.md tasks.md constitution.md architecture.md | planning only, no code, READY FOR IMPLEMENTATION REVIEW | ~45k |
+
+## Session: 2026-09-09 18:09
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 18:49 | KB-RICH-001..015 — Knowledge Base bounded Rich Text (sanitized HTML in content + additive nullable contentText projection + Lexical editor + shared <ArticleContent> render guard); ADR-057 | server+client KB/portal/ai + docs + 1 migration | server tsc/lint/build clean, vitest 926/926; client tsc/lint/build clean, vitest 800/800; git diff --check clean; disposable-DB migration apply not runnable here | ~large |
+
+## Session: 2026-09-10 09:47
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-10 09:52
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|

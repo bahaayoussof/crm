@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { EmptyState } from "@/components/shared/empty-state";
 import { LoadingRows } from "@/features/knowledge-base/knowledge-base-ui";
+import { ArticleContent } from "@/features/knowledge-base/knowledge-article-content";
 
 const errorCode = (error: unknown) => (axios.isAxiosError(error) ? (error.response?.data?.error?.code as string | undefined) : undefined);
 
@@ -132,8 +133,8 @@ export function PortalKnowledgeArticlePage() {
             </div>
           }
         />
-        <article className="rounded-xl border border-border bg-surface p-6 sm:p-8 max-w-3xl whitespace-pre-wrap break-words text-sm leading-7 text-foreground shadow-subtle" dir="auto">
-          {article.content}
+        <article className="rounded-xl border border-border bg-surface p-6 sm:p-8 max-w-3xl shadow-subtle" dir="auto">
+          <ArticleContent content={article.content} />
         </article>
       </div>
     </PortalPage>
