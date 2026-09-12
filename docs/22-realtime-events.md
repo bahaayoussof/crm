@@ -100,8 +100,8 @@ domain/service layer after the database work commits.
 
 | Event | Emitted from | Triggers covered |
 | --- | --- | --- |
-| `ticket.message.created` | `ticket.service.addTicketMessage` / `addTicketNote`; `portal.service.reply`; `integrations/email` inbound; `integrations/whatsapp` inbound | Internal agent public reply, internal note, customer portal reply, inbound EMAIL, inbound WhatsApp |
-| `ticket.updated` | `ticket.service.createTicket` / `updateTicket`; `sla-automation.service` (auto-assign + auto-escalate) | status, priority, assignment, category, department, branch, escalation, SLA auto-assignment |
+| `ticket.message.created` | `ticket.service.addTicketMessage` / `addTicketNote`; `portal.service.reply`; `integrations/email` inbound; `integrations/whatsapp` inbound; `integrations/sms` inbound | Internal agent public reply, internal note, customer portal reply, inbound EMAIL, inbound WhatsApp, inbound SMS |
+| `ticket.updated` | `ticket.service.createTicket` / `updateTicket` / `selfAssignTicket`; `portal.service.createTicket`; `sla-automation.service` (auto-assign + auto-escalate); `live-chat` start + end | status, priority, assignment (incl. agent self-claim), category, department, branch, escalation, SLA auto-assignment, portal ticket creation (unrouted → ADMIN audience only), live-chat lifecycle. A pure re-route (`departmentId` / `branchId` / `teamId` only) now also emits, to the new team's audience. |
 | `notification.created` | `notifications.service.createNotifications` (the one centralized creator) | every notification, from every source (assignment, escalation, mentions, watchers, SLA, tasks, customer replies, inbound channels) |
 | `notification.read` | `notifications.service.markRead` | single mark-as-read (multi-tab badge sync). `markAllRead` does not broadcast — the acting tab invalidates locally; other tabs self-heal on the next event / focus. |
 
@@ -126,9 +126,11 @@ past their commit).
 
 Service entrypoints wrapped in `withRealtimeOutbox`:
 `ticket.service` (`addTicketMessage`, `addTicketNote`, `createTicket`,
-`updateTicket`), `portal.service.reply`, `email.service.processInboundEmail`,
-`whatsapp.service.processInboundTextMessage`, `sla-automation.runSlaMonitor`,
-`task.service` (`createTask`, `updateTask`), `task-reminder.runTaskReminders`.
+`updateTicket`, `selfAssignTicket`), `portal.service` (`reply`, `createTicket`),
+`email.service.processInboundEmail`,
+`whatsapp.service.processInboundTextMessage`, `sms.service` inbound,
+`sla-automation.runSlaMonitor`, `task.service` (`createTask`, `updateTask`),
+`task-reminder.runTaskReminders`.
 
 EMAIL rollback semantics are intact: if Resend processing or the DB transaction
 fails, `processInboundEmail` throws before the flush and **no**
@@ -144,12 +146,14 @@ user. Resolved in `realtime.service.canReceive(subscriber, audience)`:
 | Audience | Rule |
 | --- | --- |
 | `{ scope: "user", userId }` | Delivered only to connections for that user (notifications). |
-| `{ scope: "ticket", ticketId, assignedAgentId }` | `ADMIN` / `MANAGER`: all tickets. `AGENT`: only when `assignedAgentId === null` or `assignedAgentId === <this agent>` — mirrors `ticket-visibility.ts`. |
+| `{ scope: "ticket", ticketId, assignedAgentId, teamId, customerId }` | `ADMIN`: all tickets. `MANAGER`: only events for their **own team** (`teamId` match); an unrouted ticket (`teamId: null`) reaches no manager. `AGENT`: only when `assignedAgentId === <this agent>`, or an unassigned event within the agent's **own team** — mirrors `ticket-visibility.ts` + `shared/team/team-scope.ts`. `CUSTOMER`: only their own ticket (`customerId` match) and only `visibility: "public"`. |
 
-The `assignedAgentId` on a ticket audience is a snapshot taken at emit time, so a
-just-reassigned ticket routes to the new assignee. Internal notes carry
-`visibility: "internal"` (the endpoint is internal-only today, so all internal
-subscribers with ticket visibility receive them).
+The `assignedAgentId` / `teamId` on a ticket audience are a snapshot taken at emit
+time, so a just-reassigned or just-rerouted ticket routes to the new assignee /
+new team. A portal-created ticket is unrouted + unassigned, so its `ticket.updated`
+reaches `ADMIN` only (plus the creating customer's own portal refetch). Internal
+notes carry `visibility: "internal"` (the endpoint is internal-only today, so all
+internal subscribers with ticket visibility receive them).
 
 Ticket IDs, message IDs, notification IDs, assignment changes and customer
 activity never reach an unauthorized connected user.

@@ -3,7 +3,7 @@ import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import { createNotifications } from "../notifications/notification.service.js";
 import { sanitizeReplyHtml } from "../../shared/rich-text/reply-html.js";
-import { emitTicketMessageCreated, withRealtimeOutbox } from "../realtime/realtime.publisher.js";
+import { emitTicketMessageCreated, emitTicketUpdated, withRealtimeOutbox } from "../realtime/realtime.publisher.js";
 import { customerReplyNotificationRecipientIds } from "../../shared/team/team-scope.js";
 import type { PortalCreateTicketInput, PortalReplyInput, PortalStatus, PortalTicketListQuery } from "./portal.schema.js";
 
@@ -76,7 +76,12 @@ export async function ticketDetail(id: string, userId: string) {
 export async function createTicket(input: PortalCreateTicketInput, userId: string) {
   const customerId = await customerIdFor(userId);
   const now = new Date();
-  return prisma.$transaction(async (tx) => {
+  // Same post-commit outbox pattern as reply() below: connected staff (ADMIN —
+  // the unrouted-ticket audience) get the canonical `ticket.updated` invalidation
+  // signal once the create transaction commits; a rollback publishes nothing.
+  // Portal creation stays unaudited (OD-3) — no AuditLog row here.
+  return withRealtimeOutbox(async () => {
+   const created = await prisma.$transaction(async (tx) => {
     if (input.categoryId) {
       const category = await tx.category.findFirst({ where: { id: input.categoryId, isActive: true }, select: { id: true } });
       if (!category) throw new AppError(404, "CATEGORY_NOT_FOUND", "Category not found");
@@ -94,6 +99,11 @@ export async function createTicket(input: PortalCreateTicketInput, userId: strin
     }, select: listSelect });
     await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorUserId: userId, action: "TICKET_CREATED", newValue: TicketStatus.OPEN } });
     return ticketItem(ticket);
+   });
+   // Portal tickets are always unrouted + unassigned (server-owned) → audience is
+   // ADMIN only via the unchanged canReceive routing.
+   emitTicketUpdated({ ticketId: created.id, assignedAgentId: null, customerId, teamId: null });
+   return created;
   });
 }
 

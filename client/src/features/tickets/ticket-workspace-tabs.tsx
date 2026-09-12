@@ -26,6 +26,9 @@ export type TicketWorkspaceHandle = {
 type TicketWorkspaceTabsProps = {
   ticketId: string;
   canMutate: boolean;
+  /** MS-03: the ticket is CLOSED — viewable but immutable. Reply/note composer
+   * and the attach action are gated off; the Activity/Description tabs stay. */
+  closed?: boolean;
   channel?: TicketChannel;
   customerPhone?: string | null;
   attachments: AttachmentItem[];
@@ -58,6 +61,7 @@ export const TicketWorkspaceTabs = forwardRef<TicketWorkspaceHandle, TicketWorks
     {
       ticketId,
       canMutate,
+      closed = false,
       channel,
       customerPhone,
       attachments,
@@ -294,7 +298,7 @@ export const TicketWorkspaceTabs = forwardRef<TicketWorkspaceHandle, TicketWorks
 
             {!canMutate && (
               <p className="text-sm text-warning-foreground" role="status">
-                {t("tickets.conversation.readOnly")}
+                {t(closed ? "tickets.conversation.closedReadOnly" : "tickets.conversation.readOnly")}
               </p>
             )}
             {insertError && (

@@ -5,6 +5,7 @@ import type { CreateCustomerInput, CustomerListQuery, CustomerTicketListQuery, U
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../audit-logs/audit-log.constants.js";
 import { changedFields, createAuditLog } from "../audit-logs/audit-log.service.js";
 import type { AuditRequestContext } from "../audit-logs/audit-request-context.js";
+import { resolveActorTeamId, teamScopedTicketWhere } from "../../shared/team/team-scope.js";
 
 const closedStatuses = [TicketStatus.RESOLVED, TicketStatus.CLOSED];
 
@@ -92,7 +93,13 @@ export async function getCustomer(customerId: string) {
 
 export async function listCustomerTickets(customerId: string, query: CustomerTicketListQuery, actor: { userId: string; role: Role }) {
   await ensureCustomerExists(customerId);
-  const where: Prisma.TicketWhereInput = { customerId };
+  // Team-scoped visibility (OD-6 / DG-11): the canonical helper — ADMIN → org-wide
+  // ({}), MANAGER → their managed team only ({ teamId }, or match-nothing when
+  // teamless), AGENT/other → {} (their contextual scope is unchanged; the `access`
+  // downgrade below still applies for another agent's ticket). No hand-rolled
+  // role logic; this endpoint must never be a ticket-visibility bypass.
+  const teamId = await resolveActorTeamId(actor);
+  const where: Prisma.TicketWhereInput = { customerId, ...teamScopedTicketWhere(actor, teamId) };
   const skip = (query.page - 1) * query.limit;
   const select = {
     id: true, subject: true, status: true, priority: true, createdAt: true, updatedAt: true, assignedAgentId: true,

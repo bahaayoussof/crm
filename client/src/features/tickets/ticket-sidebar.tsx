@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AppSelectField } from "@/components/ui/app-select";
 import { getTicketError } from "./ticket-error";
@@ -73,7 +73,18 @@ function PropertiesSection({
   const { t } = useTranslation();
   const update = useUpdateTicket(record.id);
   const categories = useCategories();
-  const agents = useAgents();
+  // MS-04: a CLOSED ticket is viewable but fully immutable. `canWorkflow` is
+  // already false here (the detail page gates it), so the read-only branch
+  // renders — swap in a closed-specific message instead of the "unassigned" one.
+  const isClosed = record.status === "CLOSED";
+  // Assigned-agent options are scoped to the ticket's effective team so the
+  // dropdown cannot offer an agent the backend rejects as cross-team
+  // (assertAgentAssignableToTicket → 409 CROSS_TEAM_ASSIGNMENT). An UNROUTED
+  // ticket (no team yet) keeps the full agent list — assigning then adopts the
+  // agent's team (see updateTicket's team-adoption path). A MANAGER caller is
+  // server-scoped to their own team regardless of this argument.
+  const effectiveTeamId = record.team?.id ?? undefined;
+  const agents = useAgents(effectiveTeamId);
   const [status, setStatus] = useState<TicketStatus | "">("");
   const [priority, setPriority] = useState<TicketPriority | "">("");
   const [categoryId, setCategoryId] = useState("");
@@ -82,7 +93,22 @@ function PropertiesSection({
   const [confirmingClose, setConfirmingClose] = useState(false);
   const confirmCloseRef = useRef<HTMLButtonElement>(null);
 
+  // Re-hydrate the editable controls only when the ticket's own workflow/metadata
+  // fields actually change (initial load, a genuine server-side change, or the
+  // post-save refetch) — NOT on every `record` reference change. The ticket
+  // detail payload also carries time-derived SLA fields (`slaState`,
+  // `effectiveSlaDueAt`); without this guard a routine background refetch or an
+  // unrelated `ticket.updated` realtime invalidation hands back a new object and
+  // would reset these controls, silently discarding an in-progress edit before
+  // the user can Save (MS-05).
+  const syncedFieldsRef = useRef<string | null>(null);
   useEffect(() => {
+    const signature = JSON.stringify([
+      record.id, record.status, record.priority,
+      record.category?.id ?? "", record.assignedAgent?.id ?? "",
+    ]);
+    if (syncedFieldsRef.current === signature) return;
+    syncedFieldsRef.current = signature;
     setStatus(record.status);
     setPriority(record.priority);
     setCategoryId(record.category?.id ?? "");
@@ -113,9 +139,23 @@ function PropertiesSection({
     { value: "", label: t("common.notProvided") },
     ...(categories.data?.map((item) => ({ value: item.id, label: item.name })) ?? []),
   ];
+  // ADMIN: the query is already team-scoped; still guard against a stale option
+  // after the ticket's team changed under a cached list. Keep the current
+  // assignee visible even if a later team move made them cross-team, so the
+  // select never blanks out the saved value.
+  const scopedAgents = useMemo(() => {
+    const list = agents.data ?? [];
+    if (!effectiveTeamId) return list;
+    const filtered = list.filter((item) => item.teamId === effectiveTeamId);
+    const current = record.assignedAgent;
+    if (current && !filtered.some((item) => item.id === current.id)) {
+      filtered.unshift({ id: current.id, name: current.name, email: current.email, teamId: effectiveTeamId });
+    }
+    return filtered;
+  }, [agents.data, effectiveTeamId, record.assignedAgent]);
   const agentOptions = [
     { value: "", label: t("tickets.unassigned") },
-    ...(agents.data?.map((item) => ({ value: item.id, label: item.name, searchText: item.email })) ?? []),
+    ...scopedAgents.map((item) => ({ value: item.id, label: item.name, searchText: item.email })),
   ];
 
   const dirty =
@@ -144,6 +184,16 @@ function PropertiesSection({
       setError(getTicketError(caught, t("tickets.updateError"), t));
     }
   };
+  // Reclassifying a ticket invalidates the current assignee (a category can
+  // imply a different team / skill set), so a Category change always resets the
+  // local assignee to Unassigned — a stale agent is never kept selected and,
+  // for an already-assigned ticket, `saveOperations` then submits
+  // `assignedAgentId: null`. Team-scoped agent filtering (MS-01) is unaffected.
+  const handleCategoryChange = (next: string) => {
+    setCategoryId(next);
+    if (next !== categoryId) setAssignedAgentId("");
+  };
+
   const closeTicket = async () => {
     setError(null);
     try {
@@ -187,7 +237,7 @@ function PropertiesSection({
       )}
       {canSelfAssign ? null : !canWorkflow ? (
         <p className="rounded-md border border-border bg-surface-subtle p-3 text-sm text-muted-foreground">
-          {t("tickets.unassignedReadOnly")}
+          {t(isClosed ? "tickets.closedReadOnly" : "tickets.unassignedReadOnly")}
         </p>
       ) : (
         <>
@@ -215,7 +265,7 @@ function PropertiesSection({
                 label={t("tickets.category")}
                 labelClassName={labelClassName}
                 value={categoryId}
-                onValueChange={setCategoryId}
+                onValueChange={handleCategoryChange}
                 options={categoryOptions}
               />
             )}

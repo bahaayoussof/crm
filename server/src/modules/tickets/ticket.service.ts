@@ -74,6 +74,7 @@ export async function listTickets(query: TicketListQuery, actor: Actor) {
     ...ticketListVisibilityWhere(actor, query.scope, team),
     ...(query.status && { status: query.status }),
     ...(query.priority && { priority: query.priority }),
+    ...(query.channel && { channel: query.channel }),
     ...(query.categoryId && { categoryId: query.categoryId }),
     ...(assignedAgentFilter && { assignedAgentId: assignedAgentFilter }),
     ...(unassignedOnly && { assignedAgentId: null }),
@@ -353,6 +354,12 @@ export async function updateTicket(ticketId: string, input: UpdateTicketInput, a
       select: { id: true, subject: true, description: true, status: true, priority: true, categoryId: true, assignedAgentId: true, departmentId: true, branchId: true, teamId: true, firstRespondedAt: true, category: { select: { name: true } }, assignedAgent: { select: { name: true } } },
     });
     if (!current) throw new AppError(404, "TICKET_NOT_FOUND", "Ticket not found");
+    // MS-04: CLOSED = viewable + immutable. Every metadata / workflow / routing
+    // mutation is rejected here with the canonical 409 TICKET_CLOSED, before any
+    // permission, relation, or transition check — so a CLOSED source never
+    // surfaces INVALID_STATUS_TRANSITION. Reads are untouched. RESOLVED reopen
+    // (customer reply, portal.service) targets RESOLVED, not CLOSED.
+    assertTicketOpenForMutation(current);
 
     enforceMutationPermissions(current, input, actor);
     const relations = await validateRelations(tx, input, {
@@ -389,6 +396,11 @@ export async function updateTicket(ticketId: string, input: UpdateTicketInput, a
     else if (adoptTeamId) data.team = { connect: { id: adoptTeamId } };
     if (input.status === TicketStatus.RESOLVED && current.status !== TicketStatus.RESOLVED) data.resolvedAt = now;
     if (input.status === TicketStatus.CLOSED && current.status !== TicketStatus.CLOSED) data.closedAt = now;
+    // Reopen out of RESOLVED. Every reopen path (portal reply, inbound EMAIL, and
+    // this manual RESOLVED → IN_PROGRESS) shares one rule: clear `resolvedAt`,
+    // keep `resolutionDueAt` — the ticket re-enters live SLA evaluation against
+    // its existing deadline; no fresh deadline is snapshotted (OD-1 / DG-4).
+    if (input.status === TicketStatus.IN_PROGRESS && current.status === TicketStatus.RESOLVED) data.resolvedAt = null;
 
     if (input.priority && input.priority !== current.priority && current.status !== TicketStatus.RESOLVED && current.status !== TicketStatus.CLOSED) {
       const sla = await tx.slaRule.findFirst({ where: { priority: input.priority, isActive: true } });
@@ -410,6 +422,22 @@ export async function updateTicket(ticketId: string, input: UpdateTicketInput, a
       input.categoryId !== undefined && input.categoryId !== current.categoryId && { action: AUDIT_ACTIONS.TICKET_CATEGORY_CHANGED, changes: { categoryId: { from: current.categoryId, to: input.categoryId } } },
     ].filter(Boolean) as unknown as { action: string; changes: Record<string, { from: string | null; to: string | null }> }[];
     for (const event of auditEvents) await createAuditLog({ actorId: actor.userId, action: event.action, entityType: AUDIT_ENTITY_TYPES.TICKET, entityId: ticketId, changes: event.changes, requestContext }, tx);
+
+    // Routing audit (OD-2): departmentId / branchId / teamId are the authoritative
+    // ownership fields; a change to any of them is traced in AuditLog only (no
+    // TicketHistory row). One row per PATCH that changes >=1 routing field, id
+    // values only, in this same transaction (a throw rolls the whole update back).
+    // `effectiveNewTeamId` also covers the unrouted-ticket "adopt the assignee's
+    // team" path. No row on a no-op (the `!== current` guards) or a rejected
+    // update (permission / validation / transition checks throw earlier).
+    const effectiveNewTeamId = input.teamId !== undefined ? input.teamId : (adoptTeamId ?? current.teamId);
+    const routingChanges: Record<string, { from: string | null; to: string | null }> = {};
+    if (input.departmentId !== undefined && input.departmentId !== current.departmentId) routingChanges.departmentId = { from: current.departmentId, to: input.departmentId };
+    if (input.branchId !== undefined && input.branchId !== current.branchId) routingChanges.branchId = { from: current.branchId, to: input.branchId };
+    if (effectiveNewTeamId !== current.teamId) routingChanges.teamId = { from: current.teamId, to: effectiveNewTeamId };
+    if (Object.keys(routingChanges).length) {
+      await createAuditLog({ actorId: actor.userId, action: AUDIT_ACTIONS.TICKET_ROUTING_CHANGED, entityType: AUDIT_ENTITY_TYPES.TICKET, entityId: ticketId, changes: routingChanges, requestContext }, tx);
+    }
 
     // Assignment notification: new assignee changed, non-null, not the actor
     const assigneeChanged = input.assignedAgentId !== undefined && input.assignedAgentId !== current.assignedAgentId;
@@ -496,7 +524,10 @@ export async function updateTicket(ticketId: string, input: UpdateTicketInput, a
       (input.categoryId !== undefined && input.categoryId !== current.categoryId) ||
       (input.assignedAgentId !== undefined && input.assignedAgentId !== current.assignedAgentId) ||
       (input.departmentId !== undefined && input.departmentId !== current.departmentId) ||
-      (input.branchId !== undefined && input.branchId !== current.branchId);
+      (input.branchId !== undefined && input.branchId !== current.branchId) ||
+      // A pure re-route (incl. implicit team adoption) must still push ticket.updated
+      // to the new team's realtime audience (OD-2 micro-fix).
+      (effectiveNewTeamId !== current.teamId);
     return { updated, changed };
    }, {
     // This atomic update can include relation validation, SLA recalculation,
@@ -532,9 +563,11 @@ async function selfAssignTicket(ticketId: string, input: UpdateTicketInput, acto
       // the agent's own team) → else 404.
       const current = await tx.ticket.findFirst({
         where: { id: ticketId, ...ticketVisibilityWhere(actor, team) },
-        select: { id: true, assignedAgentId: true },
+        select: { id: true, status: true, assignedAgentId: true },
       });
       if (!current) throw new AppError(404, "TICKET_NOT_FOUND", "Ticket not found");
+      // MS-04: a CLOSED ticket takes no mutation — an agent self-claim included.
+      assertTicketOpenForMutation(current);
 
       const ticketAfter = async () => {
         const row = await tx.ticket.findFirst({ where: { id: ticketId }, select: ticketSummarySelect });
@@ -578,6 +611,7 @@ async function requireConversationMutationAccess(tx: Prisma.TransactionClient, t
     select: {
       id: true,
       subject: true,
+      status: true,
       assignedAgentId: true,
       customerId: true,
       teamId: true,
@@ -587,8 +621,31 @@ async function requireConversationMutationAccess(tx: Prisma.TransactionClient, t
     },
   });
   if (!ticket) throw new AppError(404, "TICKET_NOT_FOUND", "Ticket not found");
+  // MS-03 / MS-04 invariant: CLOSED = viewable + immutable. A CLOSED ticket stays
+  // fully readable (detail, conversation, history, SLA, metadata, attachment
+  // list/download) but accepts no mutation. Here that covers the staff public
+  // reply and internal note; `updateTicket` / `selfAssignTicket` cover metadata
+  // and workflow; `attachment.service` covers uploads. Mirrors the Portal
+  // `409 TICKET_CLOSED` guard on the customer reply path.
+  assertTicketOpenForMutation(ticket);
   if (actor.role === Role.AGENT && ticket.assignedAgentId !== actor.userId) throw forbidden("Ticket must be assigned to the agent before adding conversation content");
   return ticket;
+}
+
+/**
+ * MS-04: `CLOSED` is viewable but fully immutable. Every ticket mutation path
+ * — metadata (subject/description/priority/category/assignee), routing
+ * (department/branch/team), workflow (status), the staff conversation
+ * reply/note, and attachment uploads — funnels through a guard that rejects a
+ * `CLOSED` ticket with the canonical `409 TICKET_CLOSED` before any write. The
+ * backend is the source of truth; the client only mirrors it. The `RESOLVED`
+ * reopen path (customer reply, `portal.service`) targets `RESOLVED`, never
+ * `CLOSED`, and is unaffected.
+ */
+function assertTicketOpenForMutation(ticket: { status: TicketStatus }) {
+  if (ticket.status === TicketStatus.CLOSED) {
+    throw new AppError(409, "TICKET_CLOSED", "Closed tickets are read-only");
+  }
 }
 
 function compareConversation(left: { createdAt: Date; kind: string; id: string }, right: { createdAt: Date; kind: string; id: string }) {

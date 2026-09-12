@@ -94,6 +94,57 @@ remain).
 
 ---
 
+## Tickets SDD implementation (OD-1 … OD-6) — 2026-09-10
+
+**Branch:** `chore/sdd-foundation` (the single SDD working branch) — unstaged /
+uncommitted; nothing staged, committed, pushed, merged, rebased, or tagged. No
+Prisma schema change, no migration.
+
+Executed `specs/features/tickets/tasks.md` `TK-001 … TK-011`. Five approved
+production behaviour changes, all inside existing transactions / seams:
+
+1. **OD-1 — manual reopen SLA fix.** `updateTicket` now clears `Ticket.resolvedAt`
+   on a `RESOLVED → IN_PROGRESS` transition (retains `resolutionDueAt`). A
+   manually reopened ticket re-enters `deriveSla`, the `sla=breached | at_risk`
+   list filter, and SLA-monitor auto-escalation. `WAITING_CUSTOMER` countdown
+   semantics unchanged (OD-5 guard regression-tested).
+2. **OD-2 — routing AuditLog.** New `AUDIT_ACTIONS.TICKET_ROUTING_CHANGED`
+   (constant only, `action` is a free string). `updateTicket` writes exactly one
+   id-only `AuditLog` row per `PATCH` that changes `departmentId` / `branchId` /
+   `teamId` (incl. implicit team adoption), in the update transaction; none on a
+   no-op or rejected update; no `TicketHistory` row. A pure re-route now also
+   feeds `changed` so `ticket.updated` reaches the new team's realtime audience.
+3. **OD-3 — portal-create realtime.** `portal.service.createTicket` wrapped in
+   `withRealtimeOutbox`, emits one post-commit `ticket.updated`
+   (`teamId: null, assignedAgentId: null` → ADMIN audience). No AuditLog row.
+4. **OD-4 — `channel` list filter.** `GET /tickets?channel=<Channel>` — `channel`
+   in `ticketListQuerySchema` (all five enum values, incl. `LIVE_CHAT`) + `where`
+   in `listTickets` (ANDed after visibility) + client `TicketFilters.channel` +
+   canonical `TicketFiltersPopover` `<select>` + `tickets.allChannels` /
+   `tickets.noChannelMatches` EN/AR. No DB index, no migration.
+5. **OD-6 — MANAGER customer-ticket scope.** `customer.service.listCustomerTickets`
+   now applies `teamScopedTicketWhere(actor, resolveActorTeamId(actor))` — MANAGER
+   team-bounded (teamless → empty page), ADMIN/AGENT unchanged. Closes the last
+   ADR-050 deferred bypass.
+
+**Docs reconciled:** `docs/05` (channel filter, customer-ticket MANAGER scope,
+Later Ticket Actions attachment status), `docs/06` (customer-ticket team scope,
+`TICKET_ROUTING_CHANGED` in audited actions), `docs/07` (full manual-transition
+union incl. `→ ESCALATED`, reopen SLA rule, routing = AuditLog-only), `docs/08`
+(reopen re-enters SLA evaluation), `docs/22` (emission table + `withRealtimeOutbox`
+entrypoints + team-scoped `canReceive`), and `specs/features/tickets/*`.
+
+**Verification (targeted, this session):** server `tsc` + `eslint` clean; client
+`tsc -b` + `eslint` clean (2 pre-existing unrelated `react-refresh` warnings);
+`ticket.test.ts` 131, `sla-automation.test.ts` 19, `customer.test.ts` 27,
+`portal.test.ts` + `realtime.test.ts` 46, `audit-log.test.ts` unchanged — all
+green. Full server + client suites and builds run in TK-011 (see that section of
+`tasks.md` and the final report). `git diff --check` clean. New ADR: none (all
+changes are bug/parity fixes + one additive filter + reuse of an existing helper;
+OD-1 … OD-6 are already-recorded decisions).
+
+---
+
 ## Brand asset replacement — 2026-09-03
 
 **Branch:** `feat/brand-assets` (off `master` `3eaf0c5`) — unstaged / uncommitted;

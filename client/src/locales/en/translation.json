@@ -532,6 +532,7 @@
     "search": "Search by ID, subject, or customer…",
     "allStatuses": "All statuses",
     "allPriorities": "All priorities",
+    "allChannels": "All channels",
     "allCategories": "All categories",
     "allAgents": "All agents",
     "department": "Department",
@@ -544,6 +545,7 @@
     "noStatusMatches": "No tickets with status “{{status}}”.",
     "noPriorityMatches": "No tickets with priority “{{priority}}”.",
     "noCategoryMatches": "No tickets in category “{{category}}”.",
+    "noChannelMatches": "No tickets on channel “{{channel}}”.",
     "noAgentMatches": "No tickets assigned to “{{agent}}”.",
     "noMatches": "No tickets match the current filters.",
     "loadError": "Unable to load tickets.",
@@ -565,6 +567,7 @@
     "closing": "Closing...",
     "closeError": "Unable to close ticket.",
     "unassignedReadOnly": "This ticket must be assigned to you before you can change its workflow or conversation.",
+    "closedReadOnly": "This ticket is closed. It remains fully viewable, but its status, priority, category, assignment, routing, and conversation can no longer be changed.",
     "scopeLabel": "Ticket scope",
     "scope": {
       "mine": "My Tickets",
@@ -616,6 +619,7 @@
       "replyHelp": "This response is visible to the customer.",
       "noteHelp": "Only your team can see this note.",
       "readOnly": "This ticket must be assigned to you before you can reply or add a note.",
+      "closedReadOnly": "This ticket is closed. It can still be viewed, but no further replies or notes can be added.",
       "replyPlaceholder": "Type your reply…",
       "notePlaceholder": "Type a note for your team… use @ to mention a teammate",
       "editor": {

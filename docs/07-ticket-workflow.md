@@ -16,21 +16,27 @@ ESCALATED
 ```text
 OPEN -> IN_PROGRESS
 OPEN -> RESOLVED
+OPEN -> ESCALATED               (ADMIN / MANAGER)
 IN_PROGRESS -> WAITING_CUSTOMER
 IN_PROGRESS -> RESOLVED
+IN_PROGRESS -> ESCALATED        (ADMIN / MANAGER)
 WAITING_CUSTOMER -> IN_PROGRESS
 WAITING_CUSTOMER -> RESOLVED
+WAITING_CUSTOMER -> ESCALATED   (ADMIN / MANAGER)
 RESOLVED -> CLOSED
 RESOLVED -> IN_PROGRESS
+ESCALATED -> IN_PROGRESS        (ADMIN / MANAGER — de-escalate)
 ```
 
-Arbitrary skipping and undocumented backward transitions are invalid. Direct closing from `OPEN`, `IN_PROGRESS`, `WAITING_CUSTOMER`, or `ESCALATED` is rejected. `CLOSED` has no further manual transition.
+Arbitrary skipping and undocumented backward transitions are invalid. Direct closing from `OPEN`, `IN_PROGRESS`, `WAITING_CUSTOMER`, or `ESCALATED` is rejected. `CLOSED` has no further manual transition. Entering or leaving `ESCALATED` requires `ADMIN` or `MANAGER`; an `AGENT` attempting either is rejected `403` even on a self-assigned ticket.
 
 Closing uses the existing ticket update endpoint and sets `closedAt` server-side while preserving `resolvedAt`, conversation, SLA snapshots, and status history. `ADMIN` and `MANAGER` may close any resolved ticket; `AGENT` may close only a resolved ticket assigned to that agent.
 
 ## Reopen
 
 A resolved ticket may return to OPEN/IN_PROGRESS if the customer replies and the ticket is still eligible for reopening, or via manual staff transition `RESOLVED -> IN_PROGRESS`.
+
+Every reopen path — customer portal reply, inbound EMAIL, and the manual `RESOLVED -> IN_PROGRESS` transition — shares one rule: `resolvedAt` is cleared and `resolutionDueAt` is **retained unchanged**. No fresh SLA deadline is snapshotted on reopen; the ticket re-enters live SLA evaluation against its existing `resolutionDueAt` (so a ticket reopened past that deadline is honestly `BREACHED`, not `MET`). `firstResponseDueAt` / `firstRespondedAt` are untouched.
 
 ## Escalation
 
@@ -40,7 +46,9 @@ ESCALATED represents an attention state for tickets requiring manager interventi
 
 `AGENT` cannot enter or leave `ESCALATED`. No separate previous-status field is stored; the prior status remains available through `TicketHistory`.
 
-When entering `RESOLVED`, the service sets `resolvedAt`. When leaving `RESOLVED` through a later approved conversation workflow, that workflow owns clearing or updating `resolvedAt`. Entering `CLOSED` sets `closedAt`. Clients cannot set workflow timestamps directly.
+When entering `RESOLVED`, the service sets `resolvedAt`. Every reopen out of `RESOLVED` (manual `RESOLVED -> IN_PROGRESS`, portal reply, inbound EMAIL) clears `resolvedAt` and retains `resolutionDueAt` (see [Reopen](#reopen)). Entering `CLOSED` sets `closedAt` and preserves `resolvedAt`. Clients cannot set workflow timestamps directly.
+
+Routing changes (`departmentId` / `branchId` / `teamId`) are not recorded in `TicketHistory`; they write one `AuditLog` row with `action = TICKET_ROUTING_CHANGED` (id values only) in the same transaction as the update. See `docs/06-auth-rbac.md`.
 
 ## Priorities
 

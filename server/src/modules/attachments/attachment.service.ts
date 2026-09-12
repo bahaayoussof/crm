@@ -110,6 +110,14 @@ function requireAssignedAgent(ticket: { assignedAgentId: string | null }, actor:
   }
 }
 
+/** MS-03: a CLOSED ticket is viewable but immutable — no new attachment on any
+ * staff conversation path. Parity with the Portal `409 TICKET_CLOSED` guard. */
+function requireOpenForMutation(ticket: { status: TicketStatus }) {
+  if (ticket.status === TicketStatus.CLOSED) {
+    throw new AppError(409, "TICKET_CLOSED", "Closed tickets do not accept new attachments");
+  }
+}
+
 function assertContext(context: AttachmentContext) {
   const hasTicket = context.ticketId != null;
   const hasMessage = context.messageId != null;
@@ -162,6 +170,7 @@ export async function listCustomerAttachments(customerId: string): Promise<{ dat
 
 export async function authorizeTicketUpload(ticketId: string, actor: Actor): Promise<AttachmentContext> {
   const ticket = await requireVisibleTicket(ticketId, actor);
+  requireOpenForMutation(ticket);
   requireAssignedAgent(ticket, actor);
   return { ticketId, messageId: null, customerId: null };
 }
@@ -172,6 +181,7 @@ export async function authorizeMessageUpload(
   actor: Actor,
 ): Promise<AttachmentContext> {
   const ticket = await requireVisibleTicket(ticketId, actor);
+  requireOpenForMutation(ticket);
   requireAssignedAgent(ticket, actor);
   const message = await prisma.ticketMessage.findFirst({
     where: { id: messageId, ticketId },

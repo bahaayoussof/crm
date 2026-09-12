@@ -64,6 +64,8 @@ Ticket notes and customer notes are internal and do not count as a customer resp
 
 The resolution target is satisfied when the ticket reaches RESOLVED.
 
+Every reopen out of `RESOLVED` — the manual `RESOLVED -> IN_PROGRESS` transition, a customer portal reply, or inbound EMAIL — clears `resolvedAt` and **retains** the original `resolutionDueAt`. No fresh deadline is snapshotted. The reopened ticket re-enters live SLA derivation and the `sla=breached | at_risk` list filter against that retained deadline, and the SLA monitor can auto-escalate it if the deadline has passed. A ticket reopened after its `resolutionDueAt` is therefore reported `BREACHED`, not `MET`. `WAITING_CUSTOMER` does not pause the resolution clock (out of scope — future SLA feature).
+
 ## Escalation
 
 For the assessment:

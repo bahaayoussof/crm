@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -11,7 +11,7 @@ import { CustomerCombobox } from "./customer-combobox";
 import { getTicketError } from "./ticket-error";
 import { useAgents, useCategories, useCreateTicket, useTicket, useUpdateTicket } from "./ticket-hooks";
 import { ticketFormSchema, type TicketFormValues } from "./ticket.schemas";
-import { TICKET_CREATE_CHANNELS } from "./ticket.types";
+import { TICKET_CREATE_CHANNELS, type TicketCreateChannel } from "./ticket.types";
 import { TicketPage, TicketSkeleton, TicketState } from "./ticket-ui";
 import {
   TicketFormActions,
@@ -59,19 +59,35 @@ export function TicketFormPage() {
   const teams = useTeamOptions(departmentId || undefined, { enabled: isAdmin && Boolean(departmentId) });
   const agents = useAgents(isAdmin ? teamId || undefined : undefined);
 
+  // Hydrate the form only when the ticket's editable fields actually change — not
+  // on every `ticket.data` reference change. The detail payload also carries
+  // time-derived SLA fields, so an unguarded reset() re-fires on a background
+  // refetch / realtime invalidation and wipes the user's unsaved edits, making
+  // Save persist the stale server values (MS-05).
+  const hydratedFieldsRef = useRef<string | null>(null);
   useEffect(() => {
-    if (ticket.data) {
-      reset({
-        customerId: ticket.data.customer.id,
-        subject: ticket.data.subject,
-        description: ticket.data.description,
-        priority: ticket.data.priority,
-        categoryId: ticket.data.category?.id ?? "",
-        assignedAgentId: ticket.data.assignedAgent?.id ?? "",
-        departmentId: ticket.data.department?.id ?? "",
-        teamId: ticket.data.team?.id ?? "",
-      });
-    }
+    if (!ticket.data) return;
+    const d = ticket.data;
+    const signature = JSON.stringify([
+      d.customer.id, d.subject, d.description, d.priority, d.channel,
+      d.category?.id ?? "", d.assignedAgent?.id ?? "", d.department?.id ?? "", d.team?.id ?? "",
+    ]);
+    if (hydratedFieldsRef.current === signature) return;
+    hydratedFieldsRef.current = signature;
+    reset({
+      customerId: d.customer.id,
+      subject: d.subject,
+      description: d.description,
+      priority: d.priority,
+      // Not rendered or submitted on edit, but `reset()` replaces the whole
+      // form state — omitting it here wiped it to undefined, which failed
+      // the shared schema's channel enum and silently blocked every Save.
+      channel: d.channel,
+      categoryId: d.category?.id ?? "",
+      assignedAgentId: d.assignedAgent?.id ?? "",
+      departmentId: d.department?.id ?? "",
+      teamId: d.team?.id ?? "",
+    });
   }, [reset, ticket.data]);
 
   const priorityOptions = PRIORITIES.map((value) => ({
@@ -141,7 +157,11 @@ export function TicketFormPage() {
             subject: values.subject,
             description: values.description,
             priority: values.priority,
-            channel: values.channel,
+            // The Channel select only ever offers TICKET_CREATE_CHANNELS in
+            // this (!editing) branch; the schema's `channel` is widened to
+            // every TicketChannel so an edit-mode hydration (LIVE_CHAT etc.)
+            // still validates — see ticket.schemas.ts.
+            channel: values.channel as TicketCreateChannel,
             categoryId: values.categoryId || null,
             ...(canAssign && { assignedAgentId: values.assignedAgentId || null }),
             ...routing,
@@ -154,6 +174,18 @@ export function TicketFormPage() {
 
   if (editing && ticket.isLoading) return <TicketPage><TicketSkeleton /></TicketPage>;
   if (editing && ticket.isError) return <TicketPage><TicketState>{t("tickets.notFound")}</TicketState></TicketPage>;
+  // MS-04: a CLOSED ticket is viewable but fully immutable. The Edit link is
+  // already hidden for CLOSED; a direct navigation here is turned away rather
+  // than offering fields whose save always returns 409 TICKET_CLOSED.
+  if (editing && ticket.data?.status === "CLOSED")
+    return (
+      <TicketPage>
+        <TicketState>
+          <p>{t("tickets.closedReadOnly")}</p>
+          <Link className="button-secondary mt-4 inline-flex" to={`/tickets/${id}`}>{t("tickets.backToList")}</Link>
+        </TicketState>
+      </TicketPage>
+    );
 
   return (
     <TicketPage>
@@ -248,7 +280,20 @@ export function TicketFormPage() {
                     label={t("tickets.category")}
                     labelClassName="block text-sm font-medium text-foreground"
                     value={field.value}
-                    onValueChange={field.onChange}
+                    onValueChange={(next) => {
+                      const previous = field.value ?? "";
+                      field.onChange(next);
+                      // Reclassifying a ticket invalidates the current assignee
+                      // (a category can imply a different team / skill set), so a
+                      // real Category change resets the assignee to Unassigned —
+                      // on edit this makes the submit send `assignedAgentId: null`.
+                      // Guarded to a genuine change to a different, non-empty
+                      // category so it never fires while an existing ticket
+                      // hydrates.
+                      if (next && next !== previous) {
+                        setValue("assignedAgentId", "", { shouldDirty: true });
+                      }
+                    }}
                     error={fieldState.error?.message ? t(fieldState.error.message) : undefined}
                     options={categoryOptions}
                   />

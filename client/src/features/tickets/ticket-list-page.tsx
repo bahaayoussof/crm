@@ -15,11 +15,14 @@ import { useAgents, useCategories, useClaimTicket, useTickets } from "./ticket-h
 import { getTicketError } from "./ticket-error";
 import { TicketTable } from "./ticket-table";
 import { TicketFiltersPopover } from "./ticket-filters-popover";
-import type { TicketListScope, TicketPriority, TicketStatus } from "./ticket.types";
+import type { TicketChannel, TicketListScope, TicketPriority, TicketStatus } from "./ticket.types";
 import { TicketPage, TicketState } from "./ticket-ui";
 
 const statuses: TicketStatus[] = ["OPEN", "IN_PROGRESS", "WAITING_CUSTOMER", "RESOLVED", "CLOSED", "ESCALATED"];
 const priorities: TicketPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
+// All five channels are valid list filters (a LIVE_CHAT ticket is a normal
+// internal ticket) — wider than the create form's channel set.
+const channels: TicketChannel[] = ["WEB", "EMAIL", "WHATSAPP", "SMS", "LIVE_CHAT"];
 const agentScopes: TicketListScope[] = ["mine", "unassigned"];
 
 export function TicketListPage() {
@@ -33,6 +36,7 @@ export function TicketListPage() {
   const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1;
   const status = statuses.includes(params.get("status") as TicketStatus) ? (params.get("status") as TicketStatus) : undefined;
   const priority = priorities.includes(params.get("priority") as TicketPriority) ? (params.get("priority") as TicketPriority) : undefined;
+  const channel = channels.includes(params.get("channel") as TicketChannel) ? (params.get("channel") as TicketChannel) : undefined;
   const categoryId = params.get("categoryId") || undefined;
   const assignedAgentId = isAgent ? undefined : params.get("assignedAgentId") || undefined;
   const departmentId = params.get("departmentId") || undefined;
@@ -43,7 +47,7 @@ export function TicketListPage() {
     ? (params.get("scope") === "unassigned" ? "unassigned" : "mine")
     : undefined;
 
-  const tickets = useTickets({ search: debounced, page, limit: 20, scope, status, priority, categoryId, assignedAgentId, departmentId, branchId });
+  const tickets = useTickets({ search: debounced, page, limit: 20, scope, status, priority, channel, categoryId, assignedAgentId, departmentId, branchId });
   const categories = useCategories();
   const agents = useAgents();
   const departments = useDepartmentOptions();
@@ -59,8 +63,8 @@ export function TicketListPage() {
     setParams(next, { replace: key === "search" });
   };
 
-  const hasFilters = Boolean(debounced || status || priority || categoryId || assignedAgentId || departmentId || branchId);
-  const emptyMessage = getEmptyMessage({ search: debounced, status, priority, categoryId, assignedAgentId, departmentId, branchId }, categories.data, agents.data, t);
+  const hasFilters = Boolean(debounced || status || priority || channel || categoryId || assignedAgentId || departmentId || branchId);
+  const emptyMessage = getEmptyMessage({ search: debounced, status, priority, channel, categoryId, assignedAgentId, departmentId, branchId }, categories.data, agents.data, t);
 
   const statusOptions = [
     { value: "", label: t("tickets.allStatuses") },
@@ -70,6 +74,11 @@ export function TicketListPage() {
   const priorityOptions = [
     { value: "", label: t("tickets.allPriorities") },
     ...priorities.map((value) => ({ value, label: t(`tickets.priority.${value}`) })),
+  ];
+
+  const channelOptions = [
+    { value: "", label: t("tickets.allChannels") },
+    ...channels.map((value) => ({ value, label: t(`tickets.channel.${value}`) })),
   ];
 
   const categoryOptions = [
@@ -161,12 +170,14 @@ export function TicketListPage() {
               <TicketFiltersPopover
                 status={status}
                 priority={priority}
+                channel={channel}
                 categoryId={categoryId}
                 assignedAgentId={assignedAgentId}
                 departmentId={departmentId}
                 branchId={branchId}
                 statusOptions={statusOptions}
                 priorityOptions={priorityOptions}
+                channelOptions={channelOptions}
                 categoryOptions={categoryOptions}
                 agentOptions={agentOptions}
                 departmentOptions={departmentOptions}
@@ -177,6 +188,7 @@ export function TicketListPage() {
                   const next = new URLSearchParams(params);
                   next.delete("status");
                   next.delete("priority");
+                  next.delete("channel");
                   next.delete("categoryId");
                   next.delete("assignedAgentId");
                   next.delete("departmentId");
@@ -231,17 +243,18 @@ export function TicketListPage() {
 }
 
 function getEmptyMessage(
-  filters: { search: string; status?: TicketStatus; priority?: TicketPriority; categoryId?: string; assignedAgentId?: string; departmentId?: string; branchId?: string },
+  filters: { search: string; status?: TicketStatus; priority?: TicketPriority; channel?: TicketChannel; categoryId?: string; assignedAgentId?: string; departmentId?: string; branchId?: string },
   categories: { id: string; name: string }[] | undefined,
   agents: { id: string; name: string }[] | undefined,
   t: ReturnType<typeof useTranslation>["t"]
 ) {
-  const active = [filters.search, filters.status, filters.priority, filters.categoryId, filters.assignedAgentId, filters.departmentId, filters.branchId].filter(Boolean);
+  const active = [filters.search, filters.status, filters.priority, filters.channel, filters.categoryId, filters.assignedAgentId, filters.departmentId, filters.branchId].filter(Boolean);
   if (active.length === 0) return t("tickets.empty");
   if (active.length > 1) return t("tickets.noMatches");
   if (filters.search) return t("tickets.noSearchMatches", { search: filters.search });
   if (filters.status) return t("tickets.noStatusMatches", { status: t(`tickets.status.${filters.status}`) });
   if (filters.priority) return t("tickets.noPriorityMatches", { priority: t(`tickets.priority.${filters.priority}`) });
+  if (filters.channel) return t("tickets.noChannelMatches", { channel: t(`tickets.channel.${filters.channel}`) });
   if (filters.categoryId) {
     const category = categories?.find((item) => item.id === filters.categoryId)?.name;
     return category ? t("tickets.noCategoryMatches", { category }) : t("tickets.noMatches");

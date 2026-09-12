@@ -6,7 +6,11 @@ const mocks = vi.hoisted(() => ({
   findMany: vi.fn(), countCustomers: vi.fn(), findCustomer: vi.fn(), createCustomer: vi.fn(),
   updateCustomer: vi.fn(), deleteCustomer: vi.fn(), transaction: vi.fn(),
   groupTickets: vi.fn(), countTickets: vi.fn(), findTickets: vi.fn(), findNotes: vi.fn(), createNote: vi.fn(), auditCreate: vi.fn(),
+  userFindUnique: vi.fn(),
 }));
+
+// feature/team-based-manager-scope — resolveActorTeamId() does one user.findUnique.
+const TEAM_A = "cteamaaaaaaaaaaaaaaaaaaaa1";
 
 vi.mock("../../config/prisma.js", () => ({
   prisma: {
@@ -15,6 +19,7 @@ vi.mock("../../config/prisma.js", () => ({
       create: mocks.createCustomer, update: mocks.updateCustomer, delete: mocks.deleteCustomer,
     },
     ticket: { groupBy: mocks.groupTickets, count: mocks.countTickets, findMany: mocks.findTickets },
+    user: { findUnique: mocks.userFindUnique },
     customerNote: { findMany: mocks.findNotes, create: mocks.createNote },
     auditLog: { create: mocks.auditCreate },
     $transaction: mocks.transaction,
@@ -42,6 +47,13 @@ describe("customer API", () => {
     mocks.countTickets.mockResolvedValue(0);
     mocks.findNotes.mockResolvedValue([]);
     mocks.findTickets.mockResolvedValue([]);
+    // Default team resolution: the manager token LEADS team A; agent-1 is a MEMBER of team A.
+    mocks.userFindUnique.mockImplementation(async ({ where }: { where: { id: string } }) =>
+      where.id === "c6fd0a01a46ed4545f0a5e774"
+        ? { teamId: TEAM_A, managedTeam: { id: TEAM_A } }
+        : where.id === "agent-1"
+          ? { teamId: TEAM_A, managedTeam: null }
+          : { teamId: null, managedTeam: null });
   });
 
   it("rejects unauthenticated and CUSTOMER-role access", async () => {
@@ -69,17 +81,72 @@ describe("customer API", () => {
     expect(notesResponse.body.data[0].body).toBe("Existing note");
   });
 
-  it.each([["ADMIN", adminToken], ["MANAGER", managerToken]])("returns all safe customer ticket summaries with FULL access for %s", async (_role, token) => {
+  it("returns every safe customer ticket summary org-wide with FULL access for ADMIN", async () => {
     mocks.findCustomer.mockResolvedValue({ id: customer.id });
     mocks.findTickets.mockResolvedValue([
       { id: "c737ce60fccf9da889f4605c0", subject: "Assigned", status: "OPEN", priority: "HIGH", createdAt: now, updatedAt: now, assignedAgentId: "agent-1", category: null, assignedAgent: { id: "agent-1", name: "Agent" } },
       { id: "ticket-2", subject: "Other", status: "WAITING_CUSTOMER", priority: "LOW", createdAt: now, updatedAt: now, assignedAgentId: "cc3544aa158a89417843d45b3", category: null, assignedAgent: { id: "cc3544aa158a89417843d45b3", name: "Other Agent" } },
     ]);
     mocks.countTickets.mockResolvedValue(2);
-    const response = await request(app).get(`/api/customers/${customer.id}/tickets?page=1&limit=20`).set(auth(token));
+    const response = await request(app).get(`/api/customers/${customer.id}/tickets?page=1&limit=20`).set(auth(adminToken));
     expect(response.status).toBe(200);
     expect(response.body.data.map((ticket: { access: string }) => ticket.access)).toEqual(["FULL", "FULL"]);
+    // ADMIN → no team predicate (org-wide).
     expect(mocks.findTickets).toHaveBeenCalledWith(expect.objectContaining({ where: { customerId: customer.id }, orderBy: [{ updatedAt: "desc" }, { id: "asc" }], skip: 0, take: 20 }));
+  });
+
+  // -------------------------------------------------------------------------
+  // OD-6 / TK-008 + TK-009 — MANAGER customer-ticket history is team-scoped
+  // (replaces the pre-OD-6 assertion that a MANAGER saw every ticket, "FULL")
+  // -------------------------------------------------------------------------
+  describe("MANAGER customer-ticket visibility (OD-6)", () => {
+    it("scopes the query to the manager's managed team", async () => {
+      mocks.findCustomer.mockResolvedValue({ id: customer.id });
+      mocks.findTickets.mockResolvedValue([
+        { id: "c737ce60fccf9da889f4605c0", subject: "In team", status: "OPEN", priority: "HIGH", createdAt: now, updatedAt: now, assignedAgentId: "agent-1", category: null, assignedAgent: { id: "agent-1", name: "Agent" } },
+      ]);
+      mocks.countTickets.mockResolvedValue(1);
+      const response = await request(app).get(`/api/customers/${customer.id}/tickets?page=1&limit=20`).set(auth(managerToken));
+      expect(response.status).toBe(200);
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.meta.total).toBe(1);
+      expect(response.body.data[0].access).toBe("FULL");
+      const where = mocks.findTickets.mock.calls.at(-1)![0].where;
+      expect(where).toEqual({ customerId: customer.id, teamId: TEAM_A });
+      expect(mocks.countTickets).toHaveBeenCalledWith({ where });
+    });
+
+    it("returns an empty page for a MANAGER with no managed team (no org-wide fallback)", async () => {
+      mocks.userFindUnique.mockImplementation(async () => ({ teamId: null, managedTeam: null }));
+      mocks.findCustomer.mockResolvedValue({ id: customer.id });
+      mocks.findTickets.mockResolvedValue([]);
+      mocks.countTickets.mockResolvedValue(0);
+      const response = await request(app).get(`/api/customers/${customer.id}/tickets`).set(auth(managerToken));
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({ data: [], meta: { total: 0, totalPages: 0 } });
+      expect(mocks.findTickets.mock.calls.at(-1)![0].where).toEqual({ customerId: customer.id, id: { in: [] } });
+    });
+
+    it("never exposes cross-team ticket metadata — the where predicate carries the team id", async () => {
+      mocks.findCustomer.mockResolvedValue({ id: customer.id });
+      mocks.findTickets.mockResolvedValue([]);
+      mocks.countTickets.mockResolvedValue(0);
+      await request(app).get(`/api/customers/${customer.id}/tickets`).set(auth(managerToken));
+      const where = mocks.findTickets.mock.calls.at(-1)![0].where;
+      expect(where.teamId).toBe(TEAM_A);
+    });
+
+    it("composes team scope with pagination", async () => {
+      mocks.findCustomer.mockResolvedValue({ id: customer.id });
+      mocks.findTickets.mockResolvedValue([
+        { id: "ticket-2", subject: "Second", status: "OPEN", priority: "LOW", createdAt: now, updatedAt: now, assignedAgentId: null, category: null, assignedAgent: null },
+      ]);
+      mocks.countTickets.mockResolvedValue(2);
+      const response = await request(app).get(`/api/customers/${customer.id}/tickets?page=2&limit=1`).set(auth(managerToken));
+      expect(response.status).toBe(200);
+      expect(response.body.meta).toEqual({ page: 2, limit: 1, total: 2, totalPages: 2 });
+      expect(mocks.findTickets).toHaveBeenCalledWith(expect.objectContaining({ where: { customerId: customer.id, teamId: TEAM_A }, skip: 1, take: 1 }));
+    });
   });
 
   it("returns complete safe history to AGENT with server-derived access and pagination", async () => {

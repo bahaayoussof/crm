@@ -350,6 +350,46 @@ describe("SLA automation", () => {
       );
     });
 
+    // OD-1 / TK-002 — a manually reopened ticket (resolvedAt cleared) re-enters
+    // escalation. The candidate query already requires `resolvedAt: null`, so the
+    // fix in updateTicket is what makes a reopened past-deadline ticket eligible.
+    it("escalates a reopened (resolvedAt=null) IN_PROGRESS ticket whose retained resolutionDueAt has passed", async () => {
+      const now = new Date("2026-09-02T12:00:00.000Z");
+      mocks.ticketFindMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: "reopened-1", subject: "Reopened past deadline", status: TicketStatus.IN_PROGRESS, assignedAgentId: null, customerId: "c1", teamId: "team-a" }]);
+      mocks.state.recipients = ["admin-1"];
+
+      const result = await runSlaMonitor(now);
+
+      expect(result.escalated).toBe(1);
+      expect(mocks.ticketUpdateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ id: "reopened-1", resolvedAt: null }), data: { status: TicketStatus.ESCALATED } }),
+      );
+    });
+
+    it("OD-5 guard: a WAITING_CUSTOMER ticket past its resolutionDueAt is still escalated (clock never pauses)", async () => {
+      const now = new Date("2026-09-02T12:00:00.000Z");
+      mocks.ticketFindMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: "waiting-1", subject: "Waiting on customer", status: TicketStatus.WAITING_CUSTOMER, assignedAgentId: null, customerId: "c1", teamId: "team-a" }]);
+      mocks.state.recipients = ["admin-1"];
+
+      const result = await runSlaMonitor(now);
+
+      expect(result.escalated).toBe(1);
+      expect(mocks.historyCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ action: "SLA_AUTO_ESCALATED", oldValue: TicketStatus.WAITING_CUSTOMER }) }),
+      );
+    });
+
+    it("never re-escalates an already-ESCALATED ticket (excluded from the candidate query)", async () => {
+      const now = new Date("2026-09-02T12:00:00.000Z");
+      await runSlaMonitor(now);
+      const escalationWhere = (mocks.ticketFindMany.mock.calls[1][0] as { where: { status: { in: TicketStatus[] } } }).where;
+      expect(escalationWhere.status.in).not.toContain(TicketStatus.ESCALATED);
+    });
+
     it("creates no history or notification when a concurrent or repeated run loses the guarded escalation update", async () => {
       mocks.ticketFindMany
         .mockResolvedValueOnce([])

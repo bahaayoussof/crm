@@ -560,3 +560,354 @@ describe("Ticket Details right rail & lower workspace", () => {
     expect(railColumn.className).toMatch(/lg:self-start/);
   });
 });
+
+// Manual-smoke follow-up (Tickets SDD): the Assigned Agent dropdown must not
+// offer agents from other teams — the backend rejects cross-team assignment
+// (assertAgentAssignableToTicket → 409 CROSS_TEAM_ASSIGNMENT).
+describe("Ticket Details sidebar — Assigned Agent team scoping", () => {
+  afterEach(cleanup);
+  beforeEach(async () => { await changeAppLanguage("en"); vi.clearAllMocks(); baseMocks(); });
+
+  it("scopes the agent lookup to the ticket's effective team", () => {
+    mocks.useTicket.mockReturnValue({
+      isLoading: false, isError: false,
+      data: { ...baseTicket, team: { id: "team-42", name: "Billing Team", departmentId: "dep-1" } },
+    });
+    renderDetail();
+    expect(mocks.useAgents).toHaveBeenCalledWith("team-42");
+  });
+
+  it("keeps the full agent list for an unrouted ticket so team adoption still works", () => {
+    mocks.useTicket.mockReturnValue({
+      isLoading: false, isError: false,
+      data: { ...baseTicket, team: null },
+    });
+    renderDetail();
+    expect(mocks.useAgents).toHaveBeenCalledWith(undefined);
+  });
+
+  it("drops a cross-team agent from the Assigned agent options but keeps same-team agents", async () => {
+    mocks.useTicket.mockReturnValue({
+      isLoading: false, isError: false,
+      data: {
+        ...baseTicket,
+        team: { id: "team-42", name: "Billing Team", departmentId: "dep-1" },
+        assignedAgent: { id: "agent-1", name: "Mariam Hassan", email: "mariam@example.com" },
+      },
+    });
+    mocks.useAgents.mockReturnValue({
+      data: [
+        { id: "agent-1", name: "Mariam Hassan", email: "mariam@example.com", teamId: "team-42" },
+        { id: "agent-9", name: "Other Teamer", email: "other@example.com", teamId: "team-99" },
+      ],
+    });
+    renderDetail();
+    const agentTrigger = screen.getByRole("combobox", { name: "Assigned agent" });
+    fireEvent.keyDown(agentTrigger, { key: "ArrowDown" });
+    await waitFor(() => expect(screen.getByRole("option", { name: "Mariam Hassan" })).toBeInTheDocument());
+    expect(screen.queryByRole("option", { name: "Other Teamer" })).not.toBeInTheDocument();
+  });
+});
+
+// Manual-smoke follow-up (Tickets SDD): reclassifying a ticket invalidates the
+// current assignee — the Category change must clear the assignee immediately, and
+// an already-assigned ticket must submit assignedAgentId: null.
+describe("Ticket Details sidebar — Category change clears the assignee", () => {
+  afterEach(cleanup);
+  beforeEach(async () => { await changeAppLanguage("en"); vi.clearAllMocks(); baseMocks(); });
+
+  function assignedTicketMocks() {
+    const mutateAsync = vi.fn().mockResolvedValue({});
+    mocks.useUpdateTicket.mockReturnValue({ mutateAsync, isPending: false });
+    mocks.useCategories.mockReturnValue({
+      data: [
+        { id: "category-1", name: "Billing" },
+        { id: "category-2", name: "Technical" },
+      ],
+    });
+    // Unrouted ticket: full agent list, agent-1 already assigned.
+    mocks.useAgents.mockReturnValue({
+      data: [{ id: "agent-1", name: "Mariam Hassan", email: "mariam@example.com", teamId: null }],
+    });
+    mocks.useTicket.mockReturnValue({
+      isLoading: false, isError: false,
+      data: {
+        ...baseTicket,
+        team: null,
+        category: { id: "category-1", name: "Billing" },
+        assignedAgent: { id: "agent-1", name: "Mariam Hassan", email: "mariam@example.com" },
+      },
+    });
+    return mutateAsync;
+  }
+
+  async function changeCategoryToTechnical() {
+    const categoryTrigger = screen.getByRole("combobox", { name: "Category" });
+    fireEvent.keyDown(categoryTrigger, { key: "ArrowDown" });
+    await waitFor(() => expect(screen.getByRole("option", { name: "Technical" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("option", { name: "Technical" }));
+  }
+
+  it("resets an already-assigned ticket to Unassigned when the Category changes", async () => {
+    assignedTicketMocks();
+    renderDetail();
+    expect(screen.getByRole("combobox", { name: "Assigned agent" })).toHaveTextContent("Mariam Hassan");
+
+    await changeCategoryToTechnical();
+
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Assigned agent" })).toHaveTextContent("Unassigned"),
+    );
+  });
+
+  it("submits assignedAgentId: null alongside the new category for an already-assigned ticket", async () => {
+    const mutateAsync = assignedTicketMocks();
+    renderDetail();
+
+    await changeCategoryToTechnical();
+    fireEvent.click(await screen.findByRole("button", { name: "Save changes" }));
+
+    await waitFor(() =>
+      expect(mutateAsync).toHaveBeenCalledWith({ categoryId: "category-2", assignedAgentId: null }),
+    );
+  });
+
+  it("keeps the assignee when the same Category is re-selected (no spurious clear)", async () => {
+    assignedTicketMocks();
+    renderDetail();
+    const categoryTrigger = screen.getByRole("combobox", { name: "Category" });
+    fireEvent.keyDown(categoryTrigger, { key: "ArrowDown" });
+    await waitFor(() => expect(screen.getByRole("option", { name: "Billing" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("option", { name: "Billing" }));
+
+    expect(screen.getByRole("combobox", { name: "Assigned agent" })).toHaveTextContent("Mariam Hassan");
+    expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
+  });
+});
+
+// MS-03 — CLOSED tickets are viewable but immutable. The detail page keeps
+// rendering the conversation/history, but the reply + internal-note composer is
+// gated off and a "ticket closed" notice replaces the generic read-only hint.
+describe("Ticket Details — CLOSED ticket is viewable but the composer is disabled", () => {
+  afterEach(cleanup);
+  beforeEach(async () => { await changeAppLanguage("en"); vi.clearAllMocks(); baseMocks(); });
+
+  function closedTicketMocks() {
+    mocks.useTicket.mockReturnValue({
+      isLoading: false, isError: false,
+      data: { ...baseTicket, status: "CLOSED", resolvedAt: "2026-08-25T09:00:00.000Z", closedAt: "2026-08-25T10:00:00.000Z" },
+    });
+  }
+
+  it("still shows the conversation for a CLOSED ticket", () => {
+    closedTicketMocks();
+    renderDetail();
+    expect(screen.getByRole("list", { name: "Ticket conversation timeline" })).toBeInTheDocument();
+    expect(screen.getByText("Thanks, that is resolved now.", { selector: "p" })).toBeInTheDocument();
+  });
+
+  it("disables the reply/note send action and shows the closed notice", () => {
+    closedTicketMocks();
+    renderDetail();
+    // MS-04 adds a second closed notice in the sidebar, so more than one may match.
+    expect(screen.getAllByText(/This ticket is closed/i).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Reply" })).toBeDisabled();
+  });
+
+  it("does not offer the Attach file action on a CLOSED ticket", () => {
+    closedTicketMocks();
+    renderDetail();
+    expect(screen.queryByRole("button", { name: /Attach file/i })).not.toBeInTheDocument();
+  });
+});
+
+// MS-04 — a CLOSED ticket is viewable but FULLY immutable: beyond the composer
+// (MS-03), the Edit link and every sidebar workflow/metadata control are gone,
+// while the read surfaces (conversation, history, SLA) still render.
+describe("Ticket Details — CLOSED ticket hides all mutation controls", () => {
+  afterEach(cleanup);
+  beforeEach(async () => { await changeAppLanguage("en"); vi.clearAllMocks(); baseMocks(); });
+
+  function renderClosed() {
+    mocks.useTicket.mockReturnValue({
+      isLoading: false, isError: false,
+      data: { ...baseTicket, status: "CLOSED", resolvedAt: "2026-08-25T09:00:00.000Z", closedAt: "2026-08-25T10:00:00.000Z" },
+    });
+    renderDetail();
+  }
+
+  it("hides the Edit link for an ADMIN on a CLOSED ticket", () => {
+    renderClosed();
+    expect(screen.queryByRole("link", { name: "Edit" })).not.toBeInTheDocument();
+  });
+
+  it("hides the status / priority / category / assignee controls and the Save button", () => {
+    renderClosed();
+    expect(screen.queryByRole("combobox", { name: "Status" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Priority" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Category" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Assigned agent" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
+  });
+
+  it("shows the closed read-only notice in the sidebar", () => {
+    renderClosed();
+    expect(
+      screen.getByText(/its status, priority, category, assignment, routing, and conversation can no longer be changed/i),
+    ).toBeInTheDocument();
+  });
+
+  it("still renders the conversation and history for a CLOSED ticket", () => {
+    renderClosed();
+    expect(screen.getByRole("list", { name: "Ticket conversation timeline" })).toBeInTheDocument();
+    expect(screen.getByText("Thanks, that is resolved now.", { selector: "p" })).toBeInTheDocument();
+  });
+});
+
+// MS-05 — an OPEN (non-CLOSED) ticket's sidebar edit must actually persist.
+// Regression: the sidebar re-hydrated its status/priority/category/assignee
+// controls from `record` on every `ticket.data` reference change. The detail
+// payload carries time-derived SLA fields (`slaState`, `effectiveSlaDueAt`), so
+// a routine background refetch / realtime `ticket.updated` invalidation handed
+// back a new object and silently reset the controls mid-edit — the Save button
+// vanished and the change was lost.
+describe("MS-05 — OPEN ticket sidebar edits persist", () => {
+  afterEach(cleanup);
+  beforeEach(async () => { await changeAppLanguage("en"); vi.clearAllMocks(); baseMocks(); });
+
+  function routedOpenMocks() {
+    const mutateAsync = vi.fn().mockResolvedValue({});
+    mocks.useUpdateTicket.mockReturnValue({ mutateAsync, isPending: false });
+    mocks.useCategories.mockReturnValue({ data: [
+      { id: "category-1", name: "Billing" },
+      { id: "category-2", name: "Technical" },
+    ] });
+    mocks.useAgents.mockReturnValue({ data: [
+      { id: "agent-1", name: "Mariam Hassan", email: "mariam@example.com", teamId: "team-42" },
+    ] });
+    mocks.useTicket.mockReturnValue({
+      isLoading: false, isError: false,
+      data: {
+        ...baseTicket,
+        status: "IN_PROGRESS",
+        team: { id: "team-42", name: "Billing Team", departmentId: "dep-1" },
+        category: { id: "category-1", name: "Billing" },
+        assignedAgent: { id: "agent-1", name: "Mariam Hassan", email: "mariam@example.com" },
+      },
+    });
+    return mutateAsync;
+  }
+
+  it("saves a plain status change on a routed OPEN ticket", async () => {
+    const mutateAsync = routedOpenMocks();
+    renderDetail();
+    const statusTrigger = screen.getByRole("combobox", { name: "Status" });
+    fireEvent.keyDown(statusTrigger, { key: "ArrowDown" });
+    await waitFor(() => expect(screen.getByRole("option", { name: "Resolved" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("option", { name: "Resolved" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({ status: "RESOLVED" }));
+  });
+
+  it("saves a category change on a routed assigned OPEN ticket", async () => {
+    const mutateAsync = routedOpenMocks();
+    renderDetail();
+    const categoryTrigger = screen.getByRole("combobox", { name: "Category" });
+    fireEvent.keyDown(categoryTrigger, { key: "ArrowDown" });
+    await waitFor(() => expect(screen.getByRole("option", { name: "Technical" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("option", { name: "Technical" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({ categoryId: "category-2", assignedAgentId: null }));
+  });
+
+  it("saves a priority change when the assignee is NOT in the team-scoped agent list", async () => {
+    const mutateAsync = vi.fn().mockResolvedValue({});
+    mocks.useUpdateTicket.mockReturnValue({ mutateAsync, isPending: false });
+    mocks.useCategories.mockReturnValue({ data: [{ id: "category-1", name: "Billing" }] });
+    // team-scoped list does NOT contain agent-1 (stale / cross-team assignee)
+    mocks.useAgents.mockReturnValue({ data: [
+      { id: "agent-2", name: "Other Person", email: "o@example.com", teamId: "team-42" },
+    ] });
+    mocks.useTicket.mockReturnValue({
+      isLoading: false, isError: false,
+      data: {
+        ...baseTicket, status: "IN_PROGRESS",
+        team: { id: "team-42", name: "Billing Team", departmentId: "dep-1" },
+        category: { id: "category-1", name: "Billing" },
+        assignedAgent: { id: "agent-1", name: "Mariam Hassan", email: "mariam@example.com" },
+      },
+    });
+    renderDetail();
+    const priTrigger = screen.getByRole("combobox", { name: "Priority" });
+    fireEvent.keyDown(priTrigger, { key: "ArrowDown" });
+    await waitFor(() => expect(screen.getByRole("option", { name: "Urgent" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("option", { name: "Urgent" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({ priority: "URGENT" }));
+  });
+
+  it("keeps an in-progress edit when a background refetch only bumps the derived SLA state", async () => {
+    const mutateAsync = routedOpenMocks();
+    const { rerender } = renderDetail();
+
+    const priTrigger = screen.getByRole("combobox", { name: "Priority" });
+    fireEvent.keyDown(priTrigger, { key: "ArrowDown" });
+    await waitFor(() => expect(screen.getByRole("option", { name: "Urgent" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("option", { name: "Urgent" }));
+    expect(await screen.findByRole("button", { name: "Save changes" })).toBeInTheDocument();
+
+    // react-query hands back a NEW object: same editable fields, fresher SLA state
+    // (deriveSla runs on every read of a live ticket).
+    mocks.useTicket.mockReturnValue({
+      isLoading: false, isError: false,
+      data: {
+        ...baseTicket,
+        status: "IN_PROGRESS",
+        slaState: "AT_RISK", effectiveSlaDueAt: "2026-08-25T12:00:00.000Z",
+        team: { id: "team-42", name: "Billing Team", departmentId: "dep-1" },
+        category: { id: "category-1", name: "Billing" },
+        assignedAgent: { id: "agent-1", name: "Mariam Hassan", email: "mariam@example.com" },
+      },
+    });
+    rerender(
+      <MemoryRouter initialEntries={[`/tickets/${baseTicket.id}`]}>
+        <Routes><Route path="/tickets/:id" element={<TicketDetailPage />} /></Routes>
+      </MemoryRouter>,
+    );
+
+    const save = screen.queryByRole("button", { name: "Save changes" });
+    expect(save).toBeInTheDocument();
+    fireEvent.click(save as HTMLElement);
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({ priority: "URGENT" }));
+  });
+
+  it("re-syncs the controls when the ticket's own fields really change (e.g. after a save)", async () => {
+    routedOpenMocks();
+    const { rerender } = renderDetail();
+
+    const priTrigger = screen.getByRole("combobox", { name: "Priority" });
+    fireEvent.keyDown(priTrigger, { key: "ArrowDown" });
+    await waitFor(() => expect(screen.getByRole("option", { name: "Urgent" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("option", { name: "Urgent" }));
+    expect(await screen.findByRole("button", { name: "Save changes" })).toBeInTheDocument();
+
+    // the server now reports priority URGENT — the edit landed, controls must re-sync
+    mocks.useTicket.mockReturnValue({
+      isLoading: false, isError: false,
+      data: {
+        ...baseTicket,
+        status: "IN_PROGRESS", priority: "URGENT",
+        team: { id: "team-42", name: "Billing Team", departmentId: "dep-1" },
+        category: { id: "category-1", name: "Billing" },
+        assignedAgent: { id: "agent-1", name: "Mariam Hassan", email: "mariam@example.com" },
+      },
+    });
+    rerender(
+      <MemoryRouter initialEntries={[`/tickets/${baseTicket.id}`]}>
+        <Routes><Route path="/tickets/:id" element={<TicketDetailPage />} /></Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument());
+  });
+});

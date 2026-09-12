@@ -12,6 +12,11 @@ export const ticketListQuerySchema = z.object({
   scope: z.enum(["mine", "unassigned"]).optional(),
   status: z.nativeEnum(TicketStatus).optional(),
   priority: z.nativeEnum(TicketPriority).optional(),
+  // Channel list filter (OD-4). All five Channel values are valid here — a
+  // LIVE_CHAT ticket is a normal internal ticket — intentionally wider than
+  // createTicketSchema.channel, which excludes LIVE_CHAT. ANDed with the
+  // caller's authoritative scope, so it can only narrow a list.
+  channel: z.nativeEnum(Channel).optional(),
   categoryId: databaseIdSchema.optional(),
   assignedAgentId: databaseIdSchema.optional(),
   // Operational shortcut used by the Manager Work Console "Needs Attention"

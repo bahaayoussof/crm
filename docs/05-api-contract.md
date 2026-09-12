@@ -165,9 +165,11 @@ Customer notes are internal-only, ordered newest first, and use the authenticate
 GET /customers/:id/tickets?page=1&limit=20
 ```
 
-This internal Customer Management endpoint returns a complete paginated safe-summary history for the requested customer to `ADMIN`, `MANAGER`, and `AGENT`; `CUSTOMER` is rejected. It verifies the customer exists, orders by `updatedAt` descending then `id` ascending, and returns only `id`, `subject`, `status`, `priority`, `createdAt`, `updatedAt`, safe `category`, safe `assignedAgent`, and server-derived `access`.
+This internal Customer Management endpoint returns a paginated safe-summary history for the requested customer to `ADMIN`, `MANAGER`, and `AGENT`; `CUSTOMER` is rejected. It verifies the customer exists, orders by `updatedAt` descending then `id` ascending, and returns only `id`, `subject`, `status`, `priority`, `createdAt`, `updatedAt`, safe `category`, safe `assignedAgent`, and server-derived `access`.
 
-`ADMIN` and `MANAGER` receive `FULL` for every summary. An `AGENT` receives `FULL` when the ticket is assigned to that agent or unassigned, and `SUMMARY_ONLY` when it belongs to another agent. `SUMMARY_ONLY` is presentation metadata only: it never authorizes Ticket detail, conversation, notes, history, mutation, queue, or Dashboard access.
+**Team-scoped visibility (OD-6).** The query obeys the canonical team-scoped ticket-visibility model (`shared/team/team-scope.ts`), so it can never be a Ticket-visibility bypass: `ADMIN` sees every ticket of the customer (org-wide); a `MANAGER` sees **only tickets owned by their managed team** (`Ticket.teamId ===` the manager's team), and a `MANAGER` with no managed team receives an empty page (no org-wide fallback); an `AGENT` still receives the customer's full history (ADR-014 cross-agent support-history design). `meta.total` reflects the scoped count.
+
+`ADMIN` receives `FULL` for every summary; a `MANAGER` receives `FULL` for every (team-scoped) summary. An `AGENT` receives `FULL` when the ticket is assigned to that agent or unassigned, and `SUMMARY_ONLY` when it belongs to another agent. `SUMMARY_ONLY` is presentation metadata only: it never authorizes Ticket detail, conversation, notes, history, mutation, queue, or Dashboard access.
 
 Deletion returns `409 CUSTOMER_HAS_SUPPORT_HISTORY` when the customer has a linked login identity, tickets, feedback, notes, or attachments. Only unlinked customers without related support history can be deleted.
 
@@ -180,7 +182,9 @@ POST   /tickets
 PATCH  /tickets/:id
 ```
 
-All routes require `ADMIN`, `MANAGER`, or `AGENT`; `CUSTOMER` is rejected. `ADMIN` and `MANAGER` see all tickets and their list is unchanged. **`AGENT` ticket lists are scoped** by an optional `scope` query param: `mine` (default when omitted — `assignedToId === self`) or `unassigned` (`assignedToId === null`). There is no "all" scope for agents, and an unsupported `scope` value returns `400 VALIDATION_ERROR`. A client-supplied `assignedAgentId` filter is ignored for `AGENT` callers (it can never widen scope). Listing otherwise supports server-side `page`, `limit`, `search`, `status`, `priority`, `categoryId`, `assignedAgentId` (non-agents), `customerId`, `departmentId`, `branchId` filters and uses the standard pagination envelope. Every requested filter, sort, and page is intersected with the server-authoritative scope in the DB query — search never reveals a ticket outside it. Direct `GET /:id` for a ticket assigned to another agent returns `404 TICKET_NOT_FOUND`.
+All routes require `ADMIN`, `MANAGER`, or `AGENT`; `CUSTOMER` is rejected. `ADMIN` and `MANAGER` see all tickets and their list is unchanged. **`AGENT` ticket lists are scoped** by an optional `scope` query param: `mine` (default when omitted — `assignedToId === self`) or `unassigned` (`assignedToId === null`). There is no "all" scope for agents, and an unsupported `scope` value returns `400 VALIDATION_ERROR`. A client-supplied `assignedAgentId` filter is ignored for `AGENT` callers (it can never widen scope). Listing otherwise supports server-side `page`, `limit`, `search`, `status`, `priority`, `channel`, `categoryId`, `assignedAgentId` (non-agents), `customerId`, `departmentId`, `branchId` filters and uses the standard pagination envelope. Every requested filter, sort, and page is intersected with the server-authoritative scope in the DB query — search never reveals a ticket outside it.
+
+**`channel` list filter (OD-4).** `channel` accepts any `Channel` enum value — `WEB` \| `EMAIL` \| `WHATSAPP` \| `SMS` \| `LIVE_CHAT` — intentionally wider than the create schema (which excludes `LIVE_CHAT`), since a `LIVE_CHAT` ticket is a normal internal ticket. It is an exact match ANDed after the caller's authoritative scope (so it can only narrow a list, never widen an `AGENT`'s), composes with every other filter and pagination, and an unknown value returns `400 VALIDATION_ERROR`. Omitting it preserves prior behaviour. There is no DB index on `Ticket.channel`. Direct `GET /:id` for a ticket assigned to another agent returns `404 TICKET_NOT_FOUND`.
 
 **Operational filters for `ADMIN`/`MANAGER` (`feature/manager-work-console`, ADR-049).** Two optional list params power the Manager Work Console deep-links: `sla` (`breached` | `at_risk` — a derived SLA-state filter, ANDed as a `where` fragment from `shared/sla/sla-filter.ts`, mirroring `derive-sla.ts`) and `assignee` (`unassigned` — `assignedAgentId IS NULL`). Both are ignored for `AGENT` callers (whose scope is already fixed). Any other value → `400 VALIDATION_ERROR`.
 
@@ -262,13 +266,13 @@ For `WHATSAPP`, `EMAIL`, and `SMS` channels the response carries a `delivery` fi
 ### Later Ticket Actions
 
 ```text
-POST /tickets/:id/assign          PLANNED (superseded)
-POST /tickets/:id/status          PLANNED (superseded)
-POST /tickets/:id/attachments     PLANNED (feature/attachments)
+POST /tickets/:id/assign          NOT REGISTERED (superseded by PATCH /tickets/:id)
+POST /tickets/:id/status          NOT REGISTERED (superseded by PATCH /tickets/:id)
+POST /tickets/:id/attachments     LIVE (feature/attachments, integrated)
 GET  /tickets/:id/history         PLANNED (optional focused read)
 ```
 
-None of these are registered. Assignment and status changes are already implemented through `PATCH /tickets/:id` (LIVE), so the dedicated `assign`/`status` action endpoints are not planned for implementation. History is currently included in `GET /tickets/:id`; a focused `GET /tickets/:id/history` read endpoint is optional. `POST /tickets/:id/attachments` belongs to `feature/attachments` and has no storage backend yet.
+Assignment and status changes are implemented through `PATCH /tickets/:id` (LIVE), so the dedicated `assign` / `status` action endpoints are not planned. Ticket attachment sub-routes (`feature/attachments`) are integrated and backed by the private blob store — see "Attachments" below. History is currently included in `GET /tickets/:id`; a focused `GET /tickets/:id/history` read endpoint remains optional.
 
 ## Knowledge Base — LIVE
 

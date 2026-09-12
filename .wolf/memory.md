@@ -1,6 +1,7 @@
 # Memory
 
 | 11:10 | Implemented isolated customer AI chatbot, Portal UI, KB grounding, canonical handoff, tests and docs | customer-ai modules, portal routes/nav/i18n, docs | automated gates green; unstaged | ~12000 |
+| 16:50 | MS-07: found + fixed edit-form Save silent no-op (channel reset to undefined, required schema field with no UI) | client/src/features/tickets/ticket-form-page.tsx, ticket.schemas.ts, ticket.types.ts, ticket-pages.test.tsx | tsc/eslint/vitest all green, 2 new regression tests | ~9000 |
 
 > Chronological action log. Hooks and AI append to this file automatically.
 > Old sessions are consolidated by the daemon weekly.
@@ -1126,6 +1127,80 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 |------|--------|---------|---------|--------|
 
 ## Session: 2026-09-10 09:52
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-10 10:22
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 11:30 | SDD brownfield discovery + spec for core Tickets domain (lifecycle, RBAC/team scope, 7 creation flows, assignment engine, SLA, history vs audit, realtime, portal, gaps/open-decisions) | specs/features/tickets/spec.md (new) | Created; NO production code changed; READY FOR HUMAN REVIEW, not ready for plan.md (6 open decisions, esp. OD-1 manual-reopen resolvedAt SLA hole) | ~55k |
+| 13:15 | Human resolved OD-1..OD-6. Finalized spec.md (Feature Status→READY FOR PLAN, Resolved Decisions table replaces Open Decisions, DG-4/5/6/7 reclassified "approved for impl", DG-11 Case B fix, AC 43-62 added). Created plan.md (19 sections + task preview). Verified OD-6 = Case B (customer.service.ts:93 listCustomerTickets bypasses team scope). | specs/features/tickets/spec.md, specs/features/tickets/plan.md (new) | Both done; NO production code changed; NO Prisma migration needed; plan.md = READY FOR TASKS pending human review; tasks.md NOT created | ~60k |
+| 14:05 | Generated Tickets tasks.md — 11 ordered tasks TK-001..TK-011 (Goal/Why/Deps/Files/Requirements/Tests/Non-Goals/Completion/Verification each) from finalized spec+plan. Sequential deps TK-001→011. Scope guard + implementation discipline + status/progress table. | specs/features/tickets/tasks.md (new) | Done; NO production code changed; NO migration; task status READY FOR IMPLEMENTATION, 0/11; awaiting human review before any execution | ~25k |
+
+## Session: 2026-09-10 11:47
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-10 13:17
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 13:18 | TK-001 OD-1: clear `resolvedAt` on manual `RESOLVED→IN_PROGRESS` | ticket.service.ts, ticket.test.ts | 1 clause + 5 tests; ticket.test 108→ | 6k |
+| 13:21 | TK-002 reopen-SLA + WAITING_CUSTOMER guard regression tests | ticket.test.ts, sla-automation.test.ts | +7 tests, 131 pass | 4k |
+| 13:26 | TK-003/004 OD-2: `TICKET_ROUTING_CHANGED` audit + `teamId` in `changed` | audit-log.constants.ts, ticket.service.ts, ticket.test.ts | id-only routing row in-tx; +8 tests, 120 | 6k |
+| 13:33 | TK-005 OD-3: portal-create post-commit `ticket.updated` | portal.service.ts, portal.test.ts, realtime.test.ts | withRealtimeOutbox + emit; +4 tests | 5k |
+| 13:37 | TK-006/007 OD-4: `channel` filter backend + canonical frontend | ticket.schema.ts, ticket.service.ts, ticket.types.ts, ticket-list-page.tsx, ticket-filters-popover.tsx, locales | z.nativeEnum(Channel) + `<select>` + EN/AR; +14 tests | 8k |
+| 13:41 | TK-008/009 OD-6: team-scope `listCustomerTickets` (MANAGER) | customer.service.ts, customer.test.ts | teamScopedTicketWhere; split L72 test, 27 pass | 5k |
+| 13:44 | TK-010 docs reconciliation | docs/05,06,07,08,19,22 + specs/features/tickets/{spec,plan,tasks}.md | markers flipped to implemented; no new ADR | 7k |
+| 13:50 | TK-011 verification gate | — | server 964/964, client 805/805, builds OK (server `prisma generate` file-locked — env), no migration, diff --check clean → READY FOR HUMAN REVIEW | 6k |
+
+## Session: 2026-09-10 14:09
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 14:10 | MS-01 manual-smoke follow-up: scope ticket-detail Assigned Agent dropdown to the ticket's effective teamId | client/src/features/tickets/ticket-sidebar.tsx | useAgents(record.team?.id) + scopedAgents filter; unrouted keeps full list (team adoption); backend 409 untouched | 5k |
+| 14:12 | MS-01 regression tests + tasks.md follow-up record | client/src/features/tickets/ticket-details-layout.test.tsx, specs/features/tickets/tasks.md | 3 new tests (scoped lookup / unrouted full list / cross-team agent dropped); ticket dir 144 pass; tsc -b + eslint clean | 4k |
+| 15:00 | MS-02 manual-smoke follow-up: Category change clears the Assigned Agent (sidebar + create/edit form) | client/src/features/tickets/ticket-sidebar.tsx, ticket-form-page.tsx | sidebar handleCategoryChange clears assignee on real change; form Category onValueChange calls field.onChange then setValue(assignedAgentId,'') only when next && next!==previous (avoids reset() hydration echo wiping the loaded agent); MS-01 team-scope + unrouted adoption preserved; backend untouched | 6k |
+| 15:04 | MS-02 regression tests + spec/tasks records | client/src/features/tickets/ticket-details-layout.test.tsx, ticket-pages.test.tsx, specs/features/tickets/{spec,tasks}.md | 4 new tests (sidebar: clear + submit null + same-cat no-op; form: hydrate then clear); spec.md new "Reclassification clears the assignee (client-UX invariant)" subsection; tickets dir 148 pass; tsc -b + eslint clean | 4k |
+
+## Session: 2026-09-10 15:05
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 15:10 | MS-03 backend: extend 409 TICKET_CLOSED to staff conversation paths | server/src/modules/tickets/ticket.service.ts, server/src/modules/attachments/attachment.service.ts | requireConversationMutationAccess selects status + throws 409 when CLOSED (covers addTicketMessage + addTicketNote); new requireOpenForMutation in authorizeTicketUpload/authorizeMessageUpload; portal reply + RESOLVED reopen preserved | 6k |
+| 15:14 | MS-03 client: gate reply/note composer + attach on CLOSED | client/src/features/tickets/ticket-permissions.ts, ticket-detail-page.tsx, ticket-workspace-tabs.tsx, client/src/locales/{en,ar}/translation.json | new canMutateTicketConversation; closed prop → tickets.conversation.closedReadOnly notice (EN+AR); sidebar metadata left as-is (out of scope) | 4k |
+| 15:20 | MS-03 regression tests + docs | server .../ticket.test.ts (+4), .../portal.test.ts (+2), client .../ticket-details-layout.test.tsx (+3), specs/features/tickets/{spec,tasks}.md, .wolf/STATUS.md | server 970/970 (52), client 815/815 (67, 1 flaky realtime re-run green), tsc/lint/build clean; spec.md invariant CLOSED = viewable + immutable; tasks.md MS-03 [x] | 5k |
+
+## Session: 2026-09-10 15:59
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 16:10 | MS-04 — CLOSED tickets fully immutable: new `assertTicketOpenForMutation` guard in `updateTicket` + `selfAssignTicket` (before perm/relation/transition checks → canonical `409 TICKET_CLOSED`); `requireConversationMutationAccess` refactored onto it | server/src/modules/tickets/ticket.service.ts | server typecheck+lint clean; ticket.test.ts 146 pass | ~9k |
+| 16:12 | MS-04 client: `isTicketMutable`/`canMutateTicketWorkflow`/`canManageTicketNow` in ticket-permissions; detail page uses them (hides Edit link + sidebar metadata selects for CLOSED); sidebar shows `tickets.closedReadOnly` (EN+AR); form-page turns away direct `/edit` nav on CLOSED | client/src/features/tickets/{ticket-permissions.ts,ticket-detail-page.tsx,ticket-sidebar.tsx,ticket-form-page.tsx}, client/src/locales/{en,ar}/translation.json | tsc -b + eslint clean; details-layout 46 pass; build OK | ~7k |
+| 16:14 | MS-04 tests + docs: `describe("MS-04 …")` in ticket.test.ts (8-case it.each + self-claim + code-not-leak + read still works), `describe("… hides all mutation controls")` in ticket-details-layout.test.tsx; spec.md invariant broadened + acceptance #8b; MS-04 block in tasks.md; STATUS.md updated | specs/features/tickets/{spec.md,tasks.md}, server + client test files, .wolf/STATUS.md | all green | ~5k |
+
+## Session: 2026-09-10 16:50
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 17:25 | MS-05 (client) — OPEN ticket edits not persisting. Root cause: sidebar `PropertiesSection` + `TicketFormPage` re-hydrate local form state from `ticket.data` on EVERY ref change; detail payload's time-derived `slaState`/`effectiveSlaDueAt` churn on a background refetch / realtime `ticket.updated` invalidation → effect re-runs → resets the in-progress edit (sidebar Save button vanishes; form Save submits stale values). Server fully innocent (replayed exact payloads → all 200). Fix: guard both effects with a `useRef` field-signature (JSON.stringify of just the editable fields) so only a real field change re-hydrates. +5 tests `describe("MS-05 …")` in ticket-details-layout.test.tsx, +2 in ticket-pages.test.tsx. Preserves CLOSED immutability / MS-01 / MS-02 / RBAC. | client/src/features/tickets/{ticket-sidebar.tsx,ticket-form-page.tsx,ticket-details-layout.test.tsx,ticket-pages.test.tsx}, specs/features/tickets/tasks.md, .wolf/buglog.json | client src/features/tickets 162 pass, tsc -b + eslint clean; server 297 pass (no server change) | ~90k |
+| 17:25 | INCIDENT: `git checkout server/.../ticket.test.ts` on an `MM` file discarded ~110 lines of unstaged MS-03/MS-04 server tests. Recovered verbatim from prior session transcript `~/.claude/projects/d--Private-azm-crm/*.jsonl`, re-applied → ticket.test.ts back to 146 tests. Logged bug-186 + cerebrum Do-Not-Repeat. | server/src/modules/tickets/ticket.test.ts | recovered | ~15k |
+
+## Session: 2026-09-12 16:08
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 16:35 | Debugged manual-smoke: edit form Priority/Category empty on open. Traced GET->reset()->RHF->Select; MS-05 guard fired correctly once (not the bug). Instrumented render/effect/handleValueChange to find Radix Select's hidden native-select mirror echoing a spurious onValueChange('') right after a fast controlled-value swing (reset() default->hydrated). Fixed by dropping raw '' in RadixSelect.handleValueChange (real empty selection always arrives as EMPTY_SENTINEL). Added regression test simulating isLoading:true->data-present transition, asserting Priority/Category text content (prior tests never checked text content). | client/src/components/ui/app-select.tsx, client/src/features/tickets/ticket-pages.test.tsx | 163/163 tests pass, tsc -b + vite build clean. buglog bug-187, cerebrum Do-Not-Repeat updated. | ~45k |
+
+## Session: 2026-09-12 16:37
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-12 16:51
 
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|

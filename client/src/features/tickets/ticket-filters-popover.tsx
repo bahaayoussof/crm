@@ -14,12 +14,14 @@ interface Option {
 interface TicketFiltersPopoverProps {
   status?: string;
   priority?: string;
+  channel?: string;
   categoryId?: string;
   assignedAgentId?: string;
   departmentId?: string;
   branchId?: string;
   statusOptions: Option[];
   priorityOptions: Option[];
+  channelOptions: Option[];
   categoryOptions: Option[];
   agentOptions: Option[];
   departmentOptions: Option[];
@@ -33,12 +35,14 @@ interface TicketFiltersPopoverProps {
 export function TicketFiltersPopover({
   status,
   priority,
+  channel,
   categoryId,
   assignedAgentId,
   departmentId,
   branchId,
   statusOptions,
   priorityOptions,
+  channelOptions,
   categoryOptions,
   agentOptions,
   departmentOptions,
@@ -50,7 +54,7 @@ export function TicketFiltersPopover({
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
-  const activeCount = [status, priority, categoryId, showAgentFilter ? assignedAgentId : undefined, departmentId, branchId].filter(Boolean).length;
+  const activeCount = [status, priority, channel, categoryId, showAgentFilter ? assignedAgentId : undefined, departmentId, branchId].filter(Boolean).length;
 
   const { triggerRef, panelRef, style } = useAnchoredPopover<HTMLButtonElement, HTMLDivElement>({
     open,
@@ -141,6 +145,18 @@ export function TicketFiltersPopover({
                   value={priority ?? ""}
                   onValueChange={(val) => onFilterChange("priority", val)}
                   options={priorityOptions}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                  {t("tickets.channelLabel")}
+                </label>
+                <AppSelect
+                  ariaLabel={t("tickets.channelLabel")}
+                  value={channel ?? ""}
+                  onValueChange={(val) => onFilterChange("channel", val)}
+                  options={channelOptions}
                 />
               </div>
 

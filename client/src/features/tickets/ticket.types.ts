@@ -1,6 +1,7 @@
 export type TicketStatus = "OPEN" | "IN_PROGRESS" | "WAITING_CUSTOMER" | "RESOLVED" | "CLOSED" | "ESCALATED";
 export type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
-export type TicketChannel = "WEB" | "EMAIL" | "WHATSAPP" | "SMS" | "LIVE_CHAT";
+export const TICKET_CHANNELS = ["WEB", "EMAIL", "WHATSAPP", "SMS", "LIVE_CHAT"] as const;
+export type TicketChannel = (typeof TICKET_CHANNELS)[number];
 // Channels an internal user may pick when proactively creating a ticket. Single
 // source of truth on the client — the form and its schema both derive from this.
 export const TICKET_CREATE_CHANNELS = ["WEB", "EMAIL", "WHATSAPP", "SMS"] as const;
@@ -47,7 +48,7 @@ export interface TicketDetail extends TicketListItem {
   history: TicketHistory[]; conversation: TicketConversationItem[];
 }
 export type TicketListScope = "mine" | "unassigned";
-export interface TicketFilters { search: string; page: number; limit: number; scope?: TicketListScope; status?: TicketStatus; priority?: TicketPriority; categoryId?: string; assignedAgentId?: string; customerId?: string; departmentId?: string; branchId?: string }
+export interface TicketFilters { search: string; page: number; limit: number; scope?: TicketListScope; status?: TicketStatus; priority?: TicketPriority; channel?: TicketChannel; categoryId?: string; assignedAgentId?: string; customerId?: string; departmentId?: string; branchId?: string }
 export interface TicketListResponse { data: TicketListItem[]; meta: { page: number; limit: number; total: number; totalPages: number } }
 export type AgentOption = TicketPerson & { teamId: string | null };
 export interface TicketCreateValues { customerId: string; subject: string; description: string; priority: TicketPriority; channel: TicketCreateChannel; categoryId?: string | null; assignedAgentId?: string | null; departmentId?: string | null; teamId?: string | null }

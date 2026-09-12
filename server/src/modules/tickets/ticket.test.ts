@@ -237,6 +237,52 @@ describe("ticket API", () => {
     expect(response.body).toMatchObject({ data: [], meta: { total: 0, totalPages: 0 } });
   });
 
+  // -------------------------------------------------------------------------
+  // OD-4 / TK-006 — channel list filter
+  // -------------------------------------------------------------------------
+  describe("channel list filter (OD-4)", () => {
+    const lastWhere = () => mocks.ticketFindMany.mock.calls.at(-1)?.[0].where;
+
+    it.each(["EMAIL", "LIVE_CHAT", "WHATSAPP", "SMS", "WEB"])("filters the list by channel=%s (all five valid)", async (channel) => {
+      await request(app).get(`/api/tickets?channel=${channel}`).set(auth(admin));
+      expect(lastWhere()).toEqual(expect.objectContaining({ channel }));
+    });
+
+    it("rejects an unknown channel value with 400 VALIDATION_ERROR", async () => {
+      const response = await request(app).get("/api/tickets?channel=BOGUS").set(auth(admin));
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe("VALIDATION_ERROR");
+    });
+
+    it("intersects channel with AGENT scope=mine (no widening)", async () => {
+      await request(app).get("/api/tickets?channel=WHATSAPP&scope=mine").set(auth(agent));
+      expect(lastWhere()).toEqual(expect.objectContaining({ channel: "WHATSAPP", assignedAgentId: agent.id }));
+    });
+
+    it("intersects channel with AGENT scope=unassigned (own team only)", async () => {
+      await request(app).get("/api/tickets?channel=WHATSAPP&scope=unassigned").set(auth(agent));
+      expect(lastWhere()).toEqual(expect.objectContaining({ channel: "WHATSAPP", assignedAgentId: null, teamId: TEAM_A }));
+    });
+
+    it("composes with another filter + pagination; count uses the same channel-filtered where", async () => {
+      mocks.ticketFindMany.mockResolvedValue([summary]); mocks.ticketCount.mockResolvedValue(1);
+      await request(app).get("/api/tickets?channel=EMAIL&status=OPEN&page=2&limit=5").set(auth(admin));
+      const call = mocks.ticketFindMany.mock.calls.at(-1)![0];
+      expect(call).toMatchObject({ skip: 5, take: 5, where: expect.objectContaining({ channel: "EMAIL", status: "OPEN" }) });
+      expect(mocks.ticketCount).toHaveBeenCalledWith({ where: expect.objectContaining({ channel: "EMAIL", status: "OPEN" }) });
+    });
+
+    it("keeps a MANAGER channel filter within their team", async () => {
+      await request(app).get("/api/tickets?channel=SMS").set(auth(manager));
+      expect(lastWhere()).toEqual(expect.objectContaining({ channel: "SMS", teamId: TEAM_A }));
+    });
+
+    it("omitting channel leaves the where without a channel predicate", async () => {
+      await request(app).get("/api/tickets").set(auth(admin));
+      expect(lastWhere()).not.toHaveProperty("channel");
+    });
+  });
+
   it("creates a ticket with SLA snapshots and meaningful history", async () => {
     mocks.slaFind.mockResolvedValue({ firstResponseMinutes: 60, resolutionMinutes: 1440 });
     const response = await request(app).post("/api/tickets").set(auth()).send({ subject: "Payment failed", description: "Card rejected", customerId: "ce83f10dcd2c68747c3f3ba14", priority: "HIGH", categoryId: "cbbea6ce8290afd75d03495dd", assignedAgentId: "c6ff3b3bd11c44cac620c43d5" });
@@ -449,6 +495,51 @@ describe("ticket API", () => {
     expect((await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/notes").set(auth(agent)).send({ body: "Hidden" })).status).toBe(404);
     const customerToken = createAccessToken({ id: "c8caee0fa37e01411fff0f6eb", role: Role.CUSTOMER });
     expect((await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/notes").set({ Authorization: `Bearer ${customerToken}` }).send({ body: "No" })).status).toBe(403);
+  });
+
+  // MS-03 — CLOSED = viewable + immutable. A CLOSED ticket stays fully readable
+  // (detail + conversation + history), but staff conversation mutations are
+  // rejected with 409 TICKET_CLOSED, mirroring the Portal customer-reply guard.
+  describe("MS-03 — CLOSED tickets are viewable but immutable", () => {
+    it("still serves the full CLOSED ticket detail with conversation and history", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({
+        ...summary, status: TicketStatus.CLOSED, description: "Issue", resolvedAt: now, closedAt: now,
+        history: [{ id: "h1", action: "STATUS_CHANGED", oldValue: "RESOLVED", newValue: "CLOSED", createdAt: now, actor: null }],
+        department: null, branch: null,
+        messages: [{ id: "m1", body: "Public", createdAt: now, author: { id: agent.id, name: "Agent", role: Role.AGENT } }],
+        notes: [{ id: "n1", body: "Private", createdAt: now, author: { id: admin.id, name: "Admin", role: Role.ADMIN } }],
+      });
+      const response = await request(app).get("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(agent));
+      expect(response.status).toBe(200);
+      expect(response.body.data.status).toBe("CLOSED");
+      expect(response.body.data.conversation.map((item: { kind: string }) => item.kind)).toEqual(["INTERNAL_NOTE", "PUBLIC_MESSAGE"]);
+      expect(response.body.data.history).toHaveLength(1);
+    });
+
+    it("rejects a staff public reply on a CLOSED ticket with 409 TICKET_CLOSED", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, status: TicketStatus.CLOSED, assignedAgentId: agent.id });
+      const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "Any update?" });
+      expect(response.status).toBe(409);
+      expect(response.body.error.code).toBe("TICKET_CLOSED");
+      expect(mocks.messageCreate).not.toHaveBeenCalled();
+      expect(emitMessageMock).not.toHaveBeenCalled();
+    });
+
+    it("rejects a staff internal note on a CLOSED ticket with 409 TICKET_CLOSED", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, status: TicketStatus.CLOSED, assignedAgentId: agent.id });
+      const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/notes").set(auth(admin)).send({ body: "Internal follow-up" });
+      expect(response.status).toBe(409);
+      expect(response.body.error.code).toBe("TICKET_CLOSED");
+      expect(mocks.noteCreate).not.toHaveBeenCalled();
+      expect(emitMessageMock).not.toHaveBeenCalled();
+    });
+
+    it("still accepts a staff reply on a RESOLVED ticket (only CLOSED is terminal-immutable)", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, status: TicketStatus.RESOLVED, assignedAgentId: agent.id });
+      const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "Following up" });
+      expect(response.status).toBe(201);
+      expect(mocks.messageCreate).toHaveBeenCalled();
+    });
   });
 
   it("sends the reply through the WhatsApp service for WHATSAPP-channel tickets", async () => {
@@ -726,6 +817,260 @@ describe("ticket API", () => {
     mocks.ticketFindFirst.mockResolvedValue({ ...current, status: TicketStatus.RESOLVED, assignedAgentId: agent.id });
     const reopened = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(agent)).send({ status: "IN_PROGRESS" });
     expect(reopened.status).toBe(200);
+  });
+
+  // -------------------------------------------------------------------------
+  // OD-1 / TK-001 — manual RESOLVED → IN_PROGRESS clears resolvedAt
+  // -------------------------------------------------------------------------
+  describe("manual reopen SLA semantics (OD-1)", () => {
+    const resolvedTicket = (overrides: Record<string, unknown> = {}) => ({
+      ...current,
+      status: TicketStatus.RESOLVED,
+      resolvedAt: new Date("2026-08-24T10:00:00.000Z"),
+      resolutionDueAt: new Date("2026-08-23T10:00:00.000Z"),
+      firstRespondedAt: new Date("2026-08-22T10:00:00.000Z"),
+      firstResponseDueAt: new Date("2026-08-22T09:00:00.000Z"),
+      ...overrides,
+    });
+
+    it("clears resolvedAt (keeps resolutionDueAt) on RESOLVED → IN_PROGRESS as ADMIN", async () => {
+      mocks.ticketFindFirst.mockResolvedValue(resolvedTicket());
+      const response = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(admin)).send({ status: "IN_PROGRESS" });
+      expect(response.status).toBe(200);
+      const data = mocks.ticketUpdate.mock.calls.at(-1)![0].data;
+      expect(data).toMatchObject({ status: "IN_PROGRESS", resolvedAt: null });
+      expect(data).not.toHaveProperty("resolutionDueAt");
+      expect(data).not.toHaveProperty("firstResponseDueAt");
+      expect(data).not.toHaveProperty("closedAt");
+      expect(mocks.historyCreateMany).toHaveBeenCalledWith({ data: [expect.objectContaining({ action: "STATUS_CHANGED", oldValue: "RESOLVED", newValue: "IN_PROGRESS" })] });
+      const statusAudit = mocks.auditCreate.mock.calls.filter(([arg]) => arg.data.action === "TICKET_STATUS_CHANGED");
+      expect(statusAudit).toHaveLength(1);
+    });
+
+    it("clears resolvedAt on RESOLVED → IN_PROGRESS for a self-assigned AGENT", async () => {
+      mocks.ticketFindFirst.mockResolvedValue(resolvedTicket({ assignedAgentId: agent.id }));
+      const response = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(agent)).send({ status: "IN_PROGRESS" });
+      expect(response.status).toBe(200);
+      expect(mocks.ticketUpdate.mock.calls.at(-1)![0].data).toMatchObject({ status: "IN_PROGRESS", resolvedAt: null });
+    });
+
+    it("still stamps closedAt and keeps resolvedAt on RESOLVED → CLOSED", async () => {
+      mocks.ticketFindFirst.mockResolvedValue(resolvedTicket());
+      const response = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(admin)).send({ status: "CLOSED" });
+      expect(response.status).toBe(200);
+      const data = mocks.ticketUpdate.mock.calls.at(-1)![0].data;
+      expect(data).toMatchObject({ status: "CLOSED", closedAt: expect.any(Date) });
+      expect(data).not.toHaveProperty("resolvedAt");
+    });
+
+    it("does not write resolvedAt or emit on a no-op IN_PROGRESS PATCH", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ ...current, status: TicketStatus.IN_PROGRESS, assignedAgentId: agent.id });
+      await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(agent)).send({ status: "IN_PROGRESS" });
+      const data = mocks.ticketUpdate.mock.calls.at(-1)?.[0].data ?? {};
+      expect(data).not.toHaveProperty("resolvedAt");
+      expect(emitUpdatedMock).not.toHaveBeenCalled();
+    });
+
+    it("leaves first-response fields untouched on reopen", async () => {
+      mocks.ticketFindFirst.mockResolvedValue(resolvedTicket());
+      await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(admin)).send({ status: "IN_PROGRESS" });
+      const data = mocks.ticketUpdate.mock.calls.at(-1)![0].data;
+      expect(data).not.toHaveProperty("firstRespondedAt");
+      expect(data).not.toHaveProperty("firstResponseDueAt");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // OD-1 / TK-002 — reopened ticket re-enters live SLA evaluation
+  // -------------------------------------------------------------------------
+  describe("reopened ticket SLA regression (OD-1)", () => {
+    const detail = (overrides: Record<string, unknown>) => ({
+      ...summary, description: "Issue", resolvedAt: null, closedAt: null,
+      history: [], department: null, branch: null, messages: [], notes: [],
+      firstResponseDueAt: null, firstRespondedAt: new Date("2026-08-20T00:00:00.000Z"),
+      ...overrides,
+    });
+
+    it("derives BREACHED (not MET) for a reopened ticket past its retained resolutionDueAt", async () => {
+      mocks.ticketFindFirst.mockResolvedValue(detail({ status: TicketStatus.IN_PROGRESS, resolutionDueAt: new Date("2000-01-01T00:00:00.000Z") }));
+      const response = await request(app).get("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(admin));
+      expect(response.status).toBe(200);
+      expect(response.body.data).toMatchObject({ slaState: "BREACHED", effectiveSlaTarget: "RESOLUTION" });
+      expect(response.body.data.effectiveSlaDueAt).not.toBeNull();
+    });
+
+    it("derives ON_TRACK for a reopened ticket whose retained resolutionDueAt is well in the future", async () => {
+      mocks.ticketFindFirst.mockResolvedValue(detail({ status: TicketStatus.IN_PROGRESS, resolutionDueAt: new Date("2099-01-01T00:00:00.000Z") }));
+      const response = await request(app).get("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(admin));
+      expect(response.body.data.slaState).toBe("ON_TRACK");
+    });
+
+    it("sla=breached where fragment targets unresolved tickets (resolvedAt: null) so a reopened ticket qualifies", async () => {
+      await request(app).get("/api/tickets?sla=breached").set(auth(admin));
+      const fragment = JSON.stringify(mocks.ticketFindMany.mock.calls.at(-1)?.[0].where.AND);
+      expect(fragment).toContain('"resolvedAt":null');
+      expect(fragment).toContain('"closedAt":null');
+      expect(fragment).toContain("resolutionDueAt");
+    });
+
+    it("OD-5 guard: a WAITING_CUSTOMER ticket past its resolutionDueAt still derives BREACHED (SLA clock never pauses)", async () => {
+      mocks.ticketFindFirst.mockResolvedValue(detail({ status: TicketStatus.WAITING_CUSTOMER, resolutionDueAt: new Date("2000-01-01T00:00:00.000Z") }));
+      const response = await request(app).get("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(admin));
+      expect(response.body.data).toMatchObject({ slaState: "BREACHED", effectiveSlaTarget: "RESOLUTION" });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // MS-04 — CLOSED tickets are fully immutable (metadata + workflow + routing).
+  // MS-03 already closed the conversation paths; this extends the same
+  // 409 TICKET_CLOSED guard to `updateTicket` / `selfAssignTicket` while leaving
+  // every read untouched.
+  // -------------------------------------------------------------------------
+  describe("MS-04 — CLOSED tickets are fully immutable", () => {
+    const closed = (overrides: Record<string, unknown> = {}) => ({
+      ...current, status: TicketStatus.CLOSED, ...overrides,
+    });
+
+    it.each([
+      ["status", { status: "IN_PROGRESS" }],
+      ["priority", { priority: "URGENT" }],
+      ["category", { categoryId: "cdec480321f4d7a8c2c91bcb3" }],
+      ["assignee", { assignedAgentId: "cc3544aa158a89417843d45b3" }],
+      ["subject", { subject: "Reopened topic" }],
+      ["description", { description: "Changed" }],
+      ["department routing", { departmentId: "cdept00000000000000000001" }],
+      ["team routing", { teamId: "cteambbbbbbbbbbbbbbbbbbbb2" }],
+    ])("rejects a CLOSED %s mutation with 409 TICKET_CLOSED and writes nothing", async (_label, body) => {
+      mocks.ticketFindFirst.mockResolvedValue(closed());
+      const response = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(admin)).send(body);
+      expect(response.status).toBe(409);
+      expect(response.body.error.code).toBe("TICKET_CLOSED");
+      expect(mocks.ticketUpdate).not.toHaveBeenCalled();
+      expect(mocks.historyCreateMany).not.toHaveBeenCalled();
+      expect(mocks.auditCreate).not.toHaveBeenCalled();
+      expect(emitUpdatedMock).not.toHaveBeenCalled();
+    });
+
+    it("rejects an AGENT self-claim on a CLOSED ticket with 409 TICKET_CLOSED (no updateMany)", async () => {
+      mocks.ticketFindFirst.mockResolvedValue(closed({ assignedAgentId: null }));
+      const response = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(agent)).send({ assignedAgentId: agent.id });
+      expect(response.status).toBe(409);
+      expect(response.body.error.code).toBe("TICKET_CLOSED");
+      expect(mocks.ticketUpdateMany).not.toHaveBeenCalled();
+      expect(emitUpdatedMock).not.toHaveBeenCalled();
+    });
+
+    it("does not leak INVALID_STATUS_TRANSITION for a CLOSED source — the canonical code is TICKET_CLOSED", async () => {
+      mocks.ticketFindFirst.mockResolvedValue(closed());
+      const response = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(admin)).send({ status: "OPEN" });
+      expect(response.status).toBe(409);
+      expect(response.body.error.code).toBe("TICKET_CLOSED");
+    });
+
+    it("still serves the full CLOSED ticket detail — history, SLA snapshot, and conversation all readable", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({
+        ...summary, status: TicketStatus.CLOSED, description: "Issue", resolvedAt: now, closedAt: now,
+        resolutionDueAt: new Date("2000-01-01T00:00:00.000Z"),
+        department: null, branch: null,
+        history: [{ id: "h1", action: "STATUS_CHANGED", oldValue: "RESOLVED", newValue: "CLOSED", createdAt: now, actor: { id: admin.id, name: "Admin", role: Role.ADMIN } }],
+        messages: [{ id: "m1", body: "Public", createdAt: now, author: { id: agent.id, name: "Agent", role: Role.AGENT } }],
+        notes: [{ id: "n1", body: "Private", createdAt: now, author: { id: admin.id, name: "Admin", role: Role.ADMIN } }],
+      });
+      const response = await request(app).get("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(admin));
+      expect(response.status).toBe(200);
+      expect(response.body.data.status).toBe("CLOSED");
+      expect(response.body.data.history).toHaveLength(1);
+      expect(response.body.data.conversation.map((item: { kind: string }) => item.kind)).toEqual(["INTERNAL_NOTE", "PUBLIC_MESSAGE"]);
+      expect(response.body.data.slaState).toBe("MET"); // terminal ticket — read-side derivation unchanged
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // OD-2 / TK-003 + TK-004 — TICKET_ROUTING_CHANGED AuditLog
+  // (audit-log READ RBAC — ADMIN only, others 403 — is covered in audit-log.test.ts)
+  // -------------------------------------------------------------------------
+  describe("routing AuditLog (OD-2)", () => {
+    const TEAM_B = "cteambbbbbbbbbbbbbbbbbbbb2";
+    const routingAuditCalls = () => mocks.auditCreate.mock.calls.filter(([arg]) => arg.data.action === "TICKET_ROUTING_CHANGED");
+
+    beforeEach(() => {
+      mocks.teamFindUnique.mockResolvedValue({ id: TEAM_B, name: "Team B", isActive: true, departmentId: null });
+    });
+
+    it("writes exactly one routing row with id-only {from,to} when teamId changes", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ ...current, teamId: TEAM_A });
+      const response = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(admin)).send({ teamId: TEAM_B });
+      expect(response.status).toBe(200);
+      expect(routingAuditCalls()).toHaveLength(1);
+      const { data } = routingAuditCalls()[0][0];
+      expect(data).toMatchObject({ action: "TICKET_ROUTING_CHANGED", entityType: "TICKET", entityId: "c737ce60fccf9da889f4605c0" });
+      expect(data.metadata.changes).toEqual({ teamId: { from: TEAM_A, to: TEAM_B } });
+    });
+
+    it("combines departmentId + branchId into a single routing row", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ ...current, teamId: null, departmentId: null, branchId: null });
+      mocks.departmentFind.mockResolvedValue({ id: "cdep000000000000000000001", branchId: "cbr0000000000000000000001" });
+      mocks.branchFind.mockResolvedValue({ id: "cbr0000000000000000000001" });
+      const response = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(admin)).send({ departmentId: "cdep000000000000000000001", branchId: "cbr0000000000000000000001" });
+      expect(response.status).toBe(200);
+      expect(routingAuditCalls()).toHaveLength(1);
+      expect(routingAuditCalls()[0][0].data.metadata.changes).toEqual({
+        departmentId: { from: null, to: "cdep000000000000000000001" },
+        branchId: { from: null, to: "cbr0000000000000000000001" },
+      });
+    });
+
+    it("records team adoption (unrouted ticket → assignee's team) as a routing row", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ ...current, teamId: null });
+      mocks.userFindFirst.mockResolvedValue({ id: agent.id, name: "Agent", teamId: TEAM_A });
+      mocks.ticketUpdate.mockResolvedValue(summary);
+      const response = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(admin)).send({ assignedAgentId: agent.id });
+      expect(response.status).toBe(200);
+      expect(routingAuditCalls()).toHaveLength(1);
+      expect(routingAuditCalls()[0][0].data.metadata.changes).toEqual({ teamId: { from: null, to: TEAM_A } });
+    });
+
+    it("writes no routing row for a no-op (teamId submitted unchanged)", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ ...current, teamId: TEAM_A });
+      await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(admin)).send({ teamId: TEAM_A });
+      expect(routingAuditCalls()).toHaveLength(0);
+    });
+
+    it("writes no routing row on a rejected routing PATCH (invalid team, AGENT sending teamId)", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ ...current, teamId: TEAM_A });
+      mocks.teamFindUnique.mockResolvedValue(null);
+      const invalid = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(admin)).send({ teamId: "cbadteam00000000000000001" });
+      expect(invalid.status).toBe(400);
+      expect(invalid.body.error.code).toBe("INVALID_TEAM");
+      expect(routingAuditCalls()).toHaveLength(0);
+
+      const forbidden = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(agent)).send({ teamId: TEAM_B });
+      expect(forbidden.status).toBe(403);
+      expect(routingAuditCalls()).toHaveLength(0);
+    });
+
+    it("writes a routing row AND a TICKET_STATUS_CHANGED row when teamId and status change together", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ ...current, status: TicketStatus.OPEN, teamId: TEAM_A });
+      const response = await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(admin)).send({ teamId: TEAM_B, status: "IN_PROGRESS" });
+      expect(response.status).toBe(200);
+      expect(routingAuditCalls()).toHaveLength(1);
+      expect(mocks.auditCreate.mock.calls.filter(([a]) => a.data.action === "TICKET_STATUS_CHANGED")).toHaveLength(1);
+    });
+
+    it("routing row metadata carries only actorType + id-valued changes (no subject / description / names)", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ ...current, teamId: TEAM_A, subject: "Sensitive subject", description: "Sensitive body" });
+      await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(admin)).send({ teamId: TEAM_B });
+      const meta = routingAuditCalls()[0][0].data.metadata;
+      expect(Object.keys(meta).sort()).toEqual(["actorType", "changes"]);
+      expect(JSON.stringify(meta)).not.toMatch(/Sensitive|subject|description/i);
+    });
+
+    it("emits exactly one ticket.updated for a pure re-route (teamId in the changed set)", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ ...current, teamId: TEAM_A });
+      await request(app).patch("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(admin)).send({ teamId: TEAM_B });
+      expect(emitUpdatedMock).toHaveBeenCalledTimes(1);
+      expect(emitUpdatedMock).toHaveBeenCalledWith(expect.objectContaining({ ticketId: "c737ce60fccf9da889f4605c0" }));
+    });
   });
 
   it("rejects NEW status as invalid value", async () => {

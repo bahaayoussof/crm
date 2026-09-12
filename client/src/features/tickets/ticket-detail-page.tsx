@@ -17,7 +17,7 @@ import { useTicket, useUpdateTicket } from "./ticket-hooks";
 import { TicketSidebar } from "./ticket-sidebar";
 import { TicketWorkspaceTabs, type TicketWorkspaceHandle } from "./ticket-workspace-tabs";
 import { TicketPage, TicketState } from "./ticket-ui";
-import { canCloseTicket, canManageTicketDefinition, canOperateAssignedTicket, canSelfAssignTicket } from "./ticket-permissions";
+import { canCloseTicket, canManageTicketNow, canMutateTicketConversation, canMutateTicketWorkflow, canSelfAssignTicket } from "./ticket-permissions";
 
 export function TicketDetailPage() {
   const { t, i18n } = useTranslation();
@@ -73,8 +73,13 @@ export function TicketDetailPage() {
   }
 
   const record = ticket.data;
-  const canManage = Boolean(user && canManageTicketDefinition(user.role));
-  const canWorkflow = Boolean(user && canOperateAssignedTicket(record, user));
+  // MS-03 / MS-04: CLOSED tickets are viewable but fully immutable — every
+  // mutation control (edit link, metadata selects, workflow, composer, AI
+  // category apply) is gated off even for a user who could otherwise act.
+  const isClosed = record.status === "CLOSED";
+  const canManage = Boolean(user && canManageTicketNow(record, user));
+  const canWorkflow = Boolean(user && canMutateTicketWorkflow(record, user));
+  const canConverse = Boolean(user && canMutateTicketConversation(record, user));
   const canClose = Boolean(user && canCloseTicket(record, user));
   const canSelfAssign = Boolean(user && canSelfAssignTicket(record, user));
 
@@ -134,7 +139,8 @@ export function TicketDetailPage() {
             ref={workspaceRef}
             className="lg:shrink-0"
             ticketId={record.id}
-            canMutate={canWorkflow}
+            canMutate={canConverse}
+            closed={isClosed}
             channel={record.channel}
             customerPhone={record.customer.phone}
             attachments={ticketLevelAttachments}

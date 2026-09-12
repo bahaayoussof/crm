@@ -119,6 +119,15 @@ function RadixSelect<TValue extends string = string>({
 
   const handleValueChange = React.useCallback(
     (nextVal: string) => {
+      // Guard against a spurious Radix Select callback: its hidden native
+      // <select> (kept in sync for form/autofill compatibility) can bubble a
+      // raw-empty-string "change" event of its own on a rapid controlled
+      // value transition (e.g. a programmatic `reset()` during edit-form
+      // hydration), racing in right after the real value has just rendered.
+      // Every SelectItem we render is keyed through `toInternalValue`, so a
+      // real empty selection always arrives as EMPTY_SENTINEL, never raw ""
+      // — a raw "" is therefore never a genuine option and is safe to drop.
+      if (nextVal === "") return;
       onValueChange?.(fromInternalValue<TValue>(nextVal));
     },
     [onValueChange]

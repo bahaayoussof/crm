@@ -183,6 +183,16 @@ describe("realtime authorization (canReceive)", () => {
     expect(canReceive(sub("cu", Role.CUSTOMER, "cust-9"), own)).toBe(false);
   });
 
+  it("OD-3: a portal-create ticket.updated (unrouted, unassigned) reaches ADMIN only (+ owning customer's own refetch)", () => {
+    // portal.service.createTicket emits { assignedAgentId: null, teamId: null, customerId }.
+    const portalCreate = ticketAudience(null, { customerId: "cust-1", teamId: null });
+    expect(canReceive(sub("a", Role.ADMIN), portalCreate)).toBe(true);
+    expect(canReceive(sub("m", Role.MANAGER, null, "team-a"), portalCreate)).toBe(false);
+    expect(canReceive(sub("ag", Role.AGENT, null, "team-a"), portalCreate)).toBe(false);
+    expect(canReceive(sub("cu", Role.CUSTOMER, "cust-2"), portalCreate)).toBe(false);
+    expect(canReceive(sub("cu", Role.CUSTOMER, "cust-1"), portalCreate)).toBe(true);
+  });
+
   it("publish routes a ticket event past an unauthorized AGENT", () => {
     const admin = fakeResponse();
     const wrongAgent = fakeResponse();

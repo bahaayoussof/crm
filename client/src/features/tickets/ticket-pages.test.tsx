@@ -109,6 +109,7 @@ describe("ticket pages", () => {
     ["/tickets?search=missing-id", "No tickets found for “missing-id”."],
     ["/tickets?status=WAITING_CUSTOMER", "No tickets with status “Waiting for customer”."],
     ["/tickets?priority=URGENT", "No tickets with priority “Urgent”."],
+    ["/tickets?channel=EMAIL", "No tickets on channel “Email”."],
     ["/tickets?categoryId=category-1", "No tickets in category “Billing”."],
     ["/tickets?assignedAgentId=agent-1", "No tickets assigned to “Mariam Hassan”."],
     ["/tickets?status=OPEN&priority=URGENT", "No tickets match the current filters."],
@@ -135,6 +136,35 @@ describe("ticket pages", () => {
     fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
     await waitFor(() => expect(mocks.useTickets).toHaveBeenLastCalledWith(expect.objectContaining({ search: "", status: undefined })));
     expect(screen.getByRole("searchbox")).toHaveValue("");
+  });
+
+  // OD-4 / TK-007 — canonical channel filter
+  it("selects a channel and serializes it into the query key / request params and the URL", async () => {
+    renderAt("/tickets", <Route path="/tickets" element={<TicketListPage />} />);
+    fireEvent.click(screen.getByRole("button", { name: "Filter options" }));
+    const channelTrigger = screen.getByRole("combobox", { name: "Channel" });
+    fireEvent.keyDown(channelTrigger, { key: "ArrowDown" });
+    await waitFor(() => expect(screen.getByRole("option", { name: "WhatsApp" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("option", { name: "WhatsApp" }));
+    await waitFor(() => expect(mocks.useTickets).toHaveBeenLastCalledWith(expect.objectContaining({ channel: "WHATSAPP" })));
+  });
+
+  it("reads an initial channel filter from the URL search params", async () => {
+    renderAt("/tickets?channel=EMAIL", <Route path="/tickets" element={<TicketListPage />} />);
+    await waitFor(() => expect(mocks.useTickets).toHaveBeenLastCalledWith(expect.objectContaining({ channel: "EMAIL" })));
+  });
+
+  it("combines the channel filter with another filter and clears it via Clear filters", async () => {
+    renderAt("/tickets?status=OPEN&channel=SMS", <Route path="/tickets" element={<TicketListPage />} />);
+    await waitFor(() => expect(mocks.useTickets).toHaveBeenLastCalledWith(expect.objectContaining({ status: "OPEN", channel: "SMS" })));
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    await waitFor(() => expect(mocks.useTickets).toHaveBeenLastCalledWith(expect.objectContaining({ status: undefined, channel: undefined })));
+  });
+
+  it("localizes the channel-filtered empty state in Arabic", async () => {
+    await changeAppLanguage("ar");
+    renderAt("/tickets?channel=WHATSAPP", <Route path="/tickets" element={<TicketListPage />} />);
+    expect(screen.getAllByText("لا توجد تذاكر على القناة «واتساب».")).toHaveLength(2);
   });
 
   it("uses TanStack Table with server pagination", async () => {
@@ -264,6 +294,142 @@ describe("ticket pages", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create ticket" }));
     await waitFor(() => expect(mocks.create).toHaveBeenCalled());
     expect(mocks.create.mock.calls[0][0]).not.toHaveProperty("assignedAgentId"); expect(await screen.findByText("Agent ticket detail")).toBeInTheDocument();
+  });
+
+  // Manual-smoke follow-up (Tickets SDD): reclassifying a ticket invalidates the
+  // current assignee — a Category change must clear the loaded assignee in the
+  // edit form (the submit then sends assignedAgentId: null via `values.x || null`).
+  it("clears the assignee to Unassigned on Category change when editing an already-assigned ticket", async () => {
+    mocks.departments = [{ id: "dep-1", name: "Customer Support", branchId: "b1" }];
+    mocks.teams = [{ id: "team-1", name: "Billing Support", departmentId: "dep-1", managerId: null }];
+    mocks.useCategories.mockReturnValue({ data: [
+      { id: "category-1", name: "Billing" },
+      { id: "category-2", name: "Technical" },
+    ] });
+    mocks.useAgents.mockReturnValue({ data: [
+      { id: "agent-1", name: "Mariam Hassan", email: "mariam@example.com", teamId: "team-1" },
+    ] });
+    // Routed, already-assigned ticket (exercises the MS-01 team-scoped path too).
+    mocks.useTicket.mockReturnValue({
+      isLoading: false, isError: false,
+      data: { ...ticket, department: { id: "dep-1", name: "Customer Support" }, team: { id: "team-1", name: "Billing Support", departmentId: "dep-1" } },
+    });
+    renderAt(`/tickets/${ticket.id}/edit`, <><Route path="/tickets/:id/edit" element={<TicketFormPage />} /><Route path="/tickets/:id" element={<p>Ticket detail</p>} /></>);
+
+    // The loaded assignee hydrates into the form.
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Assigned agent" })).toHaveTextContent("Mariam Hassan"),
+    );
+
+    const categoryTrigger = screen.getByRole("combobox", { name: "Category" });
+    fireEvent.keyDown(categoryTrigger, { key: "ArrowDown" });
+    await waitFor(() => expect(screen.getByRole("option", { name: "Technical" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("option", { name: "Technical" }));
+
+    // Reclassification clears the stale assignee.
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Assigned agent" })).toHaveTextContent("Unassigned"),
+    );
+    expect(screen.getByRole("combobox", { name: "Category" })).toHaveTextContent("Technical");
+  });
+
+  // MS-05 — editing an OPEN ticket must persist. Regression: the edit form
+  // re-ran reset() on every `ticket.data` reference change. The detail payload
+  // carries time-derived SLA fields, so a background refetch / realtime
+  // invalidation re-hydrated the form mid-edit and wiped the user's unsaved
+  // change, so Save then submitted the stale server values.
+  it("keeps the user's edit when ticket.data refetches with only a fresher SLA state", async () => {
+    mocks.update.mockResolvedValue(listTicket);
+    mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: ticket });
+    const { rerender } = renderAt(`/tickets/${ticket.id}/edit`, <><Route path="/tickets/:id/edit" element={<TicketFormPage />} /><Route path="/tickets/:id" element={<p>Ticket detail</p>} /></>);
+
+    const subject = await screen.findByLabelText("Subject");
+    await waitFor(() => expect(subject).toHaveValue("Payment failed"));
+    fireEvent.change(subject, { target: { value: "Payment failed — escalated" } });
+
+    // new object, same editable fields, fresher derived SLA — the form must NOT
+    // re-hydrate and wipe the pending change.
+    mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: { ...ticket, slaState: "AT_RISK", effectiveSlaDueAt: "2026-08-25T12:00:00.000Z" } });
+    rerender(<MemoryRouter initialEntries={[`/tickets/${ticket.id}/edit`]}><Routes><Route path="/tickets/:id/edit" element={<TicketFormPage />} /><Route path="/tickets/:id" element={<p>Ticket detail</p>} /></Routes></MemoryRouter>);
+
+    expect(screen.getByLabelText("Subject")).toHaveValue("Payment failed — escalated");
+  });
+
+  it("still re-hydrates the edit form when the ticket's own fields change on refetch", async () => {
+    mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: ticket });
+    const { rerender } = renderAt(`/tickets/${ticket.id}/edit`, <><Route path="/tickets/:id/edit" element={<TicketFormPage />} /><Route path="/tickets/:id" element={<p>Ticket detail</p>} /></>);
+    await waitFor(() => expect(screen.getByLabelText("Subject")).toHaveValue("Payment failed"));
+
+    mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: { ...ticket, subject: "Payment failed (renamed upstream)" } });
+    rerender(<MemoryRouter initialEntries={[`/tickets/${ticket.id}/edit`]}><Routes><Route path="/tickets/:id/edit" element={<TicketFormPage />} /><Route path="/tickets/:id" element={<p>Ticket detail</p>} /></Routes></MemoryRouter>);
+
+    await waitFor(() => expect(screen.getByLabelText("Subject")).toHaveValue("Payment failed (renamed upstream)"));
+  });
+
+  // Manual-smoke regression: opening an existing ticket's edit form sometimes
+  // showed Priority/Category empty. Unlike the other MS-05 tests above, this
+  // reproduces the REAL sequence — useTicket starts in its loading state (no
+  // `data` yet, as it is on every fresh navigation) and only resolves after
+  // the first render, instead of already having `data` at mount.
+  // Manual-smoke regression: opening an existing ticket's edit form sometimes
+  // showed Priority/Category empty. Root cause: Radix Select's hidden native
+  // <select> mirror (kept in sync for form/autofill) fires a spurious
+  // raw-empty-string onValueChange of its own right after a controlled value
+  // races in from `reset()` during hydration, silently wiping the field back
+  // to empty in the DOM even though RHF's own state holds the right value.
+  it("hydrates Priority and Category on the first load of an existing ticket (not only on refetch)", async () => {
+    mocks.useTicket.mockReturnValue({ isLoading: true, isError: false, data: undefined });
+    const { rerender } = renderAt(`/tickets/${ticket.id}/edit`, <><Route path="/tickets/:id/edit" element={<TicketFormPage />} /><Route path="/tickets/:id" element={<p>Ticket detail</p>} /></>);
+
+    mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: ticket });
+    rerender(<MemoryRouter initialEntries={[`/tickets/${ticket.id}/edit`]}><Routes><Route path="/tickets/:id/edit" element={<TicketFormPage />} /><Route path="/tickets/:id" element={<p>Ticket detail</p>} /></Routes></MemoryRouter>);
+
+    await waitFor(() => expect(screen.getByLabelText("Subject")).toHaveValue("Payment failed"));
+    expect(screen.getByRole("combobox", { name: "Priority" })).toHaveTextContent("High");
+    expect(screen.getByRole("combobox", { name: "Category" })).toHaveTextContent("Billing");
+  });
+
+  // Manual-smoke MS-07: clicking Save on the edit form silently did nothing.
+  // Root cause — the MS-05/MS-06 hydration `reset()` never included `channel`
+  // (it's create-only UI, never rendered or submitted on edit), so RHF reset
+  // it to `undefined`; the shared zod schema required `channel` to be one of
+  // the create-only enum values, so validation failed on every edit-form
+  // submit with no visible error (the Channel field, and its error, only
+  // render when `!editing`) — handleSubmit's invalid branch just returned.
+  it("saves an edited ticket on Save click (MS-07 — edit Save was a silent no-op)", async () => {
+    mocks.update.mockResolvedValue(listTicket);
+    renderAt(`/tickets/${ticket.id}/edit`, <><Route path="/tickets/:id/edit" element={<TicketFormPage />} /><Route path="/tickets/:id" element={<p>Ticket detail</p>} /></>);
+    await waitFor(() => expect(screen.getByLabelText("Subject")).toHaveValue("Payment failed"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
+    expect(mocks.update).toHaveBeenCalledWith({
+      subject: "Payment failed",
+      description: "The customer's card was rejected.",
+      priority: "HIGH",
+      categoryId: "category-1",
+      assignedAgentId: "agent-1",
+      departmentId: null,
+      teamId: null,
+    });
+    expect(await screen.findByText("Ticket detail")).toBeInTheDocument();
+  });
+
+  // Same silent-no-op failure mode, but for a ticket created on a channel the
+  // edit form's Channel <select> never offers (LIVE_CHAT). Guards the schema
+  // fix specifically: `channel` must validate against every TicketChannel,
+  // not just the create-only subset, since edit hydrates the ticket's real
+  // (possibly non-create-only) channel into a field that's never shown/sent.
+  it("saves an edited LIVE_CHAT ticket on Save click", async () => {
+    mocks.update.mockResolvedValue(listTicket);
+    mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: { ...ticket, channel: "LIVE_CHAT" } });
+    renderAt(`/tickets/${ticket.id}/edit`, <><Route path="/tickets/:id/edit" element={<TicketFormPage />} /><Route path="/tickets/:id" element={<p>Ticket detail</p>} /></>);
+    await waitFor(() => expect(screen.getByLabelText("Subject")).toHaveValue("Payment failed"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
   });
 
   it("renders details and localized operational history", () => {
