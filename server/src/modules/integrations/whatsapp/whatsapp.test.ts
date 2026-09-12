@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   watcherFindMany: vi.fn(),
   transaction: vi.fn(),
   sendTextMessage: vi.fn(),
+  auditCreate: vi.fn(),
 }));
 
 vi.mock("../../../config/prisma.js", () => {
@@ -35,6 +36,7 @@ vi.mock("../../../config/prisma.js", () => {
     ticketWatcher: { findMany: mocks.watcherFindMany },
     slaRule: { findFirst: mocks.slaFindFirst },
     notification: { createMany: mocks.notificationCreateMany },
+    auditLog: { create: mocks.auditCreate },
     $transaction: mocks.transaction,
   };
   return { prisma: client };
@@ -128,6 +130,7 @@ describe("WhatsApp integration", () => {
             ticketWatcher: { findMany: mocks.watcherFindMany },
             slaRule: { findFirst: mocks.slaFindFirst },
             notification: { createMany: mocks.notificationCreateMany },
+            auditLog: { create: mocks.auditCreate },
           })
         : Promise.all(arg as Promise<unknown>[]),
     );
@@ -149,6 +152,7 @@ describe("WhatsApp integration", () => {
     mocks.notificationCreateMany.mockResolvedValue({ count: 1 });
     mocks.watcherFindMany.mockResolvedValue([]);
     mocks.sendTextMessage.mockResolvedValue({ messageId: "wamid.OUT1" });
+    mocks.auditCreate.mockResolvedValue({});
   });
 
   // ---------------------------------------------------------------------------
@@ -246,6 +250,15 @@ describe("WhatsApp integration", () => {
       expect(emitMessageMock).toHaveBeenCalledWith(
         expect.objectContaining({ ticketId: "cd3448751688c18a75abee51f", visibility: "public" }),
       );
+      expect(mocks.auditCreate).toHaveBeenCalledTimes(1);
+      expect(mocks.auditCreate).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          actorId: null,
+          action: "CUSTOMER_CREATED",
+          entityType: "CUSTOMER",
+          entityId: "cust-new",
+        }),
+      }));
     });
 
     it("does not emit ticket.message.created for a duplicate inbound webhook", async () => {
@@ -271,6 +284,15 @@ describe("WhatsApp integration", () => {
       expect(mocks.ticketCreate).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ customerId: "c5961965bf33677e0488514c4" }) }),
       );
+      expect(mocks.auditCreate).not.toHaveBeenCalled();
+    });
+
+    it("matches an existing customer by placeholder email without auditing", async () => {
+      mocks.customerFindUnique.mockResolvedValue({ id: "c5961965bf33677e0488514c4" });
+      const res = await send(textPayload());
+      expect(res.status).toBe(200);
+      expect(mocks.customerCreate).not.toHaveBeenCalled();
+      expect(mocks.auditCreate).not.toHaveBeenCalled();
     });
 
     it("appends to an existing active WhatsApp ticket instead of creating one", async () => {

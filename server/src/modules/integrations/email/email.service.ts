@@ -3,6 +3,8 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { Channel, Prisma, Role, TicketPriority, TicketStatus } from "@prisma/client";
 import { prisma } from "../../../config/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
+import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../../audit-logs/audit-log.constants.js";
+import { createAuditLog } from "../../audit-logs/audit-log.service.js";
 import { emailSchema } from "../../../shared/validation/common.schema.js";
 import { replyHtmlToPlainText, sanitizeReplyHtml } from "../../../shared/rich-text/reply-html.js";
 import { createNotifications } from "../../notifications/notification.service.js";
@@ -99,7 +101,15 @@ async function matchOrCreateCustomer(tx: Prisma.TransactionClient, email: string
     select: { id: true },
   });
   if (existing) return existing;
-  return tx.customer.create({ data: { name, email }, select: { id: true } });
+  const created = await tx.customer.create({ data: { name, email }, select: { id: true } });
+  await createAuditLog({
+    actorId: null,
+    action: AUDIT_ACTIONS.CUSTOMER_CREATED,
+    entityType: AUDIT_ENTITY_TYPES.CUSTOMER,
+    entityId: created.id,
+    changes: { name: { to: name }, email: { to: email } },
+  }, tx);
+  return created;
 }
 
 async function createEmailTicket(

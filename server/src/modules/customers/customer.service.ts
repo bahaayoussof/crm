@@ -120,7 +120,7 @@ export async function listCustomerTickets(customerId: string, query: CustomerTic
 }
 
 export async function createCustomer(input: CreateCustomerInput, actorId: string, requestContext?: AuditRequestContext) {
-  const existing = await prisma.customer.findUnique({ where: { email: input.email }, select: { id: true } });
+  const existing = await prisma.customer.findFirst({ where: { email: { equals: input.email, mode: "insensitive" } }, select: { id: true } });
   if (existing) throw duplicateEmailError();
 
   try {
@@ -132,6 +132,11 @@ export async function createCustomer(input: CreateCustomerInput, actorId: string
 }
 
 export async function updateCustomer(customerId: string, input: UpdateCustomerInput, actorId: string, requestContext?: AuditRequestContext) {
+  if (input.email !== undefined) {
+    const existing = await prisma.customer.findFirst({ where: { email: { equals: input.email, mode: "insensitive" }, NOT: { id: customerId } }, select: { id: true } });
+    if (existing) throw duplicateEmailError();
+  }
+
   try {
     return await prisma.$transaction(async (tx) => { const before = await tx.customer.findUnique({ where: { id: customerId }, select: { name: true, email: true, phone: true } }); if (!before) throw new AppError(404, "CUSTOMER_NOT_FOUND", "Customer not found"); const customer = await tx.customer.update({ where: { id: customerId }, data: input, select: { id: true, name: true, email: true, phone: true, createdAt: true, updatedAt: true } }); const changes = changedFields(before, customer, ["name", "email", "phone"]); if (Object.keys(changes).length) await createAuditLog({ actorId, action: AUDIT_ACTIONS.CUSTOMER_UPDATED, entityType: AUDIT_ENTITY_TYPES.CUSTOMER, entityId: customerId, changes, requestContext }, tx); return customer; });
   } catch (error) {

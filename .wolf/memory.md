@@ -1,5 +1,6 @@
 # Memory
 
+| now | Created Customers SDD plan.md + tasks.md scoped to DG-1 (inbound email/sms/whatsapp customer-create audit gap) + DG-2 (case-insensitive email uniqueness gap); no code touched | specs/features/customers/plan.md, specs/features/customers/tasks.md, .wolf/STATUS.md | plan READY FOR TASKS, tasks READY FOR IMPLEMENTATION | ~9000 |
 | 11:10 | Implemented isolated customer AI chatbot, Portal UI, KB grounding, canonical handoff, tests and docs | customer-ai modules, portal routes/nav/i18n, docs | automated gates green; unstaged | ~12000 |
 | 16:50 | MS-07: found + fixed edit-form Save silent no-op (channel reset to undefined, required schema field with no UI) | client/src/features/tickets/ticket-form-page.tsx, ticket.schemas.ts, ticket.types.ts, ticket-pages.test.tsx | tsc/eslint/vitest all green, 2 new regression tests | ~9000 |
 
@@ -1204,3 +1205,41 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
+
+## Session: 2026-09-12 16:59
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-12 19:02
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-12 19:03
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 19:05 | CUST-001: case-insensitive email pre-check (createCustomer findFirst; updateCustomer new pre-check with NOT self-exclusion) | server/src/modules/customers/customer.service.ts | tsc+lint clean; suite temporarily red (mock lacked findFirst) | ~4k |
+| 19:06 | CUST-002: added findFirstCustomer mock + case-insensitive/self-exclusion regression tests | server/src/modules/customers/customer.test.ts | 29/29 pass | ~3k |
+| 19:08 | CUST-003: audit CUSTOMER_CREATED in email matchOrCreateCustomer create branch | server/src/modules/integrations/email/email.service.ts | tsc+lint clean; email.test.ts red pending CUST-006 mock | ~2k |
+| 19:09 | CUST-004: audit in SMS inline create branch + new prisma-mock scaffolding for processInboundSms | server/src/modules/integrations/sms/{sms.service,sms.test}.ts | 11/11 pass | ~5k |
+| 19:12 | CUST-005: audit in WhatsApp matchOrCreateCustomer final create branch | server/src/modules/integrations/whatsapp/whatsapp.service.ts | tsc+lint clean | ~2k |
+| 19:13 | CUST-006: added auditLog mock + create/no-audit assertions to email.test.ts and whatsapp.test.ts (SMS covered in CUST-004) | server/src/modules/integrations/{email,whatsapp}/*.test.ts | integrations suite 74/74 pass | ~4k |
+| 19:15 | CUST-007: reconciled DG-1/DG-2 as implemented, updated Current Tests + mutation-paths table, bumped Feature Status | specs/features/customers/spec.md, plan.md, tasks.md | markdown only, no code | ~3k |
+| 19:16 | CUST-008: full verification — tsc, lint, customers+integrations+audit-logs suites (108 tests), tsc build-mode clean; `npm run build`'s prisma generate hit a Windows EPERM file-lock (pre-existing env issue, unrelated to code) | server/** | READY FOR HUMAN REVIEW | ~3k |
+
+## Session: 2026-09-12 19:21
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 19:44 | Killed dev `node`/`tsx` PIDs locking `query_engine-windows.dll.node`, ran `prisma generate` | server/node_modules/.prisma | Success, no schema change | ~3k |
+| 19:52 | Ran vitest for customer/email/sms/whatsapp | *.test.ts (4 files) | 83/83 passed | ~4k |
+| 20:05 | Manual smoke via one-off deleted `tsx` script against real dev DB (DG-1 x3 channels + DG-2 x2) | server/scratch-smoke.ts (deleted after run) | 8/8 PASS, cleanup verified, no prod code changed | ~10k |
+| 20:10 | Flipped status to IMPLEMENTED + VERIFIED ON SDD BRANCH, recorded evidence | specs/features/customers/{spec,tasks}.md, .wolf/STATUS.md | Done | ~3k |
+
+## Session: 2026-09-12 19:38
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 19:47 | CUST-FOLLOWUP-001: hand-authored functional unique index on LOWER(Customer.email), 0 dupes found, applied via migrate deploy, P2002 confirmed live, race-sim tests added, no service code change needed | server/prisma/migrations/20260912163955_customer_email_lower_unique, server/src/modules/customers/customer.test.ts, specs/features/customers/{spec,tasks}.md | done, 31/31 + 79/79 tests, tsc/lint/build clean | ~55k |

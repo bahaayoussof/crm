@@ -1,9 +1,9 @@
-import { Role } from "@prisma/client";
+import { Prisma, Role } from "@prisma/client";
 import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  findMany: vi.fn(), countCustomers: vi.fn(), findCustomer: vi.fn(), createCustomer: vi.fn(),
+  findMany: vi.fn(), countCustomers: vi.fn(), findCustomer: vi.fn(), findFirstCustomer: vi.fn(), createCustomer: vi.fn(),
   updateCustomer: vi.fn(), deleteCustomer: vi.fn(), transaction: vi.fn(),
   groupTickets: vi.fn(), countTickets: vi.fn(), findTickets: vi.fn(), findNotes: vi.fn(), createNote: vi.fn(), auditCreate: vi.fn(),
   userFindUnique: vi.fn(),
@@ -15,7 +15,7 @@ const TEAM_A = "cteamaaaaaaaaaaaaaaaaaaaa1";
 vi.mock("../../config/prisma.js", () => ({
   prisma: {
     customer: {
-      findMany: mocks.findMany, count: mocks.countCustomers, findUnique: mocks.findCustomer,
+      findMany: mocks.findMany, count: mocks.countCustomers, findUnique: mocks.findCustomer, findFirst: mocks.findFirstCustomer,
       create: mocks.createCustomer, update: mocks.updateCustomer, delete: mocks.deleteCustomer,
     },
     ticket: { groupBy: mocks.groupTickets, count: mocks.countTickets, findMany: mocks.findTickets },
@@ -42,6 +42,7 @@ describe("customer API", () => {
     vi.clearAllMocks();
     mocks.findMany.mockResolvedValue([]);
     mocks.countCustomers.mockResolvedValue(0);
+    mocks.findFirstCustomer.mockResolvedValue(null);
     mocks.transaction.mockImplementation(async (value: unknown) => typeof value === "function" ? (value as (tx: unknown) => unknown)({ customer: { findUnique: mocks.findCustomer, create: mocks.createCustomer, update: mocks.updateCustomer, delete: mocks.deleteCustomer }, customerNote: { create: mocks.createNote }, auditLog: { create: mocks.auditCreate } }) : Promise.all(value as Promise<unknown>[]));
     mocks.groupTickets.mockResolvedValue([]);
     mocks.countTickets.mockResolvedValue(0);
@@ -209,7 +210,7 @@ describe("customer API", () => {
   });
 
   it("creates a normalized customer without a login identity", async () => {
-    mocks.findCustomer.mockResolvedValue(null);
+    mocks.findFirstCustomer.mockResolvedValue(null);
     mocks.createCustomer.mockResolvedValue(customer);
     const response = await request(app).post("/api/customers").set(auth()).send({
       name: "  Ahmed Mohamed ", email: " AHMED@Example.com ", phone: "+14155552671",
@@ -220,13 +221,77 @@ describe("customer API", () => {
     }));
   });
 
-  it("returns a conflict for a duplicate customer email", async () => {
-    mocks.findCustomer.mockResolvedValue({ id: "existing" });
+  it("returns a conflict for a duplicate customer email, matched case-insensitively", async () => {
+    mocks.findFirstCustomer.mockResolvedValue({ id: "existing" });
     const response = await request(app).post("/api/customers").set(auth()).send({
       name: "Ahmed Mohamed", email: "ahmed@example.com",
     });
     expect(response.status).toBe(409);
     expect(response.body.error.code).toBe("CUSTOMER_EMAIL_EXISTS");
+    expect(mocks.createCustomer).not.toHaveBeenCalled();
+    expect(mocks.findFirstCustomer).toHaveBeenCalledWith(expect.objectContaining({
+      where: { email: { equals: "ahmed@example.com", mode: "insensitive" } },
+    }));
+  });
+
+  it("returns a conflict for a case-variant duplicate customer email on update", async () => {
+    mocks.findFirstCustomer.mockResolvedValue({ id: "other-customer" });
+    const response = await request(app).patch(`/api/customers/${customer.id}`).set(auth()).send({
+      email: "Ahmed@Example.com",
+    });
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe("CUSTOMER_EMAIL_EXISTS");
+    expect(mocks.updateCustomer).not.toHaveBeenCalled();
+    expect(mocks.findFirstCustomer).toHaveBeenCalledWith(expect.objectContaining({
+      where: { email: { equals: "ahmed@example.com", mode: "insensitive" }, NOT: { id: customer.id } },
+    }));
+  });
+
+  it("maps a raced case-variant duplicate email to 409 on create when the app pre-check misses it (CUST-FOLLOWUP-001)", async () => {
+    // Simulates two concurrent creates both passing the findFirst pre-check before either
+    // commits. The DB-level functional unique index on LOWER(email) is the final authority:
+    // the losing create's Prisma call rejects with P2002 (verified against the real dev
+    // Postgres index "Customer_email_lower_key", meta.target: ["lower(email)"]), and the
+    // existing P2002 catch must still map it to 409 CUSTOMER_EMAIL_EXISTS.
+    mocks.findFirstCustomer.mockResolvedValue(null);
+    mocks.createCustomer.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+        code: "P2002", clientVersion: "6", meta: { modelName: "Customer", target: ["lower(email)"] },
+      }),
+    );
+    const response = await request(app).post("/api/customers").set(auth()).send({
+      name: "Ahmed Mohamed", email: "ahmed@example.com",
+    });
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe("CUSTOMER_EMAIL_EXISTS");
+  });
+
+  it("maps a raced case-variant duplicate email to 409 on update when the app pre-check misses it (CUST-FOLLOWUP-001)", async () => {
+    mocks.findFirstCustomer.mockResolvedValue(null);
+    mocks.findCustomer.mockResolvedValue(customer);
+    mocks.updateCustomer.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+        code: "P2002", clientVersion: "6", meta: { modelName: "Customer", target: ["lower(email)"] },
+      }),
+    );
+    const response = await request(app).patch(`/api/customers/${customer.id}`).set(auth()).send({
+      email: "Ahmed@Example.com",
+    });
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe("CUSTOMER_EMAIL_EXISTS");
+  });
+
+  it("does not conflict when a customer re-submits its own email on update", async () => {
+    mocks.findFirstCustomer.mockResolvedValue(null);
+    mocks.findCustomer.mockResolvedValue(customer);
+    mocks.updateCustomer.mockResolvedValue(customer);
+    const response = await request(app).patch(`/api/customers/${customer.id}`).set(auth()).send({
+      email: "Ahmed@Example.com",
+    });
+    expect(response.status).toBe(200);
+    expect(mocks.findFirstCustomer).toHaveBeenCalledWith(expect.objectContaining({
+      where: { email: { equals: "ahmed@example.com", mode: "insensitive" }, NOT: { id: customer.id } },
+    }));
   });
 
   it("returns customer details without sensitive identity fields", async () => {

@@ -2,6 +2,49 @@ import { createHmac } from "node:crypto";
 import express from "express";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({
+  messageFindUnique: vi.fn(),
+  messageCreate: vi.fn(),
+  userFindUnique: vi.fn(),
+  userCreate: vi.fn(),
+  customerFindMany: vi.fn(),
+  customerCreate: vi.fn(),
+  ticketFindFirst: vi.fn(),
+  ticketCreate: vi.fn(),
+  historyCreate: vi.fn(),
+  slaFindFirst: vi.fn(),
+  notificationCreateMany: vi.fn(),
+  watcherFindMany: vi.fn(),
+  userFindMany: vi.fn(),
+  auditCreate: vi.fn(),
+  transaction: vi.fn(),
+}));
+
+vi.mock("../../../config/prisma.js", () => ({
+  prisma: {
+    ticketMessage: { findUnique: mocks.messageFindUnique, create: mocks.messageCreate },
+    user: { findUnique: mocks.userFindUnique, create: mocks.userCreate, findMany: mocks.userFindMany },
+    customer: { findMany: mocks.customerFindMany, create: mocks.customerCreate },
+    ticket: { findFirst: mocks.ticketFindFirst, create: mocks.ticketCreate },
+    ticketHistory: { create: mocks.historyCreate },
+    ticketWatcher: { findMany: mocks.watcherFindMany },
+    slaRule: { findFirst: mocks.slaFindFirst },
+    notification: { createMany: mocks.notificationCreateMany },
+    auditLog: { create: mocks.auditCreate },
+    $transaction: mocks.transaction,
+  },
+}));
+
+vi.mock("bcrypt", () => ({ default: { hash: vi.fn().mockResolvedValue("hashed") } }));
+vi.mock("../../realtime/realtime.publisher.js", () => ({
+  withRealtimeOutbox: (fn: () => unknown) => fn(),
+  emitTicketMessageCreated: vi.fn(),
+  emitTicketUpdated: vi.fn(),
+  emitNotificationCreated: vi.fn(),
+  emitNotificationRead: vi.fn(),
+}));
+
 import { env } from "../../../config/env.js";
 import { errorHandler } from "../../../middleware/error-handler.js";
 import { setSmsProviderForTests } from "./sms.provider.js";
@@ -21,9 +64,39 @@ const original = {
 
 describe("SMS integration", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     env.TEXTBEE_API_KEY = "test-key";
     env.TEXTBEE_DEVICE_ID = "device-1";
     env.TEXTBEE_WEBHOOK_SECRET = "webhook-test-secret";
+    mocks.transaction.mockImplementation((arg: unknown) =>
+      typeof arg === "function"
+        ? (arg as (tx: unknown) => unknown)({
+            ticketMessage: { findUnique: mocks.messageFindUnique, create: mocks.messageCreate },
+            user: { findUnique: mocks.userFindUnique, create: mocks.userCreate, findMany: mocks.userFindMany },
+            customer: { findMany: mocks.customerFindMany, create: mocks.customerCreate },
+            ticket: { findFirst: mocks.ticketFindFirst, create: mocks.ticketCreate },
+            ticketHistory: { create: mocks.historyCreate },
+            ticketWatcher: { findMany: mocks.watcherFindMany },
+            slaRule: { findFirst: mocks.slaFindFirst },
+            notification: { createMany: mocks.notificationCreateMany },
+            auditLog: { create: mocks.auditCreate },
+          })
+        : Promise.all(arg as Promise<unknown>[]),
+    );
+    mocks.messageFindUnique.mockResolvedValue(null);
+    mocks.messageCreate.mockResolvedValue({ id: "c3a0de37932e8b19746f20b22" });
+    mocks.userFindUnique.mockResolvedValue({ id: "sms-system" });
+    mocks.userCreate.mockResolvedValue({ id: "sms-system" });
+    mocks.userFindMany.mockResolvedValue([]);
+    mocks.customerFindMany.mockResolvedValue([]);
+    mocks.customerCreate.mockResolvedValue({ id: "cust-new" });
+    mocks.ticketFindFirst.mockResolvedValue(null);
+    mocks.ticketCreate.mockResolvedValue({ id: "cd3448751688c18a75abee51f", status: "OPEN", subject: "SMS: Hello", assignedAgentId: null, teamId: null });
+    mocks.historyCreate.mockResolvedValue({});
+    mocks.slaFindFirst.mockResolvedValue({ firstResponseMinutes: 60, resolutionMinutes: 1440 });
+    mocks.notificationCreateMany.mockResolvedValue({ count: 0 });
+    mocks.watcherFindMany.mockResolvedValue([]);
+    mocks.auditCreate.mockResolvedValue({});
   });
 
   afterEach(() => {
@@ -91,5 +164,56 @@ describe("SMS integration", () => {
     const response = await request(app).post("/api/integrations/sms/webhook").set({ "content-type": "application/json", "x-signature": signature }).send(body);
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe("SMS_INVALID_PAYLOAD");
+  });
+
+  describe("inbound SMS message", () => {
+    const send = (overrides: Partial<{ smsId: string; message: string; sender: string; receivedAt: string }> = {}) => {
+      const body = JSON.stringify({
+        smsId: overrides.smsId ?? "sms-1",
+        message: overrides.message ?? "Hello, I need help",
+        deviceId: "device-1",
+        webhookEvent: "MESSAGE_RECEIVED",
+        sender: overrides.sender ?? "+14155552671",
+        receivedAt: overrides.receivedAt ?? new Date().toISOString(),
+      });
+      const signature = createHmac("sha256", "webhook-test-secret").update(body).digest("hex");
+      return request(app).post("/api/integrations/sms/webhook").set({ "content-type": "application/json", "x-signature": signature }).send(body);
+    };
+
+    it("creates a new customer, writes one CUSTOMER_CREATED audit row, and creates a ticket", async () => {
+      const response = await send();
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe("TICKET_CREATED");
+      expect(mocks.customerCreate).toHaveBeenCalledWith(expect.objectContaining({
+        data: { name: "+14155552671", phone: "+14155552671", email: "sms-14155552671@no-email.invalid" },
+      }));
+      expect(mocks.auditCreate).toHaveBeenCalledTimes(1);
+      expect(mocks.auditCreate).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          actorId: null,
+          action: "CUSTOMER_CREATED",
+          entityType: "CUSTOMER",
+          entityId: "cust-new",
+        }),
+      }));
+    });
+
+    it("does not audit when an existing customer is matched by phone", async () => {
+      mocks.customerFindMany.mockResolvedValue([{ id: "existing-customer" }]);
+      const response = await send();
+      expect(response.status).toBe(200);
+      expect(mocks.customerCreate).not.toHaveBeenCalled();
+      expect(mocks.auditCreate).not.toHaveBeenCalled();
+    });
+
+    it("does not re-process or double-audit a duplicate webhook redelivery", async () => {
+      mocks.messageFindUnique.mockResolvedValue({ id: "already-processed" });
+      const response = await send();
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe("DUPLICATE");
+      expect(mocks.customerCreate).not.toHaveBeenCalled();
+      expect(mocks.ticketCreate).not.toHaveBeenCalled();
+      expect(mocks.auditCreate).not.toHaveBeenCalled();
+    });
   });
 });

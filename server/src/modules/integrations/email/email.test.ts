@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   customerFindFirst: vi.fn(), customerCreate: vi.fn(),
   ticketFindFirst: vi.fn(), ticketFindMany: vi.fn(), ticketFindUnique: vi.fn(), ticketCreate: vi.fn(), ticketUpdate: vi.fn(),
   slaFindFirst: vi.fn(), historyCreate: vi.fn(), notificationCreateMany: vi.fn(), attachmentCreateMany: vi.fn(), watcherFindMany: vi.fn(),
-  transaction: vi.fn(), storagePut: vi.fn(), storageRemove: vi.fn(),
+  transaction: vi.fn(), storagePut: vi.fn(), storageRemove: vi.fn(), auditCreate: vi.fn(),
 }));
 
 vi.mock("../../../config/prisma.js", () => {
@@ -23,6 +23,7 @@ vi.mock("../../../config/prisma.js", () => {
     ticketWatcher: { findMany: mocks.watcherFindMany },
     notification: { createMany: mocks.notificationCreateMany },
     attachment: { createMany: mocks.attachmentCreateMany },
+    auditLog: { create: mocks.auditCreate },
     $transaction: mocks.transaction,
   };
   return { prisma: client };
@@ -135,6 +136,7 @@ describe("Resend email integration", () => {
     mocks.attachmentCreateMany.mockResolvedValue({ count: 1 });
     mocks.storagePut.mockResolvedValue(undefined);
     mocks.storageRemove.mockResolvedValue(undefined);
+    mocks.auditCreate.mockResolvedValue({});
     mocks.transaction.mockImplementation(async (callback: (tx: unknown) => unknown) => callback({
       ticketMessage: { findUnique: mocks.messageFindUnique, findFirst: mocks.messageFindFirst, create: mocks.messageCreate },
       user: { findUnique: mocks.userFindUnique, create: mocks.userCreate, findMany: mocks.userFindMany },
@@ -145,6 +147,7 @@ describe("Resend email integration", () => {
       ticketWatcher: { findMany: mocks.watcherFindMany },
       notification: { createMany: mocks.notificationCreateMany },
       attachment: { createMany: mocks.attachmentCreateMany },
+      auditLog: { create: mocks.auditCreate },
     }));
   });
 
@@ -174,6 +177,15 @@ describe("Resend email integration", () => {
     }) }));
     expect(mocks.notificationCreateMany).toHaveBeenCalled();
     expect(emitMessageMock).toHaveBeenCalledWith(expect.objectContaining({ ticketId: "ticket-1", visibility: "public" }));
+    expect(mocks.auditCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.auditCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        actorId: null,
+        action: "CUSTOMER_CREATED",
+        entityType: "CUSTOMER",
+        entityId: "customer-1",
+      }),
+    }));
   });
 
   it("returns a successful no-op for a repeated provider email id", async () => {
@@ -204,6 +216,7 @@ describe("Resend email integration", () => {
       ticket: { customerId: "customer-1", channel: "EMAIL" },
     }) }));
     expect(mocks.ticketCreate).not.toHaveBeenCalled();
+    expect(mocks.auditCreate).not.toHaveBeenCalled();
   });
 
   it("targets a reply to an assigned, team-routed ticket at the agent + team manager only (no global ADMIN fan-out)", async () => {

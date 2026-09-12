@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { Channel, Prisma, Role, TicketPriority, TicketStatus } from "@prisma/client";
 import { prisma } from "../../../config/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
+import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../../audit-logs/audit-log.constants.js";
+import { createAuditLog } from "../../audit-logs/audit-log.service.js";
 import { normalizePhoneNumber } from "../../../shared/utils/phone.js";
 import { customerReplyNotificationRecipientIds } from "../../../shared/team/team-scope.js";
 import { createNotifications } from "../../notifications/notification.service.js";
@@ -85,7 +87,17 @@ export async function processInboundSms(input: InboundSms) {
     const digits = phone.replace(/\D/g, "");
     const matches = await tx.customer.findMany({ where: { OR: [{ phone }, { phone: digits }, { phone: input.from }] }, orderBy: [{ updatedAt: "desc" }, { id: "asc" }], select: { id: true } });
     let customer = matches[0];
-    if (!customer) customer = await tx.customer.create({ data: { name: phone, phone, email: `sms-${digits}@no-email.invalid` }, select: { id: true } });
+    if (!customer) {
+      const email = `sms-${digits}@no-email.invalid`;
+      customer = await tx.customer.create({ data: { name: phone, phone, email }, select: { id: true } });
+      await createAuditLog({
+        actorId: null,
+        action: AUDIT_ACTIONS.CUSTOMER_CREATED,
+        entityType: AUDIT_ENTITY_TYPES.CUSTOMER,
+        entityId: customer.id,
+        changes: { name: { to: phone }, phone: { to: phone }, email: { to: email } },
+      }, tx);
+    }
     const author = await systemUser(tx);
     let ticket = await tx.ticket.findFirst({ where: { customerId: customer.id, channel: Channel.SMS, status: { in: [...ACTIVE] } }, orderBy: [{ createdAt: "desc" }, { id: "asc" }], select: { id: true, status: true, subject: true, assignedAgentId: true, teamId: true } });
     const created = !ticket;

@@ -2,6 +2,8 @@ import bcrypt from "bcrypt";
 import { randomUUID } from "node:crypto";
 import { Channel, Prisma, Role, TicketPriority, TicketStatus } from "@prisma/client";
 import { prisma } from "../../../config/prisma.js";
+import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../../audit-logs/audit-log.constants.js";
+import { createAuditLog } from "../../audit-logs/audit-log.service.js";
 import { createNotifications } from "../../notifications/notification.service.js";
 import { emitTicketMessageCreated, withRealtimeOutbox } from "../../realtime/realtime.publisher.js";
 import { customerReplyNotificationRecipientIds } from "../../../shared/team/team-scope.js";
@@ -110,10 +112,19 @@ async function matchOrCreateCustomer(
   const email = `wa-${digits}@no-email.invalid`;
   const existingByEmail = await tx.customer.findUnique({ where: { email }, select: { id: true } });
   if (existingByEmail) return existingByEmail;
-  return tx.customer.create({
-    data: { name: profileName?.trim() || e164, email, phone: e164 },
+  const name = profileName?.trim() || e164;
+  const created = await tx.customer.create({
+    data: { name, email, phone: e164 },
     select: { id: true },
   });
+  await createAuditLog({
+    actorId: null,
+    action: AUDIT_ACTIONS.CUSTOMER_CREATED,
+    entityType: AUDIT_ENTITY_TYPES.CUSTOMER,
+    entityId: created.id,
+    changes: { name: { to: name }, email: { to: email }, phone: { to: e164 } },
+  }, tx);
+  return created;
 }
 
 async function createWhatsappTicket(
