@@ -1,6 +1,6 @@
 import { createPortal } from "react-dom";
 import { useState, useEffect } from "react";
-import { Bell, CheckCheck, Circle } from "lucide-react";
+import { Bell, Check, CheckCheck, Circle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useAnchoredPopover } from "@/components/shared/use-anchored-popover";
@@ -103,9 +103,18 @@ function NotificationPanel({ panelRef, style, unreadCount, locale, onClose }: No
   }, [panelRef]);
 
   function handleNotificationClick(n: Notification) {
+    const target = resolveNotificationTarget(n);
+    // Defensive: a non-actionable row renders without a click handler at all
+    // (see NotificationRow), so this should be unreachable — but never mark
+    // read or close on a notification with no deterministic destination.
+    if (!target) return;
     if (!n.readAt) markOne.mutate(n.id);
     onClose();
-    if (n.ticketId) navigate(`/tickets/${n.ticketId}`);
+    navigate(target);
+  }
+
+  function handleMarkReadOnly(n: Notification) {
+    if (!n.readAt) markOne.mutate(n.id);
   }
 
   return (
@@ -188,7 +197,8 @@ function NotificationPanel({ panelRef, style, unreadCount, locale, onClose }: No
                 notification={n}
                 locale={locale}
                 isPending={markOne.isPending && markOne.variables === n.id}
-                onClick={() => handleNotificationClick(n)}
+                onNavigate={() => handleNotificationClick(n)}
+                onMarkRead={() => handleMarkReadOnly(n)}
               />
             ))}
           </ul>
@@ -200,60 +210,107 @@ function NotificationPanel({ panelRef, style, unreadCount, locale, onClose }: No
 }
 
 // ---------------------------------------------------------------------------
+// Navigation target resolution — one deterministic destination per
+// notification. ticketId takes priority; else taskId (Task Detail itself
+// links to its related ticket, if any); else the notification has no
+// meaningful destination and must not be rendered as clickable.
+// ---------------------------------------------------------------------------
+function resolveNotificationTarget(n: Pick<Notification, "ticketId" | "taskId">): string | null {
+  if (n.ticketId) return `/tickets/${n.ticketId}`;
+  if (n.taskId) return `/tasks/${n.taskId}`;
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // NotificationRow — single item in the panel list
 // ---------------------------------------------------------------------------
 interface NotificationRowProps {
   notification: Notification;
   locale: string;
   isPending: boolean;
-  onClick: () => void;
+  onNavigate: () => void;
+  onMarkRead: () => void;
 }
 
-function NotificationRow({ notification: n, locale, isPending, onClick }: NotificationRowProps) {
+function NotificationRow({ notification: n, locale, isPending, onNavigate, onMarkRead }: NotificationRowProps) {
   const { t } = useTranslation();
   const isUnread = n.readAt === null;
+  const target = resolveNotificationTarget(n);
+
+  const body = (
+    <>
+      {/* Unread indicator — NOT color-only: also announced via aria-label */}
+      <span className="mt-[5px] shrink-0">
+        {isUnread ? (
+          <Circle className="size-2 fill-primary text-primary" strokeWidth={0} aria-hidden="true" />
+        ) : (
+          <span className="block size-2" aria-hidden="true" />
+        )}
+      </span>
+
+      {/* Content */}
+      <div className="min-w-0 flex-1">
+        <p className={cn("text-xs font-semibold leading-snug text-foreground", !isUnread && "font-medium text-muted-foreground")}>
+          {n.title}
+        </p>
+        {/* Two-line message clamp with overflow-wrap for long unbroken strings */}
+        <p className="mt-0.5 line-clamp-2 break-words text-[11px] leading-snug text-muted-foreground [overflow-wrap:anywhere]">
+          {n.message}
+        </p>
+        <time
+          dateTime={n.createdAt}
+          className="mt-1 block text-[10px] text-muted-foreground/70"
+          title={new Date(n.createdAt).toLocaleString(locale)}
+        >
+          {formatRelativeTime(n.createdAt, locale)}
+        </time>
+      </div>
+    </>
+  );
 
   return (
-    <li role="option" aria-selected={false}>
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={isPending}
-        className={cn(
-          "flex w-full gap-3 px-4 py-3 text-start transition-colors outline-none",
-          "hover:bg-surface-subtle focus-visible:bg-surface-subtle focus-visible:ring-inset focus-visible:ring-2 focus-visible:ring-primary/30",
-          isUnread ? "bg-primary/[0.04]" : "bg-transparent",
-          isPending && "opacity-60 pointer-events-none"
-        )}
-        aria-label={`${n.title}${isUnread ? ` — ${t("notifications.unread")}` : ""}`}
-      >
-        {/* Unread indicator — NOT color-only: also announced via aria-label */}
-        <span className="mt-[5px] shrink-0">
-          {isUnread ? (
-            <Circle className="size-2 fill-primary text-primary" strokeWidth={0} aria-hidden="true" />
-          ) : (
-            <span className="block size-2" aria-hidden="true" />
+    <li role="option" aria-selected={false} className="flex items-stretch">
+      {target ? (
+        <button
+          type="button"
+          onClick={onNavigate}
+          disabled={isPending}
+          className={cn(
+            "flex flex-1 min-w-0 gap-3 px-4 py-3 text-start transition-colors outline-none",
+            "hover:bg-surface-subtle focus-visible:bg-surface-subtle focus-visible:ring-inset focus-visible:ring-2 focus-visible:ring-primary/30",
+            isUnread ? "bg-primary/[0.04]" : "bg-transparent",
+            isPending && "opacity-60 pointer-events-none"
           )}
-        </span>
-
-        {/* Content */}
-        <div className="min-w-0 flex-1">
-          <p className={cn("text-xs font-semibold leading-snug text-foreground", !isUnread && "font-medium text-muted-foreground")}>
-            {n.title}
-          </p>
-          {/* Two-line message clamp with overflow-wrap for long unbroken strings */}
-          <p className="mt-0.5 line-clamp-2 break-words text-[11px] leading-snug text-muted-foreground [overflow-wrap:anywhere]">
-            {n.message}
-          </p>
-          <time
-            dateTime={n.createdAt}
-            className="mt-1 block text-[10px] text-muted-foreground/70"
-            title={new Date(n.createdAt).toLocaleString(locale)}
-          >
-            {formatRelativeTime(n.createdAt, locale)}
-          </time>
+          aria-label={`${n.title}${isUnread ? ` — ${t("notifications.unread")}` : ""}`}
+        >
+          {body}
+        </button>
+      ) : (
+        // No ticketId/taskId — not actionable. No button/link semantics, so it
+        // never reads or behaves as clickable (invariant: every actionable
+        // notification has one deterministic destination; this one has none).
+        <div
+          className={cn("flex flex-1 min-w-0 gap-3 px-4 py-3 text-start", isUnread ? "bg-primary/[0.04]" : "bg-transparent")}
+        >
+          {body}
         </div>
-      </button>
+      )}
+
+      {isUnread && (
+        <button
+          type="button"
+          onClick={onMarkRead}
+          disabled={isPending}
+          aria-label={t("notifications.markRead")}
+          className={cn(
+            "shrink-0 self-stretch px-2.5 text-muted-foreground transition-colors outline-none",
+            "hover:bg-surface-subtle hover:text-foreground focus-visible:bg-surface-subtle focus-visible:ring-inset focus-visible:ring-2 focus-visible:ring-primary/30",
+            isPending && "opacity-60 pointer-events-none"
+          )}
+        >
+          <Check className="size-3.5" strokeWidth={1.75} aria-hidden="true" />
+        </button>
+      )}
     </li>
   );
 }

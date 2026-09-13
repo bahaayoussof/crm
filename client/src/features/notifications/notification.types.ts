@@ -4,6 +4,7 @@ export interface Notification {
   title: string;
   message: string;
   ticketId: string | null;
+  taskId: string | null;
   readAt: string | null;
   createdAt: string;
 }
