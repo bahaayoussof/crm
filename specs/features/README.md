@@ -141,6 +141,7 @@ feature package's status changes.
 | Conversations / Channels | `specs/features/conversations-channels/` | Implemented + verified (uncommitted) | 57/57 tasks (CONV-001–057) complete; server 1085/1085, client 833+/835 tests pass, migrations applied. Known gap: Portal/Live-Chat reply composer has no client Attach-file UI yet, though the server contract exists (CONV-049). |
 | Notifications | `specs/features/notifications/` | Implemented + verified (uncommitted) | 6/6 tasks complete (NOTIF-001/002 fixed dead Task-notification click and missing per-row mark-as-read). Deferred: point-in-time text snapshot not re-checked at read time (NOTIF-GAP-4), no per-type icon differentiation (NOTIF-GAP-5), no "view all" page (NOTIF-GAP-6). |
 | Realtime | `specs/features/realtime/` | Implemented + verified (uncommitted) | 5/5 tasks complete; fixed a real SLA auto-escalation team-scope bug (RT-GAP-1/RT-001) with regression coverage (RT-004). Accepted architecture debt: no Redis/multi-instance fanout (RT-GAP-3), no durable replay (RT-GAP-4). |
+| Dashboard / Reporting | `specs/features/dashboard-reporting/` | Implemented + verified (uncommitted) | 8/8 tasks complete. No correctness/security defect found; dashboard aggregate scope reuses Tickets' `ticketVisibilityWhere` (no cross-role leak). Fixed one stale `docs/06-auth-rbac.md` claim about AGENT dashboard scope (DR-003). Deferred: duplicated MANAGER scope-rule encoding vs. Tickets (DR-GAP-1), duplicated SLA-window filter in dashboard service (DR-GAP-2), no real-Postgres row-level test (DR-GAP-3, repo-wide characteristic). |
 
 ### Remaining CRM capability areas — ownership status
 
@@ -153,7 +154,6 @@ authoritative discovery, just a planning aid. Reflects repository state as of
 **Implemented in code, no dedicated SDD package (candidates for a future
 package, not gaps in the product):**
 
-- Reporting / analytics dashboards — `server/src/modules/reports`, `server/src/modules/dashboard`, `client/src/features/reports`. Read-only consumer of ticket data per `tickets/spec.md`'s Cross-Feature Boundary Summary.
 - Team & user management — `server/src/modules/{auth,users,teams,departments,branches}`; RBAC behavior is embedded/described in Tickets and Customers specs but the CRUD surfaces themselves have no standalone package.
 - SLA policy configuration — `server/src/modules/settings` (`PUT /api/settings/sla-rules/:priority`, category CRUD). Distinct from the SLA **auto-escalation runtime** behavior, which is already covered by Realtime (`RT-GAP-1`) and Tickets (SLA Integration section).
 - AI features — `server/src/modules/{ai,customer-ai}`, `client/src/features/ai-assistant`. Referenced only as a read-only dependency by Tickets (`POST /tickets/:id/ai`) and Knowledge Base (AI grounding) specs; no package owns the AI assistant surface itself.

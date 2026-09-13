@@ -1327,3 +1327,4 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
+| 19:44 | Dashboard/Reporting brownfield SDD audit: no cross-role leak found (dashboard reuses ticketVisibilityWhere), fixed stale AGENT-scope claim in docs/06-auth-rbac.md, updated README coverage matrix | specs/features/dashboard-reporting/{spec,plan,tasks}.md, docs/06-auth-rbac.md, specs/features/README.md | server 49/49, client 26/26, typecheck/lint clean | ~175k |
