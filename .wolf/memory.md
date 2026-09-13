@@ -1303,3 +1303,15 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | 19:15 | Added regression tests RT-004 (teamId assertion + unrouted-escalation test) | server/src/modules/sla-automation/sla-automation.test.ts | 2 new tests added | ~2k |
 | 19:20 | Ran focused + typecheck/lint verification | server + client vitest/tsc/eslint | sla-automation 20/20, realtime 25/25, tickets+notifications+integrations 320/320, client realtime 23/23; tsc/eslint clean both sides; git diff --check clean | ~12k |
 | 19:30 | OpenWolf bookkeeping: buglog bug-193, STATUS.md new top entry + next-quest note, cerebrum.md 2 Key Learnings | .wolf/buglog.json, .wolf/STATUS.md, .wolf/cerebrum.md | Session documented per OpenWolf protocol | ~6k |
+
+## Session: 2026-09-13 18:36
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 19:40 | SDD structure/lifecycle cleanup: fixed stale spec/plan/tasks status contradictions across all 6 feature packages, trimmed tasks.md session-diary bloat (customers 757→239 lines, conversations-channels narration collapsed), tightened spec/plan/tasks ownership contract + added Feature Coverage Matrix | specs/features/{README,tickets,customers,knowledge-base,conversations-channels,notifications,realtime}/*.md | Done, uncommitted | ~large (6 subagents) |
+
+## Session: 2026-09-13 18:47
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 2026-09-13 | Docs-only SDD consistency pass: confirmed constitution.md/architecture.md already correctly reflect KB Rich Text (no stale plain-text claim remained at global-spec level); fixed README.md Coverage Matrix (removed unfounded Billing row, added AI/Tasks/Quick-Replies/SLA-config/Integrations-admin-UI ownership notes, clarified Attachments/Collaboration/Feedback/Portal ownership); replaced conversations-channels CC-GAP-19 duplicate with a cross-reference to realtime RT-GAP-3/4; reconciled KB Rich Text status from overclaimed "implemented and verified" to "implemented; migration apply/rollback verification pending" across spec.md/tasks.md, with a concrete pending verification step. No docs/ changes; no runtime code changes. | specs/features/README.md, specs/features/conversations-channels/spec.md, specs/features/knowledge-base/{spec,tasks}.md | done, uncommitted on chore/sdd-foundation | ~small |

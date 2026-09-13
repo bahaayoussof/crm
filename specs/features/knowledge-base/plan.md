@@ -2,7 +2,8 @@
 
 ## Status
 
-`READY FOR TASK BREAKDOWN`
+Implemented — see `tasks.md` (`KB-AUDIT-001`…`011`) for execution and
+verification status.
 
 This plan implements the single approved enhancement in
 [`spec.md`](./spec.md): **add `AuditLog` coverage to the existing Knowledge
@@ -542,7 +543,8 @@ Exact paths. Nothing is modified by this planning task.
 > completed KB Audit pilot and is unchanged. This section plans
 > [`spec.md` → Knowledge Base Rich Text Content](./spec.md#knowledge-base-rich-text-content)
 > (`RT-1`…`RT-9`, `BC-*`, `SEC-*`). **No production code is written by
-> this planning task.** Status: `READY FOR TASK BREAKDOWN`.
+> this planning task.** Status: implemented — see `tasks.md`
+> (`KB-RICH-001`…`KB-RICH-015`) for execution and verification status.
 
 ## Current Implementation Summary (verified by inspection, `chore/sdd-foundation`)
 
@@ -1022,12 +1024,13 @@ unchanged).
 
 ## Rich Text — Plan Status
 
-`IMPLEMENTATION COMPLETE` — implemented per this plan and `tasks.md`
-(`KB-RICH-001`…`KB-RICH-015`) on branch `chore/sdd-foundation` (2026-09-09),
-ADR-057. The four "Open Decisions For Human Review" were approved as the plan
-recommended: (1) add `contentText`; (2) two heading levels; (3) the ticket
-link popover is **reused by import** (clean presentational graph); (4)
-`content` `.max()` raised to `200_000`. Changes unstaged/uncommitted.
+Implemented — see `tasks.md` (`KB-RICH-001`…`KB-RICH-015`, all complete) for
+execution and verification status. Approach followed this plan exactly, on
+branch `chore/sdd-foundation` (2026-09-09), ADR-057. The four "Open
+Decisions For Human Review" were approved as the plan recommended: (1) add
+`contentText`; (2) two heading levels; (3) the ticket link popover is
+**reused by import** (clean presentational graph); (4) `content` `.max()`
+raised to `200_000`. Changes unstaged/uncommitted.
 
 Prior status (kept for history): `READY FOR TASK BREAKDOWN`
 
@@ -1041,16 +1044,19 @@ re-sanitize, reused utilities), search (`contentText`), AI grounding
 regression-tested), file impact (enumerated, with an explicit
 not-changing list).
 
-Deferred to human review: the four items above.
+Deferred to human review (resolved as above; kept for the historical
+record): the four items above.
 
-Next step: extend `specs/features/knowledge-base/tasks.md` with the
-`KB-RICH-*` sequence (task breakdown only — no implementation).
+See `tasks.md` (`KB-RICH-001`…`KB-RICH-015`) for execution and
+verification status — that file, not this one, is authoritative for
+current progress.
 
 ---
 
 ## Plan Status (KB Audit pilot)
 
-`READY FOR TASK BREAKDOWN`
+Implemented — see `tasks.md` (`KB-AUDIT-001`…`011`) for execution and
+verification status. Kept below for the historical architecture record.
 
 Resolved:
 
@@ -1077,5 +1083,6 @@ Resolved:
   (unauthorized / invalid / read) + atomicity, extending existing suites,
   with the one-time `$transaction`/`auditLog` mock port.
 
-Next step: create `specs/features/knowledge-base/tasks.md` (task breakdown
-only — no implementation).
+(Historical note: this plan originally ended with "next step: create
+`tasks.md`" — that file now exists and the pilot is implemented; see
+`tasks.md` for execution status.)

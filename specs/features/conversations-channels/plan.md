@@ -2,9 +2,9 @@
 
 ## Plan Status
 
-**Status: `READY FOR TASK DECOMPOSITION — NOT YET IMPLEMENTED`.**
+**Status: implemented — see `tasks.md` for execution/verification status.**
 
-This plan implements `specs/features/conversations-channels/spec.md`. It intentionally stops before `tasks.md` and production changes. Task IDs, step-by-step test cycles, and execution ordering belong to the next SDD artifact.
+This plan implements `specs/features/conversations-channels/spec.md`. It defines architecture and approach only; `tasks.md` decomposed it into task IDs `CONV-001`–`CONV-057`, which are complete and verified. This document is not an execution-status tracker — it remains the authoritative record of the HOW (architecture, schema/migration strategy, and testing strategy).
 
 ## Goal
 
@@ -299,4 +299,4 @@ These are implementation phases, not `tasks.md` entries. The next SDD step shoul
 
 ## Readiness for Tasks
 
-The specification decisions are resolved and this plan is **ready for `tasks.md` decomposition**. No tasks file should be created until the developer requests the next SDD phase. Implementation must not begin from this plan before that decomposition and the normal `AGENTS.md` preflight.
+This plan was decomposed into `tasks.md` (`CONV-001`–`CONV-057`), which is complete and verified. See `tasks.md` for the execution/verification record, including the one disclosed deferred item (Portal composer attach-file UI).

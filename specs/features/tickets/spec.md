@@ -2,7 +2,7 @@
 
 ## Feature Status
 
-**Brownfield feature — discovery complete, human decisions resolved, planning-ready.**
+**Brownfield feature — discovery complete, human decisions resolved, implemented on branch `chore/sdd-foundation`, awaiting human review (not merged).**
 
 | Aspect | State |
 | --- | --- |

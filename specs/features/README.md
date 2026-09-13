@@ -13,6 +13,51 @@ specs/features/<feature-name>/
 Use a short kebab-case `<feature-name>` (e.g. `live-chat-transfer`,
 `sla-pause-on-hold`).
 
+## Ownership contract (spec / plan / tasks)
+
+Each file has one job. Do not duplicate a file's job in another file.
+
+### `spec.md` owns
+
+Purpose, scope/out-of-scope, actors/permissions, functional behavior,
+business/domain invariants, API behavior at contract level, edge cases,
+acceptance criteria, discovered gaps/deferred scope, and **current feature
+status** (implemented / partial / not started, plus known gaps).
+
+It should answer: **"What does this feature do and what behavior is
+authoritative?"**
+
+### `plan.md` owns
+
+Implementation approach, architecture choices, existing seams/modules to
+reuse, schema/migration strategy when required, backend/frontend
+implementation strategy, security considerations, testing strategy, and
+rollout/migration risks.
+
+It should answer: **"How should the approved behavior be implemented?"**
+
+`plan.md` must NOT become the execution-status tracker. Once a feature is
+implemented, plan.md should simply state that the plan has been implemented
+and point to `tasks.md` for execution/verification status — it should not
+carry its own progress state ("READY FOR TASK DECOMPOSITION", "NOT YET
+IMPLEMENTED", etc.) once work has started.
+
+### `tasks.md` owns
+
+Executable task IDs, implementation/checklist status, acceptance/
+verification per task, and concise final verification state.
+
+It should answer: **"What work must be done, and what is complete?"**
+
+`tasks.md` must NOT be used as a session diary, debugging journal, or
+chronological transcript. Prefer concise entries:
+
+```text
+[x] TASK-ID — goal
+Verification: ...
+Notes/Risk: ...
+```
+
 ## `spec.md` — WHAT and WHY
 
 Recommended sections:
@@ -82,6 +127,54 @@ LC-003: Server: emit realtime `ticket-transferred` event
 LC-004: Frontend: transfer action in ticket header (role-gated)
 LC-005: Tests: transfer authorization + realtime event
 ```
+
+## Feature Coverage Matrix
+
+Reflects repository state as of 2026-09-13. Update this table whenever a
+feature package's status changes.
+
+| Feature | Package | Status | Notes |
+|---|---|---|---|
+| Tickets | `specs/features/tickets/` | Implemented + verified (uncommitted on `chore/sdd-foundation`) | Server 964/964, client 805/805 tests pass. Deferred: bulk actions/export/saved views/SLA pause (DG-12); unmemoised per-request team lookup accepted for V1 (DG-9). |
+| Customers | `specs/features/customers/` | Implemented + verified (uncommitted) | Includes case-insensitive email uniqueness hardening (DB-level functional index, CUST-FOLLOWUP-001) and inbound-channel audit logging (DG-1). No open gaps beyond a deliberately deferred `requestContext` (IP/UA) audit-plumbing follow-up. |
+| Knowledge Base | `specs/features/knowledge-base/` | Implemented, task-complete, **ready for human review/merge pending one verification step** (uncommitted) | KB Audit Logging (11/11 tasks) and KB Rich Text Content (15/15 tasks) both done; server 926 / client 800 tests pass. `specs/constitution.md` and `specs/architecture.md` correctly document the shipped Rich Text capability (ADR-057 superseding ADR-020) — no stale plain-text claim remains at the global-spec level. Open item: migration apply/rollback for `20260909120000_kb_article_content_text` has not been exercised against a disposable Postgres in this environment — tracked as an explicit pending step in `tasks.md` (KB-RICH-015), required before merge. |
+| Conversations / Channels | `specs/features/conversations-channels/` | Implemented + verified (uncommitted) | 57/57 tasks (CONV-001–057) complete; server 1085/1085, client 833+/835 tests pass, migrations applied. Known gap: Portal/Live-Chat reply composer has no client Attach-file UI yet, though the server contract exists (CONV-049). |
+| Notifications | `specs/features/notifications/` | Implemented + verified (uncommitted) | 6/6 tasks complete (NOTIF-001/002 fixed dead Task-notification click and missing per-row mark-as-read). Deferred: point-in-time text snapshot not re-checked at read time (NOTIF-GAP-4), no per-type icon differentiation (NOTIF-GAP-5), no "view all" page (NOTIF-GAP-6). |
+| Realtime | `specs/features/realtime/` | Implemented + verified (uncommitted) | 5/5 tasks complete; fixed a real SLA auto-escalation team-scope bug (RT-GAP-1/RT-001) with regression coverage (RT-004). Accepted architecture debt: no Redis/multi-instance fanout (RT-GAP-3), no durable replay (RT-GAP-4). |
+
+### Remaining CRM capability areas — ownership status
+
+Listed only where no `specs/features/<name>/` package exists today, or where
+ownership needed a check against the actual repository. Confirm against
+`.wolf/anatomy.md` / the codebase before starting — this list is not
+authoritative discovery, just a planning aid. Reflects repository state as of
+2026-09-13.
+
+**Implemented in code, no dedicated SDD package (candidates for a future
+package, not gaps in the product):**
+
+- Reporting / analytics dashboards — `server/src/modules/reports`, `server/src/modules/dashboard`, `client/src/features/reports`. Read-only consumer of ticket data per `tickets/spec.md`'s Cross-Feature Boundary Summary.
+- Team & user management — `server/src/modules/{auth,users,teams,departments,branches}`; RBAC behavior is embedded/described in Tickets and Customers specs but the CRUD surfaces themselves have no standalone package.
+- SLA policy configuration — `server/src/modules/settings` (`PUT /api/settings/sla-rules/:priority`, category CRUD). Distinct from the SLA **auto-escalation runtime** behavior, which is already covered by Realtime (`RT-GAP-1`) and Tickets (SLA Integration section).
+- AI features — `server/src/modules/{ai,customer-ai}`, `client/src/features/ai-assistant`. Referenced only as a read-only dependency by Tickets (`POST /tickets/:id/ai`) and Knowledge Base (AI grounding) specs; no package owns the AI assistant surface itself.
+- Tasks & Reminders — `server/src/modules/tasks`. Explicitly **not** owned by Tickets (`tickets/spec.md` Cross-Feature Boundary Summary: "Tasks / Reminders | Nothing (optional `Task.ticketId` back-reference)"); genuinely unowned.
+- Quick Replies — `server/src/modules/quick-replies`. Referenced only as a dependency by Conversations/Channels ("Quick Replies/AI for draft insertion only"); not owned by any package.
+- Integrations / webhooks **admin configuration** — provider credentials (Resend/WhatsApp/SMS API keys, webhook secrets) are env-var only; no admin UI exists to configure them. Distinct from the provider **transport** (inbound parsing, outbound delivery, retries), which Conversations/Channels already owns and documents.
+
+**Already owned by an existing feature package (not pending):**
+
+- Attachments, Collaboration (`@mention`/watchers), Feedback — all ticket-scoped; owned by `specs/features/tickets/spec.md` ("Ticket owns" / Cross-Feature Boundary Summary).
+- Customer Portal — not a standalone capability; portal ticket routes are owned by Tickets, portal Knowledge Base routes by Knowledge Base, and Portal/Live-Chat conversation behavior by Conversations/Channels. No separate "Customer Portal" package is needed.
+- Audit Logs — cross-cutting infrastructure (`createAuditLog`) consumed and specified per-mutation inside each owning feature package (Tickets, Customers, Knowledge Base, Conversations/Channels); not a standalone product feature.
+
+**Confirmed not present in this repository (removed from this list after
+verification — do not re-add without new evidence):**
+
+- Billing / subscription management — no billing/subscription code, schema, or requirement found anywhere in `server/`, `client/`, or `specs/`.
+
+### Deferred consolidation notes (do not act on these yet)
+
+- Several feature `plan.md`/`spec.md` files duplicate parts of `docs/04-06-09-18-22` (RBAC, API contract, database design, realtime events). This is the known `docs/` ↔ `specs/` overlap the eventual migration is meant to resolve — intentionally left untouched per task scope.
 
 ## After implementation
 

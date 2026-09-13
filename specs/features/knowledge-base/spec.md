@@ -7,8 +7,8 @@ Two capabilities, tracked separately in this one package:
 | Capability | State |
 | --- | --- |
 | **KB Audit Logging** (`KB-AUDIT-001`…`011`) | **Implementation complete** (2026-09-09). See [Pilot Enhancement — Audit-Log Integration](#pilot-enhancement--audit-log-integration) and [Implemented as (2026-09-09)](#implemented-as-2026-09-09). Preserved below as implemented history. |
-| **KB Rich Text Content** (`KB-RICH-*`) | **Implemented and verified on branch `chore/sdd-foundation`** (2026-09-09, `KB-RICH-001`…`KB-RICH-015`; ADR-057). Changes unstaged/uncommitted. See [Knowledge Base Rich Text Content](#knowledge-base-rich-text-content). |
-| **Overall Knowledge Base SDD enhancement work** | **Ready for human review / merge** — the Rich Text enhancement is implemented and the `KB-RICH-015` readiness gate has run. |
+| **KB Rich Text Content** (`KB-RICH-*`) | **Implemented; code + test verification complete** on branch `chore/sdd-foundation` (2026-09-09, `KB-RICH-001`…`KB-RICH-015`; ADR-057). Changes unstaged/uncommitted. **One verification step remains open**: migration apply/rollback for `20260909120000_kb_article_content_text` has not been exercised against a disposable Postgres in this environment — see [Migration Verification Status](#migration-verification-status). See [Knowledge Base Rich Text Content](#knowledge-base-rich-text-content). |
+| **Overall Knowledge Base SDD enhancement work** | **Ready for human review; merge gated on the migration-apply verification step above** — the Rich Text enhancement is implemented and every `KB-RICH-015` check other than the disposable-DB migration apply/rollback has run. |
 
 The Audit pilot resolved its seven clarification questions
 (section [Clarification Decisions](#clarification-decisions)). This is a
@@ -492,8 +492,10 @@ Then neither the article change nor the audit row is persisted.
 > section is additive: it does **not** alter, weaken, or re-open any
 > `KB-AUDIT-*` requirement. Every "Existing Behavior to Preserve" item
 > above still holds except the two plain-text *content* bullets, which
-> this capability supersedes. Status: **specified, not implemented**
-> (`READY FOR PLAN`).
+> this capability supersedes. Status: **implemented; migration
+> verification pending** on branch `chore/sdd-foundation`
+> (`KB-RICH-001`…`KB-RICH-015`; ADR-057).
+> See [KB Rich Text Content — `IMPLEMENTED; MIGRATION VERIFICATION PENDING`](#kb-rich-text-content--implemented-migration-verification-pending).
 
 ## Why
 
@@ -966,7 +968,7 @@ Settled by the developer for this pilot (2026-09-09):
 - Implemented per `plan.md` / `tasks.md` (`KB-AUDIT-001`…`011`); changes
   unstaged, uncommitted on `chore/sdd-foundation`.
 
-### KB Rich Text Content — `IMPLEMENTATION COMPLETE`
+### KB Rich Text Content — `IMPLEMENTED; MIGRATION VERIFICATION PENDING`
 
 - Product behavior specified above ([Knowledge Base Rich Text
   Content](#knowledge-base-rich-text-content)) with testable acceptance
@@ -980,8 +982,37 @@ Settled by the developer for this pilot (2026-09-09):
 - Preserves every existing Knowledge Base behavior except the plain-text
   *content* model; re-opens no `KB-AUDIT-*` requirement (article body still
   never enters `AuditLog`).
+- All code-level and test-level checks in `KB-RICH-015` have run and pass
+  (server 926/926, client 800/800, typecheck/lint/build clean, no scope
+  drift). See [Migration Verification Status](#migration-verification-status)
+  for the one remaining, non-code verification step.
 
-### Overall Knowledge Base SDD enhancement — `READY FOR HUMAN REVIEW / MERGE`
+### Migration Verification Status
 
-The Rich Text enhancement is implemented and the `KB-RICH-015` readiness
-gate has run. Merge is performed manually by the developer.
+The additive migration `server/prisma/migrations/20260909120000_kb_article_content_text/`
+(`ALTER TABLE ... ADD COLUMN "contentText" TEXT;` then a straight backfill
+`UPDATE "KnowledgeArticle" SET "contentText" = "content"`) is present in the
+repository and is non-destructive by construction (nullable column, no
+default, no data rewrite of `content`). It has **not** been applied to a
+disposable/scratch Postgres in this environment to verify apply + rollback
+end-to-end, per `.wolf/memory.md` (2026-09-09, KB-RICH-001..015 entry:
+"disposable-DB migration apply not runnable here"). No other evidence of an
+apply/rollback run exists in `.wolf/buglog.json` or `.wolf/memory.md`.
+
+**This is explicitly not claimed as complete.** Remaining action before
+merge (tracked in `tasks.md` under `KB-RICH-015`):
+
+1. Run `npx prisma migrate deploy` (or `migrate dev`) against a disposable/
+   staging Postgres.
+2. Confirm `npx prisma migrate status` reports clean, and that every
+   existing row's `contentText` equals its `content` immediately after
+   apply (per the backfill statement).
+3. Confirm a rollback plan is safe if ever needed (the column is additive
+   and nullable, so `DROP COLUMN "contentText"` is the only rollback and
+   loses no other data).
+
+### Overall Knowledge Base SDD enhancement — `READY FOR HUMAN REVIEW; MERGE GATED ON MIGRATION VERIFICATION`
+
+The Rich Text enhancement is implemented and every `KB-RICH-015` check other
+than the disposable-DB migration apply/rollback (above) has run. Merge is
+performed manually by the developer, after that step is done.

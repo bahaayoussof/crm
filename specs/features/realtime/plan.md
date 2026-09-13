@@ -1,6 +1,6 @@
 # Realtime — Plan
 
-Status: **READY FOR TASKS**
+Status: **Implemented — see `tasks.md` for execution/verification status.**
 
 No schema change, no migration, no new dependency, no route/RBAC/response-shape change, no new SSE event type. Discovery (`spec.md`) found the transport itself, its authorization chokepoint, the transaction-safety outbox, and every producer call site except one already correct. This plan covers exactly one backend one-line fix (RT-GAP-1), one documentation correction (RT-GAP-2), and the regression test that would have caught RT-GAP-1 (RT-GAP-5).
 

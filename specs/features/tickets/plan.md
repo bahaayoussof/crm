@@ -7,12 +7,8 @@ Companion to [`spec.md`](./spec.md). Covers the six human-approved changes (OD-1
 ## 1. Plan Status
 
 - **Brownfield.** The Tickets domain ships end-to-end (`server/src/modules/tickets/`, `client/src/features/tickets/`, `Ticket` + related Prisma models).
-- **Spec finalised** — `spec.md` is `READY FOR PLAN`; all discovery-phase Open Decisions resolved by the human on 2026-09-10.
-- **Human decisions resolved** — OD-1 fix reopen SLA; OD-2 audit routing changes; OD-3 portal-create realtime; OD-4 `channel` list filter; OD-5 defer SLA pause; OD-6 team-scope customer-ticket history (Case B — fix).
-- **Implementation planning: complete.**
-- **Tasks not yet generated** — `tasks.md` is deliberately not created; it waits for human review of this plan + the finalised spec.
-
-**Status: `IMPLEMENTED` (2026-09-10, branch `chore/sdd-foundation`)** — kept as the historical planning record.
+- **Human decisions resolved** (2026-09-10) — OD-1 fix reopen SLA; OD-2 audit routing changes; OD-3 portal-create realtime; OD-4 `channel` list filter; OD-5 defer SLA pause; OD-6 team-scope customer-ticket history (Case B — fix).
+- **Implemented — see [`tasks.md`](./tasks.md) for execution/verification status.** This plan describes *how* the six decisions were carried out on branch `chore/sdd-foundation`; it is kept as the historical planning record and is not the status tracker. `tasks.md` tracks `TK-001…TK-011` (11/11 complete, ready for human review, not merged).
 
 Delivered exactly as planned: one new `AUDIT_ACTIONS.TICKET_ROUTING_CHANGED` constant, one additive `channel` query param (+ canonical frontend filter), one reused visibility helper (`teamScopedTicketWhere`) applied in `listCustomerTickets`, and the OD-1 reopen clause + OD-3 portal-create outbox — all behaviour correction inside existing transactions/seams. No Prisma schema change, no migration, no new dependency. Per-task verification evidence is in [`tasks.md`](./tasks.md).
 
@@ -533,9 +529,9 @@ Run before declaring implementation complete; report actual pass/fail and counts
 
 ---
 
-## Appendix — Task Preview (informational; `tasks.md` NOT created yet)
+## Appendix — Original Task Preview (historical; superseded by `tasks.md`)
 
-Anticipated task clusters, for human sizing only:
+Anticipated task clusters, as sized before decomposition. `tasks.md` now contains the actual executed `TK-001…TK-011` with per-task verification evidence — this list is kept only as the original sizing record:
 
 - **TK-01** OD-1: clear `resolvedAt` on manual `RESOLVED → IN_PROGRESS` in `updateTicket` + tests (`ticket.test.ts`, `sla-automation.test.ts`).
 - **TK-02** OD-2: add `AUDIT_ACTIONS.TICKET_ROUTING_CHANGED`; emit routing `AuditLog` row in `updateTicket`; fold `teamId` into `changed`; tests.

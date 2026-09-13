@@ -2,9 +2,9 @@
 
 ## Status
 
-`READY FOR HUMAN REVIEW` — implemented per `tasks.md` (`CUST-001`…`CUST-008`).
+Implemented — see `tasks.md` (`CUST-001`…`CUST-008`, plus `CUST-FOLLOWUP-001`) for execution and verification status, and `spec.md` `## Feature Status` for the current product-level status.
 
-This plan implements the two confirmed gaps from [`spec.md`](./spec.md)
+This plan covers the two confirmed gaps from [`spec.md`](./spec.md)
 `## Discovered Gaps` and closes them **without** redesigning the Customers
 module:
 

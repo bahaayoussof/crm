@@ -1,6 +1,6 @@
 # Realtime — Tasks
 
-Status: **READY FOR IMPLEMENTATION**
+Status: **DONE** — see "Honest status at end of implementation" below.
 
 Scope: 1 confirmed backend audience/team-scope defect (RT-GAP-1), 1 documentation drift fix (RT-GAP-2), regression tests (RT-GAP-5). No schema/migration/dependency/route/RBAC change. No new SSE event type.
 

@@ -1,6 +1,6 @@
 # Notifications — Tasks
 
-Status: **READY FOR IMPLEMENTATION**
+Status: **Complete (6/6 tasks)** — see "Honest status at end of implementation" below.
 
 Scope: 3 client-only defects (NOTIF-GAP-1/2/3 in `spec.md`). No server change. No schema/migration/dependency change.
 

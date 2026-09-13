@@ -1,6 +1,6 @@
 # Notifications — Plan
 
-Status: **READY FOR TASKS**
+Status: **Implemented** — see `tasks.md` for execution/verification status.
 
 No schema change, no migration, no new dependency, no route/RBAC/response-shape change. Backend recipient/persistence/realtime/authorization behaviour is already correct per `spec.md`'s discovery — this plan covers only the three client-side gaps (NOTIF-GAP-1/2/3) plus the focused regression tests that prove the acceptance criteria.
 

@@ -2,9 +2,9 @@
 
 ## Feature Status
 
-**Status: `SPECIFICATION APPROVED — PRODUCT DECISIONS RESOLVED; READY FOR IMPLEMENTATION PLANNING`.**
+**Status: `IMPLEMENTED + VERIFIED ON SDD BRANCH`.** See `tasks.md` for the authoritative task-by-task execution and verification record (CONV-001–057, all complete).
 
-This specification records the current implementation on `chore/sdd-foundation` and the approved target behavior for the Conversations / Channels hardening pass. The implementation is functional across WEB/Portal, EMAIL, SMS, WhatsApp, and LIVE_CHAT; the nine product decisions discovered during brownfield analysis are now resolved below. Production code and schema changes belong to the later implementation phase, not this specification update.
+This specification records the approved target behavior for the Conversations / Channels hardening pass and the brownfield-discovery findings that motivated it, on top of the pre-existing implementation across WEB/Portal, EMAIL, SMS, WhatsApp, and LIVE_CHAT. The nine product decisions discovered during brownfield analysis (OD-CC-1 through OD-CC-9) are resolved below, and the "Approved Target Behavior" section has since been implemented and verified (see `tasks.md`). One known deferred item remains: the Portal/Live-Chat reply composer has no client-side Attach-file UI yet, though its server-side contract is implemented (`tasks.md` CONV-049).
 
 Repository evidence is authoritative where older documentation differs. In particular, ADR-052 and the current code supersede the pre-ADR-052 rollback descriptions in ADR-044 and `docs/21-email-integration.md`.
 
@@ -326,7 +326,7 @@ Internal ticket attachment queries return ticket- and public-message-level files
 
 ## Approved Target Behavior
 
-The following requirements resolve OD-CC-1 through OD-CC-9. They supersede the corresponding current-state behavior above where the two differ.
+The following requirements resolve OD-CC-1 through OD-CC-9. They supersede the corresponding current-state behavior above where the two differ. **This target behavior is implemented and verified** — see `tasks.md` for the task-by-task execution record.
 
 ### Durable outbound delivery
 
@@ -489,7 +489,7 @@ Every gap is classified; differences that are already deliberate product rules a
 | CC-GAP-16 | resolved target requirement | Persist explicit format/provenance and enforce the canonical content policy defined in the implementation plan. |
 | CC-GAP-17 | test gap | No shared parameterized cross-channel invariant suite covers status, CLOSED, notification, realtime audience, and history/audit parity. |
 | CC-GAP-18 | test gap | No targeted tests for CC-GAP-01/02/03, literal plain-text markup rendering, Live Chat start concurrency, or API idempotency behavior. |
-| CC-GAP-19 | architecture debt | Realtime is process-local and non-replayable; Vercel/serverless reconnect behavior is best-effort and production realtime readiness is not established. |
+| CC-GAP-19 | architecture debt (owned by Realtime) | Realtime is process-local and non-replayable; Vercel/serverless reconnect behavior is best-effort. This is the same accepted transport-level debt authoritatively tracked as `RT-GAP-3`/`RT-GAP-4` in `specs/features/realtime/spec.md` (deferred, already documented in `docs/22-realtime-events.md` §10) — see that spec for the current disposition rather than re-litigating it here. |
 | CC-GAP-20 | architecture debt | There is no delivery retry/reconciliation/manual resend mechanism, and outbound delivery-failure history persistence itself is best-effort. This is acceptable only if explicitly retained as MVP scope. |
 | CC-GAP-21 | security/privacy concern | Phone identity can match multiple Customers; newest row wins (SMS silently, WhatsApp with warning). Misrouting can expose a customer's conversation to the wrong CRM profile. No uniqueness constraint or ambiguity quarantine exists. |
 | CC-GAP-22 | implementation bug | Live Chat's read-before-create resume check has no concurrency guard/unique invariant despite comments claiming two near-simultaneous starts do not both create a chat; two requests can both observe no active chat and create two. |
@@ -527,10 +527,10 @@ CC-GAP-01/02/03/22 are confirmed implementation defects and must be included in 
 
 ---
 
-## Recommendation
+## Implementation Outcome
 
-**Ready for `plan.md`.** Brownfield discovery is complete and OD-CC-1 through OD-CC-9 are resolved. The plan must preserve the canonical Ticket/TicketMessage/TicketNote architecture and commit-first delivery, add only the durable state and integrity constraints required by these decisions, fix the confirmed defects with focused regression tests, and reconcile stale domain/API/ADR text during implementation.
+The plan preserved the canonical Ticket/TicketMessage/TicketNote architecture and commit-first delivery, added the durable state and integrity constraints required by OD-CC-1 through OD-CC-9, fixed the confirmed defects (CC-GAP-01/02/03/22) with regression tests, and reconciled the stale domain/API/ADR text (CC-DG-01 through CC-DG-08). See `tasks.md` (CONV-057) for the full verification gate result and the one disclosed deferred item (Portal composer attach-file UI).
 
 ## Specification Status
 
-`SPECIFICATION APPROVED — PRODUCT DECISIONS RESOLVED; READY FOR IMPLEMENTATION PLANNING`
+`IMPLEMENTED + VERIFIED ON SDD BRANCH` — see `tasks.md` for the execution/verification record.

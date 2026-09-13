@@ -1,13 +1,13 @@
 # Knowledge Base Audit Logging — Task Breakdown
 
-Decomposition of [`plan.md`](./plan.md) (`READY FOR TASK BREAKDOWN`) into
-small, independently verifiable tasks. Source of truth for scope is
-[`spec.md`](./spec.md) (`READY FOR PLAN`) and `plan.md`. This file adds **no
-new decisions** — every task is anchored to an already-resolved plan
-decision.
+Decomposition of [`plan.md`](./plan.md) into small, independently verifiable
+tasks. Source of truth for scope is [`spec.md`](./spec.md) and `plan.md`.
+This file adds **no new decisions** — every task is anchored to an
+already-resolved plan decision.
 
-Creating this file changes no production code, no schema, no dependency, and
-no test. No task below is started or complete.
+Status: all 11 tasks below (`KB-AUDIT-001`…`011`) are implemented and
+verified — see [Task Breakdown Status](#task-breakdown-status) for the
+final report.
 
 ---
 
@@ -983,15 +983,19 @@ final implementation-readiness report. No merge, no push.
 # KB-RICH — Rich Text Content (task breakdown)
 
 Decomposition of [`plan.md` → Rich Text Content — Implementation
-Plan](./plan.md#rich-text-content--implementation-plan)
-(`READY FOR TASK BREAKDOWN`) against
+Plan](./plan.md#rich-text-content--implementation-plan) against
 [`spec.md` → Knowledge Base Rich Text Content](./spec.md#knowledge-base-rich-text-content)
 (`RT-1`…`RT-9`, `BC-*`, `SEC-*`).
 
 **This is a separate task series from `KB-AUDIT-*`.** `KB-AUDIT-001` …
-`KB-AUDIT-011` stay exactly as above — completed historical work. **Do
-not** reuse `KB-AUDIT-011` as the Rich Text gate; the new final gate is
-`KB-RICH-015`. Creating this section changes no code.
+`KB-AUDIT-011` stay exactly as above — completed historical work.
+`KB-RICH-015` is the true final gate for the Knowledge Base feature, not
+`KB-AUDIT-011`. Status: all 15 tasks below
+(`KB-RICH-001`…`015`) are implemented, with every code/test-level check
+passing; one non-code verification step (migration apply/rollback against a
+disposable Postgres) remains explicitly pending — see the "Known
+Limitation" note under `KB-RICH-015` and
+[Task Breakdown Status](#task-breakdown-status).
 
 ## KB-RICH Scope Guard
 
@@ -1779,8 +1783,28 @@ None (verification + report only).
   exact Git state (expected: unstaged, uncommitted), verification
   results, known limitations, suggested commit message.
 - Update the Knowledge Base status: **KB Audit = complete; KB Rich Text =
-  implemented + verified on branch; overall KB SDD enhancement = ready
-  for human review / merge.**
+  implemented, all code/test checks pass, migration apply/rollback
+  verification still pending (see below); overall KB SDD enhancement =
+  ready for human review, merge gated on that one step.**
+
+### Known Limitation — migration apply/rollback not exercised
+
+The "migration apply + rollback on a disposable DB" requirement above was
+**not executable in this environment** (no scratch Postgres available) —
+confirmed in `.wolf/memory.md` (2026-09-09 KB-RICH entry). The migration
+file (`20260909120000_kb_article_content_text`) is additive/non-destructive
+by inspection, but that has not been confirmed by an actual apply. This is
+the one item keeping the feature from being declared fully verified.
+
+**Remaining step (concise, actionable, do before merge):**
+```
+cd server && npx prisma migrate deploy   # against a disposable/staging Postgres
+npx prisma migrate status                # expect: clean
+# spot-check: every pre-existing row's contentText === content post-apply
+```
+No code, spec, or plan change is implied by this step — it is a one-time
+environment verification. Do not mark this task's status as fully
+DB-verified until it has been run and its result recorded here.
 
 ### Out of Scope
 `git commit` / `push` / `merge` / `rebase` / `amend` / staging. Any
@@ -1808,10 +1832,11 @@ All 11 tasks (`KB-AUDIT-001` … `KB-AUDIT-011`) implemented and verified
 on branch `chore/sdd-foundation`; changes remain unstaged and
 uncommitted. See `KB-AUDIT-011` for that pilot's readiness report.
 
-### KB Rich Text Content — `IMPLEMENTATION COMPLETE`
+### KB Rich Text Content — `IMPLEMENTED; MIGRATION VERIFICATION PENDING`
 
-All 15 tasks (`KB-RICH-001` … `KB-RICH-015`) implemented and verified on
-branch `chore/sdd-foundation` (2026-09-09); changes remain unstaged and
+All 15 tasks (`KB-RICH-001` … `KB-RICH-015`) implemented, with all code and
+test checks passing, on branch `chore/sdd-foundation` (2026-09-09); changes
+remain unstaged and
 uncommitted. ADR-057 records the decision. Every `RT-*` / `BC-*` / `SEC-*`
 requirement maps to at least one completed task.
 
@@ -1827,29 +1852,13 @@ apply + rollback on a disposable Postgres (no local Postgres / shadow DB) —
 deferred to the human review step; the additive DDL is otherwise verified
 against the live schema.
 
-### Overall Knowledge Base SDD enhancement — `READY FOR HUMAN REVIEW / MERGE`
+### Overall Knowledge Base SDD enhancement — `READY FOR HUMAN REVIEW; MERGE GATED ON MIGRATION VERIFICATION`
 
-`KB-RICH-015` has run. Merge (and the migration apply) are performed
-manually by the developer.
+`KB-RICH-015` has run and every check other than the disposable-DB migration
+apply/rollback passed. Merge (and the migration apply against a
+disposable/staging Postgres, per the "Known Limitation" note above) are
+performed manually by the developer.
 
-Prior status (kept for history):
-
-`READY FOR IMPLEMENTATION`
-
-- All implementation work in `plan.md` is decomposed into 11 tasks.
-- Audit constants (`KB-AUDIT-001`) are separated from mutation integration
-  (`KB-AUDIT-003`…`006`) and from request-context wiring (`KB-AUDIT-002`).
-- Create, edit, publish, unpublish, and delete are each represented as
-  independently reviewable tasks.
-- Mutation audit tests (`KB-AUDIT-007`), negative / no-audit tests
-  (`KB-AUDIT-008`), and the atomicity / audit-failure test (`KB-AUDIT-009`)
-  are represented.
-- Documentation reconciliation (`KB-AUDIT-010`) and final verification
-  (`KB-AUDIT-011`) are represented.
-- Every task has explicit dependencies, Verification, and Definition of
-  Done.
-- No architecture decision remains unresolved — all are fixed in `plan.md`
-  (`READY FOR TASK BREAKDOWN`).
-
-Next step: human review / merge of `chore/sdd-foundation`. No further
-implementation tasks remain in this pilot.
+Next step: run the migration-apply verification, then human review / merge
+of `chore/sdd-foundation`. No further implementation tasks remain in this
+pilot.
