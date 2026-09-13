@@ -19,14 +19,20 @@ Verified against `client/package.json`, `server/package.json`, and
 - Tailwind CSS 4 (styling, full RTL support)
 - Axios 1 (HTTP client, auth header injection)
 - i18next / react-i18next (EN/AR localization + RTL)
-- Lexical (rich text editor for ticket replies/notes and, since
-  `KB-RICH-*` / ADR-057, Knowledge Base article bodies — a bounded Rich
-  Text set on the same Lexical + `sanitize-html` infra, stored as
-  server-sanitized HTML in the existing `content` field; legacy
-  plain-text articles still render and are lazily converted on edit. See
-  `specs/features/knowledge-base/spec.md` "Knowledge Base Rich Text
-  Content" and ADR-057, which supersedes ADR-020's "no rich text"
-  consequence)
+- Lexical (rich text editor). The generic editor UI/insertion primitives
+  live in shared infrastructure at
+  `client/src/components/shared/rich-text/rich-text-editor.tsx`
+  (`RichTextEditor`) — extracted from Tickets after Tickets, Quick
+  Replies, and Knowledge Base all came to depend on it. Each consumer
+  owns its own behavior on top of the shared component: Tickets owns
+  ticket reply/note composition and send behavior, Quick Replies owns
+  reusable reply templates, and Knowledge Base owns article body editing
+  (`KB-RICH-*` / ADR-057 — a bounded Rich Text set on the same Lexical +
+  `sanitize-html` infra, stored as server-sanitized HTML in the existing
+  `content` field; legacy plain-text articles still render and are
+  lazily converted on edit). See `specs/features/knowledge-base/spec.md`
+  "Knowledge Base Rich Text Content" and ADR-057, which supersedes
+  ADR-020's "no rich text" consequence.
 - Recharts (report charts)
 - DOMPurify (sanitize rich HTML before render)
 - react-international-phone (phone input)

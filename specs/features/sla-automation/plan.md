@@ -1,6 +1,6 @@
 # SLA / Automation — Implementation Plan
 
-Status: **READY FOR TASKS**
+Status: **IMPLEMENTED** — see `tasks.md` (`SLA-001`…`SLA-004`) for execution and verification status.
 
 Scope: fix the two confirmed defects from `spec.md` §11 (DG-1 wrong recipient, DG-2 sweep failure isolation), close the identified test gaps, reconcile `docs/08-sla-automation.md`, no other behavior change.
 

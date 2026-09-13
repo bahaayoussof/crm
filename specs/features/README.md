@@ -158,7 +158,7 @@ authoritative discovery, just a planning aid. Reflects repository state as of
 **Implemented in code, no dedicated SDD package (candidates for a future
 package, not gaps in the product):**
 
-- Team & user management — `server/src/modules/{auth,users,teams,departments,branches}`; RBAC behavior is embedded/described in Tickets and Customers specs but the CRUD surfaces themselves have no standalone package.
+- Team & user management — `server/src/modules/{auth,users,teams,departments,branches}` plus the client `users`, `organization`, and `profile` feature folders (org-structure dropdowns, self-service profile/password pages); RBAC behavior is embedded/described in Tickets and Customers specs, and account freshness/authority rules are owned by `specs/features/auth-rbac/spec.md`, but the CRUD/self-service surfaces themselves have no standalone package.
 - Integrations / webhooks **admin configuration** — provider credentials (Resend/WhatsApp/SMS API keys, webhook secrets) are env-var only; no admin UI exists to configure them. Distinct from the provider **transport** (inbound parsing, outbound delivery, retries), which Conversations/Channels already owns and documents.
 
 **Already owned by an existing feature package (not pending):**
@@ -166,6 +166,7 @@ package, not gaps in the product):**
 - Attachments, Collaboration (`@mention`/watchers), Feedback — all ticket-scoped; owned by `specs/features/tickets/spec.md` ("Ticket owns" / Cross-Feature Boundary Summary).
 - Customer Portal — not a standalone capability; portal ticket routes are owned by Tickets, portal Knowledge Base routes by Knowledge Base, and Portal/Live-Chat conversation behavior by Conversations/Channels. No separate "Customer Portal" package is needed.
 - Audit Logs — cross-cutting infrastructure (`createAuditLog`) consumed and specified per-mutation inside each owning feature package (Tickets, Customers, Knowledge Base, Conversations/Channels); not a standalone product feature.
+- Manager Console (`server/src/modules/manager`, `client/src/features/manager`) — not a standalone capability; owned by `specs/features/dashboard-reporting/spec.md`, which documents its team-scoped visibility rules and the accepted `teamScopedTicketWhere()` vs. `ticketVisibilityWhere()` duplication (see its "Residual note").
 
 **Confirmed not present in this repository (removed from this list after
 verification — do not re-add without new evidence):**
