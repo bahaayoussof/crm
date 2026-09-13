@@ -89,6 +89,43 @@ async function ticketAccessibleBy(ticketId: string, actor: TaskActor): Promise<b
 }
 
 // ---------------------------------------------------------------------------
+// Ticket-link redaction at READ time.
+//
+// Task visibility (creator/assignee/team-linked) and ticket visibility are two
+// independent predicates. A task's `ticketId` link is only checked against
+// ticket visibility at create/update time (assertTicketAccessible /
+// ticketAccessibleBy) — it is never re-verified afterwards. If the ticket is
+// later re-routed to another team or re-assigned to another agent (or, for
+// pre-existing data, was linked without ever going through this validation),
+// an actor who still legitimately sees the TASK (as its creator/assignee)
+// would otherwise keep seeing the linked ticket's `subject` even after losing
+// visibility into the ticket itself — a metadata leak across the visibility
+// boundary. Strip the `ticket` projection (never `ticketId`, which is opaque
+// and independently re-checked by the tickets endpoints) whenever the linked
+// ticket does not currently satisfy the actor's ticket-visibility predicate.
+// ---------------------------------------------------------------------------
+type TicketLinkedRecord = { ticket: { id: string; subject: string } | null };
+
+async function redactUnauthorizedTicketLinks<T extends TicketLinkedRecord>(
+  actor: TaskActor,
+  records: T[],
+): Promise<T[]> {
+  const linkedIds = [...new Set(records.filter((r) => r.ticket).map((r) => r.ticket!.id))];
+  if (linkedIds.length === 0) return records;
+
+  const team = await resolveActorTeamScope(actor);
+  const visible = await prisma.ticket.findMany({
+    where: { id: { in: linkedIds }, ...ticketVisibilityWhere(actor, team) },
+    select: { id: true },
+  });
+  const visibleIds = new Set(visible.map((t) => t.id));
+
+  return records.map((record) =>
+    record.ticket && !visibleIds.has(record.ticket.id) ? { ...record, ticket: null } : record,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Assignee validation: active AGENT only for non-ADMIN/MANAGER actors,
 // or active AGENT OR self (the actor) for ADMIN/MANAGER.
 // An AGENT may only assign to themselves.
@@ -165,7 +202,7 @@ export async function listTasks(actor: TaskActor, query: ListTasksQuery) {
   ]);
 
   return {
-    data: records,
+    data: await redactUnauthorizedTicketLinks(actor, records),
     meta: {
       page: query.page,
       limit: query.limit,
@@ -184,7 +221,8 @@ export async function getTask(actor: TaskActor, taskId: string) {
     select: taskSummarySelect,
   });
   if (!task) throw new AppError(404, "TASK_NOT_FOUND", "Task not found");
-  return task;
+  const [redacted] = await redactUnauthorizedTicketLinks(actor, [task]);
+  return redacted;
 }
 
 // ---------------------------------------------------------------------------
@@ -360,7 +398,8 @@ export async function updateTask(actor: TaskActor, taskId: string, input: Update
     return result;
   }));
 
-  return updated;
+  const [redacted] = await redactUnauthorizedTicketLinks(actor, [updated]);
+  return redacted;
 }
 
 // ---------------------------------------------------------------------------

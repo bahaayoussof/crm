@@ -552,7 +552,7 @@ Known limitations: text only (in and out); no media/templates/interactive/status
 
 `POST /api/integrations/email/webhook` is a public machine endpoint (no product JWT). It verifies the exact raw request body with the official Resend SDK and `svix-*` headers, handles `email.received`, and returns `200` for unsupported signed events and duplicates. Full content and attachments are retrieved through Resend's Receiving API and integrated with the existing Customer, EMAIL Ticket, TicketMessage, Attachment, history, SLA, and notification flows. See `docs/21-email-integration.md` for matching order, errors, environment variables, and limitations.
 
-## Tasks — LIVE (on `feature/tasks-reminders`, not yet integrated)
+## Tasks — LIVE, integrated (mounted at `/api/tasks` in `server/src/app.ts`)
 
 ```text
 GET    /api/tasks           list (ADMIN, MANAGER, AGENT) — ?status &assigneeId &ticketId &search &page &limit
@@ -564,7 +564,8 @@ DELETE /api/tasks/:id       delete (ADMIN, MANAGER, or creator) → 204
 
 `taskRouter` is registered at `/api/tasks` in `server/src/app.ts` behind `requireAuth` + `requireRole(ADMIN, MANAGER, AGENT)`. `CUSTOMER` and unauthenticated callers are rejected everywhere; there is no Portal route. New `Task` model + nullable `Notification.taskId` (migration `20260827200533_add_tasks`).
 
-- **Visibility:** `ADMIN`/`MANAGER` see every task; `AGENT` sees only tasks they created or are assigned. An `AGENT`'s `assigneeId` list filter is ignored.
+- **Visibility:** `ADMIN` sees every task. `MANAGER` sees tasks they created/are assigned, unlinked tasks, and tasks whose linked ticket belongs to their own team (never another team's ticket-linked task). `AGENT` sees only tasks they created or are assigned. An `AGENT`'s `assigneeId` list filter is ignored.
+- **Ticket-link redaction:** a task's `ticket` projection (`{ id, subject }`) is only included in a response when the linked ticket currently satisfies the actor's ticket-visibility rule — re-checked on every read, independent of task visibility, so a task the actor still owns (as creator/assignee) never leaks a since-reassigned or since-re-routed ticket's subject. `ticketId` itself is always present.
 - **Assignment:** `AGENT` may only self-assign (other `assigneeId` → `403 FORBIDDEN`); `ADMIN`/`MANAGER` assign to any active `AGENT` or self (`404 ASSIGNEE_NOT_FOUND` otherwise). Assigning to another user writes one `TASK_ASSIGNED` notification in the same transaction.
 - **Ticket link (optional):** validated against ticket-visibility for the actor (`404 TICKET_NOT_FOUND`) and the effective assignee (`422 TICKET_NOT_ACCESSIBLE_BY_ASSIGNEE`). No `TicketHistory` row is written.
 - **Field-level `PATCH`:** `ADMIN`/`MANAGER` → all fields; `AGENT` creator → content, `status`, `dueAt`, `ticketId`, never `assigneeId` (`403`); `AGENT` assignee-but-not-creator → `status` only (any other field → `403`). `remindedAt` is reset when `dueAt` changes, the assignee changes, or a `DONE` task is reopened.

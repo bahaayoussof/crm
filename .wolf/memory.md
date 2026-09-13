@@ -1328,3 +1328,9 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
 | 19:44 | Dashboard/Reporting brownfield SDD audit: no cross-role leak found (dashboard reuses ticketVisibilityWhere), fixed stale AGENT-scope claim in docs/06-auth-rbac.md, updated README coverage matrix | specs/features/dashboard-reporting/{spec,plan,tasks}.md, docs/06-auth-rbac.md, specs/features/README.md | server 49/49, client 26/26, typecheck/lint clean | ~175k |
+
+## Session: 2026-09-13 19:47
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 20:00 | Tasks/Reminders SDD pass: created specs/features/tasks-reminders/{spec,plan,tasks}.md; found+fixed TASKS-001 (linked-ticket subject leak, read-time redaction not applied) | server/src/modules/tasks/task.service.ts, task.test.ts, docs/05-api-contract.md, specs/features/README.md | server 1102/1102, client tasks 17/17, tsc/eslint clean both sides | ~55k |

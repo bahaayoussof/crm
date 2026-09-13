@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   userFindFirst: vi.fn(),
   userFindUnique: vi.fn(),
   ticketFindFirst: vi.fn(),
+  ticketFindMany: vi.fn(),
   notificationCreateMany: vi.fn(),
 }));
 
@@ -29,7 +30,7 @@ vi.mock("../../config/prisma.js", () => {
     prisma: {
       task,
       user: { findFirst: mocks.userFindFirst, findUnique: mocks.userFindUnique },
-      ticket: { findFirst: mocks.ticketFindFirst },
+      ticket: { findFirst: mocks.ticketFindFirst, findMany: mocks.ticketFindMany },
       $transaction: vi.fn((arg: unknown) =>
         typeof arg === "function"
           ? (arg as (t: typeof tx) => unknown)(tx)
@@ -76,6 +77,9 @@ describe("tasks API", () => {
     mocks.taskUpdate.mockResolvedValue(taskRow());
     mocks.taskDelete.mockResolvedValue(taskRow());
     mocks.notificationCreateMany.mockResolvedValue({ count: 1 });
+    // TASKS ticket-link redaction: default to "still visible" so existing
+    // fixtures with a linked ticket keep passing unless a test overrides this.
+    mocks.ticketFindMany.mockResolvedValue([{ id: "c737ce60fccf9da889f4605c0" }]);
     // feature/team-based-manager-scope: taskVisibilityWhere() + ticket-link checks
     // resolve the actor's team via user.findUnique.
     mocks.userFindUnique.mockResolvedValue({ teamId: null, managedTeam: null });
@@ -171,6 +175,20 @@ describe("tasks API", () => {
       const response = await request(app).get("/api/tasks?bogus=1").set(auth(adminToken));
       expect(response.status).toBe(400);
     });
+
+    it("TASKS-SEC redacts linked-ticket subjects across a list page when the ticket is no longer visible", async () => {
+      mocks.taskFindMany.mockResolvedValue([
+        taskRow({ id: "task-a", ticketId: "t-visible", ticket: { id: "t-visible", subject: "Visible" } }),
+        taskRow({ id: "task-b", ticketId: "t-hidden", ticket: { id: "t-hidden", subject: "Hidden subject" } }),
+      ]);
+      mocks.taskCount.mockResolvedValue(2);
+      mocks.ticketFindMany.mockResolvedValue([{ id: "t-visible" }]); // t-hidden absent
+      const response = await request(app).get("/api/tasks").set(auth(agentToken));
+      expect(response.status).toBe(200);
+      const byId = Object.fromEntries(response.body.data.map((t: { id: string; ticket: unknown }) => [t.id, t.ticket]));
+      expect(byId["task-a"]).toEqual({ id: "t-visible", subject: "Visible" });
+      expect(byId["task-b"]).toBeNull();
+    });
   });
 
   describe("get one", () => {
@@ -187,6 +205,30 @@ describe("tasks API", () => {
       expect(response.status).toBe(200);
       expect(response.body.data.assignee).toEqual({ id: "c90b1b286043f1b7612e423c7", name: "Admin User" });
       expect(response.body.data.assignee).not.toHaveProperty("email");
+    });
+
+    it("TASKS-SEC redacts the linked ticket when it is no longer visible to the actor (own task, stale/foreign ticket link)", async () => {
+      // The AGENT is the task's own creator (task itself is fully visible),
+      // but the linked ticket now belongs to another team/agent — ticket
+      // visibility must be re-checked independently of task visibility.
+      mocks.taskFindFirst.mockResolvedValue(
+        taskRow({ ticketId: "c737ce60fccf9da889f4605c0", ticket: { id: "c737ce60fccf9da889f4605c0", subject: "Confidential subject" } }),
+      );
+      mocks.ticketFindMany.mockResolvedValue([]); // not visible to this actor
+      const response = await request(app).get("/api/tasks/c7afaa346b4bf92bf9dc21e9a").set(auth(agentToken));
+      expect(response.status).toBe(200);
+      expect(response.body.data.ticket).toBeNull();
+      expect(mocks.ticketFindMany.mock.calls[0][0].where.id).toEqual({ in: ["c737ce60fccf9da889f4605c0"] });
+    });
+
+    it("keeps the linked ticket visible when the actor still has ticket access", async () => {
+      mocks.taskFindFirst.mockResolvedValue(
+        taskRow({ ticketId: "c737ce60fccf9da889f4605c0", ticket: { id: "c737ce60fccf9da889f4605c0", subject: "Visible subject" } }),
+      );
+      mocks.ticketFindMany.mockResolvedValue([{ id: "c737ce60fccf9da889f4605c0" }]);
+      const response = await request(app).get("/api/tasks/c7afaa346b4bf92bf9dc21e9a").set(auth(agentToken));
+      expect(response.status).toBe(200);
+      expect(response.body.data.ticket).toEqual({ id: "c737ce60fccf9da889f4605c0", subject: "Visible subject" });
     });
   });
 
