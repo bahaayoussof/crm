@@ -142,7 +142,12 @@ async function escalateBreachedTickets(now: Date) {
     });
     if (escalated) {
       updated += 1;
-      emitTicketUpdated({ ticketId: ticket.id, assignedAgentId: ticket.assignedAgentId, customerId: ticket.customerId });
+      emitTicketUpdated({
+        ticketId: ticket.id,
+        assignedAgentId: ticket.assignedAgentId,
+        customerId: ticket.customerId,
+        teamId: ticket.teamId,
+      });
     }
   }
   return { inspected: tickets.length, updated };

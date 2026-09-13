@@ -348,6 +348,29 @@ describe("SLA automation", () => {
           ]),
         }),
       );
+      // RT-GAP-1 regression: the realtime `ticket.updated` audience must carry the
+      // ticket's own `teamId` so the escalated ticket's own-team MANAGER (and, for
+      // an unassigned ticket, that team's unassigned-queue AGENTs) actually receive
+      // the invalidation — omitting it silently defaults `canReceive`'s audience to
+      // unrouted (ADMIN-only, plus the already-assigned agent via a separate check).
+      expect(mocks.emitTicketUpdated).toHaveBeenCalledWith(
+        expect.objectContaining({ ticketId: "ticket-9", teamId: "team-a", customerId: "cust-9" }),
+      );
+    });
+
+    it("RT-GAP-1: an unrouted ticket's escalation still emits teamId explicitly as null (not merely omitted)", async () => {
+      const now = new Date("2026-09-02T12:00:00.000Z");
+      mocks.ticketFindMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: "ticket-unrouted", subject: "Unrouted breach", status: TicketStatus.OPEN, assignedAgentId: null, customerId: "cust-10", teamId: null }]);
+      mocks.state.recipients = ["admin-1"];
+
+      const result = await runSlaMonitor(now);
+
+      expect(result.escalated).toBe(1);
+      expect(mocks.emitTicketUpdated).toHaveBeenCalledWith(
+        expect.objectContaining({ ticketId: "ticket-unrouted", teamId: null, customerId: "cust-10" }),
+      );
     });
 
     // OD-1 / TK-002 — a manually reopened ticket (resolvedAt cleared) re-enters

@@ -165,7 +165,7 @@ activity never reach an unauthorized connected user.
 
 ## 6. SSE endpoint & authentication strategy
 
-`GET /api/realtime/events` — `requireAuth` + `requireRole(ADMIN, MANAGER, AGENT)`.
+`GET /api/realtime/events` — `requireAuth` + `requireRole(ADMIN, MANAGER, AGENT, CUSTOMER)` (see §9 — the Customer Portal connects through the same endpoint, scoped server-side).
 
 Response headers: `Content-Type: text/event-stream`, `Cache-Control: no-cache,
 no-transform`, `Connection: keep-alive`, `X-Accel-Buffering: no`. The socket
