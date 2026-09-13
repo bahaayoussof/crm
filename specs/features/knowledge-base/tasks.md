@@ -1829,15 +1829,14 @@ intended changes, unstaged and uncommitted.
 ### KB Audit Logging — `IMPLEMENTATION COMPLETE`
 
 All 11 tasks (`KB-AUDIT-001` … `KB-AUDIT-011`) implemented and verified
-on branch `chore/sdd-foundation`; changes remain unstaged and
-uncommitted. See `KB-AUDIT-011` for that pilot's readiness report.
+on branch `chore/sdd-foundation`; changes are committed. See `KB-AUDIT-011`
+for that pilot's readiness report.
 
 ### KB Rich Text Content — `IMPLEMENTED; MIGRATION VERIFICATION PENDING`
 
 All 15 tasks (`KB-RICH-001` … `KB-RICH-015`) implemented, with all code and
 test checks passing, on branch `chore/sdd-foundation` (2026-09-09); changes
-remain unstaged and
-uncommitted. ADR-057 records the decision. Every `RT-*` / `BC-*` / `SEC-*`
+are committed. ADR-057 records the decision. Every `RT-*` / `BC-*` / `SEC-*`
 requirement maps to at least one completed task.
 
 Verification run for `KB-RICH-015`: server `tsc` + `eslint` clean, full

@@ -3,7 +3,7 @@
 ## Status
 
 **Implemented + verified on SDD branch** (`chore/sdd-foundation`, 2026-09-13,
-uncommitted). Brownfield discovery of an already-shipped module
+committed). Brownfield discovery of an already-shipped module
 (`server/src/modules/quick-replies`, `client/src/features/quick-replies`)
 that had no dedicated SDD package (previously listed in
 `specs/features/README.md` under "Implemented in code, no dedicated SDD

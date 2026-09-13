@@ -2,7 +2,7 @@
 
 ## Status
 
-**Implemented + verified (uncommitted on `chore/sdd-foundation`)** — brownfield
+**Implemented + verified (committed on `chore/sdd-foundation`)** — brownfield
 discovery of `server/src/modules/settings` (SLA rules + category admin CRUD),
 `server/src/modules/categories` (non-admin category list), and
 `server/src/modules/portal` (customer-facing category list), plus the

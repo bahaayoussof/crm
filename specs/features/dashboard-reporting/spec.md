@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented + verified (brownfield SDD pass, uncommitted on `chore/sdd-foundation`).
+Implemented + verified (brownfield SDD pass, committed on `chore/sdd-foundation`).
 No correctness or security defect found. One stale-docs correction applied
 (`docs/06-auth-rbac.md`). Server 4/4 targeted test files pass (see
 `tasks.md`); no new product code changes were required.

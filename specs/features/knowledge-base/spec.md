@@ -7,7 +7,7 @@ Two capabilities, tracked separately in this one package:
 | Capability | State |
 | --- | --- |
 | **KB Audit Logging** (`KB-AUDIT-001`…`011`) | **Implementation complete** (2026-09-09). See [Pilot Enhancement — Audit-Log Integration](#pilot-enhancement--audit-log-integration) and [Implemented as (2026-09-09)](#implemented-as-2026-09-09). Preserved below as implemented history. |
-| **KB Rich Text Content** (`KB-RICH-*`) | **Implemented; code + test verification complete** on branch `chore/sdd-foundation` (2026-09-09, `KB-RICH-001`…`KB-RICH-015`; ADR-057). Changes unstaged/uncommitted. **One verification step remains open**: migration apply/rollback for `20260909120000_kb_article_content_text` has not been exercised against a disposable Postgres in this environment — see [Migration Verification Status](#migration-verification-status). See [Knowledge Base Rich Text Content](#knowledge-base-rich-text-content). |
+| **KB Rich Text Content** (`KB-RICH-*`) | **Implemented; code + test verification complete** on branch `chore/sdd-foundation` (2026-09-09, `KB-RICH-001`…`KB-RICH-015`; ADR-057). Changes committed. **One verification step remains open**: migration apply/rollback for `20260909120000_kb_article_content_text` has not been exercised against a disposable Postgres in this environment — see [Migration Verification Status](#migration-verification-status). See [Knowledge Base Rich Text Content](#knowledge-base-rich-text-content). |
 | **Overall Knowledge Base SDD enhancement work** | **Ready for human review; merge gated on the migration-apply verification step above** — the Rich Text enhancement is implemented and every `KB-RICH-015` check other than the disposable-DB migration apply/rollback has run. |
 
 The Audit pilot resolved its seven clarification questions
@@ -968,7 +968,7 @@ Settled by the developer for this pilot (2026-09-09):
 - `AuditLog` integration for management mutations specified with testable
   acceptance criteria and anchored to existing audit conventions.
 - Implemented per `plan.md` / `tasks.md` (`KB-AUDIT-001`…`011`); changes
-  unstaged, uncommitted on `chore/sdd-foundation`.
+  committed on `chore/sdd-foundation`.
 
 ### KB Rich Text Content — `IMPLEMENTED; MIGRATION VERIFICATION PENDING`
 
@@ -976,7 +976,7 @@ Settled by the developer for this pilot (2026-09-09):
   Content](#knowledge-base-rich-text-content)) with testable acceptance
   criteria (`RT-1`…`RT-9`, `BC-*`, `SEC-*`).
 - Implemented per `plan.md` / `tasks.md` (`KB-RICH-001`…`KB-RICH-015`) on
-  branch `chore/sdd-foundation`; changes unstaged and uncommitted.
+  branch `chore/sdd-foundation`; changes committed.
 - The four deferred technical questions were resolved as approved: sanitized
   HTML in `content`; an additive nullable `contentText` projection column;
   a normalize-on-write + content-shape sniff for legacy detection; two

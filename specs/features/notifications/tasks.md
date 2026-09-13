@@ -16,7 +16,7 @@ Scope: 3 client-only defects (NOTIF-GAP-1/2/3 in `spec.md`). No server change. N
 
 ## Honest status at end of implementation
 
-**IMPLEMENTED + VERIFIED ON SDD BRANCH (2026-09-13, branch `chore/sdd-foundation`, uncommitted).**
+**IMPLEMENTED + VERIFIED ON SDD BRANCH (2026-09-13, branch `chore/sdd-foundation`, committed).**
 
 All 6 tasks done. Discovery found the backend (recipient targeting, persistence, SSE invalidation, dedup, self-notification suppression, authorization-safe navigation targets, CLOSED-ticket viewability) already correct — no server code, schema, migration, or route changed. Only the three client-side gaps in `spec.md` were fixed:
 

@@ -3,7 +3,7 @@
 ## Status
 
 **Implemented + verified on SDD branch** (`chore/sdd-foundation`, 2026-09-13,
-uncommitted). Brownfield discovery of an already-shipped feature
+committed). Brownfield discovery of an already-shipped feature
 (`server/src/modules/tasks/*`, `client/src/features/tasks/*`) that had no
 dedicated SDD package. One confirmed security/RBAC defect found and fixed
 (ticket-link metadata redaction, TASKS-001). No other correctness,

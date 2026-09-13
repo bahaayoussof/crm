@@ -3,7 +3,7 @@
 ## Status
 
 **Implemented + verified on SDD branch** (`chore/sdd-foundation`, 2026-09-13,
-uncommitted). Brownfield discovery of two already-shipped, already
+committed). Brownfield discovery of two already-shipped, already
 well-hardened modules (`server/src/modules/{ai,customer-ai}`,
 `client/src/features/{ai-assistant,customer-ai}`) that had no dedicated SDD
 package (previously listed in `specs/features/README.md` under "Implemented

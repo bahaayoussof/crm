@@ -14,7 +14,7 @@ Scope: 1 confirmed backend audience/team-scope defect (RT-GAP-1), 1 documentatio
 
 ## Honest status at end of implementation
 
-**IMPLEMENTED + VERIFIED ON SDD BRANCH (2026-09-13, branch `chore/sdd-foundation`, uncommitted).**
+**IMPLEMENTED + VERIFIED ON SDD BRANCH (2026-09-13, branch `chore/sdd-foundation`, committed).**
 
 All 5 tasks done. Discovery read the entire realtime transport (`server/src/modules/realtime/*`, `client/src/features/realtime/*`) end-to-end plus every domain producer call site and confirmed the transport, its transaction-safety outbox, its authorization chokepoint (`canReceive`), and the frontend subscription/invalidation mapping were already correct — this is the third SDD pass to touch this surface (`conversations-channels` and `notifications` preceded it and had already fixed their own producer-side defects, CC-GAP-01/02/03/22 and NOTIF-GAP-1/2/3 respectively). The one genuine remaining defect found was in a producer file neither prior pass audited end-to-end: `sla-automation.service.ts`'s escalation path was missing `teamId` on its `ticket.updated` audience, silently dropping the event for the escalated ticket's own-team MANAGER (and, for an unrouted-to-unassigned edge, that team's unassigned-queue AGENTs) — same defect class as the already-fixed CC-GAP-01/02, now closed here.
 

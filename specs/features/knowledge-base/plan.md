@@ -1031,7 +1031,7 @@ branch `chore/sdd-foundation` (2026-09-09), ADR-057. The four "Open
 Decisions For Human Review" were approved as the plan recommended: (1) add
 `contentText`; (2) two heading levels; (3) the ticket link popover is
 **reused by import** (clean presentational graph); (4) `content` `.max()`
-raised to `200_000`. Changes unstaged/uncommitted.
+raised to `200_000`. Changes committed.
 
 Prior status (kept for history): `READY FOR TASK BREAKDOWN`
 

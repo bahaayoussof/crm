@@ -122,3 +122,42 @@ session's report / commit):
   rule → `specs/constitution.md` "Testing / Verification". Definition of
   Done → `specs/constitution.md` "Definition of Done". Git/branch workflow
   → `specs/constitution.md` "Git Rules".
+
+## Final verification summary (2026-09-13, `chore/sdd-foundation`)
+
+A verification-closure pass re-ran the full technical gate to resolve the
+open items from the prior closing review. Results:
+
+- **Client**: typecheck clean, lint clean (2 pre-existing warnings only),
+  build succeeds. Full test suite (851 tests) is **intermittently flaky**
+  under this machine's parallel test execution: three consecutive full
+  runs produced 0, 1, and 2 single-test `5000ms` timeouts, each time in a
+  **different** file, none matching a specific test's own logic (the five
+  originally reported failing tests all passed cleanly, both in isolation
+  and grouped together, across every run). Root cause is worker/CPU
+  contention on this environment, not a reproducible test or product
+  defect -- no timeout values were changed to mask this.
+- **Server**: typecheck, lint, `prisma validate`, `prisma generate`, and
+  the production build all pass; full test suite 1111/1111 passes. The
+  prior `EPERM` DLL lock during `prisma generate` was caused by a locally
+  running `npm run dev` (`tsx watch src/server.ts`) process holding the
+  Prisma query engine binary open; stopping that process and clearing the
+  stale `.dll.node.tmp*` files resolved it.
+- **Migrations** (`20260909120000_kb_article_content_text`,
+  `20260913172511_category_name_lower_unique`): both reviewed by static
+  SQL inspection only (additive nullable column + straight backfill;
+  functional unique index mirroring the existing `Customer.email` pattern)
+  and are safe by inspection. No disposable PostgreSQL instance was
+  available in this environment (no Docker, no local `psql`/`pg_ctl`, the
+  only configured `DATABASE_URL` is a remote Neon instance) --
+  **disposable PostgreSQL unavailable; live migration verification not
+  performed.**
+- **Browser/E2E**: no Playwright config or browser-smoke tooling exists in
+  this repo. Exercising any write flow (ticket reply, quick reply, KB
+  article) would require the dev server to connect to the only reachable
+  database -- the remote Neon (production-like) instance -- which is unsafe
+  for this pass. **Not performed.**
+
+Remaining gaps are verification/environment debt, not proven product
+defects. See the closing review report for the full per-test/per-area
+breakdown.

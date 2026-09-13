@@ -2,7 +2,7 @@
 
 ## Status
 
-**`IMPLEMENTED + VERIFIED ON SDD BRANCH`** — all 57 tasks (CONV-001–057) materially complete, final gate (CONV-057) passed. Branch `chore/sdd-foundation`, uncommitted. See "Honest status at end of this session" near the bottom of this file for the one deferred item (Portal composer attach-file client UI) and its scope rationale.
+**`IMPLEMENTED + VERIFIED ON SDD BRANCH`** — all 57 tasks (CONV-001–057) materially complete, final gate (CONV-057) passed. Branch `chore/sdd-foundation`, committed. See "Honest status at end of this session" near the bottom of this file for the one deferred item (Portal composer attach-file client UI) and its scope rationale.
 
 ## Progress Log
 

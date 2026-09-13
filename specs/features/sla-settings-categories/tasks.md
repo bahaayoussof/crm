@@ -1,6 +1,6 @@
 # SLA Settings / Categories — Tasks
 
-Status: `IMPLEMENTED + VERIFIED (uncommitted on chore/sdd-foundation)` —
+Status: `IMPLEMENTED + VERIFIED (committed on chore/sdd-foundation)` —
 brownfield discovery complete; one confirmed gap fixed with regression
 coverage; all other behavior documented as-is with no code change.
 
