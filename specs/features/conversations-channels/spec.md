@@ -383,7 +383,7 @@ The following requirements resolve OD-CC-1 through OD-CC-9. They supersede the c
 - Duplicate SSE events are harmless because invalidation/refetch is idempotent; no client event dedupe exists.
 - Auto-scroll follows new items only when near the bottom and explicit local send uses a token; refetch does not focus the composer or intentionally clear drafts.
 - Reply/note editors remain mounted across workspace/mode changes and hold separate drafts. Pending state blocks duplicate UI submissions; recoverable errors preserve the draft. Successful mutation clears only the active draft.
-- Quick Reply is internal-public-reply-only, searches server-side, inserts editable plain text, respects the 20,000-character draft limit, and never sends. AI suggestions similarly insert only after human action.
+- Quick Reply is internal-public-reply-only, searches server-side, inserts editable content (sanitized rich HTML for a Rich-Input-authored body, plain text for a not-yet-re-edited legacy row — see `specs/features/quick-replies/spec.md`), respects the 20,000-character draft limit, and never sends. AI suggestions similarly insert only after human action.
 - Delivery failure is shown as an inline localized error after a `201 FAILED` result. The same translation namespace still says `whatsappDelivery` internally even though its copy is channel-neutral. Reload loses the per-message warning because detail DTOs do not carry delivery state.
 - Attachment upload caches are separate from ticket conversation caches. A ticket/Portal upload invalidates only its attachment key, so upload alone does not refetch/reopen conversation state.
 

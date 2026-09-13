@@ -7,7 +7,7 @@ import type { QuickReplyFormValues } from "./quick-reply.schemas";
  * The Quick Reply "Reply text" field: the shared ticket reply/note Lexical
  * editor (`TicketReplyEditor`), wired into react-hook-form through a
  * `Controller` since it is not a native `<input>`/`<textarea>`. One component
- * used by both the Create modal and the Edit page so create/edit never diverge
+ * shared by the Create and Edit routes (both render `QuickReplyFormPage`) so create/edit never diverge
  * (mirrors the Knowledge Base article form's `Controller` + editor wiring).
  *
  * The editor is uncontrolled (Lexical owns its own state) — react-hook-form

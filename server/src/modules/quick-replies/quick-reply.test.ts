@@ -4,19 +4,26 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   findMany: vi.fn(), count: vi.fn(), findUnique: vi.fn(),
-  create: vi.fn(), update: vi.fn(), remove: vi.fn(),
+  create: vi.fn(), update: vi.fn(), remove: vi.fn(), auditCreate: vi.fn(),
 }));
 
-vi.mock("../../config/prisma.js", () => ({
-  prisma: {
-    quickReply: {
-      findMany: mocks.findMany, count: mocks.count, findUnique: mocks.findUnique,
-      create: mocks.create, update: mocks.update, delete: mocks.remove,
+vi.mock("../../config/prisma.js", () => {
+  const quickReply = {
+    findMany: mocks.findMany, count: mocks.count, findUnique: mocks.findUnique,
+    create: mocks.create, update: mocks.update, delete: mocks.remove,
+  };
+  const auditLog = { create: mocks.auditCreate };
+  return {
+    prisma: {
+      quickReply,
+      auditLog,
+      $transaction: vi.fn(async (value: unknown) =>
+        typeof value === "function"
+          ? (value as (tx: unknown) => unknown)({ quickReply, auditLog })
+          : Promise.all(value as Promise<unknown>[])),
     },
-    $transaction: vi.fn(async (value: unknown) =>
-      typeof value === "function" ? (value as (tx: unknown) => unknown)(mocks) : Promise.all(value as Promise<unknown>[])),
-  },
-}));
+  };
+});
 
 import { app } from "../../app.js";
 import { createAccessToken } from "../auth/auth-token.js";
@@ -218,5 +225,59 @@ describe("quick replies API", () => {
     const response = await request(app).delete("/api/quick-replies/c836302c0fbd491226544d598").set(auth(adminToken));
     expect(response.status).toBe(204);
     expect(mocks.remove).toHaveBeenCalledWith({ where: { id: "c836302c0fbd491226544d598" } });
+  });
+
+  it("writes a transactional QUICK_REPLY_CREATED audit row with the title but never the body", async () => {
+    mocks.create.mockResolvedValue(greetingRow);
+    const response = await request(app).post("/api/quick-replies").set(auth(adminToken))
+      .send({ title: "Greeting", body: "Hello, thanks for contacting support." });
+    expect(response.status).toBe(201);
+    expect(mocks.auditCreate).toHaveBeenCalledTimes(1);
+    const auditData = mocks.auditCreate.mock.calls[0]?.[0].data;
+    expect(auditData).toMatchObject({
+      action: "QUICK_REPLY_CREATED",
+      entityType: "QUICK_REPLY",
+      entityId: "c836302c0fbd491226544d598",
+      actorId: "c90b1b286043f1b7612e423c7",
+    });
+    expect(auditData.metadata.changes).toEqual({ title: { to: "Greeting" } });
+    expect(JSON.stringify(auditData)).not.toContain("Hello, thanks for contacting support.");
+    // create happens within the same $transaction callback, before the audit write.
+    expect(mocks.create.mock.invocationCallOrder[0]).toBeLessThan(mocks.auditCreate.mock.invocationCallOrder[0]);
+  });
+
+  it("writes a QUICK_REPLY_UPDATED audit row with a real title from/to and a presence-only body marker", async () => {
+    mocks.findUnique.mockResolvedValue({ id: "c836302c0fbd491226544d598", title: "Greeting", body: "Hello, thanks for contacting support." });
+    mocks.update.mockResolvedValue({ ...greetingRow, title: "Warm greeting", body: "<p>Updated <em>reply</em></p>" });
+    const response = await request(app).patch("/api/quick-replies/c836302c0fbd491226544d598").set(auth(managerToken))
+      .send({ title: "Warm greeting", body: "<p>Updated <em>reply</em></p>" });
+    expect(response.status).toBe(200);
+    expect(mocks.auditCreate).toHaveBeenCalledTimes(1);
+    const auditData = mocks.auditCreate.mock.calls[0]?.[0].data;
+    expect(auditData.action).toBe("QUICK_REPLY_UPDATED");
+    expect(auditData.metadata.changes).toEqual({ title: { from: "Greeting", to: "Warm greeting" } });
+    expect(auditData.metadata.bodyChanged).toBe(true);
+    expect(JSON.stringify(auditData)).not.toContain("Updated");
+  });
+
+  it("does not write an audit row for a no-op update (unchanged title, no body field)", async () => {
+    mocks.findUnique.mockResolvedValue({ id: "c836302c0fbd491226544d598", title: "Greeting", body: "Hello, thanks for contacting support." });
+    mocks.update.mockResolvedValue(greetingRow);
+    const response = await request(app).patch("/api/quick-replies/c836302c0fbd491226544d598").set(auth(adminToken))
+      .send({ title: "Greeting" });
+    expect(response.status).toBe(200);
+    expect(mocks.auditCreate).not.toHaveBeenCalled();
+  });
+
+  it("writes a transactional QUICK_REPLY_DELETED audit row with the pre-delete title but never the body", async () => {
+    mocks.findUnique.mockResolvedValue({ id: "c836302c0fbd491226544d598", title: "Greeting" });
+    mocks.remove.mockResolvedValue({ id: "c836302c0fbd491226544d598" });
+    const response = await request(app).delete("/api/quick-replies/c836302c0fbd491226544d598").set(auth(adminToken));
+    expect(response.status).toBe(204);
+    expect(mocks.auditCreate).toHaveBeenCalledTimes(1);
+    const auditData = mocks.auditCreate.mock.calls[0]?.[0].data;
+    expect(auditData).toMatchObject({ action: "QUICK_REPLY_DELETED", entityType: "QUICK_REPLY", entityId: "c836302c0fbd491226544d598" });
+    expect(auditData.metadata.changes).toEqual({ title: { from: "Greeting" } });
+    expect(mocks.remove.mock.invocationCallOrder[0]).toBeLessThan(mocks.auditCreate.mock.invocationCallOrder[0]);
   });
 });
