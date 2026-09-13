@@ -1,7 +1,7 @@
 import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
-import { Paperclip } from "lucide-react";
+import { Paperclip, X } from "lucide-react";
 import { AttachmentCompactGrid } from "@/features/attachments/attachment-ui";
 import { QuickReplyPicker } from "@/features/quick-replies/quick-reply-picker";
 import { getTicketError } from "./ticket-error";
@@ -40,10 +40,16 @@ type TicketWorkspaceTabsProps = {
   locale: string;
   /** Fired after a successful reply or note so the page can scroll the conversation to latest. */
   onSent?: () => void;
-  /** Triggered to open the shared file upload modal. */
+  /** Triggered to open the shared file upload modal for a ticket-level (legacy, non-conversation) upload — used by the Attachments tab only. */
   onAttachFile?: () => void;
+  /** CONV-041/049 — triggered to open the shared file upload modal for a staged, message/note-bound attachment. */
+  onAttachToMessage?: () => void;
   /** True while the conversation viewport shows the upload workspace (legacy/optional). */
   attachMode?: boolean;
+  /** CONV-041/049 — a staged (unbound) attachment ready to bind to the next send. */
+  stagedAttachment?: { id: string; fileName: string; mimeType: string } | null;
+  /** Drop the staged attachment without sending. */
+  onClearStagedAttachment?: () => void;
   className?: string;
 };
 
@@ -73,6 +79,9 @@ export const TicketWorkspaceTabs = forwardRef<TicketWorkspaceHandle, TicketWorks
       locale,
       onSent,
       onAttachFile,
+      onAttachToMessage,
+      stagedAttachment = null,
+      onClearStagedAttachment,
       className = "",
     },
     ref,
@@ -80,6 +89,11 @@ export const TicketWorkspaceTabs = forwardRef<TicketWorkspaceHandle, TicketWorks
     const { t } = useTranslation();
     const isWhatsapp = channel === "WHATSAPP";
     const isSms = channel === "SMS";
+    // CONV-042: EMAIL/SMS/WhatsApp public replies reject a staged attachment
+    // server-side — the composer never offers Attach for those channels in
+    // reply mode. Internal notes are never provider-delivered, so they may
+    // always attach regardless of channel.
+    const noOutboundAttachments = channel === "EMAIL" || channel === "SMS" || channel === "WHATSAPP";
     const [tab, setTab] = useState<Tab>("reply");
     const [mode, setMode] = useState<Mode>("reply");
     const [replyText, setReplyText] = useState("");
@@ -132,7 +146,8 @@ export const TicketWorkspaceTabs = forwardRef<TicketWorkspaceHandle, TicketWorks
       setError(null);
       setSuccess(null);
       try {
-        const result = (await mutation.mutateAsync({ body })) as TicketMessageResult;
+        const attachmentIds = stagedAttachment ? [stagedAttachment.id] : undefined;
+        const result = (await mutation.mutateAsync({ body, attachmentIds })) as TicketMessageResult;
         if (mode === "reply") {
           editorRef.current?.clear();
           setReplyText("");
@@ -140,6 +155,7 @@ export const TicketWorkspaceTabs = forwardRef<TicketWorkspaceHandle, TicketWorks
           noteEditorRef.current?.clear();
           setNoteText("");
         }
+        onClearStagedAttachment?.();
         onSent?.();
         if (mode === "reply" && result?.delivery?.status === "FAILED") {
           setError(
@@ -317,13 +333,31 @@ export const TicketWorkspaceTabs = forwardRef<TicketWorkspaceHandle, TicketWorks
               </p>
             )}
 
+            {stagedAttachment && (
+              <div className="flex items-center justify-between gap-2 rounded-md border border-border bg-surface-subtle px-3 py-2">
+                <span className="min-w-0 truncate text-xs font-medium text-foreground" title={stagedAttachment.fileName}>
+                  <span aria-hidden="true">📎 </span>
+                  <bdi dir="auto">{stagedAttachment.fileName}</bdi>
+                </span>
+                <button
+                  type="button"
+                  className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={t("attachments.removeFile")}
+                  title={t("attachments.removeFile")}
+                  onClick={() => onClearStagedAttachment?.()}
+                >
+                  <X className="size-3.5" strokeWidth={1.75} aria-hidden="true" />
+                </button>
+              </div>
+            )}
+
             <div className="flex flex-col gap-2 border-t border-border pt-3 sm:flex-row sm:items-center">
               <div className="sm:me-auto">
-                {canMutate && !isSms && (
+                {canMutate && (mode === "note" || !noOutboundAttachments) && (
                   <button
                     type="button"
                     className="button-secondary inline-flex items-center gap-1.5 w-full sm:w-auto"
-                    onClick={() => onAttachFile?.()}
+                    onClick={() => onAttachToMessage?.()}
                   >
                     <Paperclip className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.75} aria-hidden="true" />
                     <span>{t("attachments.attachFile")}</span>

@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 import { Sparkles } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-state";
-import { useTicketAttachments, useUploadTicketAttachment } from "@/features/attachments/attachment-hooks";
+import { useTicketAttachments, useUploadStagedAttachment, useUploadTicketAttachment } from "@/features/attachments/attachment-hooks";
 import { AiAssistantPanel } from "@/features/ai-assistant/ai-assistant-panel";
 import type { CategoryApplyApi, ReplyInsertionApi } from "@/features/ai-assistant/ai-assistant.types";
 import { FileUploadModal } from "@/components/shared/file-upload";
@@ -26,9 +26,14 @@ export function TicketDetailPage() {
   const ticket = useTicket(id);
   const attachments = useTicketAttachments(id);
   const uploadAttachment = useUploadTicketAttachment(id);
+  const stagedUpload = useUploadStagedAttachment();
 
   const [aiOpen, setAiOpen] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  // CONV-041/049 — which upload the open modal serves: a legacy ticket-level
+  // upload (Attachments tab) or a staged attachment for the next composer send.
+  const [uploadTarget, setUploadTarget] = useState<"ticket" | "compose">("ticket");
+  const [stagedAttachment, setStagedAttachment] = useState<{ id: string; fileName: string; mimeType: string } | null>(null);
   const [sendToken, setSendToken] = useState(0);
   const aiButtonRef = useRef<HTMLButtonElement>(null);
   const workspaceRef = useRef<TicketWorkspaceHandle>(null);
@@ -151,7 +156,16 @@ export function TicketDetailPage() {
             description={record.description}
             locale={i18n.language}
             onSent={() => setSendToken((token) => token + 1)}
-            onAttachFile={() => setUploadModalOpen(true)}
+            onAttachFile={() => {
+              setUploadTarget("ticket");
+              setUploadModalOpen(true);
+            }}
+            onAttachToMessage={() => {
+              setUploadTarget("compose");
+              setUploadModalOpen(true);
+            }}
+            stagedAttachment={stagedAttachment}
+            onClearStagedAttachment={() => setStagedAttachment(null)}
           />
         </div>
         <div className="min-w-0 lg:sticky lg:top-4 lg:max-h-[calc(100dvh-2rem)] lg:self-start lg:overflow-y-auto">
@@ -170,8 +184,15 @@ export function TicketDetailPage() {
       <FileUploadModal
         open={uploadModalOpen}
         onOpenChange={setUploadModalOpen}
-        onUpload={(file) => uploadAttachment.mutateAsync(file)}
-        isUploading={uploadAttachment.isPending}
+        onUpload={
+          uploadTarget === "compose"
+            ? async (file) => {
+                const row = await stagedUpload.mutateAsync(file);
+                setStagedAttachment({ id: row.id, fileName: row.fileName, mimeType: row.mimeType });
+              }
+            : (file) => uploadAttachment.mutateAsync(file)
+        }
+        isUploading={uploadTarget === "compose" ? stagedUpload.isPending : uploadAttachment.isPending}
       />
 
       <AiAssistantPanel

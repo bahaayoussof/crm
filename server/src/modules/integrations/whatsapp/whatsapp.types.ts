@@ -21,7 +21,8 @@ export interface InboundTextMessage {
 export type InboundResultStatus =
   | "TICKET_CREATED"
   | "MESSAGE_APPENDED"
-  | "DUPLICATE";
+  | "DUPLICATE"
+  | "AMBIGUOUS";
 
 export interface InboundResult {
   status: InboundResultStatus;
@@ -29,19 +30,6 @@ export interface InboundResult {
   messageId?: string;
 }
 
-export type OutboundDeliveryStatus = "SENT" | "FAILED";
-
-export type OutboundFailureReason =
-  | "INTEGRATION_NOT_CONFIGURED"
-  | "NO_RECIPIENT_PHONE"
-  | "PROVIDER_REJECTED"
-  | "PROVIDER_UNREACHABLE";
-
-export interface OutboundDeliveryResult {
-  channel: "WHATSAPP";
-  status: OutboundDeliveryStatus;
-  /** Present when status === "SENT". */
-  externalId?: string;
-  /** Present when status === "FAILED". */
-  reason?: OutboundFailureReason;
-}
+// Outbound delivery vocabulary is shared across channels — see
+// `../outbound-delivery.ts` (`OutboundDeliveryResult`, `OutboundDeliveryFailureReason`).
+// CONV-039 removed WhatsApp's parallel copy of these types.

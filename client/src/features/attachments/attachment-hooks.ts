@@ -67,3 +67,15 @@ export function useUploadPortalTicketAttachment(ticketId: string) {
     onSuccess: () => qc.invalidateQueries({ queryKey: attachmentKeys.portalTicket(ticketId) }),
   });
 }
+
+// CONV-041/049 — staged (unbound) upload, owned by the current actor. No
+// query invalidation: the staged row isn't visible in any listing until it is
+// bound to a message/note, at which point the conversation/attachments
+// queries already invalidated by the send mutation pick it up.
+export function useUploadStagedAttachment() {
+  return useMutation({ mutationFn: (file: File) => api.uploadStagedAttachment(file) });
+}
+
+export function useUploadPortalStagedAttachment() {
+  return useMutation({ mutationFn: (file: File) => api.uploadPortalStagedAttachment(file) });
+}

@@ -14,7 +14,10 @@ import {
 import { deliverOutboundReply } from "../integrations/whatsapp/whatsapp.service.js";
 import { deliverOutboundEmailReply } from "../integrations/email/email.service.js";
 import { deliverOutboundSmsReply } from "../integrations/sms/sms.service.js";
-import { replyHtmlToPlainText, sanitizeReplyHtml } from "../../shared/rich-text/reply-html.js";
+import { replyHtmlToPlainText } from "../../shared/rich-text/reply-html.js";
+import { requireConversationContent } from "../../shared/rich-text/conversation-content.js";
+import { createPendingDelivery } from "../integrations/outbound-delivery.js";
+import { bindStagedAttachments } from "../attachments/attachment.service.js";
 import {
   emitTicketMessageCreated,
   emitTicketUpdated,
@@ -27,6 +30,7 @@ import { autoAssignTicket } from "../assignment/assignment.service.js";
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../audit-logs/audit-log.constants.js";
 import { createAuditLog } from "../audit-logs/audit-log.service.js";
 import type { AuditRequestContext } from "../audit-logs/audit-request-context.js";
+import { createCanonicalTicket } from "./create-canonical-ticket.js";
 
 const ticketSummarySelect = {
   id: true, subject: true, status: true, priority: true, channel: true, teamId: true,
@@ -104,7 +108,9 @@ export async function getTicket(ticketId: string, actor: Actor, now = new Date()
         id: true, action: true, oldValue: true, newValue: true, createdAt: true,
         actor: { select: { id: true, name: true, role: true } },
       } },
-      messages: { orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: conversationSelect },
+      // CONV-048: durable delivery summary rides along with each message so a
+      // reload still shows a previously FAILED/SENT outbound state.
+      messages: { orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: messageWithDeliverySelect },
       notes: { orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: conversationSelect },
       _count: { select: { watchers: true } },
       watchers: { where: { userId: actor.userId }, select: { id: true }, take: 1 },
@@ -118,17 +124,35 @@ export async function getTicket(ticketId: string, actor: Actor, now = new Date()
     watcherCount: _count?.watchers ?? 0,
     viewerIsWatching: (watchers?.length ?? 0) > 0,
     conversation: [
-      ...messages.map((item) => ({ ...item, kind: "PUBLIC_MESSAGE" as const })),
+      ...messages.map(({ delivery, ...item }) => ({
+        ...item,
+        kind: "PUBLIC_MESSAGE" as const,
+        // Coarse, non-secret category only — never the provider id/raw error text.
+        delivery: delivery ? { status: delivery.status, reason: delivery.lastErrorCode ?? null } : null,
+      })),
       ...notes.map((item) => ({ ...item, kind: "INTERNAL_NOTE" as const })),
     ].sort(compareConversation),
   };
 }
 
+const NO_OUTBOUND_ATTACHMENT_CHANNELS: readonly Channel[] = [Channel.EMAIL, Channel.SMS, Channel.WHATSAPP];
+
+/**
+ * CONV-042 — EMAIL/SMS/WhatsApp outbound requests carrying attachments are
+ * rejected before the TicketMessage is created; no partial/text-only send.
+ * WEB/Portal and Live Chat may attach without restriction (CONV-041).
+ */
+function assertOutboundAttachmentCapability(channel: Channel, attachmentIds: string[] | undefined) {
+  if (attachmentIds?.length && NO_OUTBOUND_ATTACHMENT_CHANNELS.includes(channel)) {
+    throw new AppError(422, "ATTACHMENTS_NOT_SUPPORTED_FOR_CHANNEL", "This channel does not support outbound attachments");
+  }
+}
+
 export async function addTicketMessage(ticketId: string, input: TicketConversationInput, actor: Actor) {
   // Public replies are rich text from the Lexical composer. Sanitize to the
   // support-reply allowlist here — this is the trust boundary, not the client.
-  const body = sanitizeReplyHtml(input.body);
-  if (!body) throw new AppError(422, "EMPTY_MESSAGE", "Message body is required");
+  const content = requireConversationContent({ raw: input.body, format: "SANITIZED_HTML", source: "STAFF" });
+  const body = content.sanitizedHtml!;
   const createdAt = new Date();
   const messageId = randomUUID();
 
@@ -140,6 +164,9 @@ export async function addTicketMessage(ticketId: string, input: TicketConversati
   const local = await withRealtimeOutbox(async () => {
     const result = await prisma.$transaction(async (tx) => {
       const ticket = await requireConversationMutationAccess(tx, ticketId, actor);
+      // CONV-042: reject before any TicketMessage is created — never a
+      // silent text-only fallback.
+      assertOutboundAttachmentCapability(ticket.channel, input.attachmentIds);
       // EMAIL threading is local bookkeeping only — persist the thread token and
       // gather references now; the provider is NOT called inside the transaction.
       let emailThread: { threadToken: string; inReplyTo: string | null; references: string[] } | null = null;
@@ -158,10 +185,28 @@ export async function addTicketMessage(ticketId: string, input: TicketConversati
         emailThread = { threadToken, references, inReplyTo: references.at(-1) ?? null };
       }
       const created = await tx.ticketMessage.create({
-        data: { id: messageId, ticketId, authorUserId: actor.userId, body, createdAt },
+        data: {
+          id: messageId,
+          ticketId,
+          authorUserId: actor.userId,
+          body,
+          createdAt,
+          contentFormat: content.contentFormat,
+          contentSource: content.contentSource,
+        },
         select: conversationSelect,
       });
       await tx.ticket.updateMany({ where: { id: ticketId, firstRespondedAt: null }, data: { firstRespondedAt: createdAt } });
+      // CONV-041 — atomically bind any staged attachments to this exact message.
+      if (input.attachmentIds?.length) {
+        await bindStagedAttachments(tx, input.attachmentIds, { ticketId, messageId }, actor.userId);
+      }
+      // CONV-036 — every outbound EMAIL/SMS/WHATSAPP message gets a durable
+      // delivery row at commit time. WEB/LIVE_CHAT have no provider dispatch,
+      // so no row is created for them.
+      if (ticket.channel === Channel.EMAIL || ticket.channel === Channel.SMS || ticket.channel === Channel.WHATSAPP) {
+        await createPendingDelivery(messageId, ticket.channel, tx);
+      }
       // Watcher fan-out: a staff reply is activity on a followed ticket.
       await notifyWatchers(tx, {
         ticketId,
@@ -229,15 +274,20 @@ export async function addTicketNote(ticketId: string, input: TicketConversationI
   // Internal notes are rich text from the same Lexical editor as public replies
   // (with @mentions). Sanitize to the support allowlist at this trust boundary;
   // the `@[Name](userId)` mention tokens are plain text and survive intact.
-  const body = sanitizeReplyHtml(input.body);
-  if (!body) throw new AppError(422, "EMPTY_MESSAGE", "Note body is required");
+  const content = requireConversationContent({ raw: input.body, format: "SANITIZED_HTML", source: "STAFF" });
+  const body = content.sanitizedHtml!;
   return withRealtimeOutbox(async () => {
    const result = await prisma.$transaction(async (tx) => {
     const ticket = await requireConversationMutationAccess(tx, ticketId, actor);
     const note = await tx.ticketNote.create({
-      data: { ticketId, authorUserId: actor.userId, body },
+      data: { ticketId, authorUserId: actor.userId, body, contentFormat: content.contentFormat, contentSource: content.contentSource },
       select: conversationSelect,
     });
+    // CONV-041/042 — notes are never provider-delivered, so they may own
+    // staged attachments regardless of the ticket's channel.
+    if (input.attachmentIds?.length) {
+      await bindStagedAttachments(tx, input.attachmentIds, { ticketId, noteId: note.id }, actor.userId);
+    }
     // @mentions: records + auto-watch + mention notifications. Returns the
     // mentioned ids so they are excluded from the generic watcher fan-out below.
     const mentionedIds = await applyNoteMentions(tx, {
@@ -295,16 +345,26 @@ export async function createTicket(input: CreateTicketInput, actor: Actor, reque
     const effectiveTeamId =
       creationInput.teamId ?? relations.agent?.teamId ?? creatorTeamId ?? null;
     const sla = await tx.slaRule.findFirst({ where: { priority: creationInput.priority, isActive: true } });
-    const ticket = await tx.ticket.create({
+    // Automatic assignment (feature/automatic-assignment): a brand-new ticket is
+    // always OPEN and never terminal. When it already knows its Team but carries
+    // no explicit assignee, fill the assignee with the least-loaded eligible
+    // active agent on that Team. `teamId === null` -> left unassigned for ADMIN
+    // routing. An explicit assignee above short-circuits this entirely (handled
+    // by createCanonicalTicket's own `!assignedAgentId` guard).
+    const canonical = await createCanonicalTicket({
+      tx,
       data: {
         ...creationInput, teamId: effectiveTeamId, createdAt: now,
         firstResponseDueAt: sla ? addMinutes(now, sla.firstResponseMinutes) : null,
         resolutionDueAt: sla ? addMinutes(now, sla.resolutionMinutes) : null,
       },
+      actorId: actor.userId,
       select: ticketSummarySelect,
+      auditChanges: { status: { to: TicketStatus.OPEN }, priority: { to: creationInput.priority }, categoryId: { to: creationInput.categoryId ?? null }, assignedAgentId: { to: creationInput.assignedAgentId ?? null } },
+      requestContext,
+      autoAssign: true,
     });
-    await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorUserId: actor.userId, action: "TICKET_CREATED", newValue: TicketStatus.OPEN } });
-    await createAuditLog({ actorId: actor.userId, action: AUDIT_ACTIONS.TICKET_CREATED, entityType: AUDIT_ENTITY_TYPES.TICKET, entityId: ticket.id, changes: { status: { to: ticket.status }, priority: { to: ticket.priority }, categoryId: { to: creationInput.categoryId ?? null }, assignedAgentId: { to: creationInput.assignedAgentId ?? null } }, requestContext }, tx);
+    const ticket = canonical.ticket;
     if (creationInput.assignedAgentId) await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorUserId: actor.userId, action: "ASSIGNMENT_CHANGED", newValue: relations.agent?.name ?? creationInput.assignedAgentId } });
     if (creationInput.categoryId) await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorUserId: actor.userId, action: "CATEGORY_CHANGED", newValue: relations.category?.name ?? creationInput.categoryId } });
     // Notify newly assigned agent (only when the assignee is different from the actor)
@@ -314,25 +374,7 @@ export async function createTicket(input: CreateTicketInput, actor: Actor, reque
         await createNotifications(tx, [assignee.id], "TICKET_ASSIGNED", "New ticket assigned", `You have been assigned ticket #${ticket.id}: ${ticket.subject}`, ticket.id);
       }
     }
-    // Automatic assignment (feature/automatic-assignment): a brand-new ticket is
-    // always OPEN and never terminal. When it already knows its Team but carries
-    // no explicit assignee, fill the assignee with the least-loaded eligible
-    // active agent on that Team. `teamId === null` -> left unassigned for ADMIN
-    // routing. An explicit assignee above short-circuits this entirely.
-    let autoAssignedAgentId: string | null = null;
-    if (!creationInput.assignedAgentId && effectiveTeamId) {
-      const outcome = await autoAssignTicket(tx, {
-        ticketId: ticket.id,
-        teamId: effectiveTeamId,
-        assignedAgentId: null,
-        status: ticket.status,
-      });
-      autoAssignedAgentId = outcome?.assignedAgentId ?? null;
-    }
-    const finalTicket = autoAssignedAgentId
-      ? await tx.ticket.findUniqueOrThrow({ where: { id: ticket.id }, select: ticketSummarySelect })
-      : ticket;
-    return finalTicket;
+    return ticket;
    });
    emitTicketUpdated({ ticketId: ticket.id, assignedAgentId: ticket.assignedAgent?.id ?? null, customerId: ticket.customer?.id ?? null, teamId: ticket.teamId });
    return ticket;
@@ -600,9 +642,16 @@ async function selfAssignTicket(ticketId: string, input: UpdateTicketInput, acto
 }
 
 const conversationSelect = {
-  id: true, body: true, createdAt: true,
+  // CONV-047: contentFormat rides along so the client renders from persisted
+  // provenance instead of markup-sniffing the body.
+  id: true, body: true, createdAt: true, contentFormat: true,
   author: { select: { id: true, name: true, role: true } },
 } satisfies Prisma.TicketMessageSelect & Prisma.TicketNoteSelect;
+
+const messageWithDeliverySelect = {
+  ...conversationSelect,
+  delivery: { select: { status: true, lastErrorCode: true } },
+} satisfies Prisma.TicketMessageSelect;
 
 async function requireConversationMutationAccess(tx: Prisma.TransactionClient, ticketId: string, actor: Actor) {
   const team = await teamScopeFor(actor);

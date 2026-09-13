@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   user: { findFirst: vi.fn().mockResolvedValue(null), findMany: vi.fn().mockResolvedValue([]), findUnique: vi.fn().mockResolvedValue({ passwordChangedAt: null }) },
   notification: { createMany: vi.fn().mockResolvedValue({ count: 0 }) },
   ticketWatcher: { findMany: vi.fn().mockResolvedValue([]) },
+  auditLog: { create: vi.fn().mockResolvedValue({}) },
+  attachment: { findMany: vi.fn().mockResolvedValue([]), updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
 }));
 vi.mock("../../config/prisma.js", () => ({ prisma: { ...mocks, $transaction: vi.fn(async (value: unknown) => typeof value === "function" ? (value as (tx: typeof mocks) => unknown)(mocks) : Promise.all(value as Promise<unknown>[])) } }));
 vi.mock("../realtime/realtime.publisher.js", () => ({
@@ -28,7 +30,7 @@ const auth = (id: string, role: Role) => ({ Authorization: `Bearer ${createAcces
 const base = { id: "cdd8a71b2bbc6072cc903a822", subject: "Help", status: TicketStatus.OPEN, category: null, createdAt: new Date(), updatedAt: new Date() };
 
 describe("customer portal", () => {
-  beforeEach(() => { vi.clearAllMocks(); mocks.customer.findUnique.mockResolvedValue({ id: "c0bd7029e0d7aeffc87b34f26" }); mocks.ticket.count.mockResolvedValue(0); mocks.ticket.findMany.mockResolvedValue([]); mocks.category.findMany.mockResolvedValue([]); });
+  beforeEach(() => { vi.clearAllMocks(); mocks.customer.findUnique.mockResolvedValue({ id: "c0bd7029e0d7aeffc87b34f26" }); mocks.ticket.count.mockResolvedValue(0); mocks.ticket.findMany.mockResolvedValue([]); mocks.category.findMany.mockResolvedValue([]); mocks.attachment.findMany.mockResolvedValue([]); mocks.attachment.updateMany.mockResolvedValue({ count: 0 }); });
 
   it("rejects unauthenticated and every internal role", async () => {
     expect((await request(app).get("/api/portal/overview")).status).toBe(401);
@@ -99,13 +101,16 @@ describe("customer portal", () => {
     expect(mocks.ticket.create).not.toHaveBeenCalled();
   });
 
-  it("writes the TICKET_CREATED history row and no AuditLog row on portal create", async () => {
+  it("CONV-028/044 (OD-CC-7): writes the TICKET_CREATED history row AND exactly one actorless canonical AuditLog on portal create", async () => {
     mocks.slaRule.findFirst.mockResolvedValue({ firstResponseMinutes: 30, resolutionMinutes: 120 });
     mocks.ticket.create.mockResolvedValue(base);
-    await request(app).post("/api/portal/tickets").set(auth("customer", Role.CUSTOMER)).send({ subject: "Need help", description: "Text" });
+    const response = await request(app).post("/api/portal/tickets").set(auth("customer", Role.CUSTOMER)).send({ subject: "Need help", description: "Text" });
+    expect(response.status).toBe(201);
     expect(mocks.ticketHistory.create).toHaveBeenCalledWith({ data: expect.objectContaining({ action: "TICKET_CREATED", actorUserId: "customer" }) });
-    // The portal prisma mock exposes no `auditLog` client — a 201 response proves
-    // createTicket never touched AuditLog (OD-3 keeps portal creation unaudited).
+    expect(mocks.auditLog.create).toHaveBeenCalledTimes(1);
+    expect(mocks.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ actorId: null, action: "TICKET_CREATED", entityType: "TICKET", entityId: base.id }),
+    }));
   });
 
   it.each([[TicketStatus.WAITING_CUSTOMER, TicketStatus.IN_PROGRESS], [TicketStatus.RESOLVED, TicketStatus.OPEN]])("atomically replies and transitions %s", async (from, to) => { mocks.ticket.findFirst.mockResolvedValue({ id: "cdd8a71b2bbc6072cc903a822", status: from }); mocks.ticketMessage.create.mockResolvedValue({ id: "m", body: "Please reopen", createdAt: new Date(), author: { id: "customer", name: "Ahmed", role: Role.CUSTOMER } }); const response = await request(app).post("/api/portal/tickets/cdd8a71b2bbc6072cc903a822/messages").set(auth("customer", Role.CUSTOMER)).send({ body: "  Please reopen  " }); expect(response.status).toBe(201); expect(mocks.ticketMessage.create.mock.calls[0][0].data).toMatchObject({ authorUserId: "customer", body: "Please reopen" }); expect(mocks.ticket.update).toHaveBeenCalledWith({ where: { id: "cdd8a71b2bbc6072cc903a822" }, data: expect.objectContaining({ status: to }) }); expect(mocks.ticketHistory.create).toHaveBeenCalledWith({ data: expect.objectContaining({ oldValue: from, newValue: to }) }); expect(JSON.stringify(mocks.ticket.update.mock.calls)).not.toContain("firstRespondedAt"); });
@@ -121,6 +126,26 @@ describe("customer portal", () => {
     mocks.ticket.findFirst.mockResolvedValueOnce({ id: "cdd8a71b2bbc6072cc903a822", status: TicketStatus.CLOSED });
     await request(app).post("/api/portal/tickets/cdd8a71b2bbc6072cc903a822/messages").set(auth("customer", Role.CUSTOMER)).send({ body: "late" });
     expect(emitMessageMock).not.toHaveBeenCalled();
+  });
+
+  it("CONV-041: binds a staged attachment to the exact portal reply message", async () => {
+    mocks.ticket.findFirst.mockResolvedValue({ id: "cdd8a71b2bbc6072cc903a822", status: TicketStatus.OPEN, subject: "Help", assignedAgentId: null, channel: "WEB" });
+    mocks.ticketMessage.create.mockResolvedValue({ id: "m1", body: "See attached", createdAt: new Date(), author: { id: "customer", name: "Ahmed", role: Role.CUSTOMER } });
+    mocks.attachment.findMany.mockResolvedValue([{ id: "c00000000000000000000001", stagedByUserId: "customer", ticketId: null, messageId: null, noteId: null, customerId: null }]);
+    const response = await request(app).post("/api/portal/tickets/cdd8a71b2bbc6072cc903a822/messages").set(auth("customer", Role.CUSTOMER)).send({ body: "See attached", attachmentIds: ["c00000000000000000000001"] });
+    expect(response.status).toBe(201);
+    expect(mocks.attachment.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ["c00000000000000000000001"] } },
+      data: { ticketId: "cdd8a71b2bbc6072cc903a822", messageId: "m1", stagedByUserId: null },
+    });
+  });
+
+  it("CONV-041: rejects binding an attachment staged by a different customer", async () => {
+    mocks.ticket.findFirst.mockResolvedValue({ id: "cdd8a71b2bbc6072cc903a822", status: TicketStatus.OPEN, subject: "Help", assignedAgentId: null, channel: "WEB" });
+    mocks.attachment.findMany.mockResolvedValue([{ id: "c00000000000000000000001", stagedByUserId: "someone-else", ticketId: null, messageId: null, noteId: null, customerId: null }]);
+    const response = await request(app).post("/api/portal/tickets/cdd8a71b2bbc6072cc903a822/messages").set(auth("customer", Role.CUSTOMER)).send({ body: "See attached", attachmentIds: ["c00000000000000000000001"] });
+    expect(response.status).toBe(403);
+    expect(mocks.attachment.updateMany).not.toHaveBeenCalled();
   });
 
   // MS-03 — CLOSED = viewable + immutable. The customer reply path already
@@ -191,5 +216,23 @@ describe("customer portal", () => {
     const empty = await request(app).post("/api/portal/tickets/cdd8a71b2bbc6072cc903a822/messages").set(auth("customer", Role.CUSTOMER)).send({ body: "<p></p>" });
     expect(empty.status).toBe(422);
     expect(empty.body.error.code).toBe("EMPTY_MESSAGE");
+  });
+
+  describe("CONV-012 — conversation content provenance", () => {
+    it("persists contentFormat SANITIZED_HTML / contentSource PORTAL for a WEB-channel ticket reply", async () => {
+      mocks.ticket.findFirst.mockResolvedValue({ id: "cdd8a71b2bbc6072cc903a822", status: TicketStatus.OPEN, channel: "WEB" });
+      mocks.ticketMessage.create.mockResolvedValue({ id: "m", body: "x", createdAt: new Date(), author: { id: "customer", name: "Ahmed", role: Role.CUSTOMER } });
+      const response = await request(app).post("/api/portal/tickets/cdd8a71b2bbc6072cc903a822/messages").set(auth("customer", Role.CUSTOMER)).send({ body: "<p>Hi</p>" });
+      expect(response.status).toBe(201);
+      expect(mocks.ticketMessage.create.mock.calls.at(-1)![0].data).toMatchObject({ contentFormat: "SANITIZED_HTML", contentSource: "PORTAL" });
+    });
+
+    it("persists contentSource LIVE_CHAT for a LIVE_CHAT-channel ticket reply on the same endpoint", async () => {
+      mocks.ticket.findFirst.mockResolvedValue({ id: "cdd8a71b2bbc6072cc903a822", status: TicketStatus.OPEN, channel: "LIVE_CHAT" });
+      mocks.ticketMessage.create.mockResolvedValue({ id: "m", body: "x", createdAt: new Date(), author: { id: "customer", name: "Ahmed", role: Role.CUSTOMER } });
+      const response = await request(app).post("/api/portal/tickets/cdd8a71b2bbc6072cc903a822/messages").set(auth("customer", Role.CUSTOMER)).send({ body: "<p>Hi</p>" });
+      expect(response.status).toBe(201);
+      expect(mocks.ticketMessage.create.mock.calls.at(-1)![0].data).toMatchObject({ contentFormat: "SANITIZED_HTML", contentSource: "LIVE_CHAT" });
+    });
   });
 });

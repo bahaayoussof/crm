@@ -15,7 +15,23 @@
   `getSmsProvider()` returns `textBeeProvider` in production or a test override.
 - **Delivery-status callbacks** (carrier-level "delivered"/"failed") are out of
   scope for this MVP. TextBee "acceptance" means queued/accepted by the Android
-  gateway, not carrier confirmation.
+  gateway, not carrier confirmation. Confirmed again during the 2026-09-13
+  Conversations/Channels audit (ADR-057): TextBee has no webhook infrastructure
+  in this deployment, so no callback was fabricated for it — Email and WhatsApp
+  got one because they already have a signed/account-supported contract.
+
+> **Update (2026-09-13, ADR-057).** SMS's "newest active ticket is reused"
+> heuristic is removed — TextBee exposes no thread correlation beyond phone
+> identity, so every inbound SMS without a stronger signal creates a new
+> ticket; RESOLVED is never reopened by identity. The broad "any P2002 during
+> the inbound transaction ⇒ duplicate" classification is replaced with a
+> constraint-target check — only a genuine `TicketMessage.inboundKey` conflict
+> is a duplicate; an unrelated conflict (e.g. a placeholder-email collision)
+> now propagates as a real error instead of silently dropping the message. A
+> multiple-phone-match is a safe zero-write `ambiguous` outcome, not a guess.
+> Outbound delivery uses a durable `MessageDelivery` row with a bounded 3-attempt
+> retry sweep. Every message declares `contentFormat` (`PLAIN_TEXT` for
+> inbound) — the client renders from that field, never by sniffing the body.
 
 ## Configuration
 

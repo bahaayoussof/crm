@@ -7,12 +7,13 @@ import * as controller from "./portal.controller.js";
 import { portalCreateTicketSchema, portalProfileUpdateSchema, portalReplySchema, portalTicketListSchema, portalTicketParamsSchema } from "./portal.schema.js";
 import {
   listPortalTicketAttachments,
+  uploadPortalStagedAttachment,
   uploadPortalTicketAttachment,
 } from "../attachments/attachment.portal.controller.js";
 import * as feedbackController from "../feedback/feedback.controller.js";
 import { feedbackParamsSchema, submitFeedbackSchema } from "../feedback/feedback.schema.js";
 import * as liveChatController from "../live-chat/live-chat.controller.js";
-import { liveChatEndParamsSchema, liveChatStartSchema } from "../live-chat/live-chat.schema.js";
+import { liveChatEndParamsSchema, liveChatGetQuerySchema, liveChatStartSchema } from "../live-chat/live-chat.schema.js";
 import * as customerAiController from "../customer-ai/customer-ai.controller.js";
 import { customerAiChatSchema, customerAiHandoffSchema } from "../customer-ai/customer-ai.schema.js";
 import { customerAiRateLimit } from "../customer-ai/customer-ai-rate-limit.js";
@@ -26,7 +27,7 @@ portalRouter.post("/ai/handoff", validateBody(customerAiHandoffSchema), customer
 // feature/live-chat — the Live Chat channel is an ordinary LIVE_CHAT Ticket.
 // These two endpoints only bootstrap the portal experience (resume / start);
 // messages go through the shared `POST /portal/tickets/:id/messages`.
-portalRouter.get("/live-chat", liveChatController.get);
+portalRouter.get("/live-chat", validateQuery(liveChatGetQuerySchema), liveChatController.get);
 portalRouter.get("/live-chat/departments", liveChatController.departments);
 portalRouter.post("/live-chat", validateBody(liveChatStartSchema), liveChatController.start);
 portalRouter.post("/live-chat/:ticketId/end", validateParams(liveChatEndParamsSchema), liveChatController.end);
@@ -41,6 +42,9 @@ portalRouter.post("/tickets/:id/messages", validateParams(portalTicketParamsSche
 // feature/attachments — owned-ticket attachments (upload only while not CLOSED; never creates a message or reopens)
 portalRouter.get("/tickets/:id/attachments", validateParams(portalTicketParamsSchema), listPortalTicketAttachments);
 portalRouter.post("/tickets/:id/attachments", validateParams(portalTicketParamsSchema), uploadPortalTicketAttachment);
+// CONV-041/049 — staged (unbound) upload; the composer submits the id
+// alongside the reply POST, which binds it atomically.
+portalRouter.post("/attachments/staged", uploadPortalStagedAttachment);
 
 // feature/customer-feedback — one immutable rating (1–5) + optional comment per owned RESOLVED/CLOSED ticket
 portalRouter.get("/tickets/:id/feedback", validateParams(feedbackParamsSchema), feedbackController.get);

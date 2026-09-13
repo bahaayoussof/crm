@@ -5,7 +5,7 @@ import { emitTicketUpdated, withRealtimeOutbox } from "../realtime/realtime.publ
 import { customerIdFor, ticketDetail } from "../portal/portal.service.js";
 import { createAuditLog } from "../audit-logs/audit-log.service.js";
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from "../audit-logs/audit-log.constants.js";
-import { autoAssignTicket } from "../assignment/assignment.service.js";
+import { createCanonicalTicket } from "../tickets/create-canonical-ticket.js";
 import type { LiveChatStartInput } from "./live-chat.schema.js";
 
 /**
@@ -112,30 +112,40 @@ async function resolveLiveChatTeam(
   return { teamId: team.id, branchId: department.branchId };
 }
 
-async function resumableLiveChatId(customerId: string): Promise<string | null> {
-  const ticket = await prisma.ticket.findFirst({
-    where: { customerId, channel: Channel.LIVE_CHAT, status: { in: RESUMABLE_STATUSES } },
-    orderBy: [{ createdAt: "desc" }, { id: "asc" }],
-    select: { id: true },
-  });
-  return ticket?.id ?? null;
-}
-
 /**
- * `GET /api/portal/live-chat` — the resumable live chat for the authenticated
- * customer as a customer-safe ticket detail, or `null` so the client can offer
- * the Department start screen. Never accepts a `customerId` from the caller.
+ * CONV-022/026 — session-key-only correlation (OD-CC-4/CC-GAP-22). A ticket is
+ * resumable ONLY through its own `liveChatSessionKey`; customer identity never
+ * selects a different session's ticket. RESOLVED/CLOSED are terminal even for
+ * the key that reached them — a resume attempt with that key does not silently
+ * resume the old ticket (the unique constraint would refuse a same-key insert
+ * anyway; the client must rotate to a new key to start a fresh chat).
  */
-export async function getActiveLiveChat(userId: string) {
-  const customerId = await customerIdFor(userId);
-  const id = await resumableLiveChatId(customerId);
-  return id ? ticketDetail(id, userId) : null;
+async function ticketBySessionKey(sessionKey: string) {
+  return prisma.ticket.findUnique({
+    where: { liveChatSessionKey: sessionKey },
+    select: { id: true, status: true, customerId: true },
+  });
 }
 
 /**
- * `POST /api/portal/live-chat` — resume the customer's active live chat if one
- * exists (the selected `departmentId` is ignored; the chat is never re-routed),
- * otherwise create a new LIVE_CHAT ticket routed to the chosen Department.
+ * `GET /api/portal/live-chat?sessionKey=...` — the live chat owned by this
+ * session key, as a customer-safe ticket detail, or `null` so the client can
+ * offer the Department start screen. No `sessionKey` and no match both return
+ * `null` — there is no customer-identity fallback.
+ */
+export async function getActiveLiveChat(userId: string, sessionKey?: string) {
+  const customerId = await customerIdFor(userId);
+  if (!sessionKey) return null;
+  const ticket = await ticketBySessionKey(sessionKey);
+  if (!ticket || ticket.customerId !== customerId || !RESUMABLE_STATUSES.includes(ticket.status)) return null;
+  return ticketDetail(ticket.id, userId);
+}
+
+/**
+ * `POST /api/portal/live-chat` — resume the ticket owned by `input.sessionKey`
+ * if it exists and is still resumable (the selected `departmentId` is
+ * ignored; the chat is never re-routed), otherwise create a new LIVE_CHAT
+ * ticket bound to that session key and routed to the chosen Department.
  *
  * The owning Team + branch are resolved from the selected Department inside the
  * same transaction (see `resolveLiveChatTeam`), so the first persisted row and
@@ -143,78 +153,111 @@ export async function getActiveLiveChat(userId: string) {
  * NEVER created with `teamId: null` and patched later. Returns the same
  * customer-safe detail shape as `getActiveLiveChat`.
  *
- * Create-or-resume is preserved: the resumable check runs first and short-
- * circuits, so two near-simultaneous starts do not both create a chat.
+ * Concurrency-safe by construction (CONV-022, CC-GAP-22): the DB-level unique
+ * `liveChatSessionKey` constraint is the sole concurrency boundary. Two
+ * near-simultaneous creates for the SAME session key race on that constraint;
+ * the loser's insert raises a unique violation, which is caught and re-read
+ * as a resume — both callers return the same winning ticket, indistinguishable
+ * in shape from an ordinary successful start/resume.
  */
 export async function startLiveChat(userId: string, input: LiveChatStartInput) {
   const customerId = await customerIdFor(userId);
-  const existing = await resumableLiveChatId(customerId);
-  if (existing) return ticketDetail(existing, userId);
+  const existing = await ticketBySessionKey(input.sessionKey);
+  if (existing && existing.customerId === customerId && RESUMABLE_STATUSES.includes(existing.status)) {
+    return ticketDetail(existing.id, userId);
+  }
+  if (existing) {
+    // The key belongs to a terminal (RESOLVED/CLOSED) or foreign session —
+    // never silently resumed. The client must rotate to a new session key.
+    throw new AppError(409, "LIVE_CHAT_SESSION_ENDED", "This live chat session has ended. Start a new one.");
+  }
 
-  // Creating a new chat: the customer MUST have chosen a Department. (Optional at
-  // the schema layer only so a resume POST can carry no body.)
+  // Creating a new chat: the customer MUST have chosen a Department.
   if (!input.departmentId) {
     throw new AppError(400, "DEPARTMENT_REQUIRED", "Choose a department to start a live chat");
   }
   const departmentId = input.departmentId;
+  const sessionKey = input.sessionKey;
 
   return withRealtimeOutbox(async () => {
     const now = new Date();
-    const created = await prisma.$transaction(async (tx) => {
-      const { teamId, branchId } = await resolveLiveChatTeam(tx, departmentId);
-      const sla = await tx.slaRule.findFirst({
-        where: { priority: TicketPriority.MEDIUM, isActive: true },
+    // The P2002 recovery below MUST run outside this transaction: once a
+    // Postgres statement inside an interactive transaction errors, the whole
+    // transaction is aborted (25P02, "current transaction is aborted") and
+    // every further query issued against that same `tx` fails — including a
+    // same-tx recovery read. Catching here (after `$transaction` has already
+    // rejected and rolled back) and re-reading via the top-level `prisma`
+    // client uses a fresh connection/transaction instead.
+    let created: { id: string; customerId: string; teamId: string | null; assignedAgentId: string | null; raced: boolean };
+    try {
+      created = await prisma.$transaction(async (tx) => {
+        const { teamId, branchId } = await resolveLiveChatTeam(tx, departmentId);
+        const sla = await tx.slaRule.findFirst({
+          where: { priority: TicketPriority.MEDIUM, isActive: true },
+        });
+        // A live chat is created already routed to a Team (resolved from the
+        // customer-selected Department), so automatic assignment can run
+        // immediately — least-loaded eligible active agent on that Team. No
+        // eligible agent -> the chat stays unassigned for the manager/admin.
+        // CONV-044 (OD-CC-7): exactly one canonical TICKET_CREATED AuditLog,
+        // actorless like every other non-staff creation path, even though the
+        // authenticated customer initiated the request — TicketHistory keeps
+        // the customer's own actorUserId via `historyActorId` (unchanged).
+        const canonical = await createCanonicalTicket({
+          tx,
+          data: {
+            subject: NEW_CHAT_SUBJECT,
+            description: NEW_CHAT_DESCRIPTION,
+            customerId,
+            status: TicketStatus.OPEN,
+            priority: TicketPriority.MEDIUM,
+            channel: Channel.LIVE_CHAT,
+            assignedAgentId: null,
+            categoryId: null,
+            departmentId,
+            branchId,
+            teamId,
+            liveChatSessionKey: sessionKey,
+            createdAt: now,
+            firstResponseDueAt: sla ? addMinutes(now, sla.firstResponseMinutes) : null,
+            resolutionDueAt: sla ? addMinutes(now, sla.resolutionMinutes) : null,
+          },
+          actorId: null,
+          historyActorId: userId,
+          autoAssign: true,
+        });
+        return { id: canonical.ticketId, customerId: canonical.customerId, teamId: canonical.teamId, assignedAgentId: canonical.assignedAgentId, raced: false as const };
       });
-      const ticket = await tx.ticket.create({
-        data: {
-          subject: NEW_CHAT_SUBJECT,
-          description: NEW_CHAT_DESCRIPTION,
-          customerId,
-          status: TicketStatus.OPEN,
-          priority: TicketPriority.MEDIUM,
-          channel: Channel.LIVE_CHAT,
-          assignedAgentId: null,
-          categoryId: null,
-          departmentId,
-          branchId,
-          teamId,
-          createdAt: now,
-          firstResponseDueAt: sla ? addMinutes(now, sla.firstResponseMinutes) : null,
-          resolutionDueAt: sla ? addMinutes(now, sla.resolutionMinutes) : null,
-        },
-        select: { id: true, customerId: true, teamId: true },
-      });
-      await tx.ticketHistory.create({
-        data: {
-          ticketId: ticket.id,
-          actorUserId: userId,
-          action: "TICKET_CREATED",
-          newValue: TicketStatus.OPEN,
-        },
-      });
-      // A live chat is created already routed to a Team (resolved from the
-      // customer-selected Department), so automatic assignment can run
-      // immediately — least-loaded eligible active agent on that Team. No
-      // eligible agent -> the chat stays unassigned for the manager/admin.
-      const outcome = await autoAssignTicket(tx, {
-        ticketId: ticket.id,
-        teamId: ticket.teamId,
-        assignedAgentId: null,
-        status: TicketStatus.OPEN,
-      });
-      return { ...ticket, assignedAgentId: outcome?.assignedAgentId ?? null };
-    });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        // Lost the race for this session key — the transaction above has
+        // already rolled back; re-read the winner via a fresh top-level query.
+        // The loser never created history/audit/assignment — only the
+        // winner's createCanonicalTicket call did that, exactly once.
+        const winner = await prisma.ticket.findUniqueOrThrow({
+          where: { liveChatSessionKey: sessionKey },
+          select: { id: true, customerId: true, teamId: true, assignedAgentId: true },
+        });
+        created = { ...winner, raced: true as const };
+      } else {
+        throw error;
+      }
+    }
 
-    // The first public event already carries the resolved routing: with a
-    // `teamId` it reaches that team's MANAGER + own-team-unassigned AGENTs +
-    // ADMIN via the existing `teamId` audience. No live-chat-specific realtime
-    // rule.
-    emitTicketUpdated({
-      ticketId: created.id,
-      assignedAgentId: created.assignedAgentId,
-      customerId: created.customerId,
-      teamId: created.teamId,
-    });
+    // The loser of the race never created history/audit/assignment/event —
+    // only the winner's transaction did that, exactly once.
+    if (!created.raced) {
+      // The first public event already carries the resolved routing: with a
+      // `teamId` it reaches that team's MANAGER + own-team-unassigned AGENTs +
+      // ADMIN via the existing `teamId` audience. No live-chat-specific realtime
+      // rule.
+      emitTicketUpdated({
+        ticketId: created.id,
+        assignedAgentId: created.assignedAgentId,
+        customerId: created.customerId,
+        teamId: created.teamId,
+      });
+    }
     return ticketDetail(created.id, userId);
   });
 }

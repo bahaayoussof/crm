@@ -658,6 +658,7 @@
       "noteError": "تعذرت إضافة الملاحظة الداخلية.",
       "internalLabel": "ملاحظة داخلية",
       "publicLabel": "ظاهر للعميل",
+      "deliveryFailed": "لم يتم التسليم للعميل — تم حفظ الرد، لكن الإرسال الخارجي فشل.",
       "showMore": "عرض المزيد",
       "showLess": "عرض أقل",
       "messageCount": "{{total}} رسالة",

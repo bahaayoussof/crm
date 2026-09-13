@@ -5,7 +5,10 @@ export type { TicketPriority };
 export interface PortalTicket { id: string; subject: string; status: PortalTicketStatus; category: { id: string; name: string } | null; createdAt: string; updatedAt: string }
 /** "My Requests" list rows — the only portal shape that carries `priority`. */
 export interface PortalTicketListItem extends PortalTicket { priority: TicketPriority }
-export interface PortalMessage { id: string; body: string; createdAt: string; author: { id: string; name: string; kind: "CUSTOMER" | "SUPPORT" } }
+// CONV-047 — persisted content provenance; the client renders from this
+// instead of markup-sniffing the body.
+export type ConversationContentFormat = "PLAIN_TEXT" | "SANITIZED_HTML";
+export interface PortalMessage { id: string; body: string; createdAt: string; contentFormat: ConversationContentFormat; author: { id: string; name: string; kind: "CUSTOMER" | "SUPPORT" } }
 export interface PortalFeedback { rating: number; comment: string | null; createdAt: string }
 export interface PortalTicketDetail extends PortalTicket { description: string; messages: PortalMessage[]; feedbackEligible: boolean; feedback: PortalFeedback | null }
 export interface PortalOverview { counts: { open: number; waitingForYou: number; resolved: number }; recentTickets: PortalTicket[] }

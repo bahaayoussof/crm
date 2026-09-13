@@ -101,12 +101,15 @@ domain/service layer after the database work commits.
 | Event | Emitted from | Triggers covered |
 | --- | --- | --- |
 | `ticket.message.created` | `ticket.service.addTicketMessage` / `addTicketNote`; `portal.service.reply`; `integrations/email` inbound; `integrations/whatsapp` inbound; `integrations/sms` inbound | Internal agent public reply, internal note, customer portal reply, inbound EMAIL, inbound WhatsApp, inbound SMS |
-| `ticket.updated` | `ticket.service.createTicket` / `updateTicket` / `selfAssignTicket`; `portal.service.createTicket`; `sla-automation.service` (auto-assign + auto-escalate); `live-chat` start + end | status, priority, assignment (incl. agent self-claim), category, department, branch, escalation, SLA auto-assignment, portal ticket creation (unrouted → ADMIN audience only), live-chat lifecycle. A pure re-route (`departmentId` / `branchId` / `teamId` only) now also emits, to the new team's audience. |
+| `ticket.updated` | `ticket.service.createTicket` / `updateTicket` / `selfAssignTicket`; `portal.service.createTicket`; `sla-automation.service` (auto-assign + auto-escalate); `live-chat` start + end; `integrations/outbound-delivery.applyDeliveryCallback`; `integrations/outbound-delivery-retry.runOutboundDeliveryRetrySweep` | status, priority, assignment (incl. agent self-claim), category, department, branch, escalation, SLA auto-assignment, portal ticket creation (unrouted → ADMIN audience only), live-chat lifecycle, a genuine outbound-delivery state change (retry success/terminal-failure, or a supported provider delivery-status callback — ADR-057). A pure re-route (`departmentId` / `branchId` / `teamId` only) now also emits, to the new team's audience. |
 | `notification.created` | `notifications.service.createNotifications` (the one centralized creator) | every notification, from every source (assignment, escalation, mentions, watchers, SLA, tasks, customer replies, inbound channels) |
 | `notification.read` | `notifications.service.markRead` | single mark-as-read (multi-tab badge sync). `markAllRead` does not broadcast — the acting tab invalidates locally; other tabs self-heal on the next event / focus. |
 
 `ticket.updated` is **not** emitted for a no-op `PATCH` (every provided field
-equals its current value).
+equals its current value), nor for a retry attempt / delivery callback that
+leaves `MessageDelivery.status` unchanged (a lost claim, or a stale/duplicate/
+out-of-order callback — ADR-057). No new SSE event type was added for outbound
+delivery; it reuses `ticket.updated` exactly like any other ticket-state change.
 
 ---
 

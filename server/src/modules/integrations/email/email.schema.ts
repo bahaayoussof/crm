@@ -28,3 +28,27 @@ export function extractReceivedEvent(value: unknown) {
     subject: data.subject,
   };
 }
+
+const deliveryStatusDataSchema = z.object({ email_id: z.string().min(1).max(200) }).passthrough();
+
+const DELIVERY_STATUS_EVENT_MAP: Record<string, "DELIVERED" | "FAILED"> = {
+  "email.delivered": "DELIVERED",
+  "email.bounced": "FAILED",
+};
+
+/**
+ * CONV-040 — Resend's outbound delivery-status events arrive on the same
+ * signed webhook already configured for inbound (`email.received`). Only the
+ * two event types that map cleanly to a terminal `MessageDelivery` state are
+ * handled; every other Resend event (`email.sent`, `email.opened`,
+ * `email.clicked`, `email.complained`, `email.delivery_delayed`, ...) is
+ * safely ignored, not fabricated into a state change.
+ */
+export function extractDeliveryStatusEvent(value: unknown) {
+  const envelope = resendWebhookEventSchema.parse(value);
+  const status = DELIVERY_STATUS_EVENT_MAP[envelope.type];
+  if (!status) return null;
+  const data = deliveryStatusDataSchema.safeParse(envelope.data);
+  if (!data.success) return null;
+  return { emailId: data.data.email_id, status };
+}

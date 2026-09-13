@@ -67,6 +67,10 @@ export const ticketConversationBodySchema = z.object({
   // the ceiling has markup headroom over the 20k plain-text limit the client
   // enforces (docs/18 §16). Internal notes (same shape) stay well under this.
   body: z.string().trim().min(1).max(50_000),
+  // CONV-041/049 — optional staged attachment ids to bind to this exact
+  // message/note. EMAIL/SMS/WHATSAPP public replies reject a non-empty list
+  // (CONV-042) before any message is created.
+  attachmentIds: z.array(databaseIdSchema).max(10).optional(),
 }).strict();
 
 export type TicketListQuery = z.infer<typeof ticketListQuerySchema>;

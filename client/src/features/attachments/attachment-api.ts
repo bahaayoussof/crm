@@ -51,6 +51,10 @@ export const uploadTicketAttachment = (ticketId: string, file: File) =>
 export const uploadMessageAttachment = (ticketId: string, messageId: string, file: File) =>
   uploadFile<InternalAttachment>(`/tickets/${ticketId}/messages/${messageId}/attachments`, file);
 
+// CONV-041/049 — staged (unbound) upload; the composer submits the id
+// alongside the message/note POST, which binds it atomically.
+export const uploadStagedAttachment = (file: File) => uploadFile<InternalAttachment>("/attachments/staged", file);
+
 export const uploadCustomerAttachment = (customerId: string, file: File) =>
   uploadFile<InternalAttachment>(`/customers/${customerId}/attachments`, file);
 
@@ -64,6 +68,8 @@ export const getPortalTicketAttachments = async (ticketId: string) =>
 
 export const uploadPortalTicketAttachment = (ticketId: string, file: File) =>
   uploadFile<PortalAttachment>(`/portal/tickets/${ticketId}/attachments`, file);
+
+export const uploadPortalStagedAttachment = (file: File) => uploadFile<PortalAttachment>("/portal/attachments/staged", file);
 
 export const downloadPortalAttachment = (attachmentId: string, fallbackName: string) =>
   downloadBlob(`/portal/attachments/${attachmentId}/download`, fallbackName);

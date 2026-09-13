@@ -176,6 +176,7 @@ export function CustomerLiveChat({ chatId, initial, onStartNew }: { chatId: stri
         timestamp={message.createdAt}
         language={i18n.language}
         body={message.body}
+        contentFormat={message.contentFormat}
       />)}
       {send.isError && <li role="alert" className="rounded-md bg-danger-soft p-3 text-sm text-danger-foreground">{t("liveChat.sendError")}</li>}
       <li ref={endRef} aria-hidden="true" />

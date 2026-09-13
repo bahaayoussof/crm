@@ -174,7 +174,58 @@ describe("internal ticket attachment upload", () => {
     expect(response.status).toBe(200);
     expect(response.body.data.map((a: { id: string }) => a.id)).toEqual(["cf55ff16f66f43360266b95db", "a2"]);
     const where = mocks.attachmentFindMany.mock.calls[0]?.[0].where;
-    expect(where).toEqual({ OR: [{ ticketId: "c737ce60fccf9da889f4605c0", messageId: null }, { message: { ticketId: "c737ce60fccf9da889f4605c0" } }] });
+    expect(where).toEqual({ OR: [
+      { ticketId: "c737ce60fccf9da889f4605c0", messageId: null, noteId: null },
+      { message: { ticketId: "c737ce60fccf9da889f4605c0" } },
+      { note: { ticketId: "c737ce60fccf9da889f4605c0" } },
+    ] });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CONV-043 — note-owned attachment visibility
+// ---------------------------------------------------------------------------
+
+describe("CONV-041 — staged upload endpoint", () => {
+  it("uploads a staged attachment owned by the authenticated actor, unbound", async () => {
+    const response = await attach(request(app).post("/api/attachments/staged").set(auth(adminToken)), PNG);
+    expect(response.status).toBe(201);
+    expect(response.body.data).toMatchObject({ ticketId: null, messageId: null, customerId: null });
+    expect(response.body.data).not.toHaveProperty("storageKey");
+    expect(response.body.data).not.toHaveProperty("stagedByUserId");
+    expect(mocks.attachmentCreate.mock.calls[0][0].data).toMatchObject({ stagedByUserId: "admin-1", ticketId: null, messageId: null, customerId: null });
+  });
+
+  it("rejects an unauthenticated staged upload with 401", async () => {
+    const response = await attach(request(app).post("/api/attachments/staged"), PNG);
+    expect(response.status).toBe(401);
+  });
+});
+
+describe("CONV-043 — note-owned attachment visibility", () => {
+  it("includes a note-owned attachment in the internal ticket listing", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({ id: "c737ce60fccf9da889f4605c0", status: "OPEN", assignedAgentId: null });
+    mocks.attachmentFindMany.mockResolvedValue([
+      createdRow({ id: "cf55ff16f66f43360266b95db", ticketId: "c737ce60fccf9da889f4605c0", messageId: null, noteId: "note-1" }),
+    ]);
+    const response = await request(app).get("/api/tickets/c737ce60fccf9da889f4605c0/attachments").set(auth(adminToken));
+    expect(response.status).toBe(200);
+    expect(response.body.data[0]).toMatchObject({ id: "cf55ff16f66f43360266b95db", noteId: "note-1" });
+    const where = mocks.attachmentFindMany.mock.calls[0]?.[0].where;
+    expect(where.OR).toContainEqual({ note: { ticketId: "c737ce60fccf9da889f4605c0" } });
+  });
+
+  it("never returns a note-owned attachment through the Portal projection", async () => {
+    mocks.customerFindUnique.mockResolvedValue({ id: "portal-cust-1" });
+    mocks.ticketFindFirst.mockResolvedValue({ id: "c737ce60fccf9da889f4605c0" });
+    mocks.attachmentFindMany.mockResolvedValue([
+      { id: "cf55ff16f66f43360266b95db", fileName: "f.pdf", mimeType: "application/pdf", createdAt: new Date(), messageId: "m1" },
+    ]);
+    const response = await request(app).get("/api/portal/tickets/c737ce60fccf9da889f4605c0/attachments").set(auth(customerToken));
+    expect(response.status).toBe(200);
+    expect(response.body.data.every((row: Record<string, unknown>) => !("noteId" in row))).toBe(true);
+    const select = mocks.attachmentFindMany.mock.calls[0]?.[0].select;
+    expect(select).not.toHaveProperty("noteId");
   });
 });
 

@@ -32,6 +32,7 @@ model User {
   createdTasks        Task[]               @relation("TaskCreator")
   managedTeam         Team?                @relation("TeamManager")
   assignedTickets     Ticket[]             @relation("AssignedAgent")
+  stagedAttachments   Attachment[]         @relation("AttachmentStagedBy")
   ticketHistory       TicketHistory[]
   ticketMentions      TicketMention[]
   ticketMessages      TicketMessage[]
@@ -83,6 +84,7 @@ model Ticket {
   updatedAt          DateTime        @updatedAt
   emailThreadToken   String?         @unique
   teamId             String?
+  liveChatSessionKey String?         @unique
   attachments        Attachment[]
   feedback           Feedback?
   notifications      Notification[]
@@ -111,33 +113,64 @@ model Ticket {
 }
 
 model TicketMessage {
-  id                String       @id @default(cuid())
+  id                String                     @id @default(cuid())
   ticketId          String
   authorUserId      String
   body              String
-  createdAt         DateTime     @default(now())
-  externalId        String?      @unique
-  externalMessageId String?      @unique
+  createdAt         DateTime                   @default(now())
+  externalId        String?                    @unique
+  externalMessageId String?                    @unique
+  inboundKey        String?                    @unique
+  contentFormat     ConversationContentFormat
+  contentSource     ConversationContentSource
   attachments       Attachment[]
-  author            User         @relation(fields: [authorUserId], references: [id])
-  ticket            Ticket       @relation(fields: [ticketId], references: [id])
+  author            User                       @relation(fields: [authorUserId], references: [id])
+  ticket            Ticket                     @relation(fields: [ticketId], references: [id])
+  delivery          MessageDelivery?
 
   @@index([ticketId, createdAt])
   @@index([authorUserId])
 }
 
 model TicketNote {
-  id           String          @id @default(cuid())
-  ticketId     String
-  authorUserId String
-  body         String
-  createdAt    DateTime        @default(now())
-  mentions     TicketMention[]
-  author       User            @relation(fields: [authorUserId], references: [id])
-  ticket       Ticket          @relation(fields: [ticketId], references: [id])
+  id            String                     @id @default(cuid())
+  ticketId      String
+  authorUserId  String
+  body          String
+  createdAt     DateTime                   @default(now())
+  contentFormat ConversationContentFormat
+  contentSource ConversationContentSource
+  mentions      TicketMention[]
+  attachments   Attachment[]
+  author        User                       @relation(fields: [authorUserId], references: [id])
+  ticket        Ticket                     @relation(fields: [ticketId], references: [id])
 
   @@index([ticketId, createdAt])
   @@index([authorUserId])
+}
+
+model MessageDelivery {
+  id               String        @id @default(cuid())
+  messageId        String        @unique
+  channel          Channel
+  status           DeliveryStatus @default(PENDING)
+  providerMessageId String?
+  attemptCount     Int           @default(0)
+  lastErrorCode    String?
+  lastErrorMessage String?
+  claimedUntil     DateTime?
+  nextAttemptAt    DateTime?
+  firstAttemptedAt DateTime?
+  lastAttemptedAt  DateTime?
+  sentAt           DateTime?
+  deliveredAt      DateTime?
+  failedAt         DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  message          TicketMessage @relation(fields: [messageId], references: [id])
+
+  @@unique([channel, providerMessageId])
+  @@index([status, nextAttemptAt])
 }
 
 model TicketWatcher {
@@ -182,22 +215,32 @@ model CustomerNote {
 }
 
 model Attachment {
-  id         String         @id @default(cuid())
-  ticketId   String?
-  messageId  String?
-  customerId String?
-  fileName   String
-  mimeType   String
-  storageKey String         @unique
-  createdAt  DateTime       @default(now())
-  externalId String?        @unique
-  customer   Customer?      @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  message    TicketMessage? @relation(fields: [messageId], references: [id], onDelete: Restrict)
-  ticket     Ticket?        @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  id             String         @id @default(cuid())
+  ticketId       String?
+  messageId      String?
+  noteId         String?
+  customerId     String?
+  // CONV-041 — staged (unbound) conversation attachment ownership. Set only
+  // while ticketId/messageId/noteId/customerId are all null; cleared (left
+  // null) once the row is bound to its owning message/note. Never set
+  // alongside a bound context.
+  stagedByUserId String?
+  fileName       String
+  mimeType       String
+  storageKey     String         @unique
+  createdAt      DateTime       @default(now())
+  externalId     String?        @unique
+  customer       Customer?      @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  message        TicketMessage? @relation(fields: [messageId], references: [id], onDelete: Restrict)
+  note           TicketNote?    @relation(fields: [noteId], references: [id], onDelete: Restrict)
+  ticket         Ticket?        @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  stagedBy       User?          @relation("AttachmentStagedBy", fields: [stagedByUserId], references: [id], onDelete: SetNull)
 
   @@index([ticketId])
   @@index([messageId])
+  @@index([noteId])
   @@index([customerId])
+  @@index([stagedByUserId])
 }
 
 model Category {
@@ -434,6 +477,29 @@ enum Channel {
   WHATSAPP
   SMS
   LIVE_CHAT
+}
+
+enum ConversationContentFormat {
+  PLAIN_TEXT
+  SANITIZED_HTML
+}
+
+enum ConversationContentSource {
+  STAFF
+  PORTAL
+  EMAIL
+  SMS
+  WHATSAPP
+  LIVE_CHAT
+  SYSTEM
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENDING
+  SENT
+  DELIVERED
+  FAILED
 }
 
 enum KnowledgeArticleStatus {

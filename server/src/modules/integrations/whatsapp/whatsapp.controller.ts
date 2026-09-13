@@ -2,8 +2,9 @@ import type { RequestHandler } from "express";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { getAppSecret, getVerifyToken } from "./whatsapp.config.js";
 import { safeEqual, verifySignature } from "./whatsapp.signature.js";
-import { extractInboundTextMessages, whatsappVerificationQuerySchema, whatsappWebhookSchema } from "./whatsapp.schema.js";
+import { extractDeliveryStatusUpdates, extractInboundTextMessages, whatsappVerificationQuerySchema, whatsappWebhookSchema } from "./whatsapp.schema.js";
 import { processInboundTextMessage } from "./whatsapp.service.js";
+import { applyDeliveryCallback } from "../outbound-delivery.js";
 
 /**
  * GET /api/integrations/whatsapp/webhook
@@ -68,7 +69,18 @@ export const receiveWebhook: RequestHandler = async (request, response, next) =>
     let processed = 0;
     for (const message of messages) {
       const result = await processInboundTextMessage(message);
-      if (result.status !== "DUPLICATE") processed += 1;
+      if (result.status !== "DUPLICATE" && result.status !== "AMBIGUOUS") processed += 1;
+    }
+    // CONV-040: outbound delivery-status callbacks arrive on this same signed
+    // webhook. A callback never creates a TicketMessage/notification/audit
+    // row and never counts toward `processed`.
+    const statuses = extractDeliveryStatusUpdates(validation.data);
+    for (const status of statuses) {
+      await applyDeliveryCallback("WHATSAPP", status.providerMessageId, {
+        status: status.status,
+        errorCode: status.errorCode,
+        errorMessage: status.errorMessage,
+      });
     }
     response.status(200).json({ received: true, processed });
   } catch (error) {

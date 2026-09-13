@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   useCreateTicketMessage: vi.fn(), useCreateTicketNote: vi.fn(), useAuth: vi.fn(),
   useTicketAttachments: vi.fn(),
   useUploadTicketAttachment: vi.fn(),
+  useUploadStagedAttachment: vi.fn(),
 }));
 
 vi.mock("./ticket-hooks", () => ({
@@ -18,6 +19,7 @@ vi.mock("@/features/auth/auth-state", () => ({ useAuth: mocks.useAuth }));
 vi.mock("@/features/attachments/attachment-hooks", () => ({
   useTicketAttachments: mocks.useTicketAttachments,
   useUploadTicketAttachment: mocks.useUploadTicketAttachment,
+  useUploadStagedAttachment: mocks.useUploadStagedAttachment,
 }));
 vi.mock("@/features/quick-replies/quick-reply-picker", () => ({ QuickReplyPicker: () => null }));
 // The @mention typeahead needs a QueryClient; its behaviour is covered elsewhere.
@@ -58,9 +60,9 @@ const baseTicket = {
   category: { id: "category-1", name: "Billing" }, department: null, branch: null,
   history: [{ id: "history-1", action: "STATUS_CHANGED", oldValue: `OLD-${LONG_UNBROKEN}`, newValue: `NEW-${LONG_UNBROKEN}`, createdAt: "2026-08-25T08:30:00.000Z", actor: { id: "admin-1", name: "Admin", role: "ADMIN" } }],
   conversation: [
-    { id: "message-short", kind: "PUBLIC_MESSAGE", body: "Thanks, that is resolved now.", createdAt: "2026-08-25T09:00:00.000Z", author: { id: "customer-1", name: "Ahmed Mohamed", role: "CUSTOMER" } },
-    { id: "message-long", kind: "PUBLIC_MESSAGE", body: LONG_MESSAGE, createdAt: "2026-08-25T09:05:00.000Z", author: { id: "agent-1", name: "Mariam Hassan", role: "AGENT" } },
-    { id: "note-1", kind: "INTERNAL_NOTE", body: "Private investigation notes.", createdAt: "2026-08-25T09:10:00.000Z", author: { id: "admin-1", name: "Admin", role: "ADMIN" } },
+    { id: "message-short", kind: "PUBLIC_MESSAGE", body: "Thanks, that is resolved now.", createdAt: "2026-08-25T09:00:00.000Z", contentFormat: "PLAIN_TEXT", delivery: null, author: { id: "customer-1", name: "Ahmed Mohamed", role: "CUSTOMER" } },
+    { id: "message-long", kind: "PUBLIC_MESSAGE", body: LONG_MESSAGE, createdAt: "2026-08-25T09:05:00.000Z", contentFormat: "PLAIN_TEXT", delivery: null, author: { id: "agent-1", name: "Mariam Hassan", role: "AGENT" } },
+    { id: "note-1", kind: "INTERNAL_NOTE", body: "Private investigation notes.", createdAt: "2026-08-25T09:10:00.000Z", contentFormat: "PLAIN_TEXT", author: { id: "admin-1", name: "Admin", role: "ADMIN" } },
   ],
 };
 
@@ -86,6 +88,10 @@ function baseMocks() {
   });
   mocks.useUploadTicketAttachment.mockReturnValue({
     mutateAsync: vi.fn().mockResolvedValue({}),
+    isPending: false,
+  });
+  mocks.useUploadStagedAttachment.mockReturnValue({
+    mutateAsync: vi.fn().mockResolvedValue({ id: "staged-1", fileName: "file.pdf", mimeType: "application/pdf" }),
     isPending: false,
   });
 }
@@ -239,6 +245,8 @@ describe("Ticket Details conversation rows and long-message disclosure", () => {
             id: "m-html",
             kind: "PUBLIC_MESSAGE",
             createdAt: "2026-08-25T09:20:00.000Z",
+            contentFormat: "SANITIZED_HTML",
+            delivery: null,
             author: { id: "agent-1", name: "Mariam Hassan", role: "AGENT" },
             body:
               '<p>Hello <strong>Ahmed</strong></p><ul><li>step one</li></ul>' +
@@ -291,6 +299,7 @@ describe("Ticket Details conversation rows and long-message disclosure", () => {
             id: "note-html",
             kind: "INTERNAL_NOTE",
             createdAt: "2026-08-25T09:30:00.000Z",
+            contentFormat: "SANITIZED_HTML",
             author: { id: "admin-1", name: "Admin", role: "ADMIN" },
             body: '<p>Please review <strong>this</strong> @[Ann Lee](user-9)</p><script>alert(1)</script>',
           },
@@ -386,6 +395,28 @@ describe("Ticket Details sidebar controls & responsive sizing", () => {
     fireEvent.click(cancel);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("list", { name: "Ticket conversation timeline" })).toBeInTheDocument();
+  });
+
+  it("CONV-041/049: stages an attachment via Attach file, shows it as a chip in the composer", async () => {
+    renderDetail();
+
+    fireEvent.click(screen.getByRole("button", { name: "Attach file" }));
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(["x".repeat(2048)], "evidence.pdf", { type: "application/pdf" })] } });
+    await screen.findByTitle("evidence.pdf");
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(await screen.findByTitle("file.pdf")).toBeInTheDocument(); // staged chip in the composer, distinct from the ticket-level "evidence.pdf" attachment
+  });
+
+  it("CONV-042: hides Attach file for a reply on an EMAIL-channel ticket but keeps it for an internal note", async () => {
+    mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: { ...baseTicket, channel: "EMAIL" } });
+    renderDetail();
+    expect(screen.queryByRole("button", { name: "Attach file" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Internal note" }));
+    expect(screen.getByRole("button", { name: "Attach file" })).toBeInTheDocument();
   });
 
   it("shows a themed selected-file card in FileUploadModal with a contained filename, metadata, and a Remove action", async () => {

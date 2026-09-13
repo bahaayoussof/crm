@@ -28,6 +28,7 @@ import { portalAttachmentRouter } from "./modules/attachments/attachment.portal.
 import { taskRouter } from "./modules/tasks/task.routes.js";
 import { taskReminderRouter } from "./modules/tasks/task-reminder.routes.js";
 import { liveChatInactivityRouter } from "./modules/live-chat/live-chat-inactivity.routes.js";
+import { outboundDeliveryRetryRouter } from "./modules/integrations/outbound-delivery-retry.routes.js";
 import { whatsappRouter } from "./modules/integrations/whatsapp/whatsapp.routes.js";
 import { emailIntegrationRouter } from "./modules/integrations/email/email.routes.js";
 import { smsIntegrationRouter } from "./modules/integrations/sms/sms.routes.js";
@@ -92,6 +93,7 @@ app.use("/api/realtime", realtimeRouter);
 app.use("/api/internal/sla-monitor", slaAutomationRouter);
 app.use("/api/internal/task-reminders", taskReminderRouter);
 app.use("/api/internal/live-chat-inactivity", liveChatInactivityRouter);
+app.use("/api/internal/outbound-delivery-retry", outboundDeliveryRetryRouter);
 app.use("/api/tasks", taskRouter);
 app.use("/api/attachments", attachmentRouter);
 app.use("/api/portal/knowledge-articles", portalKnowledgeArticleRouter);

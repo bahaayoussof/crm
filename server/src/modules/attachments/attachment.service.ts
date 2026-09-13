@@ -23,7 +23,10 @@ export interface Actor {
 interface AttachmentContext {
   ticketId: string | null;
   messageId: string | null;
+  noteId?: string | null;
   customerId: string | null;
+  /** CONV-041 — set only for a staged (unbound) row; owner of the upload. */
+  stagedByUserId?: string | null;
 }
 
 const internalSelect = {
@@ -33,6 +36,7 @@ const internalSelect = {
   createdAt: true,
   ticketId: true,
   messageId: true,
+  noteId: true,
   customerId: true,
 } satisfies Prisma.AttachmentSelect;
 
@@ -46,6 +50,7 @@ export interface InternalAttachment {
   createdAt: Date;
   ticketId: string | null;
   messageId: string | null;
+  noteId: string | null;
   customerId: string | null;
 }
 
@@ -68,6 +73,7 @@ function toInternal(row: InternalRow): InternalAttachment {
     createdAt: row.createdAt,
     ticketId: row.ticketId,
     messageId: row.messageId,
+    noteId: row.noteId,
     customerId: row.customerId,
   };
 }
@@ -121,11 +127,17 @@ function requireOpenForMutation(ticket: { status: TicketStatus }) {
 function assertContext(context: AttachmentContext) {
   const hasTicket = context.ticketId != null;
   const hasMessage = context.messageId != null;
+  const hasNote = context.noteId != null;
   const hasCustomer = context.customerId != null;
-  const ticketOnly = hasTicket && !hasMessage && !hasCustomer;
-  const messageLevel = hasTicket && hasMessage && !hasCustomer;
-  const customerOnly = hasCustomer && !hasTicket && !hasMessage;
-  if (!ticketOnly && !messageLevel && !customerOnly) {
+  const hasStagedBy = context.stagedByUserId != null;
+  const ticketOnly = hasTicket && !hasMessage && !hasNote && !hasCustomer;
+  const messageLevel = hasTicket && hasMessage && !hasNote && !hasCustomer;
+  const noteLevel = hasTicket && hasNote && !hasMessage && !hasCustomer;
+  const customerOnly = hasCustomer && !hasTicket && !hasMessage && !hasNote;
+  // CONV-041: a staged row is owned by the uploader and bound to exactly none
+  // of ticket/message/note/customer until bind time.
+  const staged = hasStagedBy && !hasTicket && !hasMessage && !hasNote && !hasCustomer;
+  if (!ticketOnly && !messageLevel && !noteLevel && !customerOnly && !staged) {
     throw new AppError(422, "INVALID_ATTACHMENT_CONTEXT", "Unsupported attachment context");
   }
 }
@@ -134,11 +146,15 @@ function assertContext(context: AttachmentContext) {
 // Internal listing
 // ---------------------------------------------------------------------------
 
-/** Ticket-level attachments plus message-level attachments whose message belongs to the ticket. Each row once. */
+/**
+ * Ticket-level, message-level, and (CONV-043) note-level attachments for the
+ * ticket, each row once. Note-owned attachments are internal-only — never
+ * exposed through the Portal projection (see `listPortalTicketAttachments`).
+ */
 export async function listTicketAttachments(ticketId: string, actor: Actor): Promise<{ data: InternalAttachment[] }> {
   await requireVisibleTicket(ticketId, actor);
   const rows = await prisma.attachment.findMany({
-    where: { OR: [{ ticketId, messageId: null }, { message: { ticketId } }] },
+    where: { OR: [{ ticketId, messageId: null, noteId: null }, { message: { ticketId } }, { note: { ticketId } }] },
     orderBy: listOrder,
     select: internalSelect,
   });
@@ -202,6 +218,60 @@ export async function authorizeCustomerUpload(customerId: string): Promise<Attac
   return { customerId, ticketId: null, messageId: null };
 }
 
+/**
+ * CONV-041 — staged (unbound) upload, owned by the authenticated actor. No
+ * ticket/message/note association exists yet; the composer submits the
+ * returned id alongside the message/note POST, which binds it atomically
+ * (see `bindStagedAttachments`). Any authenticated staff role may stage a
+ * file — the ticket-specific CLOSED/assignment/authorship checks run at bind
+ * time, against the ticket the send actually targets.
+ */
+export async function authorizeStagedUpload(actor: Actor): Promise<AttachmentContext> {
+  return { ticketId: null, messageId: null, noteId: null, customerId: null, stagedByUserId: actor.userId };
+}
+
+/** Portal equivalent of `authorizeStagedUpload` — owned by the customer's linked User account. */
+export async function authorizePortalStagedUpload(userId: string): Promise<AttachmentContext> {
+  await customerIdForUser(userId);
+  return { ticketId: null, messageId: null, noteId: null, customerId: null, stagedByUserId: userId };
+}
+
+export type BindTarget = { ticketId: string; messageId: string } | { ticketId: string; noteId: string };
+
+/**
+ * CONV-041 — atomically bind previously staged attachment ids to the exact
+ * message/note being created, inside the caller's own transaction. Re-checks
+ * ownership (`stagedByUserId === actorUserId`) and that each row is still
+ * unbound; any mismatch throws so the whole transaction rolls back rather
+ * than silently skipping a file or misbinding it onto someone else's send.
+ */
+export async function bindStagedAttachments(
+  tx: Prisma.TransactionClient,
+  attachmentIds: string[],
+  target: BindTarget,
+  actorUserId: string,
+): Promise<void> {
+  if (attachmentIds.length === 0) return;
+  const unique = [...new Set(attachmentIds)];
+  const rows = await tx.attachment.findMany({
+    where: { id: { in: unique } },
+    select: { id: true, stagedByUserId: true, ticketId: true, messageId: true, noteId: true, customerId: true },
+  });
+  if (rows.length !== unique.length) {
+    throw new AppError(404, "ATTACHMENT_NOT_FOUND", "One or more attachments were not found");
+  }
+  for (const row of rows) {
+    const isUnbound = row.ticketId == null && row.messageId == null && row.noteId == null && row.customerId == null;
+    if (!isUnbound || !row.stagedByUserId || row.stagedByUserId !== actorUserId) {
+      throw new AppError(403, "FORBIDDEN", "One or more attachments cannot be attached to this message");
+    }
+  }
+  const bindData: Prisma.AttachmentUncheckedUpdateManyInput = "messageId" in target
+    ? { ticketId: target.ticketId, messageId: target.messageId, stagedByUserId: null }
+    : { ticketId: target.ticketId, noteId: target.noteId, stagedByUserId: null };
+  await tx.attachment.updateMany({ where: { id: { in: unique } }, data: bindData });
+}
+
 // ---------------------------------------------------------------------------
 // Persist (signature validation -> key -> provider put -> DB create -> cleanup)
 // ---------------------------------------------------------------------------
@@ -235,7 +305,9 @@ export async function persistUpload(context: AttachmentContext, upload: ParsedUp
       data: {
         ticketId: context.ticketId,
         messageId: context.messageId,
+        noteId: context.noteId ?? null,
         customerId: context.customerId,
+        stagedByUserId: context.stagedByUserId ?? null,
         fileName,
         mimeType,
         storageKey,

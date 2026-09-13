@@ -54,6 +54,13 @@ export const uploadMessageAttachment: RequestHandler = async (request, response)
   response.status(201).json({ data: service.projectInternal(row) });
 };
 
+export const uploadStagedAttachment: RequestHandler = async (request, response) => {
+  const context = await service.authorizeStagedUpload(actor(request));
+  const upload = await parseSingleUpload(request);
+  const row = await service.persistUpload(context, upload);
+  response.status(201).json({ data: service.projectInternal(row) });
+};
+
 export const listCustomerAttachments: RequestHandler = async (_request, response) => {
   response.status(200).json(await service.listCustomerAttachments(params<CustomerAttachmentParams>(response).customerId));
 };

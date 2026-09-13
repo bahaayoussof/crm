@@ -2,6 +2,21 @@
 
 EMAIL is a transport for the existing Ticket conversation. It does not create a second inbox, composer, message table, workflow, or permission model.
 
+> **Update (2026-09-13, ADR-057 — Conversations/Channels hardening).** Four
+> behaviors changed from the description below: (1) the "one active EMAIL
+> ticket" identity-only correlation fallback is removed — absent a reliable
+> RFC-reference/reply-token/thread match, every inbound email creates a new
+> ticket; RESOLVED only reopens via one of those three reliable correlations,
+> never by sender identity alone. (2) The inbound realtime event now always
+> carries the correlated/created ticket's `teamId` (previously omitted on an
+> already-routed ticket, so the assigned team never got the invalidation
+> signal). (3) Outbound delivery state lives in a durable `MessageDelivery` row
+> (not a best-effort `TicketMessage.externalId` update), with a bounded 3-attempt
+> retry sweep and a signed `email.delivered`/`email.bounced` callback that can
+> advance it post-commit. (4) Every message declares `contentFormat`
+> (`PLAIN_TEXT` for provider-delivered inbound bodies) — the client renders from
+> that field, never by sniffing the body for markup.
+
 ## Architecture
 
 ```text

@@ -28,12 +28,24 @@ const messageSchema = z
   .partial()
   .passthrough();
 
+const statusErrorSchema = z.object({ code: z.union([z.string(), z.number()]), title: z.string().max(500) }).partial().passthrough();
+
+const statusSchema = z
+  .object({
+    id: z.string().trim().min(1).max(256),
+    status: z.string().trim().min(1).max(50),
+    timestamp: z.string().regex(/^\d{1,12}$/),
+    errors: z.array(statusErrorSchema),
+  })
+  .partial()
+  .passthrough();
+
 const changeValueSchema = z
   .object({
     messaging_product: z.string().trim().min(1).max(50),
     contacts: z.array(contactSchema),
     messages: z.array(messageSchema),
-    statuses: z.array(z.unknown()),
+    statuses: z.array(statusSchema),
   })
   .partial()
   .passthrough();
@@ -90,6 +102,49 @@ export function extractInboundTextMessages(payload: WhatsappWebhookPayload): Inb
           profileName: nameByWaId.get(message.from) ?? null,
           text: body,
           timestamp: Number.parseInt(message.timestamp ?? "", 10) || Math.floor(Date.now() / 1000),
+        });
+      }
+    }
+  }
+  return result;
+}
+
+export interface DeliveryStatusUpdate {
+  providerMessageId: string;
+  status: "SENT" | "DELIVERED" | "FAILED";
+  errorCode: string | null;
+  errorMessage: string | null;
+}
+
+const STATUS_MAP: Record<string, "SENT" | "DELIVERED" | "FAILED"> = {
+  sent: "SENT",
+  delivered: "DELIVERED",
+  read: "DELIVERED",
+  failed: "FAILED",
+};
+
+/**
+ * CONV-040 — pull outbound delivery-status updates (Meta's `statuses` field,
+ * already present on the same signed webhook this CRM has always received —
+ * no new provider setup required). Unknown/unrecognized status values
+ * (e.g. future Meta status types) are safely ignored, never guessed at.
+ */
+export function extractDeliveryStatusUpdates(payload: WhatsappWebhookPayload): DeliveryStatusUpdate[] {
+  const result: DeliveryStatusUpdate[] = [];
+  for (const entry of payload.entry ?? []) {
+    for (const change of entry.changes ?? []) {
+      if (change.field && change.field !== "messages") continue;
+      const value = change.value;
+      if (!value) continue;
+      for (const status of value.statuses ?? []) {
+        const mapped = status.status ? STATUS_MAP[status.status] : undefined;
+        if (!status.id || !mapped) continue;
+        const firstError = status.errors?.[0];
+        result.push({
+          providerMessageId: status.id,
+          status: mapped,
+          errorCode: firstError?.code != null ? String(firstError.code) : null,
+          errorMessage: firstError?.title ?? null,
         });
       }
     }

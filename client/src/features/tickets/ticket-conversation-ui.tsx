@@ -16,13 +16,13 @@ import { useConversationAutoScroll } from "./use-conversation-auto-scroll";
 const LONG_MESSAGE_LINES = 10;
 const LONG_MESSAGE_CHARS = 800;
 
-// Public staff replies are stored as server-sanitized HTML from the Lexical
-// composer; everything else (customer messages, internal notes) is plain text.
-// The render path is chosen by content, and the HTML is re-sanitized here so a
-// pre-sanitizer row — or any unexpected markup — can never inject.
+// CONV-047: the render path is chosen by the server-persisted `contentFormat`
+// (SANITIZED_HTML vs PLAIN_TEXT) — never by sniffing the body for markup, so a
+// PLAIN_TEXT body containing literal `<strong>` text renders as visible literal
+// text, not formatting. SANITIZED_HTML is re-sanitized here as defence in depth
+// (the server already sanitized on write).
 const RICH_ALLOWED_TAGS = ["b", "strong", "i", "em", "u", "p", "br", "ul", "ol", "li", "a"];
 const RICH_SAFE_URI = /^(?:https?:|mailto:)/i;
-const LOOKS_LIKE_HTML = /<(?:\/?)(?:b|strong|i|em|u|p|br|ul|ol|li|a)\b[^>]*>/i;
 
 if (typeof window !== "undefined" && typeof DOMPurify.addHook === "function") {
   DOMPurify.addHook("afterSanitizeAttributes", (node) => {
@@ -67,9 +67,12 @@ function tokenizeMentionsHtml(safeHtml: string): string {
 
 export function MessageBody({
   body,
+  contentFormat,
   mentionize = false,
 }: {
   body: string;
+  /** CONV-047: drives the render path — never inferred from the body's content. */
+  contentFormat: "PLAIN_TEXT" | "SANITIZED_HTML";
   /** Internal-note bodies: render `@[Name](id)` tokens as mention chips (works on
    * both the sanitized-HTML path and the legacy plain-text path). */
   mentionize?: boolean;
@@ -78,7 +81,7 @@ export function MessageBody({
   const [expanded, setExpanded] = useState(false);
   const isLong = body.length > LONG_MESSAGE_CHARS || body.split("\n").length > LONG_MESSAGE_LINES;
   const clamp = isLong && !expanded ? "line-clamp-[10]" : "";
-  const asHtml = LOOKS_LIKE_HTML.test(body);
+  const asHtml = contentFormat === "SANITIZED_HTML";
   const html = asHtml
     ? mentionize
       ? tokenizeMentionsHtml(sanitizeReplyHtml(body))
@@ -135,8 +138,11 @@ export function ConversationMessage({
   timestamp,
   language,
   body,
+  contentFormat,
   mentionize = false,
   footnote,
+  deliveryFailed = false,
+  deliveryFailedLabel,
   attachmentsSlot,
   maxWidthClass = "sm:max-w-[min(85%,46rem)]",
 }: {
@@ -148,9 +154,14 @@ export function ConversationMessage({
   timestamp: string;
   language: string;
   body: string;
+  /** CONV-047: drives the render path — never inferred from the body's content. */
+  contentFormat: "PLAIN_TEXT" | "SANITIZED_HTML";
   /** Internal-note bodies: render `@[Name](id)` tokens as chips. */
   mentionize?: boolean;
   footnote?: string;
+  /** CONV-048: shows a durable "not delivered" indicator that survives reload. */
+  deliveryFailed?: boolean;
+  deliveryFailedLabel?: string;
   attachmentsSlot?: React.ReactNode;
   /** Tailwind max-width utility for the bubble (default: Portal's wide ceiling). */
   maxWidthClass?: string;
@@ -188,9 +199,14 @@ export function ConversationMessage({
             {formatTicketDate(timestamp, language)}
           </time>
         </header>
-        <MessageBody body={body} mentionize={mentionize} />
+        <MessageBody body={body} contentFormat={contentFormat} mentionize={mentionize} />
         {attachmentsSlot}
         {footnote && <p className="mt-2 text-xs text-muted-foreground">{footnote}</p>}
+        {deliveryFailed && deliveryFailedLabel && (
+          <p className="mt-1 text-xs font-medium text-danger-foreground" role="status">
+            {deliveryFailedLabel}
+          </p>
+        )}
       </article>
     </li>
   );

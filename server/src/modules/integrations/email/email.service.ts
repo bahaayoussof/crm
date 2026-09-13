@@ -16,21 +16,19 @@ import { sanitizeFileName } from "../../attachments/file-name.js";
 import { getAttachmentStorage, StorageUnavailableError } from "../../attachments/attachment-storage.js";
 import { requireInboundEmailConfig, requireOutboundEmailConfig } from "./email.config.js";
 import { emailClient, ResendEmailError } from "./email.client.js";
+import { createCanonicalTicket } from "../../tickets/create-canonical-ticket.js";
 import type { EmailDeliveryResult, InboundEmailEvent, ReceivedEmail } from "./email.types.js";
 import {
   type OutboundDeliveryResult,
   outboundFailureReason,
   recordOutboundDeliveryFailure,
+  claimDeliveryForAttempt,
+  recordDeliveryOutcome,
+  skippedClaimResult,
 } from "../outbound-delivery.js";
 
 const SYSTEM_USER_EMAIL = "email-inbound@system.invalid";
 const SYSTEM_USER_NAME = "Email Customer";
-const ACTIVE_STATUSES = [
-  TicketStatus.OPEN,
-  TicketStatus.IN_PROGRESS,
-  TicketStatus.WAITING_CUSTOMER,
-  TicketStatus.ESCALATED,
-] as const;
 
 function addMinutes(date: Date, minutes: number) {
   return new Date(date.getTime() + minutes * 60_000);
@@ -123,7 +121,8 @@ async function createEmailTicket(
   // Inbound email tickets have no Team at creation (teamId null), so automatic
   // assignment does not run here — the ticket waits for ADMIN routing, then the
   // canonical ticket update flow auto-assigns it once a Team is set.
-  const ticket = await tx.ticket.create({
+  const canonical = await createCanonicalTicket({
+    tx,
     data: {
       subject: (subject.trim() || "Email support request").slice(0, 200),
       description: body,
@@ -136,12 +135,10 @@ async function createEmailTicket(
       firstResponseDueAt: sla ? addMinutes(now, sla.firstResponseMinutes) : null,
       resolutionDueAt: sla ? addMinutes(now, sla.resolutionMinutes) : null,
     },
-    select: { id: true, status: true, subject: true, assignedAgentId: true, emailThreadToken: true },
+    actorId: null,
+    select: { emailThreadToken: true },
   });
-  await tx.ticketHistory.create({
-    data: { ticketId: ticket.id, actorUserId: null, action: "TICKET_CREATED", newValue: TicketStatus.OPEN },
-  });
-  return ticket;
+  return canonical.ticket;
 }
 
 async function correlateTicket(
@@ -186,13 +183,10 @@ async function correlateTicket(
     if (candidates.length === 1) return candidates[0]!;
   }
 
-  const active = await tx.ticket.findMany({
-    where: { customerId, channel: Channel.EMAIL, status: { in: [...ACTIVE_STATUSES] } },
-    orderBy: { createdAt: "desc" },
-    take: 2,
-    select: { id: true, status: true, subject: true, assignedAgentId: true, emailThreadToken: true },
-  });
-  return active.length === 1 ? active[0]! : null;
+  // CONV-023 (OD-CC-4): no "exactly one active EMAIL ticket" identity-only
+  // fallback. Absent thread/token/reference evidence, the caller always
+  // creates a new ticket — customer identity alone never selects one.
+  return null;
 }
 
 async function notifyInbound(
@@ -217,6 +211,10 @@ async function notifyInbound(
     `Customer replied to ticket #${ticket.id}: ${ticket.subject}`,
     ticket.id,
   );
+  // CONV-019 (CC-GAP-01 fix): callers need this to assemble the complete
+  // realtime audience — omitting teamId silently drops the event for the
+  // ticket's own-team Manager/Agent subscribers on an already-routed ticket.
+  return teamRow?.teamId ?? null;
 }
 
 type PreparedAttachment = { externalId: string; storageKey: string; fileName: string; mimeType: string; body: Buffer };
@@ -302,6 +300,8 @@ export async function processInboundEmail(event: InboundEmailEvent) {
           externalId: `resend:${event.emailId}`,
           externalMessageId: email.messageId,
           createdAt: new Date(email.createdAt),
+          contentFormat: "PLAIN_TEXT",
+          contentSource: "EMAIL",
         },
       });
       if (prepared.length) {
@@ -328,13 +328,14 @@ export async function processInboundEmail(event: InboundEmailEvent) {
           data: { ticketId: ticket.id, actorUserId: null, action: "STATUS_CHANGED", oldValue: ticket.status, newValue: TicketStatus.OPEN },
         });
       }
-      await notifyInbound(tx, ticket);
+      const teamId = await notifyInbound(tx, ticket);
       return {
         status: createdTicket ? "TICKET_CREATED" as const : "MESSAGE_APPENDED" as const,
         ticketId: ticket.id,
         messageId,
         assignedAgentId: ticket.assignedAgentId,
         customerId: customer.id,
+        teamId,
       };
     });
     // Committed — tell connected staff (and the owning portal customer). Rolled-back
@@ -345,6 +346,7 @@ export async function processInboundEmail(event: InboundEmailEvent) {
       messageId: outcome.messageId,
       assignedAgentId: outcome.assignedAgentId,
       customerId: outcome.customerId,
+      teamId: outcome.teamId,
       visibility: "public",
     });
     return { status: outcome.status, ticketId: outcome.ticketId, messageId: outcome.messageId };
@@ -419,8 +421,15 @@ export async function deliverOutboundEmailReply(params: {
   references: string[];
 }): Promise<OutboundDeliveryResult> {
   if (!params.recipient) {
+    await recordDeliveryOutcome(params.messageId, { status: "FAILED", errorCode: "NO_RECIPIENT_EMAIL", terminal: true });
     return recordOutboundDeliveryFailure({ channel: "EMAIL", ticketId: params.ticketId, reason: "NO_RECIPIENT_EMAIL" });
   }
+  // CONV-037/038: claim the durable delivery row for this attempt. A `null`
+  // claim means it is already leased/terminal (an overlapping sweep call, or
+  // this row is already SENT/DELIVERED/FAILED) — skip the provider call
+  // entirely so two overlapping invocations never both send.
+  const claimed = await claimDeliveryForAttempt(params.messageId);
+  if (!claimed) return skippedClaimResult("EMAIL", params.messageId);
   let result: EmailDeliveryResult;
   try {
     result = await deliverEmailReply({
@@ -434,15 +443,18 @@ export async function deliverOutboundEmailReply(params: {
       references: params.references,
     });
   } catch (error) {
-    return recordOutboundDeliveryFailure({
-      channel: "EMAIL",
-      ticketId: params.ticketId,
-      reason: outboundFailureReason(error),
-    });
+    const reason = outboundFailureReason(error);
+    await recordDeliveryOutcome(params.messageId, { status: "FAILED", errorCode: reason, errorMessage: error instanceof Error ? error.message : undefined });
+    return recordOutboundDeliveryFailure({ channel: "EMAIL", ticketId: params.ticketId, reason });
   }
-  await prisma.ticketMessage
-    .update({ where: { id: params.messageId }, data: { externalId: result.externalId } })
-    .catch((error) => console.error("email: sent reply but could not store provider id", error));
+  // CONV-037: the durable MessageDelivery row is now the source of truth for
+  // provider id/status — TicketMessage.externalId is no longer written for
+  // new outbound sends (it stays populated only for historical/inbound rows).
+  // A bookkeeping failure here must never turn an actually-sent email into a
+  // lost reply — log and still report SENT, mirroring the prior best-effort
+  // externalId-write behavior.
+  await recordDeliveryOutcome(params.messageId, { status: "SENT", providerMessageId: result.externalId })
+    .catch((error) => console.error("email: sent reply but could not record delivery outcome", error));
   return { channel: "EMAIL", status: "SENT", externalId: result.externalId };
 }
 

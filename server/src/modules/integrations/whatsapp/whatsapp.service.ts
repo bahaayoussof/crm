@@ -9,13 +9,18 @@ import { emitTicketMessageCreated, withRealtimeOutbox } from "../../realtime/rea
 import { customerReplyNotificationRecipientIds } from "../../../shared/team/team-scope.js";
 import { getSendConfig } from "./whatsapp.config.js";
 import { whatsappClient, WhatsappApiError } from "./whatsapp.client.js";
-import type {
-  InboundResult,
-  InboundTextMessage,
-  OutboundDeliveryResult,
-  OutboundFailureReason,
-} from "./whatsapp.types.js";
+import type { InboundResult, InboundTextMessage } from "./whatsapp.types.js";
 import { normalizePhoneNumber } from "../../../shared/utils/phone.js";
+import { resolveCustomerByPhone } from "../../customers/resolve-customer-by-phone.js";
+import { createCanonicalTicket } from "../../tickets/create-canonical-ticket.js";
+import {
+  claimDeliveryForAttempt,
+  recordDeliveryOutcome,
+  recordOutboundDeliveryFailure,
+  skippedClaimResult,
+  type OutboundDeliveryFailureReason,
+  type OutboundDeliveryResult,
+} from "../outbound-delivery.js";
 
 /**
  * Adapter between the WhatsApp Cloud API and the existing CRM
@@ -25,14 +30,6 @@ import { normalizePhoneNumber } from "../../../shared/utils/phone.js";
  * customer-reply path already does (portal.service.ts) — a new inbound message
  * either appends to the customer's active WhatsApp ticket or opens a new one.
  */
-
-// Non-terminal statuses — an incoming message joins one of these, otherwise a new ticket opens.
-const ACTIVE_TICKET_STATUSES = [
-  TicketStatus.OPEN,
-  TicketStatus.IN_PROGRESS,
-  TicketStatus.WAITING_CUSTOMER,
-  TicketStatus.ESCALATED,
-] as const;
 
 // Login-less identity used as the author of every inbound WhatsApp TicketMessage.
 // TicketMessage.authorUserId is a required FK; WhatsApp senders usually have no User.
@@ -91,27 +88,35 @@ async function ensureSystemUser(tx: Prisma.TransactionClient) {
  *   and WhatsApp provides no email, so a non-routable `.invalid` placeholder is
  *   stored (see ADR-030) — it is a schema-compatibility key, not contact data.
  */
+export type MatchOrCreateCustomerResult =
+  | { kind: "customer"; customer: { id: string } }
+  | { kind: "ambiguous"; candidateCount: number; correlationId: string };
+
+/**
+ * CONV-027 (OD-CC-6, CC-GAP-21): phone resolution now goes through the shared
+ * `resolveCustomerByPhone` (CONV-015) instead of WhatsApp's own ordered-match-
+ * and-take-newest logic. Ambiguity stops automatic resolution entirely — no
+ * customer is chosen, and the caller must not proceed to any ticket/message
+ * write.
+ */
 async function matchOrCreateCustomer(
   tx: Prisma.TransactionClient,
   from: string,
   profileName: string | null,
-) {
+): Promise<MatchOrCreateCustomerResult> {
   const digits = from.replace(/\D/g, "");
   const e164 = toE164(from);
-  const matches = await tx.customer.findMany({
-    where: { OR: [{ phone: e164 }, { phone: digits }, { phone: from }] },
-    orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
-    select: { id: true },
-  });
-  if (matches.length === 1) return matches[0]!;
-  if (matches.length > 1) {
-    console.warn(`whatsapp: ${matches.length} customers match the sender phone; routing to the most recently updated`);
-    return matches[0]!;
+  const resolved = await resolveCustomerByPhone(tx, from, { id: true });
+  if (resolved.kind === "one") return { kind: "customer", customer: resolved.customer };
+  if (resolved.kind === "ambiguous") {
+    console.warn(`whatsapp: ambiguous phone match — correlationId=${resolved.correlationId} channel=WHATSAPP count=${resolved.candidateCount}`);
+    return { kind: "ambiguous", candidateCount: resolved.candidateCount, correlationId: resolved.correlationId };
   }
 
+  // `none` — existing deterministic placeholder-email fallback, unchanged.
   const email = `wa-${digits}@no-email.invalid`;
   const existingByEmail = await tx.customer.findUnique({ where: { email }, select: { id: true } });
-  if (existingByEmail) return existingByEmail;
+  if (existingByEmail) return { kind: "customer", customer: existingByEmail };
   const name = profileName?.trim() || e164;
   const created = await tx.customer.create({
     data: { name, email, phone: e164 },
@@ -124,7 +129,7 @@ async function matchOrCreateCustomer(
     entityId: created.id,
     changes: { name: { to: name }, email: { to: email }, phone: { to: e164 } },
   }, tx);
-  return created;
+  return { kind: "customer", customer: created };
 }
 
 async function createWhatsappTicket(
@@ -137,7 +142,8 @@ async function createWhatsappTicket(
   // Inbound WhatsApp tickets have no Team at creation (teamId null), so automatic
   // assignment does not run here — the ticket waits for ADMIN routing, then the
   // canonical ticket update flow auto-assigns it once a Team is set.
-  const ticket = await tx.ticket.create({
+  const canonical = await createCanonicalTicket({
+    tx,
     data: {
       subject: deriveSubject(firstText),
       description: firstText,
@@ -150,12 +156,9 @@ async function createWhatsappTicket(
       firstResponseDueAt: sla ? addMinutes(now, sla.firstResponseMinutes) : null,
       resolutionDueAt: sla ? addMinutes(now, sla.resolutionMinutes) : null,
     },
-    select: { id: true, status: true, subject: true, assignedAgentId: true },
+    actorId: null,
   });
-  await tx.ticketHistory.create({
-    data: { ticketId: ticket.id, actorUserId: null, action: "TICKET_CREATED", newValue: TicketStatus.OPEN },
-  });
-  return ticket;
+  return canonical.ticket;
 }
 
 async function fanOutInboundNotification(
@@ -180,6 +183,10 @@ async function fanOutInboundNotification(
     `Customer replied to ticket #${ticket.id}: ${ticket.subject}`,
     ticket.id,
   );
+  // CONV-020 (CC-GAP-02 fix): callers need this to assemble the complete
+  // realtime audience — omitting teamId silently drops the event for the
+  // ticket's own-team Manager/Agent subscribers on an already-routed ticket.
+  return teamRow?.teamId ?? null;
 }
 
 /**
@@ -188,25 +195,31 @@ async function fanOutInboundNotification(
  */
 export async function processInboundTextMessage(message: InboundTextMessage): Promise<InboundResult> {
   return withRealtimeOutbox(async () => {
-   const { outcome, assignedAgentId, customerId } = await prisma.$transaction(async (tx) => {
+   const { outcome, assignedAgentId, customerId, teamId } = await prisma.$transaction(async (tx) => {
     const duplicate = await tx.ticketMessage.findUnique({
       where: { externalId: message.externalId },
       select: { id: true },
     });
-    if (duplicate) return { outcome: { status: "DUPLICATE" } as InboundResult, assignedAgentId: null, customerId: null };
+    if (duplicate) return { outcome: { status: "DUPLICATE" } as InboundResult, assignedAgentId: null, customerId: null, teamId: null };
 
     const author = await ensureSystemUser(tx);
-    const customer = await matchOrCreateCustomer(tx, message.from, message.profileName);
+    const matched = await matchOrCreateCustomer(tx, message.from, message.profileName);
+    if (matched.kind === "ambiguous") {
+      // CONV-027: stop automatic resolution entirely — no customer/ticket/
+      // message write, safe acknowledged outcome (200, not an error the
+      // provider would retry-storm on).
+      return { outcome: { status: "AMBIGUOUS" } as InboundResult, assignedAgentId: null, customerId: null, teamId: null };
+    }
+    const customer = matched.customer;
 
-    const activeTicket = await tx.ticket.findFirst({
-      where: { customerId: customer.id, channel: Channel.WHATSAPP, status: { in: [...ACTIVE_TICKET_STATUSES] } },
-      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
-      select: { id: true, status: true, subject: true, assignedAgentId: true },
-    });
-
+    // CONV-025 (OD-CC-4): Meta's webhook payload for text messages exposes no
+    // reliable thread/message correlation beyond phone identity, so every
+    // inbound WhatsApp message without a stronger signal creates a new ticket
+    // — never the "newest active WhatsApp ticket" heuristic. This also
+    // trivially satisfies OD-CC-3 (never reopen RESOLVED from identity/phone
+    // matching): there is no lookup to reopen.
     const now = new Date();
-    const ticket = activeTicket ?? (await createWhatsappTicket(tx, customer.id, message.text, now));
-    const createdTicket = !activeTicket;
+    const ticket = await createWhatsappTicket(tx, customer.id, message.text, now);
 
     let record: { id: string };
     try {
@@ -217,40 +230,27 @@ export async function processInboundTextMessage(message: InboundTextMessage): Pr
           body: message.text,
           externalId: message.externalId,
           createdAt: messageTimestamp(message.timestamp, now),
+          contentFormat: "PLAIN_TEXT",
+          contentSource: "WHATSAPP",
         },
         select: { id: true },
       });
     } catch (error) {
-      if (isUniqueConstraintError(error)) return { outcome: { status: "DUPLICATE" } as InboundResult, assignedAgentId: ticket.assignedAgentId, customerId: customer.id };
+      if (isUniqueConstraintError(error)) return { outcome: { status: "DUPLICATE" } as InboundResult, assignedAgentId: ticket.assignedAgentId, customerId: customer.id, teamId: null };
       throw error;
     }
 
-    // Mirror the Portal customer-reply behaviour: a reply while WAITING_CUSTOMER
-    // moves the ticket back to IN_PROGRESS. RESOLVED/CLOSED never match the
-    // active filter above, so a message after resolution opens a fresh ticket.
-    if (!createdTicket && ticket.status === TicketStatus.WAITING_CUSTOMER) {
-      await tx.ticket.update({ where: { id: ticket.id }, data: { status: TicketStatus.IN_PROGRESS } });
-      await tx.ticketHistory.create({
-        data: {
-          ticketId: ticket.id,
-          actorUserId: null,
-          action: "STATUS_CHANGED",
-          oldValue: TicketStatus.WAITING_CUSTOMER,
-          newValue: TicketStatus.IN_PROGRESS,
-        },
-      });
-    }
-
-    await fanOutInboundNotification(tx, ticket);
+    const resolvedTeamId = await fanOutInboundNotification(tx, ticket);
 
     return {
       outcome: {
-        status: createdTicket ? "TICKET_CREATED" : "MESSAGE_APPENDED",
+        status: "TICKET_CREATED",
         ticketId: ticket.id,
         messageId: record.id,
       } as InboundResult,
       assignedAgentId: ticket.assignedAgentId,
       customerId: customer.id,
+      teamId: resolvedTeamId,
     };
    });
 
@@ -260,25 +260,12 @@ export async function processInboundTextMessage(message: InboundTextMessage): Pr
        messageId: outcome.messageId,
        assignedAgentId,
        customerId,
+       teamId,
        visibility: "public",
      });
    }
    return outcome;
   });
-}
-
-async function recordDeliveryFailure(
-  ticketId: string,
-  reason: OutboundFailureReason,
-): Promise<OutboundDeliveryResult> {
-  try {
-    await prisma.ticketHistory.create({
-      data: { ticketId, actorUserId: null, action: "WHATSAPP_DELIVERY_FAILED", newValue: reason },
-    });
-  } catch (error) {
-    console.error("whatsapp: failed to record delivery failure", error);
-  }
-  return { channel: "WHATSAPP", status: "FAILED", reason };
 }
 
 /**
@@ -297,19 +284,31 @@ export async function deliverOutboundReply(params: {
 }): Promise<OutboundDeliveryResult> {
   const { ticketId, messageId, to, text } = params;
 
-  if (!getSendConfig()) return recordDeliveryFailure(ticketId, "INTEGRATION_NOT_CONFIGURED");
-  if (!to || !to.replace(/\D/g, "")) return recordDeliveryFailure(ticketId, "NO_RECIPIENT_PHONE");
+  if (!getSendConfig()) {
+    await recordDeliveryOutcome(messageId, { status: "FAILED", errorCode: "INTEGRATION_NOT_CONFIGURED", terminal: true });
+    return recordOutboundDeliveryFailure({ channel: "WHATSAPP", ticketId, reason: "INTEGRATION_NOT_CONFIGURED" });
+  }
+  if (!to || !to.replace(/\D/g, "")) {
+    await recordDeliveryOutcome(messageId, { status: "FAILED", errorCode: "NO_RECIPIENT_PHONE", terminal: true });
+    return recordOutboundDeliveryFailure({ channel: "WHATSAPP", ticketId, reason: "NO_RECIPIENT_PHONE" });
+  }
 
+  // CONV-037/038: claim the durable delivery row for this attempt; a lost
+  // claim (already leased/terminal) skips the provider call entirely.
+  const claimed = await claimDeliveryForAttempt(messageId);
+  if (!claimed) return (await skippedClaimResult("WHATSAPP", messageId)) as OutboundDeliveryResult;
   try {
     const { messageId: providerId } = await whatsappClient.sendTextMessage({ to, text });
-    await prisma.ticketMessage
-      .update({ where: { id: messageId }, data: { externalId: providerId } })
-      .catch((error) => console.error("whatsapp: sent message but could not store provider id", error));
+    // CONV-037: MessageDelivery.providerMessageId is now the source of truth —
+    // TicketMessage.externalId is no longer written for new outbound sends.
+    await recordDeliveryOutcome(messageId, { status: "SENT", providerMessageId: providerId })
+      .catch((error) => console.error("whatsapp: sent message but could not record delivery outcome", error));
     return { channel: "WHATSAPP", status: "SENT", externalId: providerId };
   } catch (error) {
-    const reason: OutboundFailureReason =
+    const reason: OutboundDeliveryFailureReason =
       error instanceof WhatsappApiError && !error.rejected ? "PROVIDER_UNREACHABLE" : "PROVIDER_REJECTED";
-    return recordDeliveryFailure(ticketId, reason);
+    await recordDeliveryOutcome(messageId, { status: "FAILED", errorCode: reason, errorMessage: error instanceof Error ? error.message : undefined });
+    return recordOutboundDeliveryFailure({ channel: "WHATSAPP", ticketId, reason });
   }
 }
 

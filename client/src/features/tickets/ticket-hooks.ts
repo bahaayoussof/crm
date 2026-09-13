@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { attachmentKeys } from "@/features/attachments/attachment-hooks";
 import { createTicket, createTicketMessage, createTicketNote, getAgents, getCategories, getTicket, getTickets, updateTicket } from "./ticket-api";
 import type { TicketConversationValues, TicketCreateValues, TicketFilters, TicketUpdateValues } from "./ticket.types";
 
@@ -45,7 +46,13 @@ export function useUpdateTicket(id: string) {
 function useConversationMutation(id: string, mutationFn: (id: string, values: TicketConversationValues) => Promise<unknown>) {
   const client = useQueryClient();
   return useMutation({ mutationFn: (values: TicketConversationValues) => mutationFn(id, values), onSuccess: async () => {
-    await Promise.all([client.invalidateQueries({ queryKey: ticketKeys.detail(id) }), client.invalidateQueries({ queryKey: ticketKeys.lists() })]);
+    // CONV-049: a staged attachmentId bound during this send only becomes
+    // visible through the attachments list once it's refetched.
+    await Promise.all([
+      client.invalidateQueries({ queryKey: ticketKeys.detail(id) }),
+      client.invalidateQueries({ queryKey: ticketKeys.lists() }),
+      client.invalidateQueries({ queryKey: attachmentKeys.ticket(id) }),
+    ]);
   } });
 }
 export const useCreateTicketMessage = (id: string) => useConversationMutation(id, createTicketMessage);

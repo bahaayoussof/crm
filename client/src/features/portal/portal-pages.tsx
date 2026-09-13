@@ -786,6 +786,7 @@ export function PortalTicketDetailPage() {
                   timestamp={message.createdAt}
                   language={i18n.language}
                   body={message.body}
+                  contentFormat={message.contentFormat}
                   attachmentsSlot={<MessageAttachmentList attachments={messageAttachments.get(message.id) ?? []} scope="portal" />}
                 />
               ))}

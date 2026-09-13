@@ -17,7 +17,9 @@ export interface TicketListItem {
 }
 export interface TicketHistory { id: string; action: string; oldValue: string | null; newValue: string | null; createdAt: string; actor: { id: string; name: string; role: string } | null }
 export type TicketConversationKind = "PUBLIC_MESSAGE" | "INTERNAL_NOTE";
-export interface TicketConversationItem { id: string; kind: TicketConversationKind; body: string; createdAt: string; author: { id: string; name: string; role: string } }
+// CONV-047 — persisted content provenance; the client renders from this
+// instead of markup-sniffing the body.
+export type ConversationContentFormat = "PLAIN_TEXT" | "SANITIZED_HTML";
 // Delivery-failure reasons are shared across every provider-backed channel
 // (WhatsApp, Email, SMS). A staff reply is persisted locally first; the outbound
 // provider is attempted after commit, so `status: "FAILED"` means the reply was
@@ -31,13 +33,26 @@ export type OutboundDeliveryReason =
   | "PROVIDER_UNREACHABLE";
 /** @deprecated use OutboundDeliveryReason — kept as an alias for existing imports. */
 export type WhatsappDeliveryReason = OutboundDeliveryReason;
+// CONV-048 — the durable per-message delivery summary that rides on every
+// reload (coarse status/reason only; never a provider id or raw error text).
+export type PersistedDeliveryStatus = "PENDING" | "SENDING" | "SENT" | "DELIVERED" | "FAILED";
+export interface ConversationDeliverySummary { status: PersistedDeliveryStatus; reason: OutboundDeliveryReason | null }
+export interface TicketConversationItem {
+  id: string; kind: TicketConversationKind; body: string; createdAt: string;
+  contentFormat: ConversationContentFormat;
+  delivery: ConversationDeliverySummary | null;
+  author: { id: string; name: string; role: string };
+}
+// The one-off shape returned by the send-message mutation response — distinct
+// from the persisted `ConversationDeliverySummary` (this one may carry an
+// `externalId`, useful only for the immediate post-send confirmation).
 export type MessageDelivery = {
   channel: "WHATSAPP" | "EMAIL" | "SMS";
   status: "SENT" | "FAILED";
   externalId?: string;
   reason?: OutboundDeliveryReason;
 };
-export type TicketMessageResult = TicketConversationItem & { delivery?: MessageDelivery };
+export type TicketMessageResult = Omit<TicketConversationItem, "delivery"> & { delivery?: MessageDelivery | null };
 export interface TicketDetail extends TicketListItem {
   description: string; resolvedAt: string | null; closedAt: string | null;
   slaState: SlaState; effectiveSlaDueAt: string | null; effectiveSlaTarget: SlaTarget;
@@ -54,4 +69,5 @@ export type AgentOption = TicketPerson & { teamId: string | null };
 export interface TicketCreateValues { customerId: string; subject: string; description: string; priority: TicketPriority; channel: TicketCreateChannel; categoryId?: string | null; assignedAgentId?: string | null; departmentId?: string | null; teamId?: string | null }
 // `channel` is fixed at creation and never updated (it drives provider routing).
 export type TicketUpdateValues = Partial<Omit<TicketCreateValues, "customerId" | "channel"> & { status: TicketStatus }>;
-export interface TicketConversationValues { body: string }
+// CONV-041/049 — optional staged attachment ids bound atomically to this exact message/note.
+export interface TicketConversationValues { body: string; attachmentIds?: string[] }

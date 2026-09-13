@@ -1,5 +1,9 @@
 # Memory
 
+| now | Root-caused + fixed manual-smoke Ticket-creation 500 regression from the createCanonicalTicket rollout: Live Chat's P2002 session-key race guard caught the unique-violation INSIDE the `prisma.$transaction` callback and re-read the winner via the SAME (now Postgres-aborted, 25P02) `tx` client — deterministic 500 for the race loser, proved live against the real dev Neon DB (concurrent `startLiveChat` calls) both before (25P02 `PrismaClientUnknownRequestError`) and after (both callers return the same winning ticket) the fix. Existing mocked `live-chat.test.ts` race test couldn't catch it because its hoisted `$transaction` mock treats `tx` as a plain never-poisoned object. Fix: moved the try/catch to wrap the whole `$transaction` call (let the transaction reject+rollback cleanly) and re-read the winner via the top-level `prisma` client, not `tx`. Also empirically confirmed (not fixed, out of scope): team-routed auto-assign creation (staff MANAGER/ADMIN path) occasionally hits Prisma's 5s interactive-transaction timeout (P2028) under real Neon latency — same query count before/after this refactor, so not a new regression, flagged for awareness only | server/src/modules/live-chat/live-chat.service.ts, live-chat.test.ts (+1 regression test) | server 1090/1090 (58 files, was 1089), tsc/eslint clean, tsc build-step clean (prisma generate blocked by pre-existing Windows dll lock, schema unchanged), git diff --check clean; not committed | ~medium |
+| now | Wired `createCanonicalTicket` (CONV-013) into all 6 ticket-creation paths (staff, Portal, Email, SMS, WhatsApp, Live Chat) — was dead code despite CONV-044 claiming completion; each path hand-rolled its own create+history+audit inline instead. Extended helper: generic `select`/`ticket` return field (callers no longer need a manual post-create refetch) + `historyActorId` override (Portal/Live Chat keep the customer's own actorUserId on TicketHistory while AuditLog stays actorless); auto-assign guard moved from the created row's echoed fields to the request's own `data.assignedAgentId`/`data.teamId` (mocked tests echo a static fixture regardless of input). Live Chat's P2002 session-key race guard now wraps the whole `createCanonicalTicket` call (loser still writes nothing). Also fixed stale flaky-test docs naming `phone-input.test.tsx` as the fixed timeout source — audit evidence showed the affected files vary run to run — reworded to generic "parallel-load / machine-contention" in tasks.md + docs/19 | server/src/modules/tickets/create-canonical-ticket.ts(+test), ticket.service.ts, portal.service.ts, integrations/email/sms/whatsapp service.ts, live-chat.service.ts; specs/features/conversations-channels/tasks.md, docs/19-progress-tracking.md | server 1089/1089 (58 files), tsc/eslint/build clean, git diff --check clean; not committed | ~large |
+| now | Pre-commit verification audit (no fixes applied): server 1085/1085 + tsc/eslint/build clean, client 833+/835 (2 flaky under full-parallel, both pass isolated: date-picker.test.tsx + attachments.test.tsx, not phone-input as docs claimed), prisma validate/migrate status/generate clean+additive-only, all 11 named invariants PASS, working tree unchanged by audit | none (audit only) | AUTOMATED VERIFICATION PASSED WITH WARNINGS: createCanonicalTicket (CONV-013) unused in prod code despite CONV-044 implying it's wired in; stale flaky-test filename in docs; human manual smoke still required before commit | ~large |
+| now | Finished Conversations/Channels SDD (CONV-039–057, all 57/57): WhatsApp vocab dedup, Email/WhatsApp delivery-status callbacks, staged-attachment subsystem + migration, audit/first-response confirmation tests, contentFormat+delivery exposed server+client (markup-sniffing removed), staff composer stage-then-bind attach flow, gap-filling for cross-channel/delivery/content matrices, full gate + ADR-057 + 7 docs updated | server (whatsapp/email/outbound-delivery/attachments/ticket/portal modules + migration), client (ticket-conversation-ui, ticket-workspace-tabs, ticket-detail-page, attachment-hooks, portal/live-chat types), specs/features/conversations-channels/tasks.md, docs/17,07,20,21,23,22,05,19 | server 1085/58, client 833+/68, tsc/eslint/build clean both sides, git diff --check clean; marked IMPLEMENTED + VERIFIED ON SDD BRANCH; not committed | ~large |
 | now | Created Customers SDD plan.md + tasks.md scoped to DG-1 (inbound email/sms/whatsapp customer-create audit gap) + DG-2 (case-insensitive email uniqueness gap); no code touched | specs/features/customers/plan.md, specs/features/customers/tasks.md, .wolf/STATUS.md | plan READY FOR TASKS, tasks READY FOR IMPLEMENTATION | ~9000 |
 | 11:10 | Implemented isolated customer AI chatbot, Portal UI, KB grounding, canonical handoff, tests and docs | customer-ai modules, portal routes/nav/i18n, docs | automated gates green; unstaged | ~12000 |
 | 16:50 | MS-07: found + fixed edit-form Save silent no-op (channel reset to undefined, required schema field with no UI) | client/src/features/tickets/ticket-form-page.tsx, ticket.schemas.ts, ticket.types.ts, ticket-pages.test.tsx | tsc/eslint/vitest all green, 2 new regression tests | ~9000 |
@@ -1243,3 +1247,43 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
 | 19:47 | CUST-FOLLOWUP-001: hand-authored functional unique index on LOWER(Customer.email), 0 dupes found, applied via migrate deploy, P2002 confirmed live, race-sim tests added, no service code change needed | server/prisma/migrations/20260912163955_customer_email_lower_unique, server/src/modules/customers/customer.test.ts, specs/features/customers/{spec,tasks}.md | done, 31/31 + 79/79 tests, tsc/lint/build clean | ~55k |
+
+## Session: 2026-09-12 19:49
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 19:57 | Conversations / Channels brownfield discovery and SDD specification | specs/features/conversations-channels/spec.md, .wolf/{anatomy,cerebrum,STATUS,memory}.md | current architecture documented; 23 classified gaps and 9 blocking product decisions; no production code or plan/tasks | ~40k |
+| 20:04 | Resolved OD-CC-1…9 and authored Conversations / Channels implementation plan | specs/features/conversations-channels/{spec,plan}.md, .wolf/{anatomy,cerebrum,STATUS,memory}.md | spec approved; plan ready for tasks; no production code/migration/tasks/progress tracker | ~18k |
+| 20:06 | Docs-only SDD verification | specs/features/conversations-channels/{spec,plan}.md | 9/9 decision rows present; resolved/ready statuses present; no tasks/placeholders/trailing whitespace; diff check and buglog JSON valid | ~2k |
+| 20:18 | Conversations / Channels task decomposition (57 tasks CONV-001..057, 14 phases) | specs/features/conversations-channels/tasks.md, .wolf/{STATUS,memory}.md | tasks.md READY FOR IMPLEMENTATION; no contradiction vs spec/plan; no production code touched | ~35k |
+
+## Session: 2026-09-13 12:15
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-13 14:03
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-13 14:31
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-13 15:44
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-13 17:52
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 18:05 | Investigated Portal reply `contentFormat is missing` regression; found already fixed uncommitted (portal.service.ts uses requireConversationContent) + regression test already present | portal.service.ts, portal.test.ts, conversation-content.ts, persist-inbound-message.ts | Verified, no fix needed; full server suite 1090/1090, typecheck/lint/tsc clean | ~35k |
+
+## Session: 2026-09-13 17:59
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|

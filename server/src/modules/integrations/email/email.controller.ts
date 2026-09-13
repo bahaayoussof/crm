@@ -2,8 +2,9 @@ import type { RequestHandler } from "express";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { requireInboundEmailConfig } from "./email.config.js";
 import { emailClient } from "./email.client.js";
-import { extractReceivedEvent } from "./email.schema.js";
+import { extractDeliveryStatusEvent, extractReceivedEvent } from "./email.schema.js";
 import { processInboundEmail } from "./email.service.js";
+import { applyDeliveryCallback } from "../outbound-delivery.js";
 
 function requiredHeader(value: string | undefined, name: string) {
   if (!value) throw new AppError(401, "INVALID_WEBHOOK_SIGNATURE", `Missing ${name} webhook header`);
@@ -30,10 +31,20 @@ export const receiveEmailWebhook: RequestHandler = async (request, response) => 
     throw new AppError(401, "INVALID_WEBHOOK_SIGNATURE", "Invalid email webhook signature");
   }
   const event = extractReceivedEvent(verified);
-  if (!event) {
+  if (event) {
+    const result = await processInboundEmail(event);
+    response.status(200).json({ data: result });
+    return;
+  }
+
+  // CONV-040: outbound delivery-status callbacks arrive on this same signed
+  // webhook. A callback never creates a TicketMessage/notification/audit row.
+  const deliveryStatus = extractDeliveryStatusEvent(verified);
+  if (deliveryStatus) {
+    await applyDeliveryCallback("EMAIL", `resend:${deliveryStatus.emailId}`, { status: deliveryStatus.status });
     response.status(200).json({ data: { status: "IGNORED" } });
     return;
   }
-  const result = await processInboundEmail(event);
-  response.status(200).json({ data: result });
+
+  response.status(200).json({ data: { status: "IGNORED" } });
 };

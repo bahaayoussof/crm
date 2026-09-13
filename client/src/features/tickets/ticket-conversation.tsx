@@ -80,6 +80,9 @@ export function TicketConversation({
             timestamp={item.createdAt}
             language={i18n.language}
             body={item.body}
+            contentFormat={item.contentFormat}
+            deliveryFailed={item.delivery?.status === "FAILED"}
+            deliveryFailedLabel={t("tickets.conversation.deliveryFailed")}
             mentionize={internal}
             attachmentsSlot={
               internal ? undefined : (

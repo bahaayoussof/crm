@@ -25,6 +25,14 @@ export const uploadPortalTicketAttachment: RequestHandler = async (request, resp
   response.status(201).json({ data: service.projectPortal(row) });
 };
 
+/** CONV-041/049 — staged (unbound) upload, bound at the exact reply send. */
+export const uploadPortalStagedAttachment: RequestHandler = async (request, response) => {
+  const context = await service.authorizePortalStagedUpload(userId(request));
+  const upload = await parseSingleUpload(request);
+  const row = await service.persistUpload(context, upload);
+  response.status(201).json({ data: service.projectPortal(row) });
+};
+
 export const downloadPortalAttachment: RequestHandler = async (request, response) => {
   const resolved = await service.resolvePortalDownload(
     params<AttachmentDownloadParams>(response).attachmentId,

@@ -658,6 +658,7 @@
       "noteError": "Unable to add the internal note.",
       "internalLabel": "Internal note",
       "publicLabel": "Visible to customer",
+      "deliveryFailed": "Not delivered to the customer — the reply is saved, but the outbound send failed.",
       "showMore": "Show more",
       "showLess": "Show less",
       "messageCount": "{{total}} messages",

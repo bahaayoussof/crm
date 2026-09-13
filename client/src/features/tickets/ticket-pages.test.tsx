@@ -15,6 +15,7 @@ vi.mock("@/features/auth/auth-state", () => ({ useAuth: mocks.useAuth }));
 vi.mock("@/features/attachments/attachment-hooks", () => ({
   useTicketAttachments: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
   useUploadTicketAttachment: () => ({ mutateAsync: vi.fn().mockResolvedValue({}), isPending: false }),
+  useUploadStagedAttachment: () => ({ mutateAsync: vi.fn().mockResolvedValue({ id: "staged-1", fileName: "file.pdf", mimeType: "application/pdf" }), isPending: false }),
 }));
 vi.mock("@/features/quick-replies/quick-reply-picker", () => ({ QuickReplyPicker: () => null }));
 vi.mock("@/features/collaboration/mention-textarea", () => ({
@@ -481,8 +482,8 @@ describe("ticket pages", () => {
 
   it("renders public messages and internal notes chronologically with explicit semantics", () => {
     mocks.useTicket.mockReturnValue({ isLoading: false, isError: false, data: { ...ticket, conversation: [
-      { id: "message-1", kind: "PUBLIC_MESSAGE", body: "Customer-visible update", createdAt: "2026-08-25T09:00:00.000Z", author: { id: "agent-1", name: "Mariam Hassan", role: "AGENT" } },
-      { id: "note-1", kind: "INTERNAL_NOTE", body: "Private investigation", createdAt: "2026-08-25T09:05:00.000Z", author: { id: "admin-1", name: "Admin", role: "ADMIN" } },
+      { id: "message-1", kind: "PUBLIC_MESSAGE", body: "Customer-visible update", createdAt: "2026-08-25T09:00:00.000Z", contentFormat: "PLAIN_TEXT", delivery: null, author: { id: "agent-1", name: "Mariam Hassan", role: "AGENT" } },
+      { id: "note-1", kind: "INTERNAL_NOTE", body: "Private investigation", createdAt: "2026-08-25T09:05:00.000Z", contentFormat: "PLAIN_TEXT", author: { id: "admin-1", name: "Admin", role: "ADMIN" } },
     ] } });
     renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
     expect(screen.getByText("Customer-visible update")).toBeInTheDocument(); expect(screen.getByText("Private investigation")).toBeInTheDocument();
@@ -496,6 +497,25 @@ describe("ticket pages", () => {
     await waitFor(() => expect(mocks.createMessage).toHaveBeenCalledWith({ body: "Public update" })); expect(reply).toHaveValue("");
     fireEvent.click(screen.getByRole("tab", { name: "Internal note" })); const note = screen.getByLabelText("Internal note"); fireEvent.change(note, { target: { value: "Private context" } }); fireEvent.click(screen.getByRole("button", { name: "Add note" }));
     await waitFor(() => expect(mocks.createNote).toHaveBeenCalledWith({ body: "Private context" })); expect(note).toHaveValue("");
+  });
+
+  it("CONV-041/049: binds a staged attachment to the reply on send and clears the chip after success", async () => {
+    mocks.createMessage.mockResolvedValue({});
+    renderAt(`/tickets/${ticket.id}`, <Route path="/tickets/:id" element={<TicketDetailPage />} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Attach file" }));
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(["x".repeat(2048)], "evidence.pdf", { type: "application/pdf" })] } });
+    await screen.findByTitle("evidence.pdf");
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(await screen.findByTitle("file.pdf")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Reply to customer"), { target: { value: "See attached" } });
+    fireEvent.click(screen.getByRole("button", { name: "Reply" }));
+
+    await waitFor(() => expect(mocks.createMessage).toHaveBeenCalledWith({ body: "See attached", attachmentIds: ["staged-1"] }));
+    await waitFor(() => expect(screen.queryByTitle("file.pdf")).not.toBeInTheDocument());
   });
 
   it("preserves composer content on localized failure and prevents pending duplicates", async () => {

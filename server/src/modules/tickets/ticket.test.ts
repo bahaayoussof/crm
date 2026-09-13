@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   categoryFindFirst: vi.fn(), categoryFindMany: vi.fn(), departmentFind: vi.fn(), branchFind: vi.fn(), slaFind: vi.fn(), transaction: vi.fn(),
   watcherCreateMany: vi.fn(), watcherFindMany: vi.fn(), watcherDeleteMany: vi.fn(), watcherCount: vi.fn(), watcherFindFirst: vi.fn(),
   mentionCreateMany: vi.fn(), notificationCreateMany: vi.fn(), auditCreate: vi.fn(), teamFindUnique: vi.fn(),
+  deliveryCreate: vi.fn(), deliveryFindUnique: vi.fn(), deliveryUpdate: vi.fn(), deliveryUpdateMany: vi.fn(),
+  attachmentFindMany: vi.fn(), attachmentUpdateMany: vi.fn(),
 }));
 
 vi.mock("../../config/prisma.js", () => {
@@ -23,6 +25,8 @@ vi.mock("../../config/prisma.js", () => {
     branch: { findUnique: mocks.branchFind }, team: { findUnique: mocks.teamFindUnique }, slaRule: { findFirst: mocks.slaFind },
     notification: { createMany: mocks.notificationCreateMany },
     auditLog: { create: mocks.auditCreate },
+    messageDelivery: { create: mocks.deliveryCreate, findUnique: mocks.deliveryFindUnique, update: mocks.deliveryUpdate, updateMany: mocks.deliveryUpdateMany },
+    attachment: { findMany: mocks.attachmentFindMany, updateMany: mocks.attachmentUpdateMany },
     $transaction: mocks.transaction,
   };
   return { prisma };
@@ -97,6 +101,8 @@ describe("ticket API", () => {
       branch: { findUnique: mocks.branchFind }, team: { findUnique: mocks.teamFindUnique }, slaRule: { findFirst: mocks.slaFind },
       notification: { createMany: mocks.notificationCreateMany },
       auditLog: { create: mocks.auditCreate },
+      messageDelivery: { create: mocks.deliveryCreate, findUnique: mocks.deliveryFindUnique, update: mocks.deliveryUpdate, updateMany: mocks.deliveryUpdateMany },
+      attachment: { findMany: mocks.attachmentFindMany, updateMany: mocks.attachmentUpdateMany },
     }) : Promise.all(value as Promise<unknown>[]));
     mocks.customerFind.mockResolvedValue({ id: "ce83f10dcd2c68747c3f3ba14" }); mocks.userFindFirst.mockResolvedValue({ id: "c6ff3b3bd11c44cac620c43d5", name: "Assigned Agent", teamId: TEAM_A });
     mocks.categoryFindFirst.mockResolvedValue({ id: "cbbea6ce8290afd75d03495dd", name: "Billing" }); mocks.departmentFind.mockResolvedValue(null);
@@ -112,6 +118,12 @@ describe("ticket API", () => {
     mocks.watcherFindFirst.mockResolvedValue(null); mocks.mentionCreateMany.mockResolvedValue({ count: 0 });
     mocks.notificationCreateMany.mockResolvedValue({ count: 0 });
     mocks.messageFindMany.mockResolvedValue([]);
+    mocks.deliveryCreate.mockResolvedValue({});
+    mocks.deliveryUpdateMany.mockResolvedValue({ count: 1 });
+    mocks.deliveryFindUnique.mockResolvedValue({ attemptCount: 0, firstAttemptedAt: null, providerMessageId: null });
+    mocks.deliveryUpdate.mockResolvedValue({});
+    mocks.attachmentFindMany.mockResolvedValue([]);
+    mocks.attachmentUpdateMany.mockResolvedValue({ count: 0 });
     // feature/team-based-manager-scope: resolveActorTeamId() does one user.findUnique.
     mocks.userFindUnique.mockImplementation(async (args: { where: { id: string } }) => teamOf(args.where.id));
     mocks.teamFindUnique.mockResolvedValue({ id: TEAM_A, name: "Team A", isActive: true, departmentId: null });
@@ -421,6 +433,34 @@ describe("ticket API", () => {
     expect(response.body.data).not.toHaveProperty("notes"); expect(response.body.data).not.toHaveProperty("messages");
   });
 
+  it("CONV-047/048: exposes contentFormat and a coarse delivery summary on reload, never a provider id/raw error", async () => {
+    const sameTime = new Date("2026-08-25T09:00:00.000Z");
+    mocks.ticketFindFirst.mockResolvedValue({ ...summary, description: "Issue", history: [], department: null, branch: null,
+      messages: [{
+        id: "message-2", body: "Sent to customer", createdAt: sameTime, contentFormat: "SANITIZED_HTML",
+        author: { id: agent.id, name: "Agent", role: Role.AGENT },
+        delivery: { status: "FAILED", lastErrorCode: "PROVIDER_UNREACHABLE" },
+      }],
+      notes: [],
+    });
+    const response = await request(app).get("/api/tickets/c737ce60fccf9da889f4605c0").set(auth());
+    expect(response.status).toBe(200);
+    const message = response.body.data.conversation[0];
+    expect(message).toMatchObject({ contentFormat: "SANITIZED_HTML", delivery: { status: "FAILED", reason: "PROVIDER_UNREACHABLE" } });
+    const serialized = JSON.stringify(response.body);
+    expect(serialized).not.toContain("providerMessageId");
+    expect(serialized).not.toContain("lastErrorMessage");
+  });
+
+  it("CONV-048: a message with no delivery row (WEB/LIVE_CHAT) reports delivery: null, not a fabricated status", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({ ...summary, description: "Issue", history: [], department: null, branch: null,
+      messages: [{ id: "message-3", body: "Web reply", createdAt: new Date(), contentFormat: "SANITIZED_HTML", author: { id: agent.id, name: "Agent", role: Role.AGENT }, delivery: null }],
+      notes: [],
+    });
+    const response = await request(app).get("/api/tickets/c737ce60fccf9da889f4605c0").set(auth());
+    expect(response.body.data.conversation[0].delivery).toBeNull();
+  });
+
   it("creates a public reply with the authenticated author and records first response", async () => {
     mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: agent.id });
     const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "  We are checking this.  " });
@@ -621,6 +661,22 @@ describe("ticket API", () => {
     expect(mocks.messageCreate).toHaveBeenCalledTimes(1);
     expect(mocks.messageCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.not.objectContaining({ externalId: expect.anything() }) }));
     expect(response.body.data.delivery).toMatchObject({ channel: "EMAIL", status: "SENT", externalId: "resend:email-out-1" });
+  });
+
+  it("CONV-036: creates a MessageDelivery(PENDING) row inside the same transaction as the message, before any provider call", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({
+      id: summary.id, subject: summary.subject, assignedAgentId: agent.id, channel: "EMAIL",
+      emailThreadToken: "thread-token", customer: { email: "customer@example.net", phone: null },
+    });
+    mocks.messageFindMany.mockResolvedValue([]);
+    await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "Email reply" });
+    expect(mocks.deliveryCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ channel: "EMAIL", status: "PENDING", attemptCount: 0 }) });
+  });
+
+  it("CONV-036: does not create a MessageDelivery row for WEB or LIVE_CHAT channel replies (no provider dispatch)", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, subject: summary.subject, assignedAgentId: agent.id, channel: "WEB" });
+    await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "Web reply" });
+    expect(mocks.deliveryCreate).not.toHaveBeenCalled();
   });
 
   it("keeps the EMAIL reply when Resend is unconfigured (201, delivery FAILED, no rollback)", async () => {
@@ -1327,6 +1383,128 @@ describe("ticket API", () => {
       await request(app).get("/api/tickets?scope=unassigned").set(auth(agent));
       const where = mocks.ticketFindMany.mock.calls[0][0].where;
       expect(where).toMatchObject({ assignedAgentId: null, teamId: TEAM_A });
+    });
+  });
+
+  describe("CONV-012 — conversation content provenance", () => {
+    it("persists contentFormat SANITIZED_HTML / contentSource STAFF on a staff public reply", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: agent.id, channel: "WEB" });
+      mocks.messageCreate.mockResolvedValue({ id: "m-conv-012", body: "Hi", createdAt: now, author: { id: agent.id, name: "Agent", role: Role.AGENT } });
+      const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "<p>Hi</p>" });
+      expect(response.status).toBe(201);
+      expect(mocks.messageCreate.mock.calls[0][0].data).toMatchObject({ contentFormat: "SANITIZED_HTML", contentSource: "STAFF" });
+    });
+
+    it("persists contentFormat SANITIZED_HTML / contentSource STAFF on an internal note", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: agent.id, channel: "WEB" });
+      mocks.noteCreate.mockResolvedValue({ id: "n-conv-012", body: "x", createdAt: now, author: { id: agent.id, name: "Agent", role: Role.AGENT } });
+      const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/notes").set(auth(agent)).send({ body: "<p>Note</p>" });
+      expect(response.status).toBe(201);
+      expect(mocks.noteCreate.mock.calls[0][0].data).toMatchObject({ contentFormat: "SANITIZED_HTML", contentSource: "STAFF" });
+    });
+  });
+
+  describe("CONV-046 — first-response stamping scope", () => {
+    it("an internal note never stamps firstRespondedAt", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: agent.id, channel: "WEB" });
+      const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/notes").set(auth(agent)).send({ body: "Internal note" });
+      expect(response.status).toBe(201);
+      expect(mocks.ticketUpdateMany).not.toHaveBeenCalled();
+    });
+
+    it("a second staff public reply's stamp attempt still guards on firstRespondedAt: null (no re-stamp)", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: agent.id, channel: "WEB" });
+      await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "First reply" });
+      await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "Second reply" });
+      for (const call of mocks.ticketUpdateMany.mock.calls) {
+        expect(call[0].where).toMatchObject({ firstRespondedAt: null });
+      }
+    });
+  });
+
+  describe("CONV-045 — no audit noise for plain reads", () => {
+    it("a GET ticket-detail read writes zero AuditLog rows", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ ...current, history: [], messages: [], notes: [], _count: { watchers: 0 }, watchers: [] });
+      const response = await request(app).get("/api/tickets/c737ce60fccf9da889f4605c0").set(auth(agent));
+      expect(response.status).toBe(200);
+      expect(mocks.auditCreate).not.toHaveBeenCalled();
+    });
+
+    it("a GET ticket-list read writes zero AuditLog rows", async () => {
+      const response = await request(app).get("/api/tickets").set(auth(admin));
+      expect(response.status).toBe(200);
+      expect(mocks.auditCreate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("CONV-041/042 — staged attachment binding", () => {
+    const stagedRow = (id: string, over: Record<string, unknown> = {}) => ({
+      id, stagedByUserId: agent.id, ticketId: null, messageId: null, noteId: null, customerId: null, ...over,
+    });
+
+    it("binds a staged attachment to a WEB reply's exact message", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: agent.id, channel: "WEB" });
+      mocks.attachmentFindMany.mockResolvedValue([stagedRow("c00000000000000000000001")]);
+      const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "See attached", attachmentIds: ["c00000000000000000000001"] });
+      expect(response.status).toBe(201);
+      expect(mocks.attachmentUpdateMany).toHaveBeenCalledWith({
+        where: { id: { in: ["c00000000000000000000001"] } },
+        data: { ticketId: summary.id, messageId: expect.any(String), stagedByUserId: null },
+      });
+    });
+
+    it("binds a staged attachment to an internal note", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: agent.id, channel: "EMAIL" });
+      mocks.attachmentFindMany.mockResolvedValue([stagedRow("c00000000000000000000002")]);
+      const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/notes").set(auth(agent)).send({ body: "Internal note", attachmentIds: ["c00000000000000000000002"] });
+      expect(response.status).toBe(201);
+      expect(mocks.attachmentUpdateMany).toHaveBeenCalledWith({
+        where: { id: { in: ["c00000000000000000000002"] } },
+        data: { ticketId: summary.id, noteId: "note-1", stagedByUserId: null },
+      });
+    });
+
+    it.each(["EMAIL", "SMS", "WHATSAPP"])(
+      "CONV-042: rejects a %s public reply carrying a staged attachment before creating any message",
+      async (channel) => {
+        mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: agent.id, channel, customer: { phone: "+15551230000", email: "c@example.net" } });
+        const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "See attached", attachmentIds: ["c00000000000000000000001"] });
+        expect(response.status).toBe(422);
+        expect(response.body.error.code).toBe("ATTACHMENTS_NOT_SUPPORTED_FOR_CHANNEL");
+        expect(mocks.messageCreate).not.toHaveBeenCalled();
+        expect(mocks.deliveryCreate).not.toHaveBeenCalled();
+      },
+    );
+
+    it("allows an EMAIL/SMS/WhatsApp-channel internal note to carry a staged attachment (notes are never provider-delivered)", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: agent.id, channel: "EMAIL" });
+      mocks.attachmentFindMany.mockResolvedValue([stagedRow("c00000000000000000000003")]);
+      const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/notes").set(auth(agent)).send({ body: "Internal note", attachmentIds: ["c00000000000000000000003"] });
+      expect(response.status).toBe(201);
+    });
+
+    it("rejects binding an attachment staged by a different user", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: agent.id, channel: "WEB" });
+      mocks.attachmentFindMany.mockResolvedValue([stagedRow("c00000000000000000000004", { stagedByUserId: "someone-else" })]);
+      const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "See attached", attachmentIds: ["c00000000000000000000004"] });
+      expect(response.status).toBe(403);
+      expect(mocks.attachmentUpdateMany).not.toHaveBeenCalled();
+    });
+
+    it("rejects binding an already-bound (non-staged) attachment id", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: agent.id, channel: "WEB" });
+      mocks.attachmentFindMany.mockResolvedValue([stagedRow("c00000000000000000000005", { ticketId: "other-ticket", messageId: "other-message" })]);
+      const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "See attached", attachmentIds: ["c00000000000000000000005"] });
+      expect(response.status).toBe(403);
+      expect(mocks.attachmentUpdateMany).not.toHaveBeenCalled();
+    });
+
+    it("rejects an unknown staged attachment id with 404", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: agent.id, channel: "WEB" });
+      mocks.attachmentFindMany.mockResolvedValue([]); // none found
+      const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "See attached", attachmentIds: ["c00000000000000000000009"] });
+      expect(response.status).toBe(404);
+      expect(response.body.error.code).toBe("ATTACHMENT_NOT_FOUND");
     });
   });
 });

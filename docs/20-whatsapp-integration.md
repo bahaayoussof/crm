@@ -5,6 +5,22 @@ agents answer from the existing ticket conversation UI. It is an adapter over th
 existing customer / ticket / conversation / notification / SLA services — **not**
 a parallel messaging system.
 
+> **Update (2026-09-13, ADR-057 — Conversations/Channels hardening).** The
+> "find active WHATSAPP Ticket" step below no longer means "customer's newest
+> active WhatsApp ticket" — that identity-only fallback is removed (Meta's
+> webhook exposes no reliable thread/message correlation beyond phone identity,
+> so every inbound message without a stronger signal now creates a new ticket;
+> RESOLVED is never reopened by identity). A multiple-phone-match no longer
+> "most-recently-updated Customer wins" — it is a safe, zero-write `ambiguous`
+> outcome (`resolveCustomerByPhone`), logged with only a correlation id and
+> count. The inbound realtime event now always carries `teamId`. Outbound
+> delivery uses the shared `outbound-delivery.ts` vocabulary directly (no more
+> parallel `OutboundDeliveryResult` copy) and a durable `MessageDelivery` row;
+> Meta's `statuses` field on the same signed webhook now also updates that row
+> via a supported delivery-status callback. Every message declares
+> `contentFormat` (`PLAIN_TEXT` for inbound) — the client renders from that
+> field, never by sniffing the body for markup.
+
 ## Architecture
 
 ```text

@@ -1,8 +1,10 @@
+import axios from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { portalKeys } from "@/features/portal/portal-hooks";
 import { replyPortalTicket } from "@/features/portal/portal-api";
 import * as api from "./live-chat-api";
 import type { LiveChat } from "./live-chat.types";
+import { rotateLiveChatSessionKey } from "./live-chat-session";
 
 export const liveChatKeys = {
   /** The resume-or-null bootstrap query. */
@@ -33,10 +35,27 @@ export const useLiveChatDepartments = (options?: { enabled?: boolean }) =>
     staleTime: 60_000,
   });
 
+/**
+ * If the current session key already belongs to a RESOLVED/CLOSED chat, the
+ * server rejects it with `409 LIVE_CHAT_SESSION_ENDED` (CONV-026) instead of
+ * silently resuming the old ticket. The client rotates to a brand-new session
+ * key and retries exactly once — that always starts a fresh chat.
+ */
+async function startLiveChatWithSessionRotation(departmentId?: string): Promise<LiveChat> {
+  try {
+    return await api.startLiveChat(departmentId);
+  } catch (error) {
+    const code = axios.isAxiosError(error) ? (error.response?.data?.error?.code as string | undefined) : undefined;
+    if (code !== "LIVE_CHAT_SESSION_ENDED") throw error;
+    rotateLiveChatSessionKey();
+    return api.startLiveChat(departmentId);
+  }
+}
+
 export function useStartLiveChat() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (departmentId: string) => api.startLiveChat(departmentId),
+    mutationFn: (departmentId?: string) => startLiveChatWithSessionRotation(departmentId),
     onSuccess: async (chat: LiveChat) => {
       qc.setQueryData(liveChatKeys.root, chat);
       await Promise.all([
@@ -60,6 +79,9 @@ export function useEndLiveChat(ticketId: string) {
   return useMutation({
     mutationFn: () => api.endLiveChat(ticketId),
     onSuccess: async (chat: LiveChat) => {
+      // The current session key now owns a terminal (RESOLVED) ticket — rotate
+      // proactively so the next "start a new chat" doesn't need a 409 round trip.
+      rotateLiveChatSessionKey();
       qc.setQueryData(portalKeys.ticket(ticketId), chat);
       await Promise.all([
         qc.invalidateQueries({ queryKey: portalKeys.ticket(ticketId) }),

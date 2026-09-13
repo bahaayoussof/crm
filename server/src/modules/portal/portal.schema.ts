@@ -18,7 +18,11 @@ export const portalCreateTicketSchema = z.object({
   description: z.string().trim().min(1).max(20_000),
   categoryId: databaseIdSchema.nullable().optional(),
 }).strict();
-export const portalReplySchema = z.object({ body: z.string().trim().min(1).max(20_000) }).strict();
+// CONV-041/049 — optional staged attachment ids to bind to this exact reply.
+export const portalReplySchema = z.object({
+  body: z.string().trim().min(1).max(20_000),
+  attachmentIds: z.array(databaseIdSchema).max(10).optional(),
+}).strict();
 
 // Customer self-service profile edit. Explicit whitelist — name / email / phone only.
 export const portalProfileUpdateSchema = z.object({

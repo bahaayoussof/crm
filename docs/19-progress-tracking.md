@@ -1,5 +1,30 @@
 # Customer Support CRM — Progress Tracking
 
+## CURRENT STATE — 2026-09-13 (Conversations/Channels hardening — ADR-057)
+
+> This block supersedes the 2026-09-02 block below it as the authoritative
+> current summary; the 2026-09-02 block and everything after it is now history.
+
+**Branch:** `chore/sdd-foundation`, uncommitted. Spec-driven: `specs/features/conversations-channels/{spec,plan,tasks}.md` (57 tasks, CONV-001–057). Full architectural/behavioral summary: `docs/17-decisions-log.md` **ADR-057**, with amendments to ADR-052 (durable delivery bookkeeping) and ADR-045 (audience `teamId` fix + no new SSE event type).
+
+**What changed, in one paragraph:** every provider channel's inbound ticket-matching heuristic that could silently pick the wrong ticket ("customer's newest active ticket") is removed in favor of explicit/reliable correlation only, with a shared audit/history helper closing a gap where some creation paths skipped the `AuditLog(TICKET_CREATED)` row; outbound delivery moved from a best-effort field update to a durable `MessageDelivery` row with a bounded retry sweep and, where a provider actually supports it (Resend, Meta Cloud API), a signed delivery-status callback; conversation attachments are now staged-then-atomically-bound to the exact message/note instead of landing ambiguously at the ticket level; every conversation item declares its rendering format (`contentFormat`) instead of the client guessing from the body; and two real realtime-audience bugs (missing `teamId` on Email/WhatsApp inbound) were fixed.
+
+**Automated verification (this session):**
+
+| Gate | Result |
+| --- | --- |
+| Prisma `migrate status` | PASS — 18 migrations, schema up to date, additive-only |
+| Prisma `generate` | PASS |
+| Server TypeScript / ESLint / build | PASS (0 errors) |
+| Server tests (Vitest) | PASS — **1085 / 58 files** |
+| Client TypeScript / ESLint / build | PASS (0 errors; 2 pre-existing unrelated `react-refresh` warnings) |
+| Client tests (Vitest) | PASS — **833+ / 68 files** (two parallel-load / machine-contention test timeouts confirmed as flakes under a fully parallel run — the affected files vary run to run, not a fixed file — not regressions; individually rerun files pass clean) |
+| `git diff --check` | PASS (exit 0; only pre-existing LF/CRLF autocrlf advisories, no whitespace errors or conflict markers) |
+
+**Deferred / explicitly out of scope this session** (unchanged from plan.md): external outbound attachment transmission for Email/SMS/WhatsApp; SMS delivery-status callbacks (no webhook infra exists for TextBee in this deployment); customer merge/dedup; a generic queue/outbox; realtime transport replacement; the Portal/Live-Chat reply composer's own attach-file **client UI** (the server-side staged-attachment contract is wired for Portal, but the Portal composer has no Attach control yet — staff Ticket Details got the full composer flow).
+
+---
+
 ## CURRENT STATE — 2026-09-02 (Final QA & Production Readiness Audit)
 
 > This block is the authoritative current summary. Everything below it is a

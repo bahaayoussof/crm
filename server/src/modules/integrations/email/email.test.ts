@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   ticketFindFirst: vi.fn(), ticketFindMany: vi.fn(), ticketFindUnique: vi.fn(), ticketCreate: vi.fn(), ticketUpdate: vi.fn(),
   slaFindFirst: vi.fn(), historyCreate: vi.fn(), notificationCreateMany: vi.fn(), attachmentCreateMany: vi.fn(), watcherFindMany: vi.fn(),
   transaction: vi.fn(), storagePut: vi.fn(), storageRemove: vi.fn(), auditCreate: vi.fn(),
+  deliveryCreate: vi.fn(), deliveryFindUnique: vi.fn(), deliveryUpdate: vi.fn(), deliveryUpdateMany: vi.fn(),
 }));
 
 vi.mock("../../../config/prisma.js", () => {
@@ -24,6 +25,7 @@ vi.mock("../../../config/prisma.js", () => {
     notification: { createMany: mocks.notificationCreateMany },
     attachment: { createMany: mocks.attachmentCreateMany },
     auditLog: { create: mocks.auditCreate },
+    messageDelivery: { create: mocks.deliveryCreate, findUnique: mocks.deliveryFindUnique, update: mocks.deliveryUpdate, updateMany: mocks.deliveryUpdateMany },
     $transaction: mocks.transaction,
   };
   return { prisma: client };
@@ -137,6 +139,10 @@ describe("Resend email integration", () => {
     mocks.storagePut.mockResolvedValue(undefined);
     mocks.storageRemove.mockResolvedValue(undefined);
     mocks.auditCreate.mockResolvedValue({});
+    mocks.deliveryCreate.mockResolvedValue({});
+    mocks.deliveryUpdateMany.mockResolvedValue({ count: 1 });
+    mocks.deliveryFindUnique.mockResolvedValue({ attemptCount: 0, firstAttemptedAt: null, providerMessageId: null });
+    mocks.deliveryUpdate.mockResolvedValue({});
     mocks.transaction.mockImplementation(async (callback: (tx: unknown) => unknown) => callback({
       ticketMessage: { findUnique: mocks.messageFindUnique, findFirst: mocks.messageFindFirst, create: mocks.messageCreate },
       user: { findUnique: mocks.userFindUnique, create: mocks.userCreate, findMany: mocks.userFindMany },
@@ -166,6 +172,25 @@ describe("Resend email integration", () => {
     expect(mocks.retrieve).not.toHaveBeenCalled();
   });
 
+  it("CONV-040: applies a supported email.delivered callback without creating a message/audit row", async () => {
+    mocks.deliveryFindUnique
+      .mockResolvedValueOnce({ id: "d1", status: "SENT", sentAt: new Date() })
+      .mockResolvedValueOnce({ message: { ticket: { id: "ticket-1", teamId: null, assignedAgentId: null, customer: { id: "customer-1" } } } });
+    const response = await signed({ type: "email.delivered", created_at: "2026-08-31T10:00:00Z", data: { email_id: "email-out-1" } } as unknown as typeof webhookEvent);
+    expect(response.status).toBe(200);
+    expect(response.body.data.status).toBe("IGNORED");
+    expect(mocks.deliveryUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "DELIVERED" }) }));
+    expect(mocks.messageCreate).not.toHaveBeenCalled();
+    expect(mocks.auditCreate).not.toHaveBeenCalled();
+  });
+
+  it("CONV-040: an email.bounced callback for an unknown provider id is a safe no-op", async () => {
+    mocks.deliveryFindUnique.mockResolvedValueOnce(null);
+    const response = await signed({ type: "email.bounced", created_at: "2026-08-31T10:00:00Z", data: { email_id: "unknown-id" } } as unknown as typeof webhookEvent);
+    expect(response.status).toBe(200);
+    expect(mocks.deliveryUpdate).not.toHaveBeenCalled();
+  });
+
   it("creates a customer, EMAIL ticket, customer message, history, and notification", async () => {
     const response = await signed();
     expect(response.status).toBe(200);
@@ -177,7 +202,8 @@ describe("Resend email integration", () => {
     }) }));
     expect(mocks.notificationCreateMany).toHaveBeenCalled();
     expect(emitMessageMock).toHaveBeenCalledWith(expect.objectContaining({ ticketId: "ticket-1", visibility: "public" }));
-    expect(mocks.auditCreate).toHaveBeenCalledTimes(1);
+    // CUSTOMER_CREATED (unchanged) + CONV-044's new TICKET_CREATED — exactly two, both actorless.
+    expect(mocks.auditCreate).toHaveBeenCalledTimes(2);
     expect(mocks.auditCreate).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         actorId: null,
@@ -186,6 +212,22 @@ describe("Resend email integration", () => {
         entityId: "customer-1",
       }),
     }));
+    expect(mocks.auditCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        actorId: null,
+        action: "TICKET_CREATED",
+        entityType: "TICKET",
+        entityId: "ticket-1",
+      }),
+    }));
+  });
+
+  it("CONV-019 (CC-GAP-01 fix): includes teamId in the realtime event for an already-routed ticket", async () => {
+    mocks.ticketFindMany.mockResolvedValue([{ id: "ticket-1", status: "OPEN", subject: "Need help", assignedAgentId: "agent-1", emailThreadToken: "token-1" }]);
+    mocks.ticketFindUnique.mockResolvedValue({ teamId: "team-9" });
+    const response = await signed();
+    expect(response.status).toBe(200);
+    expect(emitMessageMock).toHaveBeenCalledWith(expect.objectContaining({ ticketId: "ticket-1", teamId: "team-9" }));
   });
 
   it("returns a successful no-op for a repeated provider email id", async () => {
@@ -246,13 +288,24 @@ describe("Resend email integration", () => {
     }));
   });
 
-  it("reuses the customer-reply WAITING_CUSTOMER transition", async () => {
+  it("reuses the customer-reply WAITING_CUSTOMER transition (reliably correlated via RFC reference)", async () => {
     mocks.customerFindFirst.mockResolvedValue({ id: "customer-1" });
-    mocks.ticketFindMany.mockResolvedValueOnce([{ id: "ticket-waiting", status: "WAITING_CUSTOMER", subject: "Waiting", assignedAgentId: null, emailThreadToken: "token" }]);
+    mocks.retrieve.mockResolvedValue({ ...received, headers: { ...received.headers, "in-reply-to": "<prior@example.net>" } });
+    mocks.messageFindFirst.mockResolvedValue({ ticket: { id: "ticket-waiting", status: "WAITING_CUSTOMER", subject: "Waiting", assignedAgentId: null, emailThreadToken: "token" } });
     const response = await signed();
     expect(response.body.data.status).toBe("MESSAGE_APPENDED");
     expect(mocks.ticketUpdate).toHaveBeenCalledWith({ where: { id: "ticket-waiting" }, data: { status: "IN_PROGRESS" } });
     expect(mocks.historyCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ oldValue: "WAITING_CUSTOMER", newValue: "IN_PROGRESS" }) });
+  });
+
+  it("CONV-023 (OD-CC-4 fix): with no reliable correlation and two active EMAIL tickets, creates a THIRD new ticket rather than falling back to either", async () => {
+    mocks.customerFindFirst.mockResolvedValue({ id: "customer-1" });
+    // No in-reply-to/references, no reply-token address, no subject reference —
+    // only identity (customerId) would have matched under the old heuristic.
+    mocks.ticketFindMany.mockResolvedValue([{ id: "ticket-a" }, { id: "ticket-b" }]);
+    const response = await signed();
+    expect(response.body.data.status).toBe("TICKET_CREATED");
+    expect(mocks.ticketCreate).toHaveBeenCalledTimes(1);
   });
 
   it("stores a valid inbound attachment with provider idempotency metadata", async () => {
@@ -301,12 +354,18 @@ describe("outbound email reply resilience (deliverOutboundEmailReply)", () => {
     mocks.send.mockResolvedValue({ emailId: "email-out-1" });
     mocks.messageUpdate.mockResolvedValue({ id: "message-1" });
     mocks.historyCreate.mockResolvedValue({});
+    mocks.deliveryUpdateMany.mockResolvedValue({ count: 1 });
+    mocks.deliveryFindUnique.mockResolvedValue({ attemptCount: 0, firstAttemptedAt: null, providerMessageId: null });
+    mocks.deliveryUpdate.mockResolvedValue({});
   });
 
-  it("delivers after commit and stamps the provider id on the already-persisted row", async () => {
+  it("delivers after commit and records the provider id on the durable delivery row (CONV-037 — not TicketMessage.externalId)", async () => {
     const result = await deliverOutboundEmailReply(params);
     expect(result).toEqual({ channel: "EMAIL", status: "SENT", externalId: "resend:email-out-1" });
-    expect(mocks.messageUpdate).toHaveBeenCalledWith({ where: { id: "message-1" }, data: { externalId: "resend:email-out-1" } });
+    expect(mocks.messageUpdate).not.toHaveBeenCalled();
+    expect(mocks.deliveryUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: "SENT", providerMessageId: "resend:email-out-1" }),
+    }));
     expect(mocks.historyCreate).not.toHaveBeenCalled();
   });
 
@@ -334,8 +393,8 @@ describe("outbound email reply resilience (deliverOutboundEmailReply)", () => {
     expect(mocks.historyCreate).toHaveBeenCalledWith({ data: { ticketId: "ticket-1", actorUserId: null, action: "EMAIL_DELIVERY_FAILED", newValue: "NO_RECIPIENT_EMAIL" } });
   });
 
-  it("still returns SENT when the post-send provider-id write fails (reply is not deleted)", async () => {
-    mocks.messageUpdate.mockRejectedValueOnce(new Error("db blip"));
+  it("still returns SENT when the post-send delivery-row write fails (reply is not deleted)", async () => {
+    mocks.deliveryUpdate.mockRejectedValueOnce(new Error("db blip"));
     const result = await deliverOutboundEmailReply(params);
     expect(result).toEqual({ channel: "EMAIL", status: "SENT", externalId: "resend:email-out-1" });
   });

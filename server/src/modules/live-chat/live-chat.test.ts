@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
   customer: { findUnique: vi.fn() },
   department: { findUnique: vi.fn(), findMany: vi.fn() },
   team: { findFirst: vi.fn() },
-  ticket: { findFirst: vi.fn(), findUniqueOrThrow: vi.fn(), create: vi.fn(), updateMany: vi.fn(), groupBy: vi.fn().mockResolvedValue([]) },
+  ticket: { findFirst: vi.fn(), findUnique: vi.fn(), findUniqueOrThrow: vi.fn(), create: vi.fn(), updateMany: vi.fn(), groupBy: vi.fn().mockResolvedValue([]) },
   ticketHistory: { create: vi.fn().mockResolvedValue({}) },
   auditLog: { create: vi.fn().mockResolvedValue({}) },
   notification: { createMany: vi.fn().mockResolvedValue({ count: 0 }) },
@@ -33,6 +33,7 @@ import { app } from "../../app.js";
 import { createAccessToken } from "../auth/auth-token.js";
 import { liveChatInternals } from "./live-chat.service.js";
 import { emitTicketUpdated } from "../realtime/realtime.publisher.js";
+import { prisma } from "../../config/prisma.js";
 
 const emitUpdated = vi.mocked(emitTicketUpdated);
 const auth = (id: string, role: Role) => ({ Authorization: `Bearer ${createAccessToken({ id, role })}` });
@@ -54,17 +55,19 @@ const detailRow = (status: TicketStatus = TicketStatus.OPEN) => ({
   feedback: null,
 });
 
-/** Wire the happy-path create: no resumable chat, active department + team. */
+const SESSION_KEY = "session-key-1234567890ab";
+const SESSION_KEY_2 = "session-key-abcdefghij999";
+
+/** Wire the happy-path create: no ticket owns this session key yet, active department + team. */
 function arrangeCreate() {
-  mocks.ticket.findFirst
-    .mockResolvedValueOnce(null) // resumable lookup
-    .mockResolvedValueOnce(detailRow(TicketStatus.OPEN)); // ticketDetail after create
+  mocks.ticket.findUnique.mockResolvedValueOnce(null); // no ticket owns this session key
+  mocks.ticket.findFirst.mockResolvedValueOnce(detailRow(TicketStatus.OPEN)); // ticketDetail after create
   mocks.department.findUnique.mockResolvedValue({ id: DEPT_ID, isActive: true, branchId: BRANCH_ID });
   mocks.team.findFirst.mockResolvedValue({ id: TEAM_ID });
   mocks.ticket.create.mockResolvedValue({ id: CHAT_ID, customerId: CUSTOMER_ID, teamId: TEAM_ID });
 }
 
-const startBody = { departmentId: DEPT_ID };
+const startBody = { departmentId: DEPT_ID, sessionKey: SESSION_KEY };
 
 describe("portal live chat", () => {
   beforeEach(() => {
@@ -120,37 +123,50 @@ describe("portal live chat", () => {
     expect(select).not.toHaveProperty("_count");
   });
 
-  // --- Resume ---------------------------------------------------------------
+  // --- Resume (CONV-022/026: session-key-only correlation) ------------------
 
-  it("GET returns null when the customer has no resumable live chat", async () => {
-    mocks.ticket.findFirst.mockResolvedValueOnce(null);
+  it("GET returns null when no sessionKey is supplied — no customer-identity fallback", async () => {
     const response = await request(app).get("/api/portal/live-chat").set(auth("customer", Role.CUSTOMER));
     expect(response.status).toBe(200);
     expect(response.body.data).toBeNull();
-    const where = mocks.ticket.findFirst.mock.calls[0][0].where;
-    expect(where.customerId).toBe(CUSTOMER_ID);
-    expect(where.channel).toBe("LIVE_CHAT");
-    expect(where.status.in).toEqual(expect.arrayContaining([TicketStatus.OPEN, TicketStatus.IN_PROGRESS, TicketStatus.WAITING_CUSTOMER, TicketStatus.ESCALATED]));
-    expect(where.status.in).not.toContain(TicketStatus.RESOLVED);
-    expect(where.status.in).not.toContain(TicketStatus.CLOSED);
+    expect(mocks.ticket.findUnique).not.toHaveBeenCalled();
   });
 
-  it("GET resumes the most recent non-terminal live chat", async () => {
-    mocks.ticket.findFirst
-      .mockResolvedValueOnce({ id: CHAT_ID })
-      .mockResolvedValueOnce(detailRow(TicketStatus.IN_PROGRESS));
-    const response = await request(app).get("/api/portal/live-chat").set(auth("customer", Role.CUSTOMER));
+  it("GET returns null when the sessionKey matches no ticket", async () => {
+    mocks.ticket.findUnique.mockResolvedValueOnce(null);
+    const response = await request(app).get(`/api/portal/live-chat?sessionKey=${SESSION_KEY}`).set(auth("customer", Role.CUSTOMER));
+    expect(response.status).toBe(200);
+    expect(response.body.data).toBeNull();
+    expect(mocks.ticket.findUnique).toHaveBeenCalledWith({ where: { liveChatSessionKey: SESSION_KEY }, select: { id: true, status: true, customerId: true } });
+  });
+
+  it("GET resumes the ticket owned by the given sessionKey when it is still active", async () => {
+    mocks.ticket.findUnique.mockResolvedValueOnce({ id: CHAT_ID, status: TicketStatus.IN_PROGRESS, customerId: CUSTOMER_ID });
+    mocks.ticket.findFirst.mockResolvedValueOnce(detailRow(TicketStatus.IN_PROGRESS));
+    const response = await request(app).get(`/api/portal/live-chat?sessionKey=${SESSION_KEY}`).set(auth("customer", Role.CUSTOMER));
     expect(response.status).toBe(200);
     expect(response.body.data.id).toBe(CHAT_ID);
     expect(response.body.data.status).toBe("IN_PROGRESS");
     expect(mocks.ticket.create).not.toHaveBeenCalled();
-    expect(mocks.ticket.findFirst.mock.calls[0][0].orderBy).toEqual([{ createdAt: "desc" }, { id: "asc" }]);
   });
 
-  it("POST resumes an existing chat without re-routing it — department/team are never touched", async () => {
-    mocks.ticket.findFirst
-      .mockResolvedValueOnce({ id: CHAT_ID }) // resumable lookup hits
-      .mockResolvedValueOnce(detailRow(TicketStatus.IN_PROGRESS)); // ticketDetail
+  it("GET returns null for a sessionKey owned by a RESOLVED/CLOSED (terminal) ticket", async () => {
+    mocks.ticket.findUnique.mockResolvedValueOnce({ id: CHAT_ID, status: TicketStatus.RESOLVED, customerId: CUSTOMER_ID });
+    const response = await request(app).get(`/api/portal/live-chat?sessionKey=${SESSION_KEY}`).set(auth("customer", Role.CUSTOMER));
+    expect(response.status).toBe(200);
+    expect(response.body.data).toBeNull();
+  });
+
+  it("GET returns null for a sessionKey owned by a different customer", async () => {
+    mocks.ticket.findUnique.mockResolvedValueOnce({ id: CHAT_ID, status: TicketStatus.OPEN, customerId: "some-other-customer" });
+    const response = await request(app).get(`/api/portal/live-chat?sessionKey=${SESSION_KEY}`).set(auth("customer", Role.CUSTOMER));
+    expect(response.status).toBe(200);
+    expect(response.body.data).toBeNull();
+  });
+
+  it("POST resumes an existing chat by sessionKey without re-routing it — department/team are never touched", async () => {
+    mocks.ticket.findUnique.mockResolvedValueOnce({ id: CHAT_ID, status: TicketStatus.IN_PROGRESS, customerId: CUSTOMER_ID });
+    mocks.ticket.findFirst.mockResolvedValueOnce(detailRow(TicketStatus.IN_PROGRESS)); // ticketDetail
     const response = await request(app)
       .post("/api/portal/live-chat")
       .set(auth("customer", Role.CUSTOMER))
@@ -161,8 +177,18 @@ describe("portal live chat", () => {
     // resume short-circuits BEFORE any routing work
     expect(mocks.department.findUnique).not.toHaveBeenCalled();
     expect(mocks.team.findFirst).not.toHaveBeenCalled();
-    expect(mocks.ticket.findFirst).toHaveBeenCalledTimes(2);
     expect(emitUpdated).not.toHaveBeenCalled();
+  });
+
+  it("POST rejects a sessionKey that already belongs to a terminal (RESOLVED/CLOSED) chat — never silently resumed", async () => {
+    mocks.ticket.findUnique.mockResolvedValueOnce({ id: CHAT_ID, status: TicketStatus.RESOLVED, customerId: CUSTOMER_ID });
+    const response = await request(app)
+      .post("/api/portal/live-chat")
+      .set(auth("customer", Role.CUSTOMER))
+      .send(startBody);
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe("LIVE_CHAT_SESSION_ENDED");
+    expect(mocks.ticket.create).not.toHaveBeenCalled();
   });
 
   // --- Create: routing by selected Department ------------------------------
@@ -191,6 +217,11 @@ describe("portal live chat", () => {
     expect(data.firstResponseDueAt).toBeInstanceOf(Date);
     expect(data.resolutionDueAt).toBeInstanceOf(Date);
     expect(mocks.ticketHistory.create).toHaveBeenCalledWith({ data: expect.objectContaining({ actorUserId: "customer", action: "TICKET_CREATED" }) });
+    // CONV-044 (OD-CC-7): exactly one canonical, actorless TICKET_CREATED AuditLog.
+    expect(mocks.auditLog.create).toHaveBeenCalledTimes(1);
+    expect(mocks.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ actorId: null, action: "TICKET_CREATED", entityType: "TICKET", entityId: CHAT_ID }),
+    }));
     // first + only realtime event already carries the resolved teamId
     expect(emitUpdated).toHaveBeenCalledTimes(1);
     expect(emitUpdated).toHaveBeenCalledWith(expect.objectContaining({ ticketId: CHAT_ID, assignedAgentId: null, teamId: TEAM_ID }));
@@ -224,17 +255,14 @@ describe("portal live chat", () => {
   it("does NOT consult the customer's ticket history for routing (heuristic removed)", async () => {
     arrangeCreate();
     await request(app).post("/api/portal/live-chat").set(auth("customer", Role.CUSTOMER)).send(startBody);
-    // exactly two ticket.findFirst calls: the resumable lookup + ticketDetail.
-    // No third "most recent routed ticket" lookup.
-    expect(mocks.ticket.findFirst).toHaveBeenCalledTimes(2);
-    for (const call of mocks.ticket.findFirst.mock.calls) {
-      expect(call[0].where).not.toHaveProperty("teamId");
-    }
+    // the pre-check is keyed by sessionKey only — never by customerId/teamId.
+    expect(mocks.ticket.findUnique).toHaveBeenCalledWith({ where: { liveChatSessionKey: SESSION_KEY }, select: { id: true, status: true, customerId: true } });
     expect(liveChatInternals).not.toHaveProperty("resolveLiveChatTeamId");
   });
 
   it("persists branchId as null when the Department has no branch", async () => {
-    mocks.ticket.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce(detailRow());
+    mocks.ticket.findUnique.mockResolvedValueOnce(null);
+    mocks.ticket.findFirst.mockResolvedValueOnce(detailRow());
     mocks.department.findUnique.mockResolvedValue({ id: DEPT_ID, isActive: true, branchId: null });
     mocks.team.findFirst.mockResolvedValue({ id: TEAM_ID });
     mocks.ticket.create.mockResolvedValue({ id: CHAT_ID, customerId: CUSTOMER_ID, teamId: TEAM_ID });
@@ -245,7 +273,7 @@ describe("portal live chat", () => {
   // --- Invalid routing ----------------------------------------------------
 
   it("rejects an unknown Department with 404 and creates nothing", async () => {
-    mocks.ticket.findFirst.mockResolvedValueOnce(null);
+    mocks.ticket.findUnique.mockResolvedValueOnce(null);
     mocks.department.findUnique.mockResolvedValue(null);
     const response = await request(app)
       .post("/api/portal/live-chat")
@@ -258,7 +286,7 @@ describe("portal live chat", () => {
   });
 
   it("rejects an inactive Department and creates nothing", async () => {
-    mocks.ticket.findFirst.mockResolvedValueOnce(null);
+    mocks.ticket.findUnique.mockResolvedValueOnce(null);
     mocks.department.findUnique.mockResolvedValue({ id: DEPT_ID, isActive: false, branchId: BRANCH_ID });
     const response = await request(app)
       .post("/api/portal/live-chat")
@@ -270,7 +298,7 @@ describe("portal live chat", () => {
   });
 
   it("returns a customer-safe 'unavailable' error when the Department has no active Team, and creates nothing", async () => {
-    mocks.ticket.findFirst.mockResolvedValueOnce(null);
+    mocks.ticket.findUnique.mockResolvedValueOnce(null);
     mocks.department.findUnique.mockResolvedValue({ id: DEPT_ID, isActive: true, branchId: BRANCH_ID });
     mocks.team.findFirst.mockResolvedValue(null);
     const response = await request(app)
@@ -287,15 +315,17 @@ describe("portal live chat", () => {
 
   // --- Strict input ------------------------------------------------------
 
-  it("rejects a malformed departmentId or any server-controlled field", async () => {
+  it("rejects a malformed departmentId, a missing/too-short sessionKey, or any server-controlled field", async () => {
     for (const body of [
-      { departmentId: "not-a-cuid" },
-      { departmentId: DEPT_ID, customerId: "cd9298a10d1b0735837dc4bd8" },
-      { departmentId: DEPT_ID, teamId: TEAM_ID },
-      { departmentId: DEPT_ID, channel: "WEB" },
-      { departmentId: DEPT_ID, status: "CLOSED" },
-      { departmentId: DEPT_ID, priority: "HIGH" },
-      { departmentId: DEPT_ID, assignedAgentId: "x" },
+      { departmentId: "not-a-cuid", sessionKey: SESSION_KEY },
+      { departmentId: DEPT_ID }, // missing sessionKey
+      { departmentId: DEPT_ID, sessionKey: "short" }, // too short
+      { departmentId: DEPT_ID, sessionKey: SESSION_KEY, customerId: "cd9298a10d1b0735837dc4bd8" },
+      { departmentId: DEPT_ID, sessionKey: SESSION_KEY, teamId: TEAM_ID },
+      { departmentId: DEPT_ID, sessionKey: SESSION_KEY, channel: "WEB" },
+      { departmentId: DEPT_ID, sessionKey: SESSION_KEY, status: "CLOSED" },
+      { departmentId: DEPT_ID, sessionKey: SESSION_KEY, priority: "HIGH" },
+      { departmentId: DEPT_ID, sessionKey: SESSION_KEY, assignedAgentId: "x" },
     ]) {
       const response = await request(app)
         .post("/api/portal/live-chat")
@@ -307,24 +337,23 @@ describe("portal live chat", () => {
   });
 
   it("rejects a create with no departmentId (DEPARTMENT_REQUIRED) and creates nothing", async () => {
-    mocks.ticket.findFirst.mockResolvedValueOnce(null); // no resumable chat
+    mocks.ticket.findUnique.mockResolvedValueOnce(null); // no ticket owns this session key
     const response = await request(app)
       .post("/api/portal/live-chat")
       .set(auth("customer", Role.CUSTOMER))
-      .send({});
+      .send({ sessionKey: SESSION_KEY });
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe("DEPARTMENT_REQUIRED");
     expect(mocks.ticket.create).not.toHaveBeenCalled();
   });
 
-  it("POST with no body resumes an existing chat (departmentId not required to resume)", async () => {
-    mocks.ticket.findFirst
-      .mockResolvedValueOnce({ id: CHAT_ID }) // resumable lookup hits
-      .mockResolvedValueOnce(detailRow(TicketStatus.IN_PROGRESS)); // ticketDetail
+  it("POST resumes an existing chat with no departmentId in the body (departmentId not required to resume)", async () => {
+    mocks.ticket.findUnique.mockResolvedValueOnce({ id: CHAT_ID, status: TicketStatus.IN_PROGRESS, customerId: CUSTOMER_ID });
+    mocks.ticket.findFirst.mockResolvedValueOnce(detailRow(TicketStatus.IN_PROGRESS)); // ticketDetail
     const response = await request(app)
       .post("/api/portal/live-chat")
       .set(auth("customer", Role.CUSTOMER))
-      .send({});
+      .send({ sessionKey: SESSION_KEY });
     expect(response.status).toBe(201);
     expect(response.body.data.id).toBe(CHAT_ID);
     expect(mocks.ticket.create).not.toHaveBeenCalled();
@@ -342,37 +371,88 @@ describe("portal live chat", () => {
 
   it("derives the customer strictly from auth, not from any input", async () => {
     mocks.customer.findUnique.mockResolvedValue({ id: "c61b1436de3085c47167cb3c9" });
-    mocks.ticket.findFirst.mockResolvedValueOnce(null);
-    await request(app).get("/api/portal/live-chat").set(auth("cb9b8f9ca9e0d9e79cf06cef9", Role.CUSTOMER));
+    mocks.ticket.findUnique.mockResolvedValueOnce(null);
+    await request(app).get(`/api/portal/live-chat?sessionKey=${SESSION_KEY}`).set(auth("cb9b8f9ca9e0d9e79cf06cef9", Role.CUSTOMER));
     expect(mocks.customer.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: "cb9b8f9ca9e0d9e79cf06cef9" } }));
-    expect(mocks.ticket.findFirst.mock.calls[0][0].where.customerId).toBe("c61b1436de3085c47167cb3c9");
   });
 
-  // --- Race safety -----------------------------------------------------
+  // --- Race safety (CONV-022, CC-GAP-22) --------------------------------
 
-  it("does not create a duplicate when an active chat appears first (create-or-resume preserved)", async () => {
-    mocks.ticket.findFirst
-      .mockResolvedValueOnce({ id: CHAT_ID }) // resumable lookup wins the race
-      .mockResolvedValueOnce(detailRow(TicketStatus.OPEN));
+  it("two concurrent creates for the SAME session key: the loser re-reads and returns the winning ticket instead of erroring", async () => {
+    mocks.ticket.findUnique.mockResolvedValueOnce(null); // pre-check: no ticket yet
+    mocks.department.findUnique.mockResolvedValue({ id: DEPT_ID, isActive: true, branchId: BRANCH_ID });
+    mocks.team.findFirst.mockResolvedValue({ id: TEAM_ID });
+    const raceError = Object.assign(new Error("unique violation"), { code: "P2002", meta: { target: ["Ticket_liveChatSessionKey_key"] } });
+    Object.setPrototypeOf(raceError, (await import("@prisma/client")).Prisma.PrismaClientKnownRequestError.prototype);
+    mocks.ticket.create.mockRejectedValueOnce(raceError);
+    mocks.ticket.findUniqueOrThrow.mockResolvedValueOnce({ id: CHAT_ID, customerId: CUSTOMER_ID, teamId: TEAM_ID, assignedAgentId: "winner-agent" });
+    mocks.ticket.findFirst.mockResolvedValueOnce(detailRow(TicketStatus.OPEN));
+
     const response = await request(app)
       .post("/api/portal/live-chat")
       .set(auth("customer", Role.CUSTOMER))
       .send(startBody);
     expect(response.status).toBe(201);
     expect(response.body.data.id).toBe(CHAT_ID);
-    expect(mocks.ticket.create).not.toHaveBeenCalled();
+    // the loser never wrote history/audit/assignment/event — only the winner's transaction did
+    expect(mocks.ticketHistory.create).not.toHaveBeenCalled();
     expect(emitUpdated).not.toHaveBeenCalled();
   });
 
-  it("treats a RESOLVED/CLOSED live chat as terminal and starts a fresh routed one", async () => {
-    arrangeCreate();
+  // REGRESSION (manual-smoke): Postgres aborts an interactive transaction after
+  // ANY statement error (25P02, "current transaction is aborted") — every
+  // further query against that same `tx` handle then fails too, including a
+  // same-tx recovery read. The default hoisted `$transaction` mock above does
+  // NOT reproduce this (it treats `tx` as a plain, never-poisoned object), which
+  // is exactly why the race test above kept passing against real Postgres
+  // failures. This test builds a `tx` stub that fails every further call once
+  // the create rejects, distinct from the top-level `prisma` mock, to prove the
+  // recovery read happens on a fresh client after `$transaction` itself rejects
+  // — not on the poisoned transaction.
+  it("REGRESSION: the loser's recovery read must not run on the aborted transaction client", async () => {
+    mocks.ticket.findUnique.mockResolvedValueOnce(null);
+    mocks.department.findUnique.mockResolvedValue({ id: DEPT_ID, isActive: true, branchId: BRANCH_ID });
+    mocks.team.findFirst.mockResolvedValue({ id: TEAM_ID });
+    const raceError = Object.assign(new Error("unique violation"), { code: "P2002", meta: { target: ["Ticket_liveChatSessionKey_key"] } });
+    Object.setPrototypeOf(raceError, (await import("@prisma/client")).Prisma.PrismaClientKnownRequestError.prototype);
+    const abortedError = Object.assign(new Error('current transaction is aborted, commands ignored until end of transaction block'), { code: "P2028" });
+
+    const txStub = {
+      ...mocks,
+      ticket: { ...mocks.ticket, create: vi.fn().mockRejectedValue(raceError), findUniqueOrThrow: vi.fn().mockRejectedValue(abortedError) },
+    };
+    vi.mocked(prisma.$transaction).mockImplementationOnce(async (fn: unknown) => (fn as (tx: typeof txStub) => unknown)(txStub));
+    mocks.ticket.findUniqueOrThrow.mockResolvedValueOnce({ id: CHAT_ID, customerId: CUSTOMER_ID, teamId: TEAM_ID, assignedAgentId: "winner-agent" });
+    mocks.ticket.findFirst.mockResolvedValueOnce(detailRow(TicketStatus.OPEN));
+
     const response = await request(app)
       .post("/api/portal/live-chat")
       .set(auth("customer", Role.CUSTOMER))
       .send(startBody);
+
+    expect(response.status).toBe(201);
+    expect(response.body.data.id).toBe(CHAT_ID);
+    expect(txStub.ticket.findUniqueOrThrow).not.toHaveBeenCalled();
+    expect(mocks.ticket.findUniqueOrThrow).toHaveBeenCalledWith({
+      where: { liveChatSessionKey: SESSION_KEY },
+      select: { id: true, customerId: true, teamId: true, assignedAgentId: true },
+    });
+  });
+
+  it("a different session key for the same customer creates a different ticket even while the first is active", async () => {
+    mocks.ticket.findUnique.mockResolvedValueOnce(null); // new session key, no existing ticket
+    mocks.ticket.findFirst.mockResolvedValueOnce(detailRow(TicketStatus.OPEN));
+    mocks.department.findUnique.mockResolvedValue({ id: DEPT_ID, isActive: true, branchId: BRANCH_ID });
+    mocks.team.findFirst.mockResolvedValue({ id: TEAM_ID });
+    mocks.ticket.create.mockResolvedValue({ id: "cnewchat11111111111111111", customerId: CUSTOMER_ID, teamId: TEAM_ID });
+
+    const response = await request(app)
+      .post("/api/portal/live-chat")
+      .set(auth("customer", Role.CUSTOMER))
+      .send({ departmentId: DEPT_ID, sessionKey: SESSION_KEY_2 });
     expect(response.status).toBe(201);
     expect(mocks.ticket.create).toHaveBeenCalledTimes(1);
-    expect(mocks.ticket.create.mock.calls[0][0].data.teamId).toBe(TEAM_ID);
+    expect(mocks.ticket.create.mock.calls[0][0].data.liveChatSessionKey).toBe(SESSION_KEY_2);
   });
 
   // --- Internal resolver -----------------------------------------------

@@ -1,16 +1,18 @@
 import type { RequestHandler } from "express";
 import { AppError } from "../../shared/errors/app-error.js";
 import * as liveChat from "./live-chat.service.js";
-import type { LiveChatEndParams, LiveChatStartInput } from "./live-chat.schema.js";
+import type { LiveChatEndParams, LiveChatGetQuery, LiveChatStartInput } from "./live-chat.schema.js";
 
 function userId(request: Express.Request) {
   if (!request.auth) throw new AppError(401, "AUTHENTICATION_REQUIRED", "Authentication is required");
   return request.auth.userId;
 }
 
-/** `GET /api/portal/live-chat` — resumable live chat, or `{ data: null }`. */
-export const get: RequestHandler = async (req, res) =>
-  res.json({ data: await liveChat.getActiveLiveChat(userId(req)) });
+/** `GET /api/portal/live-chat?sessionKey=...` — the chat owned by that session key, or `{ data: null }`. */
+export const get: RequestHandler = async (req, res) => {
+  const { sessionKey } = res.locals.validatedQuery as LiveChatGetQuery;
+  res.json({ data: await liveChat.getActiveLiveChat(userId(req), sessionKey) });
+};
 
 /**
  * `GET /api/portal/live-chat/departments` — customer-safe list of Departments

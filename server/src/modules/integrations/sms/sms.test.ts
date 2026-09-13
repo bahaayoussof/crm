@@ -2,6 +2,7 @@ import { createHmac } from "node:crypto";
 import express from "express";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Prisma } from "@prisma/client";
 
 const mocks = vi.hoisted(() => ({
   messageFindUnique: vi.fn(),
@@ -19,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   userFindMany: vi.fn(),
   auditCreate: vi.fn(),
   transaction: vi.fn(),
+  deliveryCreate: vi.fn(), deliveryFindUnique: vi.fn(), deliveryUpdate: vi.fn(), deliveryUpdateMany: vi.fn(),
 }));
 
 vi.mock("../../../config/prisma.js", () => ({
@@ -32,6 +34,7 @@ vi.mock("../../../config/prisma.js", () => ({
     slaRule: { findFirst: mocks.slaFindFirst },
     notification: { createMany: mocks.notificationCreateMany },
     auditLog: { create: mocks.auditCreate },
+    messageDelivery: { create: mocks.deliveryCreate, findUnique: mocks.deliveryFindUnique, update: mocks.deliveryUpdate, updateMany: mocks.deliveryUpdateMany },
     $transaction: mocks.transaction,
   },
 }));
@@ -95,6 +98,10 @@ describe("SMS integration", () => {
     mocks.historyCreate.mockResolvedValue({});
     mocks.slaFindFirst.mockResolvedValue({ firstResponseMinutes: 60, resolutionMinutes: 1440 });
     mocks.notificationCreateMany.mockResolvedValue({ count: 0 });
+    mocks.deliveryCreate.mockResolvedValue({});
+    mocks.deliveryUpdateMany.mockResolvedValue({ count: 1 });
+    mocks.deliveryFindUnique.mockResolvedValue({ attemptCount: 0, firstAttemptedAt: null, providerMessageId: null });
+    mocks.deliveryUpdate.mockResolvedValue({});
     mocks.watcherFindMany.mockResolvedValue([]);
     mocks.auditCreate.mockResolvedValue({});
   });
@@ -187,7 +194,8 @@ describe("SMS integration", () => {
       expect(mocks.customerCreate).toHaveBeenCalledWith(expect.objectContaining({
         data: { name: "+14155552671", phone: "+14155552671", email: "sms-14155552671@no-email.invalid" },
       }));
-      expect(mocks.auditCreate).toHaveBeenCalledTimes(1);
+      // CUSTOMER_CREATED (unchanged) + CONV-044's new TICKET_CREATED — exactly two, both actorless.
+      expect(mocks.auditCreate).toHaveBeenCalledTimes(2);
       expect(mocks.auditCreate).toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({
           actorId: null,
@@ -196,14 +204,49 @@ describe("SMS integration", () => {
           entityId: "cust-new",
         }),
       }));
+      expect(mocks.auditCreate).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ actorId: null, action: "TICKET_CREATED", entityType: "TICKET" }),
+      }));
     });
 
-    it("does not audit when an existing customer is matched by phone", async () => {
+    it("CONV-027/031: two customers sharing a normalized phone produce an AMBIGUOUS outcome with zero writes and no PII in the log", async () => {
+      mocks.customerFindMany.mockResolvedValue([{ id: "existing-customer" }, { id: "other-customer" }]);
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      const response = await send();
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe("AMBIGUOUS");
+      expect(mocks.customerCreate).not.toHaveBeenCalled();
+      expect(mocks.ticketCreate).not.toHaveBeenCalled();
+      expect(mocks.messageCreate).not.toHaveBeenCalled();
+      expect(mocks.auditCreate).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      const logged = warnSpy.mock.calls[0]!.join(" ");
+      expect(logged).not.toContain("+14155552671"); // no phone number logged
+      expect(logged).not.toContain("existing-customer"); // no candidate customer id logged
+      expect(logged).not.toContain("other-customer");
+      expect(logged).toMatch(/correlationId=/);
+      expect(logged).toMatch(/count=2/);
+      warnSpy.mockRestore();
+    });
+
+    it("CONV-024/033 (OD-CC-4/OD-CC-3): always creates a NEW ticket, even for a customer with an existing active or RESOLVED SMS ticket — no newest-active-ticket reuse, no reopen", async () => {
+      mocks.customerFindMany.mockResolvedValue([{ id: "existing-customer" }]);
+      const response = await send();
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe("TICKET_CREATED");
+      expect(mocks.ticketFindFirst).not.toHaveBeenCalled(); // no "newest active ticket" lookup exists at all
+      expect(mocks.ticketCreate).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not audit CUSTOMER_CREATED when an existing customer is matched by phone (TICKET_CREATED still fires once, CONV-044)", async () => {
       mocks.customerFindMany.mockResolvedValue([{ id: "existing-customer" }]);
       const response = await send();
       expect(response.status).toBe(200);
       expect(mocks.customerCreate).not.toHaveBeenCalled();
-      expect(mocks.auditCreate).not.toHaveBeenCalled();
+      expect(mocks.auditCreate).toHaveBeenCalledTimes(1);
+      expect(mocks.auditCreate).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ action: "TICKET_CREATED", actorId: null }),
+      }));
     });
 
     it("does not re-process or double-audit a duplicate webhook redelivery", async () => {
@@ -214,6 +257,24 @@ describe("SMS integration", () => {
       expect(mocks.customerCreate).not.toHaveBeenCalled();
       expect(mocks.ticketCreate).not.toHaveBeenCalled();
       expect(mocks.auditCreate).not.toHaveBeenCalled();
+    });
+
+    it("CONV-021 (CC-GAP-03 fix): a raced externalId P2002 inside the transaction is classified DUPLICATE", async () => {
+      mocks.messageCreate.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError("dup", { code: "P2002", clientVersion: "6", meta: { target: ["TicketMessage_externalId_key"] } }),
+      );
+      const response = await send();
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe("DUPLICATE");
+    });
+
+    it("CONV-021 (CC-GAP-03 fix): an unrelated P2002 (e.g. placeholder-email collision) propagates as a real error, not DUPLICATE", async () => {
+      mocks.customerCreate.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError("dup", { code: "P2002", clientVersion: "6", meta: { target: ["Customer_email_key"] } }),
+      );
+      const response = await send();
+      expect(response.status).toBe(500);
+      expect(response.body.status).not.toBe("DUPLICATE");
     });
   });
 });

@@ -2,16 +2,20 @@ import { Channel, Prisma, Role, TicketPriority, TicketStatus } from "@prisma/cli
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import { createNotifications } from "../notifications/notification.service.js";
-import { sanitizeReplyHtml } from "../../shared/rich-text/reply-html.js";
+import { requireConversationContent } from "../../shared/rich-text/conversation-content.js";
 import { emitTicketMessageCreated, emitTicketUpdated, withRealtimeOutbox } from "../realtime/realtime.publisher.js";
 import { customerReplyNotificationRecipientIds } from "../../shared/team/team-scope.js";
+import { bindStagedAttachments } from "../attachments/attachment.service.js";
+import { createCanonicalTicket } from "../tickets/create-canonical-ticket.js";
 import type { PortalCreateTicketInput, PortalReplyInput, PortalStatus, PortalTicketListQuery } from "./portal.schema.js";
 
 const listSelect = { id: true, subject: true, status: true, category: { select: { id: true, name: true } }, createdAt: true, updatedAt: true } satisfies Prisma.TicketSelect;
 // "My Requests" table only — adds the customer-safe `priority` column/filter support.
 // Kept separate from `listSelect` so overview / detail / create response shapes are unchanged.
 const ticketListSelect = { ...listSelect, priority: true } satisfies Prisma.TicketSelect;
-const messageSelect = { id: true, body: true, createdAt: true, author: { select: { id: true, name: true, role: true } } } satisfies Prisma.TicketMessageSelect;
+// CONV-047: contentFormat rides along so the client renders from persisted
+// provenance instead of markup-sniffing the body.
+const messageSelect = { id: true, body: true, createdAt: true, contentFormat: true, author: { select: { id: true, name: true, role: true } } } satisfies Prisma.TicketMessageSelect;
 const statusMap: Record<TicketStatus, PortalStatus> = {
   OPEN: "OPEN", IN_PROGRESS: "IN_PROGRESS", ESCALATED: "IN_PROGRESS",
   WAITING_CUSTOMER: "WAITING_FOR_YOU", RESOLVED: "RESOLVED", CLOSED: "CLOSED",
@@ -91,14 +95,23 @@ export async function createTicket(input: PortalCreateTicketInput, userId: strin
     // automatic-assignment core rule, a ticket with no Team is left unassigned
     // for ADMIN routing; auto-assignment runs later, from the canonical ticket
     // update flow, once an ADMIN routes it to a Team.
-    const ticket = await tx.ticket.create({ data: { subject: input.subject, description: input.description, categoryId: input.categoryId ?? null,
-      customerId, status: TicketStatus.OPEN, priority: TicketPriority.MEDIUM, channel: Channel.WEB,
-      assignedAgentId: null, departmentId: null, branchId: null, createdAt: now,
-      firstResponseDueAt: sla ? addMinutes(now, sla.firstResponseMinutes) : null,
-      resolutionDueAt: sla ? addMinutes(now, sla.resolutionMinutes) : null,
-    }, select: listSelect });
-    await tx.ticketHistory.create({ data: { ticketId: ticket.id, actorUserId: userId, action: "TICKET_CREATED", newValue: TicketStatus.OPEN } });
-    return ticketItem(ticket);
+    // CONV-028/044 (OD-CC-7): exactly one canonical TICKET_CREATED AuditLog,
+    // actorless even though a Portal customer initiated the request — but the
+    // TicketHistory row keeps the customer's own actorUserId (historyActorId
+    // override), same divergence as Live Chat.
+    const canonical = await createCanonicalTicket({
+      tx,
+      data: { subject: input.subject, description: input.description, categoryId: input.categoryId ?? null,
+        customerId, status: TicketStatus.OPEN, priority: TicketPriority.MEDIUM, channel: Channel.WEB,
+        assignedAgentId: null, departmentId: null, branchId: null, createdAt: now,
+        firstResponseDueAt: sla ? addMinutes(now, sla.firstResponseMinutes) : null,
+        resolutionDueAt: sla ? addMinutes(now, sla.resolutionMinutes) : null,
+      },
+      actorId: null,
+      historyActorId: userId,
+      select: listSelect,
+    });
+    return ticketItem(canonical.ticket);
    });
    // Portal tickets are always unrouted + unassigned (server-owned) → audience is
    // ADMIN only via the unchanged canReceive routing.
@@ -111,15 +124,29 @@ export async function reply(id: string, input: PortalReplyInput, userId: string)
   const customerId = await customerIdFor(userId);
   return withRealtimeOutbox(async () => {
    const { result, assignedAgentId, teamId } = await prisma.$transaction(async (tx) => {
-    const ticket = await tx.ticket.findFirst({ where: { id, customerId }, select: { id: true, status: true, subject: true, assignedAgentId: true, teamId: true } });
+    const ticket = await tx.ticket.findFirst({ where: { id, customerId }, select: { id: true, status: true, subject: true, assignedAgentId: true, teamId: true, channel: true } });
     if (!ticket) throw new AppError(404, "TICKET_NOT_FOUND", "Ticket not found");
     if (ticket.status === TicketStatus.CLOSED) throw new AppError(409, "TICKET_CLOSED", "Closed tickets do not accept replies");
     // The Portal composer is the shared rich Lexical editor. Sanitize the HTML to
     // the support allowlist at this trust boundary (same as staff replies); the
-    // `MessageBody` render guard re-sanitizes as defence in depth.
-    const body = sanitizeReplyHtml(input.body);
-    if (!body) throw new AppError(422, "EMPTY_MESSAGE", "Reply body is required");
-    const message = await tx.ticketMessage.create({ data: { ticketId: id, authorUserId: userId, body }, select: messageSelect });
+    // `MessageBody` render guard re-sanitizes as defence in depth. Live Chat
+    // customer messages ride this same endpoint, so provenance is derived from
+    // the ticket's channel rather than always assumed to be PORTAL.
+    const content = requireConversationContent({
+      raw: input.body,
+      format: "SANITIZED_HTML",
+      source: ticket.channel === Channel.LIVE_CHAT ? "LIVE_CHAT" : "PORTAL",
+    });
+    const body = content.sanitizedHtml!;
+    const message = await tx.ticketMessage.create({
+      data: { ticketId: id, authorUserId: userId, body, contentFormat: content.contentFormat, contentSource: content.contentSource },
+      select: messageSelect,
+    });
+    // CONV-041/049 — Portal/Live-Chat replies are always WEB/LIVE_CHAT channel,
+    // so no outbound-attachment-capability rejection (CONV-042) applies here.
+    if (input.attachmentIds?.length) {
+      await bindStagedAttachments(tx, input.attachmentIds, { ticketId: id, messageId: message.id }, userId);
+    }
     const next = ticket.status === TicketStatus.WAITING_CUSTOMER ? TicketStatus.IN_PROGRESS : ticket.status === TicketStatus.RESOLVED ? TicketStatus.OPEN : null;
     if (next) {
       await tx.ticket.update({ where: { id }, data: { status: next, ...(ticket.status === TicketStatus.RESOLVED && { resolvedAt: null }) } });
