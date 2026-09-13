@@ -42,8 +42,8 @@ import {
   UNDO_COMMAND,
 } from "lexical";
 import type { LucideIcon } from "lucide-react";
-import { TicketReplyLinkPopover } from "@/features/tickets/ticket-reply-link-popover";
-import type { LinkPopoverData, LinkSubmitPayload } from "@/features/tickets/ticket-reply-link.utils";
+import { RichTextLinkPopover } from "@/components/shared/rich-text/rich-text-link-popover";
+import type { LinkPopoverData, LinkSubmitPayload } from "@/components/shared/rich-text/rich-text-link.utils";
 
 type BlockType = "paragraph" | "h2" | "h3";
 
@@ -287,7 +287,7 @@ export function KnowledgeArticleEditorToolbar({ disabled = false }: { disabled?:
       <ToolbarButton icon={Undo2} label={t("knowledgeBase.editor.undo")} disabled={disabled || !canUndo} onClick={() => editor.dispatchCommand(UNDO_COMMAND, undefined)} />
       <ToolbarButton icon={Redo2} label={t("knowledgeBase.editor.redo")} disabled={disabled || !canRedo} onClick={() => editor.dispatchCommand(REDO_COMMAND, undefined)} />
 
-      <TicketReplyLinkPopover
+      <RichTextLinkPopover
         open={linkPopoverOpen}
         triggerRef={linkButtonRef}
         initialData={linkData}

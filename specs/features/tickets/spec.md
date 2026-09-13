@@ -107,8 +107,11 @@ client/src/features/tickets/
 │                                      close-confirm, self-assign) + SLA section; client transition map
 ├── ticket-conversation.tsx / ticket-conversation-ui.tsx  Merged chronological thread; MessageBody sanitises
 │                                      HTML on render (DOMPurify); notes always plain text
-├── ticket-workspace-tabs.tsx         Reply / Note / Quick-reply / Attachments / History / Description tabs
-├── ticket-reply-editor.tsx + toolbar + mention plugin/node   Lexical rich composer (reply + note @mentions)
+├── ticket-workspace-tabs.tsx         Reply / Note / Quick-reply / Attachments / History / Description tabs;
+│                                      composes the shared `RichTextEditor` (client/src/components/shared/
+│                                      rich-text/) with the ticket-owned mention plugin/node for notes
+├── ticket-mention-plugin.tsx / ticket-mention-node.ts   Note-only `@mention` typeahead (Ticket-specific,
+│                                      passed into `RichTextEditor` via `extraPlugins`/`extraNodes`)
 ├── ticket-badges.tsx / ticket-status-theme.ts               Status/priority/SLA presentation, canonical order
 └── ticket-permissions.ts            Client-only UX gates (canManageTicketDefinition, canOperateAssignedTicket,
                                      canCloseTicket, canSelfAssignTicket) — never a security boundary
@@ -473,7 +476,7 @@ Paginated safe summaries for the opened customer; `SUMMARY_ONLY` never authorise
 
 2-column workspace (`ticket-detail-page.tsx`):
 
-- **Main column:** back link + reference + subject + status badge + created date; `TicketContextSummary` (Customer / Priority / Category / Channel / Followers strip); bounded auto-scrolling `TicketConversation` card (viewer-relative bubbles, internal notes styled distinctly, `@mention` rendering); `TicketWorkspaceTabs` (Reply · Note · Quick reply picker · Attachments · History · Description) with the shared Lexical composer (`TicketReplyEditor` — bold/italic/underline/lists/link/undo-redo; `@mention` typeahead on the Note tab only, never in the Portal import graph).
+- **Main column:** back link + reference + subject + status badge + created date; `TicketContextSummary` (Customer / Priority / Category / Channel / Followers strip); bounded auto-scrolling `TicketConversation` card (viewer-relative bubbles, internal notes styled distinctly, `@mention` rendering); `TicketWorkspaceTabs` (Reply · Note · Quick reply picker · Attachments · History · Description) with the shared Lexical composer (`RichTextEditor` — bold/italic/underline/lists/link/undo-redo; `@mention` typeahead on the Note tab only, never in the Portal import graph).
 - **Right rail:** Properties card (status / priority / category / assignee `<select>`s; close-confirm; "Assign to me" for an eligible AGENT) + SLA card (derived state + effective deadline). The client transition map mirrors the server matrix; ADMIN/MANAGER additionally get an "Escalate" option from `OPEN`/`IN_PROGRESS`/`WAITING_CUSTOMER` and a "De-escalate → IN_PROGRESS" option from `ESCALATED`.
 - **AI Assistant** panel (`Sheet`): 4 read-only actions (summary, suggested reply, classification, KB suggestions). Never mutates the ticket; "Apply category" / "Insert reply" route through the normal ticket-update / composer paths with their own RBAC.
 - Attachments card (ticket-level + per-message); watch toggle; `FileUploadModal`.

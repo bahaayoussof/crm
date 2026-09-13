@@ -7,9 +7,9 @@ import {
   validateLinkUrl,
   type LinkPopoverData,
   type LinkSubmitPayload,
-} from "./ticket-reply-link.utils";
+} from "./rich-text-link.utils";
 
-interface TicketReplyLinkPopoverProps {
+interface RichTextLinkPopoverProps {
   open: boolean;
   triggerRef: React.RefObject<HTMLElement | null>;
   initialData: LinkPopoverData;
@@ -18,14 +18,14 @@ interface TicketReplyLinkPopoverProps {
   onClose: () => void;
 }
 
-export function TicketReplyLinkPopover({
+export function RichTextLinkPopover({
   open,
   triggerRef,
   initialData,
   onSubmit,
   onRemove,
   onClose,
-}: TicketReplyLinkPopoverProps) {
+}: RichTextLinkPopoverProps) {
   const { t } = useTranslation();
   const rootId = useId();
   const urlInputId = `${rootId}-url`;

@@ -25,12 +25,12 @@ vi.mock("./quick-reply-hooks", () => ({
 
 // Form-wiring tests: a plain-textarea stand-in for the shared Lexical reply
 // editor (Quick Reply's Rich Input). The editor's own hydrate/insert/sanitize
-// behaviour is covered in ticket-reply-editor.test.tsx and
+// behaviour is covered in rich-text-editor.test.tsx and
 // quick-reply-composer.test.tsx; here the stand-in's "HTML" is just its raw
 // string value, which is enough to exercise the create/edit/validation wiring.
-vi.mock("@/features/tickets/ticket-reply-editor", async () => {
+vi.mock("@/components/shared/rich-text/rich-text-editor", async () => {
   const React = await import("react");
-  const TicketReplyEditor = React.forwardRef(function TicketReplyEditor(
+  const RichTextEditor = React.forwardRef(function RichTextEditor(
     props: {
       id: string; ariaLabel: string; ariaDescribedBy?: string; ariaInvalid?: boolean; disabled?: boolean;
       onChange?: (html: string, plainText: string) => void;
@@ -55,7 +55,7 @@ vi.mock("@/features/tickets/ticket-reply-editor", async () => {
       onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => { setValue(e.target.value); props.onChange?.(e.target.value, e.target.value); },
     });
   });
-  return { TicketReplyEditor };
+  return { RichTextEditor };
 });
 
 import { AppShell } from "@/app/layouts/app-shell";

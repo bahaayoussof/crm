@@ -2,12 +2,12 @@ import { createRef } from "react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { changeAppLanguage } from "@/lib/i18n";
-import { TicketReplyEditor, type TicketReplyEditorHandle } from "./ticket-reply-editor";
+import { RichTextEditor, type RichTextEditorHandle } from "./rich-text-editor";
 
-function setup(props: Partial<React.ComponentProps<typeof TicketReplyEditor>> = {}) {
-  const ref = createRef<TicketReplyEditorHandle>();
+function setup(props: Partial<React.ComponentProps<typeof RichTextEditor>> = {}) {
+  const ref = createRef<RichTextEditorHandle>();
   render(
-    <TicketReplyEditor
+    <RichTextEditor
       ref={ref}
       id="conversation-reply"
       ariaLabel="Reply to customer"
@@ -21,7 +21,7 @@ function setup(props: Partial<React.ComponentProps<typeof TicketReplyEditor>> = 
 
 const editorEl = () => screen.getByLabelText("Reply to customer") as HTMLElement;
 
-describe("TicketReplyEditor", () => {
+describe("RichTextEditor", () => {
   afterEach(cleanup);
   beforeEach(async () => {
     await changeAppLanguage("en");

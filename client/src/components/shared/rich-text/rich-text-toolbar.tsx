@@ -28,16 +28,16 @@ import {
   UNDO_COMMAND,
 } from "lexical";
 import type { LucideIcon } from "lucide-react";
-import { TicketReplyLinkPopover } from "./ticket-reply-link-popover";
-import type { LinkPopoverData, LinkSubmitPayload } from "./ticket-reply-link.utils";
+import { RichTextLinkPopover } from "./rich-text-link-popover";
+import type { LinkPopoverData, LinkSubmitPayload } from "./rich-text-link.utils";
 
 /**
- * Minimal formatting toolbar for the public-reply Lexical editor: emphasis,
+ * Minimal formatting toolbar for the reply-style Lexical editor: emphasis,
  * lists, link, and history. Icon-only buttons with accessible labels and
  * `aria-pressed` for the toggle formats. No headings, code blocks, tables, or
  * markdown — support replies only.
  */
-export function TicketReplyToolbar({ disabled = false }: { disabled?: boolean }) {
+export function RichTextToolbar({ disabled = false }: { disabled?: boolean }) {
   const { t } = useTranslation();
   const [editor] = useLexicalComposerContext();
   const [bold, setBold] = useState(false);
@@ -260,7 +260,7 @@ export function TicketReplyToolbar({ disabled = false }: { disabled?: boolean })
       <ToolbarButton icon={Undo2} label={t("tickets.conversation.editor.undo")} disabled={disabled || !canUndo} onClick={() => editor.dispatchCommand(UNDO_COMMAND, undefined)} />
       <ToolbarButton icon={Redo2} label={t("tickets.conversation.editor.redo")} disabled={disabled || !canRedo} onClick={() => editor.dispatchCommand(REDO_COMMAND, undefined)} />
 
-      <TicketReplyLinkPopover
+      <RichTextLinkPopover
         open={linkPopoverOpen}
         triggerRef={linkButtonRef}
         initialData={linkData}
@@ -317,4 +317,3 @@ function ToolbarButton({
     </button>
   );
 }
-

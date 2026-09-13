@@ -9,7 +9,8 @@ import {
 import { $generateNodesFromDOM } from "@lexical/html";
 
 /**
- * Tag set the public-reply / Quick Reply Lexical editor can produce (bold,
+ * Tag set the shared reply-style Lexical editor
+ * (`@/components/shared/rich-text/rich-text-editor`) can produce (bold,
  * italic, underline, lists, links) — identical to the server's
  * `REPLY_HTML_SANITIZE_OPTIONS` allowlist (`server/src/shared/rich-text/reply-html.ts`).
  * No headings: this is the reply-composer surface, not the Knowledge Base editor.
@@ -41,8 +42,9 @@ export function replyHtmlHasVisibleText(value: string): boolean {
 /** Hydrate a reply-style Lexical editor from a stored body: rich sanitized HTML,
  * or a legacy plain-text body (split into paragraphs on blank lines, single
  * newlines kept as line breaks). Mirrors the Knowledge Base article editor's
- * `hydrate()` for the reply tag set — shared by the ticket reply/note composer
- * and the Quick Reply editor so there is one hydration implementation. */
+ * `hydrate()` for the reply tag set — shared by every reply-style editor
+ * consumer (ticket reply/note composer, Quick Reply, Customer Portal) so
+ * there is one hydration implementation. */
 export function hydrateReplyHtml(editor: LexicalEditor, value: string): void {
   editor.update(
     () => {

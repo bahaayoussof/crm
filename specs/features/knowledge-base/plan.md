@@ -562,7 +562,7 @@ Exact paths. Nothing is modified by this planning task.
 | AI grounding — internal | `server/src/modules/ai/ai-kb-candidates.ts` — `findMany({ where:{ status:PUBLISHED, OR:[title/content contains …] }, select:{ id,title,content } })`, then `excerpt: deriveExcerpt(row.content)`. Ranking prompt uses `title` + `excerpt` only. |
 | AI grounding — customer | `server/src/modules/customer-ai/customer-ai-context.ts` — `findMany({ where:{ status:PUBLISHED, OR:[…] }, select:{ id,title,category,content } })`, returns `{ …row, excerpt }`. |
 | AI grounding — prompt | `customer-ai.service.ts` builds `SOURCES` as `…CONTENT: ${a.content}` — **full body text goes into the model prompt** (this is the one place the whole body is consumed). Suggested-articles reply uses `excerpt`. |
-| Existing rich-text infra (ticket) | Editor: `client/src/features/tickets/ticket-reply-editor.tsx` (Lexical, `forwardRef` handle) + `ticket-reply-toolbar.tsx` (B / I / U / ul / ol / link / undo / redo — **no headings**) + `ticket-reply-link-popover.tsx` / `ticket-reply-link.utils.ts` (ADR-041 anchored popover, protocol validation). Deps present: `lexical`, `@lexical/react`, `@lexical/rich-text` (⇒ `HeadingNode` available, unused today), `@lexical/list`, `@lexical/link`, `@lexical/history`, `@lexical/html`, `@lexical/utils`, `@lexical/selection`, `dompurify` — all `^0.49` / `^3`. |
+| Existing rich-text infra (ticket, since moved to shared UI) | Editor: `client/src/components/shared/rich-text/rich-text-editor.tsx` (Lexical, `forwardRef` handle) + `rich-text-toolbar.tsx` (B / I / U / ul / ol / link / undo / redo — **no headings**) + `rich-text-link-popover.tsx` / `rich-text-link.utils.ts` (ADR-041 anchored popover, protocol validation) — all under `client/src/components/shared/rich-text/`. Deps present: `lexical`, `@lexical/react`, `@lexical/rich-text` (⇒ `HeadingNode` available, unused today), `@lexical/list`, `@lexical/link`, `@lexical/history`, `@lexical/html`, `@lexical/utils`, `@lexical/selection`, `dompurify` — all `^0.49` / `^3`. |
 | Existing sanitizer (server) | `server/src/shared/rich-text/reply-html.ts` (`sanitize-html`): `REPLY_HTML_SANITIZE_OPTIONS` (tags `b strong i em u p br ul ol li a`; `a[href,rel,target]`; schemes `http https mailto`; forces `rel="noopener noreferrer nofollow" target="_blank"`; discards everything else), `sanitizeReplyHtml()` (→ `""` when text-empty), `replyHtmlToPlainText()` (strips all tags, `br` + `</p|div|li|ul|ol>` → `\n`, decodes entities, collapses blank lines). Reused server-side by `ticket.service`, `portal.service`, `email.service`, `ai-context.service`. |
 | Existing render guard (client) | `MessageBody` in `client/src/features/tickets/ticket-conversation-ui.tsx`: `LOOKS_LIKE_HTML` regex sniff → DOMPurify re-sanitize (`ALLOWED_TAGS` = same 10, `ALLOWED_ATTR` href/target/rel, `ALLOWED_URI_REGEXP` `^(?:https?:|mailto:)`) → `dangerouslySetInnerHTML`; else `whitespace-pre-wrap` plain-text path. `afterSanitizeAttributes` hook forces `target`/`rel` on `<a>`. Portal already imports from this file. |
 | Precedent | ADR-035 did exactly this for `TicketMessage.body`: plain `<textarea>` → Lexical, `String` column reused (no migration), **sanitized HTML on write**, client re-sanitize on render, `replyHtmlToPlainText` for AI/WhatsApp, schema max raised for markup headroom. ADR-037 extended it to internal notes + portal reply. ADR-041 = the link popover. |
@@ -588,7 +588,7 @@ gets a **new ADR** at implementation time (KB-RICH-014), not now.
   (`@lexical/html`). The ticket editor is a working reference for the
   `forwardRef` handle, the toolbar, the link popover, and the
   serialize-to-HTML-on-read pattern.
-- **Why a new component, not literal reuse of `TicketReplyEditor`:** that
+- **Why a new component, not literal reuse of `RichTextEditor`:** that
   component hard-codes `namespace: "ticket-reply"`, the
   `MAX_PUBLIC_REPLY_LENGTH = 20_000` guard inside `insertText`/
   `replaceText`, ticket i18n keys, and an imperative surface shaped for
@@ -598,13 +598,14 @@ gets a **new ADR** at implementation time (KB-RICH-014), not now.
   `knowledge-article-editor.tsx` in the KB feature folder that imports the
   **same Lexical packages** and mirrors the **same structure**, plus a
   `knowledge-article-editor-toolbar.tsx` that mirrors
-  `ticket-reply-toolbar.tsx` **and adds the two heading buttons**.
-- **Link popover:** import and reuse `ticket-reply-link-popover.tsx` +
-  `ticket-reply-link.utils.ts` as-is if they are cleanly presentational
-  (inspection at task time). If importing them would pull ticket-only
-  deps into the KB/portal graph, copy the ~2 small files into the KB
-  folder. Either way the protocol allowlist (ADR-041:
-  `javascript:` / `data:` / `vbscript:` / `file:` rejected) is kept.
+  `rich-text-toolbar.tsx` **and adds the two heading buttons**.
+- **Link popover:** import and reuse the shared `rich-text-link-popover.tsx`
+  + `rich-text-link.utils.ts` directly from `client/src/components/shared/
+  rich-text/` (a later architecture refactor moved these out of the
+  Tickets feature specifically so other features could import them without
+  a Tickets dependency — KB's toolbar now does exactly that). The protocol
+  allowlist (ADR-041: `javascript:` / `data:` / `vbscript:` / `file:`
+  rejected) is unchanged.
 - **V1 toolbar:** paragraph, H2, H3, bold, italic, underline, unordered
   list, ordered list, link, undo, redo. Nothing else (`RT-1.3` /
   `RT-1.4`). Headings limited to two levels — the page renders the `<h1>`
@@ -741,7 +742,7 @@ which is a regression against `RT-5.1`/`RT-5.3` and is called out as
 | File | Change |
 | --- | --- |
 | `client/src/features/knowledge-base/knowledge-article-editor.tsx` | **New.** Lexical composer: `LexicalComposer` + `RichTextPlugin` + `HistoryPlugin` + `ListPlugin` + `LinkPlugin`; nodes `HeadingNode, ListNode, ListItemNode, LinkNode`; `forwardRef` handle exposing `getHtml()` / `getPlainText()` / `hasText()` / `setHtml(value)` / `focus()`. Namespace `"knowledge-article"`. `dir="auto"` content element; logical-property theme. |
-| `client/src/features/knowledge-base/knowledge-article-editor-toolbar.tsx` | **New.** Mirrors `ticket-reply-toolbar.tsx`; adds **H2 / H3** toggle buttons (`$setBlocksType` + `$createHeadingNode`). Icon-only, `aria-pressed`, i18n labels. |
+| `client/src/features/knowledge-base/knowledge-article-editor-toolbar.tsx` | **New.** Mirrors the shared `rich-text-toolbar.tsx` (`client/src/components/shared/rich-text/`); adds **H2 / H3** toggle buttons (`$setBlocksType` + `$createHeadingNode`). Icon-only, `aria-pressed`, i18n labels. |
 | `knowledge-article-link-popover` | **Reuse** the ticket popover + link utils by import, or copy the ~2 files into the KB folder if importing widens the graph. Protocol allowlist preserved. |
 | `client/src/features/knowledge-base/knowledge-article-content.tsx` | **New.** `<ArticleContent content={string} />` — the shared render guard (sniff → DOMPurify allowlist `p br h2 h3 ul ol li b strong i em u a` + `href/target/rel` + `^(?:https?:|mailto:)` → `dangerouslySetInnerHTML`; else plain-text path). One place, used by internal **and** portal detail. |
 | `client/src/lib/rich-text/article-html.ts` (or co-located) | **New (client).** DOMPurify config + sniff constant for `<ArticleContent>` and for the editor's legacy-hydration path. Do **not** edit `ticket-conversation-ui.tsx` to share its private helper (scope). |

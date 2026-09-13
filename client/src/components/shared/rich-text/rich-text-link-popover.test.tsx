@@ -1,8 +1,8 @@
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { changeAppLanguage } from "@/lib/i18n";
-import { TicketReplyLinkPopover } from "./ticket-reply-link-popover";
-import { validateLinkUrl, type LinkPopoverData } from "./ticket-reply-link.utils";
+import { RichTextLinkPopover } from "./rich-text-link-popover";
+import { validateLinkUrl, type LinkPopoverData } from "./rich-text-link.utils";
 
 describe("validateLinkUrl", () => {
   it("rejects empty / whitespace URLs with urlRequired error", () => {
@@ -42,7 +42,7 @@ describe("validateLinkUrl", () => {
   });
 });
 
-describe("TicketReplyLinkPopover Component", () => {
+describe("RichTextLinkPopover Component", () => {
   afterEach(cleanup);
   beforeEach(async () => {
     await changeAppLanguage("en");
@@ -59,7 +59,7 @@ describe("TicketReplyLinkPopover Component", () => {
 
   it("renders when open is true", () => {
     render(
-      <TicketReplyLinkPopover
+      <RichTextLinkPopover
         open={true}
         triggerRef={dummyTrigger}
         initialData={defaultInitialData}
@@ -78,7 +78,7 @@ describe("TicketReplyLinkPopover Component", () => {
 
   it("does not render when open is false", () => {
     render(
-      <TicketReplyLinkPopover
+      <RichTextLinkPopover
         open={false}
         triggerRef={dummyTrigger}
         initialData={defaultInitialData}
@@ -93,7 +93,7 @@ describe("TicketReplyLinkPopover Component", () => {
   it("submits normalized URL and user-provided text", () => {
     const submitSpy = vi.fn();
     render(
-      <TicketReplyLinkPopover
+      <RichTextLinkPopover
         open={true}
         triggerRef={dummyTrigger}
         initialData={defaultInitialData}
@@ -123,7 +123,7 @@ describe("TicketReplyLinkPopover Component", () => {
     };
 
     render(
-      <TicketReplyLinkPopover
+      <RichTextLinkPopover
         open={true}
         triggerRef={dummyTrigger}
         initialData={existingData}

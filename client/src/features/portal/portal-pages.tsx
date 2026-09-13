@@ -12,7 +12,7 @@ import { formatTicketDate } from "@/features/tickets/ticket-format";
 import { ConversationMessage, ConversationSection } from "@/features/tickets/ticket-conversation-ui";
 import { AttachmentCompactGrid, MessageAttachmentList } from "@/features/attachments/attachment-ui";
 import { FileUploadModal } from "@/components/shared/file-upload";
-import { TicketReplyEditor, type TicketReplyEditorHandle } from "@/features/tickets/ticket-reply-editor";
+import { RichTextEditor, type RichTextEditorHandle } from "@/components/shared/rich-text/rich-text-editor";
 import { usePortalTicketAttachments, useUploadPortalTicketAttachment } from "@/features/attachments/attachment-hooks";
 import { portalTicketSchema, type PortalTicketForm } from "./portal.schemas";
 import { useCreatePortalTicket, usePortalCategories, usePortalOverview, usePortalTicket, usePortalTickets, useReplyPortalTicket, useSubmitPortalFeedback } from "./portal-hooks";
@@ -595,7 +595,7 @@ function PortalWorkspaceTabs({
 }) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<"reply" | "attachments">("reply");
-  const editorRef = useRef<TicketReplyEditorHandle>(null);
+  const editorRef = useRef<RichTextEditorHandle>(null);
   const [text, setText] = useState("");
 
   const submit = async (event: React.FormEvent) => {
@@ -669,7 +669,7 @@ function PortalWorkspaceTabs({
                   {t("portal.reopenNotice")}
                 </p>
               )}
-              <TicketReplyEditor
+              <RichTextEditor
                 ref={editorRef}
                 id="portal-reply"
                 ariaLabel={t("portal.replyLabel")}

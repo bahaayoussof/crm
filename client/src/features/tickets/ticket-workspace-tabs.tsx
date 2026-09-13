@@ -10,7 +10,7 @@ import { formatTicketDate } from "./ticket-format";
 import { useCreateTicketMessage, useCreateTicketNote } from "./ticket-hooks";
 import { MentionNode } from "./ticket-mention-node";
 import { TicketMentionPlugin } from "./ticket-mention-plugin";
-import { TicketReplyEditor, type TicketReplyEditorHandle } from "./ticket-reply-editor";
+import { RichTextEditor, type RichTextEditorHandle } from "@/components/shared/rich-text/rich-text-editor";
 import type { TicketChannel, TicketDetail, TicketMessageResult } from "./ticket.types";
 
 type Mode = "reply" | "note";
@@ -102,8 +102,8 @@ export const TicketWorkspaceTabs = forwardRef<TicketWorkspaceHandle, TicketWorks
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     const [insertError, setInsertError] = useState<string | null>(null);
-    const editorRef = useRef<TicketReplyEditorHandle>(null);
-    const noteEditorRef = useRef<TicketReplyEditorHandle>(null);
+    const editorRef = useRef<RichTextEditorHandle>(null);
+    const noteEditorRef = useRef<RichTextEditorHandle>(null);
     const messageMutation = useCreateTicketMessage(ticketId);
     const noteMutation = useCreateTicketNote(ticketId);
     const mutation = mode === "reply" ? messageMutation : noteMutation;
@@ -253,7 +253,7 @@ export const TicketWorkspaceTabs = forwardRef<TicketWorkspaceHandle, TicketWorks
                   )}
                 </p>
               )}
-              <TicketReplyEditor
+              <RichTextEditor
                 ref={editorRef}
                 id="conversation-reply"
                 ariaLabel={t("tickets.conversation.replyLabel")}
@@ -277,7 +277,7 @@ export const TicketWorkspaceTabs = forwardRef<TicketWorkspaceHandle, TicketWorks
                   {t("tickets.conversation.noteHelp")}
                 </p>
               </div>
-              <TicketReplyEditor
+              <RichTextEditor
                 ref={noteEditorRef}
                 extraNodes={[MentionNode]}
                 // Mount the typeahead only while the note tab is active — the

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import type { TicketReplyEditorHandle } from "@/features/tickets/ticket-reply-editor";
+import type { RichTextEditorHandle } from "@/components/shared/rich-text/rich-text-editor";
 import { getLocalizedQuickReplyError, getQuickReplyError } from "./quick-reply-error";
 import { QuickReplyBodyField } from "./quick-reply-body-field";
 import { useCreateQuickReply, useQuickReply, useUpdateQuickReply } from "./quick-reply-hooks";
@@ -19,7 +19,7 @@ export function QuickReplyFormPage() {
   const update = useUpdateQuickReply(id);
   const navigate = useNavigate();
   const [apiError, setApiError] = useState<string | null>(null);
-  const editorRef = useRef<TicketReplyEditorHandle>(null);
+  const editorRef = useRef<RichTextEditorHandle>(null);
   const hydratedRef = useRef<string | null>(null);
 
   const { register, control, handleSubmit, formState: { errors, isSubmitting } } = useForm<QuickReplyFormValues>({

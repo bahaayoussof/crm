@@ -3,6 +3,14 @@
 Stable IDs use the feature's initials, `QR-NNN`. This is a fast-track
 brownfield discovery/verification pass with exactly one confirmed defect.
 
+> Note: task entries below record file paths and commands as they were at
+> the time each task ran. A later architecture refactor moved the shared
+> rich-text editor from `client/src/features/tickets/ticket-reply-editor.tsx`
+> (`TicketReplyEditor`) to `client/src/components/shared/rich-text/
+> rich-text-editor.tsx` (`RichTextEditor`) — see `plan.md`'s "Shared Rich
+> Text refactor (completed)" section for the current location. The
+> historical entries are left as-run, not rewritten.
+
 [x] QR-001 — Fix: audit-log Quick Reply create/update/delete
 Goal: Close the confirmed data-integrity/observability gap — Quick Reply
 mutations had no `AuditLog` row, unlike every other admin-managed content
@@ -67,7 +75,7 @@ Affected files/area: `quick-reply-form-page.tsx`,
 `client/src/app/layouts/nav-config.ts`, `client/src/lib/rich-text/
 reply-html.ts`, `client/src/features/tickets/ticket-reply-editor.tsx`,
 `client/src/features/tickets/ticket-workspace-tabs.tsx`,
-`client/src/features/tickets/reply-insertion.ts`.
+`client/src/features/tickets/reply-insertion.ts` (as they were at the time — since relocated).
 Verification: source inspection of every listed file plus
 `quick-replies.test.tsx`, `quick-reply-composer.test.tsx`,
 `quick-reply-manage-route.test.tsx`, `ticket-reply-editor.test.tsx`;

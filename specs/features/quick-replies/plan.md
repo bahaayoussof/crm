@@ -12,8 +12,8 @@ verified as-is, and the implementation approach for the one fix. See
   — the exact allowlist the ticket reply/note composer already trusts.
   Quick Replies reuses it verbatim (`quick-reply.service.ts#
   prepareQuickReplyBody`); it does not define a second sanitizer.
-- **Rich-text editor:** `client/src/features/tickets/ticket-reply-editor.tsx`
-  (`TicketReplyEditor`, `insertText`/`insertHtml`/`setHtml`) — Quick Replies'
+- **Rich-text editor:** `client/src/components/shared/rich-text/rich-text-editor.tsx`
+  (`RichTextEditor`, `insertText`/`insertHtml`/`setHtml`) — Quick Replies'
   Create/Edit body field (`quick-reply-body-field.tsx`) and the ticket
   composer's insertion path both drive this one component/imperative
   handle. Not re-implemented.
@@ -77,7 +77,7 @@ Management:
                              → quick-reply-table.tsx (row actions, delete confirm)
   quick-reply-form-page.tsx (Create at /quick-replies/new, Edit at /quick-replies/:id/edit)
     → react-hook-form + quickReplyFormSchema (Zod)
-    → quick-reply-body-field.tsx (Controller → TicketReplyEditor)
+    → quick-reply-body-field.tsx (Controller → RichTextEditor)
     → useCreateQuickReply / useUpdateQuickReply (quick-reply-hooks.ts)
     → quick-reply-api.ts (axios wrappers) → GET/POST/PATCH /quick-replies
 
@@ -86,7 +86,7 @@ Composer insertion:
     → useQuickReplies (same list endpoint, limit 10)
     → onSelect(body) → insertQuickReply(snippet)
         LOOKS_LIKE_REPLY_HTML sniff → editorRef.insertHtml | insertText
-    → TicketReplyEditor (owned by Tickets/Conversations-Channels)
+    → RichTextEditor (shared UI; composer/send behavior owned by Tickets/Conversations-Channels)
 ```
 
 No frontend code changed this pass — the fix (QR-001) is server-only
@@ -109,7 +109,7 @@ requires a confirmed defect, and none was found in this area.
 
 ## Composer integration strategy (verified, unchanged)
 
-Quick Replies inserts through the same imperative `TicketReplyEditor`
+Quick Replies inserts through the same imperative `RichTextEditor`
 handle every other insertion source uses (direct typing, AI "Insert into
 Reply"), gated by the same length ceiling and never bypassing the
 composer's own send action — see `spec.md`'s Composer Insertion Behavior
@@ -237,17 +237,26 @@ changed.
   `createAuditLog` consumer in this codebase; not a new risk introduced by
   QR-001.
 
-## Planned future shared Rich Text refactor (explicitly deferred)
+## Shared Rich Text refactor (completed)
 
-`client/src/features/tickets/ticket-reply-editor.tsx` is now depended on
-by a feature (Quick Replies) that is not Tickets. The correct end state is
-to move/rename this component (and its `client/src/lib/rich-text/
-reply-html.ts` helpers, which already live in a shared-sounding path) into
-a genuinely shared Rich Text module that both Tickets and Quick Replies
-(and, per `specs/features/knowledge-base/spec.md`, potentially Knowledge
-Base's own editor) import from, rather than Quick Replies importing a
-Tickets-namespaced path. **This refactor is intentionally not performed in
-this pass** — it is scheduled to happen after every feature's SDD package
-is complete, and before the final `docs/` → `specs/` consolidation, so it
-can be done once across every consumer rather than piecemeal inside one
-feature's brownfield pass.
+The generic Lexical editor previously lived at `client/src/features/tickets/
+ticket-reply-editor.tsx` (`TicketReplyEditor`) even though it was already
+depended on by a feature that is not Tickets (Quick Replies) and by the
+Customer Portal. It has been moved/renamed to `client/src/components/
+shared/rich-text/rich-text-editor.tsx` (`RichTextEditor`,
+`RichTextEditorHandle`), together with its toolbar
+(`rich-text-toolbar.tsx`) and link popover (`rich-text-link-popover.tsx`,
+`rich-text-link.utils.ts`); the length-ceiling constant moved to
+`client/src/lib/rich-text/reply-insertion.ts` alongside the existing
+`client/src/lib/rich-text/reply-html.ts` sniff/hydrate helpers. Knowledge
+Base's own editor toolbar (`knowledge-article-editor-toolbar.tsx`) now also
+imports the shared link popover from this location instead of reaching
+into `features/tickets`. Ticket-specific composition (mode switching
+between Reply/Note, the `@mention` typeahead, the AI "Insert into Reply"
+bridge, send/authorization) remains in `ticket-workspace-tabs.tsx`, which
+now imports the shared component directly — no Tickets-owned wrapper was
+kept, since the moved component had no Ticket-specific behavior left in
+it. This was done after every feature's SDD package was complete and
+before the final `docs/` → `specs/` consolidation, once across every
+consumer rather than piecemeal inside one feature's brownfield pass. No
+product behavior, storage format, or API contract changed.

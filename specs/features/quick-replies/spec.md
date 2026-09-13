@@ -48,7 +48,7 @@ through the normal, independently-authorized send action.
   (default 15/page), delete-with-confirmation.
 - A composer-embedded picker (`QuickReplyPicker`) that searches quick
   replies server-side and inserts the selected body into the open ticket
-  reply draft (`TicketReplyEditor`), preserving rich formatting for a
+  reply draft (`RichTextEditor`), preserving rich formatting for a
   Rich-Input-authored body and plain text for a not-yet-re-edited legacy
   body.
 - Server-authoritative RBAC: ADMIN/MANAGER manage (create/update/delete),
@@ -68,9 +68,9 @@ Not implemented anywhere in this codebase, and not added by this pass:
 - A dedicated `contentFormat` enum column — format detection is
   sniff-based (see Rich-Content Storage Contract) and this pass does not
   introduce a migration to add one.
-- Moving/renaming the shared rich-text editor out of the Tickets feature
-  directory — tracked as deferred architecture debt (see Cross-Feature
-  Ownership Boundaries and `plan.md`).
+- (Moving/renaming the shared rich-text editor out of the Tickets feature
+  directory was tracked here as deferred architecture debt; it has since
+  been completed — see Cross-Feature Ownership Boundaries and `plan.md`.)
 
 ## Actors
 
@@ -136,7 +136,7 @@ removed):
   `useUpdateQuickReply(id).mutateAsync`, then navigates to `/quick-replies`.
 - Create and Edit share: the same Zod resolver
   (`quickReplyFormSchema`), the same `QuickReplyBodyField` (a
-  `Controller`-wrapped `TicketReplyEditor`), the same submit handler shape,
+  `Controller`-wrapped `RichTextEditor`), the same submit handler shape,
   the same API-error mapping (`getLocalizedQuickReplyError`), and the same
   footer (`Cancel` → `/quick-replies`, `Save`/`Saving…` disabled while
   `isSubmitting || create.isPending || update.isPending`) — this
@@ -214,7 +214,7 @@ Verified (automated-test-verified, `quick-reply.test.ts` +
 Full trace, Rich Input → API → server sanitization → persistence →
 retrieval → editor hydration / composer insertion:
 
-1. **Client editor (`TicketReplyEditor`, reused as `QuickReplyBodyField`)**
+1. **Client editor (`RichTextEditor`, reused as `QuickReplyBodyField`)**
    emits only the tag set it can produce (`p, br, b, strong, i, em, u, ul,
    ol, li, a`) via Lexical's `$generateHtmlFromNodes` — a convenience, not
    the trust boundary.
@@ -244,7 +244,7 @@ retrieval → editor hydration / composer insertion:
    as-is; there is no re-sanitization on read (none is needed, since
    nothing but the one write path can populate the column).
 6. **Editor hydration (Edit page, `hydrateReplyHtml`)** and **composer
-   insertion (`insertHtml`, `ticket-reply-editor.tsx`)** both parse the
+   insertion (`insertHtml`, `rich-text-editor.tsx`)** both parse the
    HTML with `DOMParser` and convert it to Lexical nodes via
    `$generateNodesFromDOM` — **never** `dangerouslySetInnerHTML`. Verified
    by source inspection: zero `dangerouslySetInnerHTML` occurrences in
@@ -279,7 +279,7 @@ in Internal Note mode and disabled when the agent cannot mutate the ticket.
    `LOOKS_LIKE_REPLY_HTML` and dispatches to either
    `editorRef.current.insertHtml(snippet)` (rich) or
    `editorRef.current.insertText(snippet)` (legacy plain), both against
-   the same `TicketReplyEditor` imperative handle the Reply tab already
+   the same `RichTextEditor` imperative handle the Reply tab already
    uses for direct typing and AI "Insert into Reply".
 3. Both insertion paths append at the end of the current draft (not at a
    live caret — the trigger lives outside the editor) and enforce the
@@ -398,13 +398,15 @@ Classified per the task brief's taxonomy (§15):
 - **Architecture debt (deferred, not fixed):** "body contains" search
   operates on stored raw HTML (see Search Semantics) — a real, narrow,
   non-security limitation, not fast-tracked per the task brief.
-- **Architecture debt (deferred, not fixed):** the shared rich-text editor
-  Quick Replies depends on (`TicketReplyEditor`) physically lives under
-  `client/src/features/tickets/`, even though it is now reused by a
-  feature that is not Tickets. Scheduled for a future move/rename into
-  shared Rich Text infrastructure, after every feature SDD package is
-  complete and before final docs consolidation — not performed in this
-  pass (see Cross-Feature Ownership Boundaries and `plan.md`).
+- **Architecture debt (resolved):** the shared rich-text editor Quick
+  Replies depends on used to physically live under `client/src/features/
+  tickets/rich-text-editor.tsx` even though it was reused by a feature
+  that is not Tickets. It has since moved to `client/src/components/
+  shared/rich-text/rich-text-editor.tsx` as `RichTextEditor` (handle type
+  `RichTextEditorHandle`), alongside its toolbar and link-popover, in the
+  shared-Rich-Text-UI architecture refactor performed after every feature
+  SDD package was complete and before final docs consolidation (see
+  Cross-Feature Ownership Boundaries and `plan.md`).
 - **No missing-test gaps found** beyond the audit-logging regression
   coverage added alongside QR-001 — the existing 28 server + 66 client
   targeted tests already cover create/edit with rich content, legacy
@@ -416,8 +418,8 @@ Classified per the task brief's taxonomy (§15):
 ## Deferred Scope
 
 Everything listed under Out of Scope above, plus: the search-semantics
-architecture debt and the shared-rich-text-editor relocation, both
-described in Discovered Gaps. None of these are product gaps in the sense
+architecture debt described in Discovered Gaps (the shared-rich-text-editor
+relocation noted there has since been completed). None of these are product gaps in the sense
 of missing user-requested capability — they are explicitly out of this
 fast-track pass's mandate per the task brief (§15/§17).
 
@@ -447,12 +449,15 @@ fast-track pass's mandate per the task brief (§15/§17).
 - **Quick Replies owns:** the `QuickReply` CRUD lifecycle, its RBAC, its
   body sanitization/storage contract, and the picker UI that searches and
   offers a template for insertion.
-- **Tickets/Conversations-Channels owns:** the reply/note composer itself
-  (`TicketReplyEditor`), the draft state, the send action and its
+- **Shared Rich Text UI (`client/src/components/shared/rich-text/`) owns:**
+  the generic Lexical editor (`RichTextEditor`), its toolbar, and its link
+  popover — no ticket-sending or Quick-Reply-persistence behavior lives
+  there. **Tickets/Conversations-Channels owns:** the reply/note composer
+  built on top of it, the draft state, the send action and its
   authorization, and the 20,000-character public-reply length ceiling that
   both direct typing and Quick Reply insertion share. Quick Replies
-  consumes this editor's imperative handle (`insertText`/`insertHtml`) but
-  does not define or duplicate it — see `specs/features/
+  consumes the shared editor's imperative handle (`insertText`/`insertHtml`)
+  directly but does not define or duplicate it — see `specs/features/
   conversations-channels/spec.md` for the composer's own spec, which
   already documents Quick Reply as a draft-insertion-only dependency.
 - **Shared rich-text sanitization (`server/src/shared/rich-text/
@@ -464,7 +469,7 @@ fast-track pass's mandate per the task brief (§15/§17).
   `AuditLog` model, `createAuditLog`, and the `AUDIT_ACTIONS`/
   `AUDIT_ENTITY_TYPES` constants; Quick Replies is one more consumer
   (`QUICK_REPLY_*`), not a new implementation of audit logging.
-- **Not owned by Quick Replies:** the `TicketReplyEditor` component's
-  location/implementation (currently under Tickets — see Discovered Gaps'
+- **Not owned by Quick Replies:** the `RichTextEditor` component's
+  location/implementation (shared UI, not Tickets — see Discovered Gaps'
   architecture-debt note), the ticket message/note domain model, or any
   KB-adjacent capability.

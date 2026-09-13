@@ -27,9 +27,9 @@ vi.mock("@/features/collaboration/watch-toggle", () => ({ WatchToggle: () => nul
 vi.mock("@/features/ai-assistant/ai-assistant-panel", () => ({ AiAssistantPanel: () => null }));
 // Page-wiring tests: a plain-textarea stand-in for the Lexical reply editor.
 // The editor's own behaviour is covered in quick-reply-composer.test.tsx.
-vi.mock("./ticket-reply-editor", async () => {
+vi.mock("@/components/shared/rich-text/rich-text-editor", async () => {
   const React = await import("react");
-  const TicketReplyEditor = React.forwardRef(function TicketReplyEditor(
+  const RichTextEditor = React.forwardRef(function RichTextEditor(
     props: { id: string; ariaLabel: string; ariaDescribedBy?: string; disabled?: boolean; onTextChange?: (v: string) => void },
     ref: React.ForwardedRef<unknown>,
   ) {
@@ -49,7 +49,7 @@ vi.mock("./ticket-reply-editor", async () => {
       onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => { setValue(e.target.value); props.onTextChange?.(e.target.value); },
     });
   });
-  return { TicketReplyEditor };
+  return { RichTextEditor };
 });
 
 import { TicketDetailPage } from "./ticket-detail-page";

@@ -23,12 +23,13 @@ import { $generateHtmlFromNodes, $generateNodesFromDOM } from "@lexical/html";
 import type { Klass, LexicalNode } from "lexical";
 import type { ReactNode } from "react";
 import { hydrateReplyHtml } from "@/lib/rich-text/reply-html";
-import { MAX_PUBLIC_REPLY_LENGTH, type ReplyInsertOutcome } from "./reply-insertion";
-import { TicketReplyToolbar } from "./ticket-reply-toolbar";
+import { MAX_PUBLIC_REPLY_LENGTH, type ReplyInsertOutcome } from "@/lib/rich-text/reply-insertion";
+import { RichTextToolbar } from "./rich-text-toolbar";
 
-/** Imperative surface used by the composer, Quick Reply picker, and the AI
- * "Insert into Reply" bridge. Never exposes the raw Lexical editor. */
-export type TicketReplyEditorHandle = {
+/** Imperative surface used by the ticket composer, Quick Reply picker/form, the
+ * Customer Portal reply composer, and the AI "Insert into Reply" bridge. Never
+ * exposes the raw Lexical editor. */
+export type RichTextEditorHandle = {
   hasText: () => boolean;
   getPlainText: () => string;
   /** Serialized, ready to POST as the message body. */
@@ -119,7 +120,7 @@ type Props = {
   editorHeightClassName?: string;
 };
 
-export const TicketReplyEditor = forwardRef<TicketReplyEditorHandle, Props>(function TicketReplyEditor(
+export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function RichTextEditor(
   {
     id,
     ariaLabel,
@@ -226,7 +227,7 @@ export const TicketReplyEditor = forwardRef<TicketReplyEditorHandle, Props>(func
   }, []);
 
   const initialConfig = {
-    namespace: "ticket-reply",
+    namespace: "rich-text-editor",
     theme: EDITOR_THEME,
     editable: !disabled,
     nodes: [ListNode, ListItemNode, LinkNode, AutoLinkNode, ...(extraNodes ?? [])],
@@ -238,7 +239,7 @@ export const TicketReplyEditor = forwardRef<TicketReplyEditorHandle, Props>(func
   return (
     <div className="rounded-md border border-border bg-surface focus-within:ring-2 focus-within:ring-ring">
       <LexicalComposer initialConfig={initialConfig}>
-        <TicketReplyToolbar disabled={disabled} />
+        <RichTextToolbar disabled={disabled} />
         <div className="relative">
           <RichTextPlugin
             contentEditable={
