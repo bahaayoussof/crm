@@ -1334,3 +1334,9 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
 | 20:00 | Tasks/Reminders SDD pass: created specs/features/tasks-reminders/{spec,plan,tasks}.md; found+fixed TASKS-001 (linked-ticket subject leak, read-time redaction not applied) | server/src/modules/tasks/task.service.ts, task.test.ts, docs/05-api-contract.md, specs/features/README.md | server 1102/1102, client tasks 17/17, tsc/eslint clean both sides | ~55k |
+
+## Session: 2026-09-13 20:03
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 20:40 | AI Assistance brownfield SDD pass: created specs/features/ai-assistance/{spec,plan,tasks}.md documenting server/src/modules/{ai,customer-ai} + client/src/features/{ai-assistant,customer-ai}; no confirmed security/privacy/correctness defect found (already well-hardened: authz-before-context, prompt-injection containment, candidate-id re-validation, no XSS, no secret leakage) — zero production code changed | specs/features/ai-assistance/{spec,plan,tasks}.md, specs/features/README.md, .wolf/anatomy.md | server 1102/1102, client 840/840, tsc/eslint clean both sides, git diff --check clean | ~230k |
