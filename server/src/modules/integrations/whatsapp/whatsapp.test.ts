@@ -247,6 +247,10 @@ describe("WhatsApp integration", () => {
       expect(mocks.ticketCreate).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ channel: "WHATSAPP", customerId: "cust-new" }) }),
       );
+      // SLA first-response rule: an inbound customer/provider message is never a
+      // staff reply, so ticket creation from this webhook must never stamp or
+      // seed firstRespondedAt.
+      expect((mocks.ticketCreate.mock.calls[0][0] as { data: object }).data).not.toHaveProperty("firstRespondedAt");
       expect(mocks.messageCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ externalId: "wamid.ABC123", authorUserId: "wa-system", ticketId: "cd3448751688c18a75abee51f" }),

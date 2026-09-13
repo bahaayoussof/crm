@@ -197,6 +197,10 @@ describe("Resend email integration", () => {
     expect(response.body.data.status).toBe("TICKET_CREATED");
     expect(mocks.customerCreate).toHaveBeenCalledWith({ data: { name: "Customer Name", email: "customer@example.net" }, select: { id: true } });
     expect(mocks.ticketCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ channel: "EMAIL", customerId: "customer-1" }) }));
+    // SLA first-response rule: an inbound customer/provider message is never a
+    // staff reply, so ticket creation from this webhook must never stamp or
+    // seed firstRespondedAt.
+    expect((mocks.ticketCreate.mock.calls[0][0] as { data: object }).data).not.toHaveProperty("firstRespondedAt");
     expect(mocks.messageCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
       ticketId: "ticket-1", authorUserId: "email-system", externalId: "resend:email-in-1", externalMessageId: "<message-in-1@example.net>",
     }) }));

@@ -236,6 +236,10 @@ describe("SMS integration", () => {
       expect(response.body.status).toBe("TICKET_CREATED");
       expect(mocks.ticketFindFirst).not.toHaveBeenCalled(); // no "newest active ticket" lookup exists at all
       expect(mocks.ticketCreate).toHaveBeenCalledTimes(1);
+      // SLA first-response rule: an inbound customer/provider message is never a
+      // staff reply, so ticket creation from this webhook must never stamp or
+      // seed firstRespondedAt.
+      expect((mocks.ticketCreate.mock.calls[0][0] as { data: object }).data).not.toHaveProperty("firstRespondedAt");
     });
 
     it("does not audit CUSTOMER_CREATED when an existing customer is matched by phone (TICKET_CREATED still fires once, CONV-044)", async () => {

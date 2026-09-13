@@ -358,6 +358,36 @@ describe("SLA automation", () => {
       );
     });
 
+    it("SLA-001: the escalated ticket's own assigned agent is included in the breach notification recipients", async () => {
+      // Regression for a defect found in this pass: the automatic-escalation
+      // path hand-rolled its own ADMIN+manager-only recipient query instead of
+      // reusing `ticketOperationalRecipientIds` (the same helper the MANUAL
+      // ESCALATED transition in ticket.service.ts already uses), silently
+      // excluding the assignee from their own ticket's SLA-breach alert.
+      const now = new Date("2026-09-02T12:00:00.000Z");
+      mocks.ticketFindMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: "ticket-assigned", subject: "Breached, assigned", status: TicketStatus.IN_PROGRESS, assignedAgentId: "agent-9", customerId: "cust-9", teamId: "team-a" }]);
+      mocks.state.recipients = ["admin-1", "manager-a", "agent-9"];
+
+      const result = await runSlaMonitor(now);
+
+      expect(result.escalated).toBe(1);
+      expect(mocks.userFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            isActive: true,
+            OR: expect.arrayContaining([{ id: "agent-9" }]),
+          }),
+        }),
+      );
+      expect(mocks.notificationCreateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.arrayContaining([expect.objectContaining({ userId: "agent-9", type: "SLA_BREACH_ESCALATION" })]),
+        }),
+      );
+    });
+
     it("RT-GAP-1: an unrouted ticket's escalation still emits teamId explicitly as null (not merely omitted)", async () => {
       const now = new Date("2026-09-02T12:00:00.000Z");
       mocks.ticketFindMany
@@ -424,6 +454,46 @@ describe("SLA automation", () => {
       expect(result).toMatchObject({ assigned: 0, escalated: 0 });
       expect(mocks.historyCreate).not.toHaveBeenCalled();
       expect(mocks.notificationCreateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("sweep failure isolation", () => {
+    it("a failing escalation transaction for one candidate does not abort the rest of the batch", async () => {
+      const now = new Date("2026-09-02T12:00:00.000Z");
+      mocks.ticketFindMany.mockResolvedValueOnce([]).mockResolvedValueOnce([
+        { id: "ticket-fail", subject: "Will throw", status: TicketStatus.OPEN, assignedAgentId: null, customerId: "c1", teamId: "team-a" },
+        { id: "ticket-ok", subject: "Will escalate", status: TicketStatus.OPEN, assignedAgentId: null, customerId: "c2", teamId: "team-a" },
+      ]);
+      mocks.state.recipients = ["admin-1"];
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      mocks.transaction.mockImplementationOnce(() => Promise.reject(new Error("P2028 transaction timeout")));
+
+      const result = await runSlaMonitor(now);
+
+      expect(result.escalated).toBe(1);
+      expect(mocks.ticketUpdateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ id: "ticket-ok" }) }),
+      );
+      expect(mocks.emitTicketUpdated).toHaveBeenCalledWith(expect.objectContaining({ ticketId: "ticket-ok" }));
+      expect(mocks.emitTicketUpdated).not.toHaveBeenCalledWith(expect.objectContaining({ ticketId: "ticket-fail" }));
+      expect(consoleError).toHaveBeenCalledWith(expect.stringContaining("ticket-fail"), expect.any(Error));
+      consoleError.mockRestore();
+    });
+
+    it("a failing assignment transaction for one candidate does not abort the rest of the batch", async () => {
+      mocks.ticketFindMany.mockResolvedValueOnce([candidate("t-fail", "team-a"), candidate("t-ok", "team-a")]).mockResolvedValueOnce([]);
+      mocks.state.agentsByTeam = { "team-a": [agent("a1", "team-a")] };
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      mocks.transaction.mockImplementationOnce(() => Promise.reject(new Error("P2028 transaction timeout")));
+
+      const result = await runSlaMonitor();
+
+      expect(result.assigned).toBe(1);
+      expect(mocks.ticketUpdateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ id: "t-ok" }), data: { assignedAgentId: "a1" } }),
+      );
+      expect(consoleError).toHaveBeenCalledWith(expect.stringContaining("t-fail"), expect.any(Error));
+      consoleError.mockRestore();
     });
   });
 });
