@@ -143,21 +143,56 @@ open items from the prior closing review. Results:
   running `npm run dev` (`tsx watch src/server.ts`) process holding the
   Prisma query engine binary open; stopping that process and clearing the
   stale `.dll.node.tmp*` files resolved it.
-- **Migrations** (`20260909120000_kb_article_content_text`,
-  `20260913172511_category_name_lower_unique`): both reviewed by static
-  SQL inspection only (additive nullable column + straight backfill;
-  functional unique index mirroring the existing `Customer.email` pattern)
-  and are safe by inspection. No disposable PostgreSQL instance was
-  available in this environment (no Docker, no local `psql`/`pg_ctl`, the
-  only configured `DATABASE_URL` is a remote Neon instance) --
-  **disposable PostgreSQL unavailable; live migration verification not
-  performed.**
-- **Browser/E2E**: no Playwright config or browser-smoke tooling exists in
-  this repo. Exercising any write flow (ticket reply, quick reply, KB
-  article) would require the dev server to connect to the only reachable
-  database -- the remote Neon (production-like) instance -- which is unsafe
-  for this pass. **Not performed.**
 
-Remaining gaps are verification/environment debt, not proven product
-defects. See the closing review report for the full per-test/per-area
+### Runtime/DB verification (2026-09-13/14, authorized disposable Neon TEST DB)
+
+A follow-up pass used the project's already-configured Neon database,
+explicitly authorized as a **disposable TEST-only** instance for this one
+verification session, to close the runtime evidence gap left above.
+
+- **Full migration chain**: `prisma migrate reset --force` rebuilt the
+  database from empty through all 19 migrations twice (once before, once
+  after runtime testing) -- both rebuilds applied cleanly, `prisma migrate
+  status` reported "up to date", `prisma validate` and `prisma generate`
+  passed both times. **Full-chain rebuild verified**, not just reviewed by
+  inspection.
+- **`20260909120000_kb_article_content_text`**: verified at the strongest
+  level (Option A). Schema was replayed on real Postgres up to the
+  migration immediately before it, a legacy `KnowledgeArticle` row was
+  inserted with only the pre-existing `content` column populated (no
+  `contentText`), the migration was then applied, and the resulting row
+  showed `contentText` backfilled to an exact match of the legacy
+  `content` value -- on real PostgreSQL, with real legacy-shaped data.
+- **`20260913172511_category_name_lower_unique`**: verified on real
+  Postgres. Creating `Support` then `support` raised Prisma `P2002` with
+  `target: ["lower(name)"]`; `pg_indexes` confirmed the functional unique
+  index `Category_name_lower_key ON "Category" ((lower(name)))` exists
+  alongside the original exact-case `Category_name_key`. No API-layer
+  mapping could be exercised -- the Category module currently exposes only
+  `GET /api/categories` (no create/update endpoint) -- so this is DB-level
+  proof only, which is what the constraint actually enforces.
+- **API -> Prisma -> PostgreSQL persistence**: exercised with real HTTP
+  requests against the rebuilt/reseeded database (ADMIN/AGENT/CUSTOMER
+  login through the shared `/api/auth/login` surface, ticket priority
+  mutation via `PATCH /api/tickets/:id` read back both directly from
+  Postgres and via a separate authenticated `GET`, RBAC checks on
+  ticket/KB endpoints, and Knowledge Base + Quick Reply create/read).
+  Full flow and role-boundary evidence is in the verification pass report.
+- **Fresh rebuild/reapply**: repeated once more after the runtime pass
+  (reset -> 19/19 migrations -> reseed -> login sanity check) to confirm
+  the environment is reliably reconstructible. **Fresh rebuild/reapply
+  verified.**
+- **Browser/E2E**: still **not performed** -- no browser-automation tool
+  was available in this environment and no manual browser session was
+  driven. This remains an open gap; it is not claimed as covered by the
+  API-level verification above.
+- **Tooling drift found and fixed**: `server/scripts/seed-test-data.ts`
+  predated the `contentFormat`/`contentSource` fields added to
+  `TicketMessage`/`TicketNote` by the Conversations/Channels migrations
+  and failed on a fresh DB. Fixed as a test-tooling change only (no
+  product/API code touched) so the seed script matches the current schema.
+
+Remaining gaps: client full-suite flakiness (environment, not product) and
+browser/E2E smoke (tooling unavailable). Neither is a proven product
+defect. See the closing review report for the full per-test/per-area
 breakdown.

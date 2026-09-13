@@ -16,6 +16,8 @@ import "dotenv/config";
 import bcrypt from "bcrypt";
 import {
   Channel,
+  ConversationContentFormat,
+  ConversationContentSource,
   KnowledgeArticleStatus,
   Prisma,
   PrismaClient,
@@ -892,6 +894,10 @@ export async function seedTestData() {
           authorUserId,
           body,
           createdAt: msgTime,
+          contentFormat: ConversationContentFormat.SANITIZED_HTML,
+          contentSource: isCustomer && ticketCustomerUserId
+            ? ConversationContentSource.PORTAL
+            : ConversationContentSource.STAFF,
         },
       });
       messageCount++;
@@ -920,6 +926,8 @@ export async function seedTestData() {
           authorUserId: noteAuthor.id,
           body: noteBody,
           createdAt: new Date(t.createdAt.getTime() + 15 * 60_000),
+          contentFormat: ConversationContentFormat.SANITIZED_HTML,
+          contentSource: ConversationContentSource.STAFF,
         },
       });
       noteCount++;
