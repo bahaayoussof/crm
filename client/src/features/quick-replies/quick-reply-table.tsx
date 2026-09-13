@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import { DataTable } from "@/components/shared/data-table";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
+import { stripReplyHtmlToPlainText } from "@/lib/rich-text/reply-html";
 import { formatQuickReplyDate } from "./quick-reply-format";
 import { useDeleteQuickReply } from "./quick-reply-hooks";
 import { PencilIcon, SpinnerIcon, TrashIcon } from "./quick-reply-icons";
@@ -60,15 +61,18 @@ export function QuickReplyTable({
         id: "body",
         accessorKey: "body",
         header: () => t("quickReplies.columns.body"),
-        cell: ({ getValue }) => (
-          <p
-            className="line-clamp-2 whitespace-pre-line break-words [overflow-wrap:anywhere] text-muted-foreground"
-            dir="auto"
-            title={getValue<string>()}
-          >
-            {getValue<string>()}
-          </p>
-        ),
+        cell: ({ getValue }) => {
+          const preview = stripReplyHtmlToPlainText(getValue<string>());
+          return (
+            <p
+              className="line-clamp-2 whitespace-pre-line break-words [overflow-wrap:anywhere] text-muted-foreground"
+              dir="auto"
+              title={preview}
+            >
+              {preview}
+            </p>
+          );
+        },
       },
       {
         id: "updatedAt",
@@ -119,9 +123,9 @@ export function QuickReplyTable({
           <p
             className="mt-1.5 line-clamp-3 whitespace-pre-line break-words [overflow-wrap:anywhere] text-sm text-muted-foreground"
             dir="auto"
-            title={quickReply.body}
+            title={stripReplyHtmlToPlainText(quickReply.body)}
           >
-            {quickReply.body}
+            {stripReplyHtmlToPlainText(quickReply.body)}
           </p>
           <p className="mt-2.5 border-t border-border-subtle pt-2 text-xs text-muted-foreground">
             {t("quickReplies.columns.updated")}:{" "}

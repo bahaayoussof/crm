@@ -1,9 +1,34 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
+import { replyHtmlToPlainText, sanitizeReplyHtml } from "../../shared/rich-text/reply-html.js";
 import type { CreateQuickReplyInput, QuickReplyListQuery, UpdateQuickReplyInput } from "./quick-reply.schema.js";
 
 const authorSelect = { select: { id: true, name: true, role: true } } satisfies Prisma.UserDefaultArgs;
+
+/** Readable-text ceiling enforced against the flattened body — the Zod `body`
+ * bound is a larger transport limit that only caps raw markup size. */
+const BODY_TEXT_MAX = 5_000;
+
+/**
+ * The single server-side trusted transform for an incoming Quick Reply body:
+ * sanitize to the reply-composer HTML allowlist (same allowlist the ticket
+ * reply/note editor writes — a Quick Reply is inserted straight into that
+ * composer), then derive its plain-text projection. Rejects a body that is
+ * empty once markup is stripped, or whose readable text exceeds the ceiling.
+ * A legacy plain-text body sanitizes to itself unchanged.
+ */
+function prepareQuickReplyBody(raw: string): string {
+  const body = sanitizeReplyHtml(raw);
+  const bodyText = replyHtmlToPlainText(body);
+  if (!bodyText) {
+    throw new AppError(400, "VALIDATION_ERROR", "Quick reply body is required");
+  }
+  if (bodyText.length > BODY_TEXT_MAX) {
+    throw new AppError(400, "VALIDATION_ERROR", "Quick reply body is too long");
+  }
+  return body;
+}
 
 const quickReplySelect = {
   id: true, title: true, body: true, createdAt: true, updatedAt: true,
@@ -43,7 +68,7 @@ export async function getQuickReply(id: string) {
 
 export async function createQuickReply(input: CreateQuickReplyInput, actor: { userId: string }) {
   return prisma.quickReply.create({
-    data: { title: input.title, body: input.body, createdById: actor.userId },
+    data: { title: input.title, body: prepareQuickReplyBody(input.body), createdById: actor.userId },
     select: quickReplySelect,
   });
 }
@@ -54,7 +79,9 @@ export async function updateQuickReply(id: string, input: UpdateQuickReplyInput)
 
   const data: Prisma.QuickReplyUpdateInput = {};
   if (input.title !== undefined) data.title = input.title;
-  if (input.body !== undefined) data.body = input.body;
+  // Same trusted transform as create: sanitized HTML persisted, may normalize a
+  // legacy plain-text body to HTML on first edit (lazy conversion).
+  if (input.body !== undefined) data.body = prepareQuickReplyBody(input.body);
 
   return prisma.quickReply.update({ where: { id }, data, select: quickReplySelect });
 }

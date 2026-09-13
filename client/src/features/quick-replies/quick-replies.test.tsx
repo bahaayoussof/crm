@@ -23,6 +23,41 @@ vi.mock("./quick-reply-hooks", () => ({
   useDeleteQuickReply: mocks.useDeleteQuickReply,
 }));
 
+// Form-wiring tests: a plain-textarea stand-in for the shared Lexical reply
+// editor (Quick Reply's Rich Input). The editor's own hydrate/insert/sanitize
+// behaviour is covered in ticket-reply-editor.test.tsx and
+// quick-reply-composer.test.tsx; here the stand-in's "HTML" is just its raw
+// string value, which is enough to exercise the create/edit/validation wiring.
+vi.mock("@/features/tickets/ticket-reply-editor", async () => {
+  const React = await import("react");
+  const TicketReplyEditor = React.forwardRef(function TicketReplyEditor(
+    props: {
+      id: string; ariaLabel: string; ariaDescribedBy?: string; ariaInvalid?: boolean; disabled?: boolean;
+      onChange?: (html: string, plainText: string) => void;
+    },
+    ref: React.ForwardedRef<unknown>,
+  ) {
+    const [value, setValue] = React.useState("");
+    React.useImperativeHandle(ref, () => ({
+      hasText: () => value.trim().length > 0,
+      getPlainText: () => value,
+      getHtml: () => value,
+      insertText: (t: string) => { setValue((v) => v + t); return "inserted"; },
+      replaceText: (t: string) => { setValue(t); return "inserted"; },
+      insertHtml: (t: string) => { setValue((v) => v + t); return "inserted"; },
+      setHtml: (v: string) => { setValue(v ?? ""); props.onChange?.(v ?? "", v ?? ""); },
+      focus: () => {},
+      clear: () => setValue(""),
+    }), [value, props]);
+    return React.createElement("textarea", {
+      id: props.id, "aria-label": props.ariaLabel, "aria-describedby": props.ariaDescribedBy,
+      "aria-invalid": props.ariaInvalid, disabled: props.disabled, value,
+      onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => { setValue(e.target.value); props.onChange?.(e.target.value, e.target.value); },
+    });
+  });
+  return { TicketReplyEditor };
+});
+
 import { AppShell } from "@/app/layouts/app-shell";
 import { QuickReplyFormPage } from "./quick-reply-form-page";
 import { QuickReplyListPage } from "./quick-reply-list-page";
@@ -184,6 +219,30 @@ describe("quick replies management", () => {
     expect(screen.getAllByRole("link", { name: "Warm greeting" }).length).toBeGreaterThanOrEqual(2);
   });
 
+  it("navigates to the dedicated Create page instead of opening a modal", () => {
+    renderAt("/quick-replies", <><Route path="/quick-replies" element={<><QuickReplyListPage /><LocationProbe /></>} /><Route path="/quick-replies/new" element={<LocationProbe />} /></>);
+    fireEvent.click(screen.getAllByRole("button", { name: "Create quick reply" })[0]);
+    expect(screen.getByTestId("location")).toHaveTextContent("/quick-replies/new");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("returns to the Quick Replies list on Cancel from the Create page", () => {
+    renderAt("/quick-replies/new", <><Route path="/quick-replies/new" element={<QuickReplyFormPage />} /><Route path="/quick-replies" element={<LocationProbe />} /></>);
+    fireEvent.click(screen.getByRole("link", { name: "Cancel" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("/quick-replies");
+  });
+
+  it("shares the same form component for Create and Edit and prevents duplicate submits while pending", async () => {
+    mocks.useCreateQuickReply.mockReturnValue({ mutateAsync: mocks.create, isPending: true });
+    renderAt("/quick-replies/new", <Route path="/quick-replies/new" element={<QuickReplyFormPage />} />);
+    expect(screen.getByRole("button", { name: "Saving…" })).toBeDisabled();
+
+    cleanup();
+    mocks.useUpdateQuickReply.mockReturnValue({ mutateAsync: mocks.update, isPending: true });
+    renderAt("/quick-replies/qr-1/edit", <Route path="/quick-replies/:id/edit" element={<QuickReplyFormPage />} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Saving…" })).toBeDisabled());
+  });
+
   it("creates a quick reply with only title and body then returns to the list", async () => {
     mocks.create.mockResolvedValue(greeting);
     renderAt("/quick-replies/new", <><Route path="/quick-replies/new" element={<QuickReplyFormPage />} /><Route path="/quick-replies" element={<LocationProbe />} /></>);
@@ -210,6 +269,28 @@ describe("quick replies management", () => {
     fireEvent.change(screen.getByLabelText(/Title/), { target: { value: "Warmer greeting" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({ title: "Warmer greeting", body: greeting.body }));
+  });
+
+  it("rejects an effectively empty Rich Input body (an empty editor paragraph is not content)", async () => {
+    renderAt("/quick-replies/new", <Route path="/quick-replies/new" element={<QuickReplyFormPage />} />);
+    fireEvent.change(screen.getByLabelText(/Title/), { target: { value: "Warm greeting" } });
+    fireEvent.change(screen.getByLabelText(/Reply text/), { target: { value: "<p></p>" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("Reply text is required")).toBeInTheDocument();
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it("loads a legacy plain-text Quick Reply body into the editor for Edit", async () => {
+    mocks.useQuickReply.mockReturnValue({ isLoading: false, isError: false, data: refund });
+    renderAt("/quick-replies/qr-2/edit", <Route path="/quick-replies/:id/edit" element={<QuickReplyFormPage />} />);
+    await waitFor(() => expect((screen.getByLabelText(/Reply text/) as HTMLTextAreaElement).value).toBe(refund.body));
+  });
+
+  it("rehydrates a saved rich-HTML Quick Reply showing the same formatting on reopen", async () => {
+    const richReply = { ...greeting, id: "qr-rich", body: "<p>Hello <strong>there</strong></p><ul><li>Step one</li></ul>" };
+    mocks.useQuickReply.mockReturnValue({ isLoading: false, isError: false, data: richReply });
+    renderAt("/quick-replies/qr-rich/edit", <Route path="/quick-replies/:id/edit" element={<QuickReplyFormPage />} />);
+    await waitFor(() => expect((screen.getByLabelText(/Reply text/) as HTMLTextAreaElement).value).toBe(richReply.body));
   });
 
   it("keeps the same column ownership in Arabic RTL", async () => {

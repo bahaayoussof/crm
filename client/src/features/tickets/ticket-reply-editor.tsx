@@ -19,9 +19,10 @@ import { LinkPlugin } from "@lexical/react/LexicalLinkPlugin";
 import { OnChangePlugin } from "@lexical/react/LexicalOnChangePlugin";
 import { ListItemNode, ListNode } from "@lexical/list";
 import { AutoLinkNode, LinkNode } from "@lexical/link";
-import { $generateHtmlFromNodes } from "@lexical/html";
+import { $generateHtmlFromNodes, $generateNodesFromDOM } from "@lexical/html";
 import type { Klass, LexicalNode } from "lexical";
 import type { ReactNode } from "react";
+import { hydrateReplyHtml } from "@/lib/rich-text/reply-html";
 import { MAX_PUBLIC_REPLY_LENGTH, type ReplyInsertOutcome } from "./reply-insertion";
 import { TicketReplyToolbar } from "./ticket-reply-toolbar";
 
@@ -37,6 +38,13 @@ export type TicketReplyEditorHandle = {
   insertText: (text: string) => ReplyInsertOutcome;
   /** Replace the whole draft with plain text, same length rule. */
   replaceText: (text: string) => ReplyInsertOutcome;
+  /** Insert rich HTML at the end of the draft (Quick Reply / canned-reply
+   * insertion). Same length rule as {@link insertText}, measured against the
+   * inserted HTML's flattened plain text. */
+  insertHtml: (html: string) => ReplyInsertOutcome;
+  /** Replace the whole draft from a stored body: rich sanitized HTML, or a
+   * legacy plain-text body. Used to hydrate the editor for editing. */
+  setHtml: (value: string) => void;
   focus: () => void;
   clear: () => void;
 };
@@ -93,18 +101,38 @@ type Props = {
   id: string;
   ariaLabel: string;
   ariaDescribedBy?: string;
+  ariaInvalid?: boolean;
   placeholder: string;
   disabled?: boolean;
   onTextChange?: (plainText: string) => void;
+  /** Fired on every edit with both the serialized HTML and flattened plain
+   * text — for callers (e.g. a react-hook-form `Controller`) that need the
+   * rich value, not just the plain-text mirror `onTextChange` provides. */
+  onChange?: (html: string, plainText: string) => void;
   /** Extra Lexical node classes to register (e.g. the internal-note `MentionNode`).
    * Kept as a prop so the mention code never enters the Customer Portal import graph. */
   extraNodes?: Klass<LexicalNode>[];
   /** Extra Lexical plugin elements rendered inside the composer (e.g. the mention typeahead). */
   extraPlugins?: ReactNode;
+  /** Override the contenteditable's min/max-height utility classes (default:
+   * the ticket composer's `min-h-[7rem] max-h-60`). */
+  editorHeightClassName?: string;
 };
 
 export const TicketReplyEditor = forwardRef<TicketReplyEditorHandle, Props>(function TicketReplyEditor(
-  { id, ariaLabel, ariaDescribedBy, placeholder, disabled = false, onTextChange, extraNodes, extraPlugins },
+  {
+    id,
+    ariaLabel,
+    ariaDescribedBy,
+    ariaInvalid,
+    placeholder,
+    disabled = false,
+    onTextChange,
+    onChange,
+    extraNodes,
+    extraPlugins,
+    editorHeightClassName = "min-h-[7rem] max-h-60",
+  },
   ref,
 ) {
   const editorRef = useRef<LexicalEditor | null>(null);
@@ -159,6 +187,28 @@ export const TicketReplyEditor = forwardRef<TicketReplyEditorHandle, Props>(func
           editor.focus();
           return "inserted";
         }, "too-long"),
+      insertHtml: (html) =>
+        withEditor<ReplyInsertOutcome>((editor) => {
+          const dom = new DOMParser().parseFromString(html, "text/html");
+          const additionalText = dom.body.textContent ?? "";
+          if (readPlainText(editor).length + additionalText.length > MAX_PUBLIC_REPLY_LENGTH) {
+            return "too-long";
+          }
+          editor.update(
+            () => {
+              const root = $getRoot();
+              if (root.getChildrenSize() === 0) root.append($createParagraphNode());
+              const nodes = $generateNodesFromDOM(editor, dom);
+              root.selectEnd();
+              const selection = $getSelection();
+              if ($isRangeSelection(selection) && nodes.length) selection.insertNodes(nodes);
+            },
+            { discrete: true },
+          );
+          editor.focus();
+          return "inserted";
+        }, "too-long"),
+      setHtml: (value) => withEditor((editor) => hydrateReplyHtml(editor, value ?? ""), undefined),
       focus: () => withEditor((editor) => editor.focus(), undefined),
       clear: () =>
         withEditor((editor) => {
@@ -196,9 +246,10 @@ export const TicketReplyEditor = forwardRef<TicketReplyEditorHandle, Props>(func
                 id={id}
                 aria-label={ariaLabel}
                 aria-describedby={ariaDescribedBy}
+                aria-invalid={ariaInvalid}
                 role="textbox"
                 aria-multiline="true"
-                className="min-h-[7rem] max-h-60 overflow-y-auto px-3 py-2 text-sm leading-6 outline-none [overflow-wrap:anywhere]"
+                className={`${editorHeightClassName} overflow-y-auto px-3 py-2 text-sm leading-6 outline-none [overflow-wrap:anywhere]`}
               />
             }
             placeholder={
@@ -213,8 +264,12 @@ export const TicketReplyEditor = forwardRef<TicketReplyEditorHandle, Props>(func
           <LinkPlugin />
           {extraPlugins}
           <OnChangePlugin
-            onChange={(editorState) =>
-              editorState.read(() => onTextChange?.($getRoot().getTextContent()))
+            onChange={(editorState, lexicalEditor) =>
+              editorState.read(() => {
+                const plainText = $getRoot().getTextContent();
+                onTextChange?.(plainText);
+                onChange?.($generateHtmlFromNodes(lexicalEditor, null), plainText);
+              })
             }
           />
           <EditorBridge editorRef={editorRef} disabled={disabled} onTextChange={onTextChange} />

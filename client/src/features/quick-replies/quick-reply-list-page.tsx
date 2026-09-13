@@ -1,6 +1,5 @@
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   DataTableSurface,
   DataTableToolbar,
@@ -10,13 +9,12 @@ import {
 import { useDebouncedValue } from "@/features/customers/use-debounced-value";
 import { useQuickReplies } from "./quick-reply-hooks";
 import { QuickReplyTable } from "./quick-reply-table";
-import { QuickReplyCreateModal } from "./quick-reply-create-modal";
 import { PageHeader, QuickRepliesPage, StatePanel } from "./quick-replies-ui";
 
 export function QuickReplyListPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const [createOpen, setCreateOpen] = useState(false);
 
   const search = params.get("search") ?? "";
   const debouncedSearch = useDebouncedValue(search);
@@ -41,7 +39,7 @@ export function QuickReplyListPage() {
         <PageHeader
           title={t("quickReplies.title")}
           description={t("quickReplies.description")}
-          actions={<button type="button" className="button-link" onClick={() => setCreateOpen(true)}>{t("quickReplies.create")}</button>}
+          actions={<button type="button" className="button-link" onClick={() => navigate("/quick-replies/new")}>{t("quickReplies.create")}</button>}
         />
 
         {/* Unified DataTable Surface */}
@@ -83,7 +81,7 @@ export function QuickReplyListPage() {
             </div>
           ) : quickReplies.data && quickReplies.data.data.length === 0 ? (
             <div className="p-6">
-              <StatePanel action={hasFilters ? <button className="button-secondary" onClick={() => setParams({})}>{t("quickReplies.clearFilters")}</button> : <button type="button" className="button-link" onClick={() => setCreateOpen(true)}>{t("quickReplies.create")}</button>}>
+              <StatePanel action={hasFilters ? <button className="button-secondary" onClick={() => setParams({})}>{t("quickReplies.clearFilters")}</button> : <button type="button" className="button-link" onClick={() => navigate("/quick-replies/new")}>{t("quickReplies.create")}</button>}>
                 {hasFilters ? t("quickReplies.noMatches") : t("quickReplies.empty")}
               </StatePanel>
             </div>
@@ -98,12 +96,6 @@ export function QuickReplyListPage() {
             />
           )}
         </DataTableSurface>
-
-        <QuickReplyCreateModal
-          open={createOpen}
-          onOpenChange={setCreateOpen}
-          onSuccess={() => quickReplies.refetch()}
-        />
       </div>
     </QuickRepliesPage>
   );

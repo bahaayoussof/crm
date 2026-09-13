@@ -151,7 +151,33 @@ describe("quick replies API", () => {
   it("validates create input length", async () => {
     expect((await request(app).post("/api/quick-replies").set(auth(adminToken)).send({ title: "x", body: "Body" })).status).toBe(400);
     expect((await request(app).post("/api/quick-replies").set(auth(adminToken)).send({ title: "Valid title", body: "" })).status).toBe(400);
-    expect((await request(app).post("/api/quick-replies").set(auth(adminToken)).send({ title: "Valid title", body: "a".repeat(5001) })).status).toBe(400);
+    const tooLong = await request(app).post("/api/quick-replies").set(auth(adminToken)).send({ title: "Valid title", body: "a".repeat(5001) });
+    expect(tooLong.status).toBe(400);
+    expect(tooLong.body.error.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("sanitizes rich HTML to the reply-composer allowlist, stripping scripts/styles/attributes", async () => {
+    mocks.create.mockResolvedValue(greetingRow);
+    const response = await request(app).post("/api/quick-replies").set(auth(adminToken)).send({
+      title: "Greeting",
+      body: '<p onclick="steal()">Hi <script>alert(1)</script><strong style="color:red">there</strong></p><img src=x onerror=alert(1)>',
+    });
+    expect(response.status).toBe(201);
+    const createArgs = mocks.create.mock.calls[0]?.[0];
+    expect(createArgs.data.body).toBe("<p>Hi <strong>there</strong></p>");
+  });
+
+  it("rejects a body that is empty once markup is stripped (e.g. an empty editor paragraph)", async () => {
+    const response = await request(app).post("/api/quick-replies").set(auth(adminToken)).send({ title: "Greeting", body: "<p></p><p><br></p>" });
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("VALIDATION_ERROR");
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it("keeps a legacy plain-text body sanitizing to itself unchanged", async () => {
+    mocks.create.mockResolvedValue(greetingRow);
+    await request(app).post("/api/quick-replies").set(auth(adminToken)).send({ title: "Greeting", body: "Hello, thanks for contacting support." });
+    expect(mocks.create.mock.calls[0]?.[0].data.body).toBe("Hello, thanks for contacting support.");
   });
 
   it("updates an existing quick reply with only the provided fields", async () => {
@@ -161,6 +187,15 @@ describe("quick replies API", () => {
     expect(response.status).toBe(200);
     expect(mocks.update.mock.calls[0]?.[0]).toMatchObject({ where: { id: "c836302c0fbd491226544d598" }, data: { title: "Warm greeting" } });
     expect(mocks.update.mock.calls[0]?.[0].data).not.toHaveProperty("body");
+  });
+
+  it("sanitizes rich HTML on update, lazily converting a legacy plain-text row on first edit", async () => {
+    mocks.findUnique.mockResolvedValue({ id: "c836302c0fbd491226544d598" });
+    mocks.update.mockResolvedValue(greetingRow);
+    const response = await request(app).patch("/api/quick-replies/c836302c0fbd491226544d598").set(auth(adminToken))
+      .send({ body: "<p>Updated <em>reply</em></p><script>alert(1)</script>" });
+    expect(response.status).toBe(200);
+    expect(mocks.update.mock.calls[0]?.[0].data.body).toBe("<p>Updated <em>reply</em></p>");
   });
 
   it("rejects an empty update body", async () => {

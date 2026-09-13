@@ -1,9 +1,11 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import type { TicketReplyEditorHandle } from "@/features/tickets/ticket-reply-editor";
 import { getLocalizedQuickReplyError, getQuickReplyError } from "./quick-reply-error";
+import { QuickReplyBodyField } from "./quick-reply-body-field";
 import { useCreateQuickReply, useQuickReply, useUpdateQuickReply } from "./quick-reply-hooks";
 import { quickReplyFormSchema, type QuickReplyFormValues } from "./quick-reply.schemas";
 import { LoadingRows, PageHeader, QuickRepliesPage, StatePanel } from "./quick-replies-ui";
@@ -17,15 +19,25 @@ export function QuickReplyFormPage() {
   const update = useUpdateQuickReply(id);
   const navigate = useNavigate();
   const [apiError, setApiError] = useState<string | null>(null);
+  const editorRef = useRef<TicketReplyEditorHandle>(null);
+  const hydratedRef = useRef<string | null>(null);
 
-  const { register, reset, handleSubmit, formState: { errors, isSubmitting } } = useForm<QuickReplyFormValues>({
+  const { register, control, handleSubmit, formState: { errors, isSubmitting } } = useForm<QuickReplyFormValues>({
     resolver: zodResolver(quickReplyFormSchema),
-    defaultValues: { title: "", body: "" },
+    values: isEditing && quickReply.data
+      ? { title: quickReply.data.title, body: quickReply.data.body }
+      : { title: "", body: "" },
   });
 
+  // Hydrate the editor from the loaded quick reply exactly once (rich HTML or
+  // legacy plain text — the editor handles both). User edits after this flow
+  // through `field.onChange` and are never overwritten.
   useEffect(() => {
-    if (isEditing && quickReply.data) reset({ title: quickReply.data.title, body: quickReply.data.body });
-  }, [isEditing, quickReply.data, reset]);
+    if (!isEditing || !quickReply.data) return;
+    if (hydratedRef.current === quickReply.data.id) return;
+    hydratedRef.current = quickReply.data.id;
+    editorRef.current?.setHtml(quickReply.data.body);
+  }, [isEditing, quickReply.data]);
 
   const submit = handleSubmit(async (values) => {
     setApiError(null);
@@ -63,7 +75,15 @@ export function QuickReplyFormPage() {
             </Field>
 
             <Field id="qr-body" label={t("quickReplies.fieldBody")} required error={errors.body?.message ? t(errors.body.message) : undefined}>
-              <textarea id="qr-body" className="input min-h-48 resize-y" dir="auto" aria-invalid={Boolean(errors.body)} aria-describedby={errors.body ? "qr-body-error" : "qr-body-help"} {...register("body")} />
+              <QuickReplyBodyField
+                ref={editorRef}
+                id="qr-body"
+                control={control}
+                ariaLabel={t("quickReplies.fieldBody")}
+                ariaDescribedBy={errors.body ? "qr-body-error" : "qr-body-help"}
+                ariaInvalid={Boolean(errors.body)}
+                editorHeightClassName="min-h-48 max-h-[32rem]"
+              />
               <span className="mt-1.5 block text-xs text-muted-foreground" id="qr-body-help">{t("quickReplies.bodyHelp")}</span>
             </Field>
           </div>

@@ -913,7 +913,7 @@
     "formDescription": "A short title agents recognize and the reply text inserted into the composer.",
     "fieldTitle": "Title",
     "fieldBody": "Reply text",
-    "bodyHelp": "Plain text. Inserted into the reply composer as editable text and never sent automatically.",
+    "bodyHelp": "Formatting is inserted into the reply composer as editable text and never sent automatically.",
     "saveError": "Unable to save the quick reply.",
     "editAction": "Edit quick reply",
     "deleteAction": "Delete quick reply",

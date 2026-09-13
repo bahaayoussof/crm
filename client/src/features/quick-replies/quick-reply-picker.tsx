@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { useDebouncedValue } from "@/features/customers/use-debounced-value";
+import { stripReplyHtmlToPlainText } from "@/lib/rich-text/reply-html";
 import { useQuickReplies } from "./quick-reply-hooks";
 import { QuickReplyIcon } from "./quick-reply-icons";
 
@@ -165,7 +166,7 @@ export function QuickReplyPicker({ onSelect, disabled }: { onSelect: (body: stri
                 onClick={() => choose(item.body)}
               >
                 <span className="block truncate text-sm font-medium text-foreground" dir="auto">{item.title}</span>
-                <span className="mt-0.5 block truncate text-xs text-muted-foreground" dir="auto">{item.body}</span>
+                <span className="mt-0.5 block truncate text-xs text-muted-foreground" dir="auto">{stripReplyHtmlToPlainText(item.body)}</span>
               </button>
             ))}
           </div>

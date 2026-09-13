@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Paperclip, X } from "lucide-react";
 import { AttachmentCompactGrid } from "@/features/attachments/attachment-ui";
 import { QuickReplyPicker } from "@/features/quick-replies/quick-reply-picker";
+import { LOOKS_LIKE_REPLY_HTML } from "@/lib/rich-text/reply-html";
 import { getTicketError } from "./ticket-error";
 import { formatTicketDate } from "./ticket-format";
 import { useCreateTicketMessage, useCreateTicketNote } from "./ticket-hooks";
@@ -110,7 +111,12 @@ export const TicketWorkspaceTabs = forwardRef<TicketWorkspaceHandle, TicketWorks
     const canSubmit = mode === "reply" ? replyText.trim().length > 0 : noteText.trim().length > 0;
 
     const insertQuickReply = (snippet: string) => {
-      const outcome = editorRef.current?.insertText(snippet) ?? "too-long";
+      // Quick Reply bodies are stored as sanitized HTML once authored through the
+      // Rich Input editor; a not-yet-re-edited row is still legacy plain text.
+      // Route each through the matching insertion path so formatting survives.
+      const outcome = LOOKS_LIKE_REPLY_HTML.test(snippet)
+        ? (editorRef.current?.insertHtml(snippet) ?? "too-long")
+        : (editorRef.current?.insertText(snippet) ?? "too-long");
       if (outcome === "too-long") {
         setInsertError(t("quickReplies.picker.lengthExceeded"));
         return;

@@ -317,6 +317,21 @@ describe("quick reply composer integration", () => {
     expect(document.documentElement).toHaveAttribute("dir", "rtl");
   });
 
+  it("inserts a rich Quick Reply body preserving bold/list formatting, not raw markup", async () => {
+    mocks.getQuickReplies.mockResolvedValue(
+      listResponse([qr("qr-rich", "Escalation notice", "<p>Please <strong>confirm</strong> your details:</p><ul><li>Order ID</li></ul>")]),
+    );
+    renderConversation();
+    setDraft("");
+    await openAndPick(/Escalation notice/);
+    await waitFor(() => expect(replyText()).toBe("Please confirm your details:Order ID"));
+    expect(replyBox().innerHTML).toMatch(/<(strong|b)[^>]*>confirm/);
+    expect(replyBox().innerHTML).toMatch(/<ul[^>]*>[\s\S]*<li[^>]*>[\s\S]*Order ID/);
+    // never shown as literal, unrendered markup
+    expect(replyText()).not.toContain("<strong>");
+    expect(replyText()).not.toContain("<p>");
+  });
+
   it("keeps quick replies beyond the first page reachable through search", async () => {
     const many = Array.from({ length: 12 }, (_, index) => qr(`qr-${index}`, `Reply ${String.fromCharCode(65 + index)}`, `Body ${index}`));
     const zebra = qr("qr-zebra", "Zebra escalation", "Escalate to the zebra team immediately.");

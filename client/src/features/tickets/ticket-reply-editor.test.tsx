@@ -88,6 +88,41 @@ describe("TicketReplyEditor", () => {
     expect(html).toMatch(/<li[^>]*>[\s\S]*point one/);
   });
 
+  it("hydrates rich sanitized HTML via setHtml and round-trips through getHtml", () => {
+    const ref = setup();
+    act(() => ref.current!.setHtml("<p>Hello <strong>brave</strong> world</p><ul><li>one</li></ul>"));
+    expect(ref.current!.getPlainText()).toBe("Hello brave world\n\none");
+    const html = ref.current!.getHtml();
+    expect(html).toMatch(/<(strong|b)[^>]*>brave/);
+    expect(html).toMatch(/<ul[^>]*>[\s\S]*<li[^>]*>[\s\S]*one/);
+  });
+
+  it("hydrates a legacy plain-text body via setHtml, preserving blank-line paragraphs", () => {
+    const ref = setup();
+    act(() => ref.current!.setHtml("Line one.\nLine two.\n\nSecond paragraph."));
+    expect(ref.current!.getPlainText()).toBe("Line one.\nLine two.\n\nSecond paragraph.");
+    expect(ref.current!.getHtml()).toMatch(/^<p/);
+  });
+
+  it("insertHtml appends rich formatting at the end of the draft", () => {
+    const ref = setup();
+    act(() => ref.current!.insertText("Intro. "));
+    act(() => ref.current!.insertHtml("<p>Please <strong>confirm</strong> your order.</p>"));
+    expect(ref.current!.getPlainText()).toBe("Intro. Please confirm your order.");
+    expect(ref.current!.getHtml()).toMatch(/<(strong|b)[^>]*>confirm/);
+  });
+
+  it("rejects an insertHtml that would exceed the plain-text limit and leaves the draft untouched", () => {
+    const ref = setup();
+    act(() => ref.current!.insertText("keep"));
+    let outcome: string | undefined;
+    act(() => {
+      outcome = ref.current!.insertHtml(`<p>${"x".repeat(20_000)}</p>`);
+    });
+    expect(outcome).toBe("too-long");
+    expect(ref.current!.getPlainText()).toBe("keep");
+  });
+
   it("goes read-only when disabled", () => {
     setup({ disabled: true });
     expect(editorEl().getAttribute("contenteditable")).toBe("false");
