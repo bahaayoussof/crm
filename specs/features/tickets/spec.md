@@ -170,7 +170,7 @@ Authoritative enforcement lives in: `requireRole` (coarse per-router allowlist),
 - MANAGER access is IDOR-safe: another team's ticket id returns `404 TICKET_NOT_FOUND` (never `403`).
 - `GET /api/customers/:id/tickets` (Customer Management history) returns non-actionable **summaries** and never grants detail/conversation/mutation. Current implementation (`customer.service.ts:93` `listCustomerTickets`) scopes the query by `customerId` **only** — no ticket-visibility predicate — so before OD-6 a `MANAGER` received `FULL`-access summaries for every one of the customer's tickets regardless of team. **OD-6 (implemented):** this endpoint now obeys the canonical team-scoped ticket-visibility model — `ADMIN` org-wide, **`MANAGER` restricted to their managed team** (teamless → empty page), `AGENT` unchanged (still receives the full history with `access = SUMMARY_ONLY` for another agent's ticket, matching the ADR-014 cross-agent-history design). See [`plan.md` §10](./plan.md) and [DG-11](#known-gaps--drift).
 - The customer-portal router additionally runs `requireFreshToken` — a demoted / password-changed / deactivated customer is rejected `401 SESSION_EXPIRED` immediately, not after JWT expiry.
-- Internal routers authorise from the **JWT-embedded role** (8h). A demoted internal user keeps their old role on ticket routes until the token expires (documented bounded limitation; only `/auth/me` and `/api/users` re-read the DB).
+- Internal routers verify the signed JWT, then `requireRole` reloads current account activity, password freshness, and role before coarse authorization. Demotion, deactivation, and password changes take effect on the next role-protected request; downstream ticket visibility receives the refreshed role.
 
 ---
 

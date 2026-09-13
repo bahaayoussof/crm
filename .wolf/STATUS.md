@@ -1,5 +1,7 @@
 # STATUS — crm
 
+> **SDD — Auth / RBAC: IMPLEMENTED + VERIFIED ON SDD BRANCH (2026-09-13, `chore/sdd-foundation`, unstaged/uncommitted).** Added `specs/features/auth-rbac/{spec,plan,tasks}.md`. Closed stale-authority gap bug-196: every role-protected API now reloads current account id/role/activity/password freshness in `requireRole`, so demotion, deactivation/deletion, and password changes take effect on the next request; current forbidden roles remain `403`, invalid/expired/missing auth remains `401`, and downstream domain visibility receives the refreshed role. Existing team/customer/privacy boundaries unchanged. Verification: auth 54/54; full server 1096/1096 (58); server typecheck/lint clean; client auth/router/nav 73/73; diff check clean. Server build blocked only at known Prisma Windows DLL rename `EPERM`; independent TypeScript compile clean. No schema/migration/dependency/client change.
+
 > _Last updated: 2026-09-13._
 >
 > **SDD — SLA / Automation: IMPLEMENTED + VERIFIED ON SDD BRANCH (2026-09-13, branch `chore/sdd-foundation`, uncommitted).** Full brownfield audit of `server/src/modules/sla-automation/*`, `shared/sla/{derive-sla,sla-filter,sla-outcomes}.ts`, `SlaRule`, and every seam that touches `firstResponseDueAt`/`firstRespondedAt`/`resolutionDueAt`/`resolvedAt`/`closedAt` across tickets, portal, live chat, and Email/SMS/WhatsApp inbound. Two confirmed defects found and fixed, both isolated to `sla-automation.service.ts`:

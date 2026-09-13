@@ -7,12 +7,9 @@ import { AppError } from "../shared/errors/app-error.js";
  * change, so a password reset / change immediately invalidates every OTHER
  * session for that user.
  *
- * Runs after `requireAuth`. Scope: the customer portal router only. `/auth/me`
- * performs the same check inside `getCurrentUser` (it already reads the user
- * row). Global `requireAuth` is deliberately NOT modified — a DB-backed
- * `requireAuth` would break the many module test suites that mock prisma
- * without `user.findUnique` (see `.wolf/cerebrum.md`). All other internal
- * routes remain bounded by the 8h JWT expiry.
+ * Runs after `requireAuth`. Retained on profile/Portal routes as defense in
+ * depth; the shared `requireRole` guard now performs the same freshness check
+ * for every role-protected API.
  */
 export const requireFreshToken: RequestHandler = (request, _response, next) => {
   const auth = request.auth;

@@ -8,9 +8,8 @@ import { AppError } from "../shared/errors/app-error.js";
  * changes the account. Runs after `requireAuth` and before `requireRole`, and
  * overwrites `request.auth.role` with the persisted value.
  *
- * Scope: the User Management router. `/auth/me` already re-reads the database;
- * other routers keep JWT-role authorization until token expiry by design (no
- * per-request user lookup on every endpoint).
+ * Retained as an explicit guard on legacy admin routers. `requireRole` now
+ * enforces the same current-account rule globally, so this is defense in depth.
  */
 export const requireActiveUser: RequestHandler = (request, _response, next) => {
   const auth = request.auth;

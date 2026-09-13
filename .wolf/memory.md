@@ -1314,6 +1314,7 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
+| 19:18 | Completed Auth/RBAC fast-track SDD; closed stale JWT authority across role-protected APIs and verified server/client guards | specs/features/auth-rbac/*, server/src/middleware/auth*, docs/05,06,17,19, Tickets spec, OpenWolf trackers | IMPLEMENTED + VERIFIED; full server 1096/1096, client focused 73/73, typecheck/lint clean; build Prisma DLL lock documented | ~9000 |
 | 2026-09-13 | Docs-only SDD consistency pass: confirmed constitution.md/architecture.md already correctly reflect KB Rich Text (no stale plain-text claim remained at global-spec level); fixed README.md Coverage Matrix (removed unfounded Billing row, added AI/Tasks/Quick-Replies/SLA-config/Integrations-admin-UI ownership notes, clarified Attachments/Collaboration/Feedback/Portal ownership); replaced conversations-channels CC-GAP-19 duplicate with a cross-reference to realtime RT-GAP-3/4; reconciled KB Rich Text status from overclaimed "implemented and verified" to "implemented; migration apply/rollback verification pending" across spec.md/tasks.md, with a concrete pending verification step. No docs/ changes; no runtime code changes. | specs/features/README.md, specs/features/conversations-channels/spec.md, specs/features/knowledge-base/{spec,tasks}.md | done, uncommitted on chore/sdd-foundation | ~small |
 
 ## Session: 2026-09-13 18:58
@@ -1321,3 +1322,8 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
 | 19:12 | SLA/Automation SDD fast-track: brownfield audit of sla-automation.service.ts + first-response/resolution/escalation/cron seams; fixed DG-1 (escalation notification excluded assignee — now uses shared ticketOperationalRecipientIds) and DG-2 (one candidate's tx failure aborted whole cron batch — wrapped per-candidate try/catch); added 3 sla-automation regression tests + 3 inbound-channel negative-space assertions (email/sms/whatsapp never stamp firstRespondedAt) | server/src/modules/sla-automation/sla-automation.service.ts, sla-automation.test.ts, server/src/modules/integrations/{email,sms,whatsapp}/*.test.ts, docs/08-sla-automation.md, specs/features/sla-automation/{spec,plan,tasks}.md | IMPLEMENTED + VERIFIED, uncommitted on chore/sdd-foundation | ~large |
+
+## Session: 2026-09-13 19:27
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|

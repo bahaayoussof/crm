@@ -1,5 +1,7 @@
 # Customer Support CRM — Progress Tracking
 
+> **Auth / RBAC SDD (2026-09-13, `chore/sdd-foundation`, unstaged/uncommitted): IMPLEMENTED + VERIFIED ON SDD BRANCH.** Brownfield audit confirmed one vertical-privilege gap: most role-protected APIs trusted an 8-hour JWT's stale role/activity until expiry. `requireRole` now resolves current `id`/`role`/`isActive`/`passwordChangedAt`, rejects deleted/deactivated and pre-password-change sessions with `401`, replaces the request role, then applies the route allowlist (`403` for current authenticated-but-forbidden roles). Existing ADMIN global, MANAGER team, AGENT assignment/team, CUSTOMER ownership/privacy, notification, realtime, and nested-resource rules remain service-owned and unchanged. Verification: auth/middleware 54/54; full server 1096/1096 (58 files); server typecheck/lint clean; focused client auth/router/navigation 73/73 (19 files); diff check clean. Server build's Prisma generate remains blocked by the known Windows engine DLL rename lock; TypeScript compilation is independently clean. No schema/migration/dependency/client change. See `specs/features/auth-rbac/`.
+
 ## CURRENT STATE — 2026-09-13 (Conversations/Channels hardening — ADR-057)
 
 > This block supersedes the 2026-09-02 block below it as the authoritative
