@@ -1,4 +1,4 @@
-import { Role, TicketPriority } from "@prisma/client";
+import { Prisma, Role, TicketPriority } from "@prisma/client";
 import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -21,6 +21,7 @@ describe("settings API", () => {
   it("creates and trims a category", async () => { const response = await request(app).post("/api/settings/categories").set(auth(Role.ADMIN)).send({ name: "  Billing  ", description: "  invoices " }); expect(response.status).toBe(201); expect(mocks.categoryCreate).toHaveBeenCalledWith(expect.objectContaining({ data: { name: "Billing", description: "invoices" } })); });
   it("updates activation without deleting", async () => { const response = await request(app).patch("/api/settings/categories/cd0f631ca1ddba8db3bcfcb9e").set(auth(Role.ADMIN)).send({ isActive: false }); expect(response.status).toBe(200); expect(mocks.categoryUpdate).toHaveBeenCalled(); });
   it.each([{ name: "" }, { name: "x" }, { name: "ok", unknown: true }])("rejects invalid category input", async (body) => expect((await request(app).post("/api/settings/categories").set(auth(Role.ADMIN)).send(body)).status).toBe(400));
+  it("maps a case-insensitive name conflict (DB functional unique index on LOWER(name)) to 409", async () => { mocks.categoryCreate.mockRejectedValue(Object.assign(new Prisma.PrismaClientKnownRequestError("Unique constraint failed", { code: "P2002", clientVersion: "x", meta: { target: ["lower(name)"] } }), {})); const response = await request(app).post("/api/settings/categories").set(auth(Role.ADMIN)).send({ name: "billing" }); expect(response.status).toBe(409); expect(response.body.error.code).toBe("CATEGORY_NAME_ALREADY_EXISTS"); });
   it("lists SLA rules", async () => { const response = await request(app).get("/api/settings/sla-rules").set(auth(Role.ADMIN)); expect(response.status).toBe(200); });
   it("upserts one priority rule", async () => { const response = await request(app).put("/api/settings/sla-rules/HIGH").set(auth(Role.ADMIN)).send({ firstResponseMinutes: 60, resolutionMinutes: 240, isActive: true }); expect(response.status).toBe(200); expect(mocks.slaUpsert).toHaveBeenCalledWith(expect.objectContaining({ where: { priority: "HIGH" }, update: expect.objectContaining({ isActive: true }) })); });
   it.each([["INVALID", 60, 240], ["LOW", 0, 240], ["LOW", 60, 30], ["LOW", 60, 525601]])("rejects invalid SLA settings", async (priority, first, resolution) => expect((await request(app).put(`/api/settings/sla-rules/${priority}`).set(auth(Role.ADMIN)).send({ firstResponseMinutes: first, resolutionMinutes: resolution, isActive: true })).status).toBe(400));

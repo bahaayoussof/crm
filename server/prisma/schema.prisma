@@ -244,6 +244,9 @@ model Attachment {
 }
 
 model Category {
+  // Case-insensitive uniqueness is also enforced at the DB level via a hand-authored
+  // functional unique index on LOWER(name) — see migration
+  // 20260913172511_category_name_lower_unique (not representable in Prisma schema DSL).
   id          String   @id @default(cuid())
   name        String   @unique
   description String?
