@@ -95,6 +95,17 @@ over-permissive UI found.
 
 ## SLA Policy Semantics
 
+**Seeded defaults** (from `server/prisma/seed.ts`; ADMIN-editable
+thereafter via `PUT /api/settings/sla-rules/:priority` — these are starting
+values, not hard-coded policy):
+
+| Priority | First response | Resolution |
+| --- | --- | --- |
+| LOW | 8h | 72h |
+| MEDIUM | 4h | 48h |
+| HIGH | 1h | 24h |
+| URGENT | 15m | 4h |
+
 - Table: `SlaRule` (`priority TicketPriority @unique`,
   `firstResponseMinutes Int`, `resolutionMinutes Int`, `isActive Boolean`,
   `createdAt`, `updatedAt`).

@@ -13,7 +13,7 @@ Branch: `chore/sdd-foundation`. Reuses the existing `SlaRule`, `Ticket` SLA colu
 
 ## 2. SLA defaults / policy source
 
-Default targets are documented in `docs/08-sla-automation.md` (LOW 8h/72h, MEDIUM 4h/48h, HIGH 1h/24h, URGENT 15m/4h) and seeded as `SlaRule` rows; the live values are whatever is currently active in the `SlaRule` table (ADMIN-editable, prospective only — never rewrites existing ticket snapshots).
+Default targets (LOW 8h/72h, MEDIUM 4h/48h, HIGH 1h/24h, URGENT 15m/4h — see `specs/features/sla-settings-categories/spec.md`) are seeded as `SlaRule` rows; the live values are whatever is currently active in the `SlaRule` table (ADMIN-editable, prospective only — never rewrites existing ticket snapshots).
 
 ## 3. Deadline calculation (snapshot semantics)
 

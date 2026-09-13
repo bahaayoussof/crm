@@ -63,15 +63,15 @@ Notes/Risk: ...
 Recommended sections:
 
 - **Goal** — one or two sentences.
-- **Context** — why this is needed now; link relevant `docs/` sections or
-  `specs/domain-model.md` entities this touches.
+- **Context** — why this is needed now; link relevant `specs/architecture.md`
+  sections or `specs/domain-model.md` entities this touches.
 - **Actors** — which roles/actors are involved (see
   `specs/domain-model.md#actors--roles`).
 - **User Stories** — short, from the actor's point of view.
 - **Functional Requirements** — the concrete behavior being added/changed.
 - **Permissions** — who can do what; call out any RBAC change explicitly
-  (this repo treats permission changes as requiring `docs/06-auth-rbac.md`
-  updates — see `specs/constitution.md`).
+  (this repo treats permission changes as requiring a
+  `specs/features/auth-rbac/spec.md` update — see `specs/constitution.md`).
 - **Edge Cases** — states/inputs that need explicit handling.
 - **Acceptance Criteria** — observable, testable statements (see below).
 - **Out of Scope** — what this feature deliberately does not do.
@@ -104,9 +104,10 @@ Recommended sections:
 - **Backend changes** — routes, controllers, services, middleware.
 - **Frontend changes** — pages, hooks, components.
 - **Database changes** — Prisma schema/migration, referencing
-  `docs/04-database-design.md` conventions.
-- **API changes** — request/response shape changes; update
-  `docs/05-api-contract.md` when implemented.
+  `specs/domain-model.md` conventions and `server/prisma/schema.prisma`.
+- **API changes** — request/response shape changes; update the owning
+  `specs/features/<name>/spec.md` and `specs/constitution.md` "API
+  Conventions" (cross-cutting only) when implemented.
 - **Realtime implications** — new/changed SSE events, if any.
 - **Security / permissions** — server-side enforcement plan.
 - **Localization** — new user-facing strings need `en`/`ar` entries.
@@ -173,13 +174,20 @@ verification — do not re-add without new evidence):**
 
 - Billing / subscription management — no billing/subscription code, schema, or requirement found anywhere in `server/`, `client/`, or `specs/`.
 
-### Deferred consolidation notes (do not act on these yet)
+### Docs consolidation (executed 2026-09-13)
 
-- Several feature `plan.md`/`spec.md` files duplicate parts of `docs/04-06-09-18-22` (RBAC, API contract, database design, realtime events). This is the known `docs/` ↔ `specs/` overlap the eventual migration is meant to resolve — intentionally left untouched per task scope.
+The `docs/` ↔ `specs/` overlap this section used to flag as deferred has
+been resolved: the redundant `docs/*.md` files (RBAC, API contract,
+database design, realtime events, and others) were removed once their
+content was verified present in `specs/`. Some individual
+`plan.md`/`tasks.md` files still cite a since-removed `docs/NN` path inside
+a historical "documentation drift, now fixed" note — those citations are
+non-authoritative audit evidence and are left as-is rather than rewritten;
+see `docs/README.md` for what remains under `docs/` and why.
 
 ## After implementation
 
 Update `spec.md`'s Acceptance Criteria (or add a short "Implemented as"
 note) when actual behavior intentionally diverges from the original spec,
-and update `docs/17-decisions-log.md` if the change is architecturally
+and update `specs/decisions.md` if the change is architecturally
 significant, per `specs/constitution.md`.

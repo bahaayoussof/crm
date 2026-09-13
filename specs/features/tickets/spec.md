@@ -51,10 +51,10 @@ Nearly every other feature (Dashboard, Reports, SLA automation, Notifications, R
 
 ### Out of scope (Ticket depends on — specified elsewhere or later)
 
-- Channel provider implementations: Email (`docs/21`), WhatsApp (`docs/20`), SMS (`docs/23`), Live Chat routing/inactivity. This spec fixes only the contract Tickets rely on.
-- The SLA configuration surface (`SlaRule` CRUD in Settings, `docs/08`). Tickets consume active rules; they do not manage them.
+- Channel provider implementations: Email, WhatsApp, SMS (`specs/features/conversations-channels/spec.md`), Live Chat routing/inactivity. This spec fixes only the contract Tickets rely on.
+- The SLA configuration surface (`SlaRule` CRUD in Settings, `specs/features/sla-settings-categories/spec.md`). Tickets consume active rules; they do not manage them.
 - **SLA pause / resume policy (e.g. stopping the resolution clock while `WAITING_CUSTOMER`)** — explicitly out of scope (OD-5, deferred to the future SLA SDD feature). Current countdown semantics are frozen; no Tickets task may change them.
-- The Realtime transport (SSE framing / reconnect / heartbeat, `docs/22`, ADR-045). Tickets emit domain events; the transport is a dependency.
+- The Realtime transport (SSE framing / reconnect / heartbeat, `specs/features/realtime/spec.md`, ADR-045). Tickets emit domain events; the transport is a dependency.
 - The Notification centre UI and the `Notification` model lifecycle (ADR-029). Tickets are one producer.
 - `AuditLog` as a system (ADR-039). Tickets write rows into it.
 - Tasks/Reminders, Reports, Dashboard, Knowledge Base, AI assistants, Attachments — each is its own feature; only the ticket-facing contract is stated here.
@@ -318,7 +318,7 @@ Every implemented entry path, with its current behaviour. Paths not listed here 
 
 ### 3. Customer Portal — AI assistant handoff (`POST /api/portal/ai/handoff`)
 
-Creates a normal Portal ticket through the canonical Portal creation path (per `docs/05`). Customer identity, status, priority, channel, assignment, SLA defaults, and history remain server-owned. The bounded AI chat/history is attached as the ticket content; the `customer-ai` context boundary (ADR-054) means no internal ticket data is ever fed to the customer assistant.
+Creates a normal Portal ticket through the canonical Portal creation path (see §2 above). Customer identity, status, priority, channel, assignment, SLA defaults, and history remain server-owned. The bounded AI chat/history is attached as the ticket content; the `customer-ai` context boundary (ADR-054) means no internal ticket data is ever fed to the customer assistant.
 
 ### 4. Live Chat — `POST /api/portal/live-chat`
 
@@ -511,7 +511,7 @@ Own ticket only (`{ id, customerId }` — else `404`). Returns: `id`, `subject`,
 
 ### Not owned here
 
-The channel provider adapters, their configuration, retry/timeout policy, webhook signature schemes, and channel-specific edge cases belong to `docs/20` / `docs/21` / `docs/23` and future per-channel feature specs.
+The channel provider adapters, their configuration, retry/timeout policy, webhook signature schemes, and channel-specific edge cases belong to `specs/features/conversations-channels/spec.md`.
 
 ---
 
@@ -545,7 +545,7 @@ The channel provider adapters, their configuration, retry/timeout policy, webhoo
 
 ### Realtime events (ticket-side)
 
-Contract (`docs/22`, ADR-045): tiny invalidation signals only — **no records on the wire**.
+Contract (`specs/features/realtime/spec.md`, ADR-045): tiny invalidation signals only — **no records on the wire**.
 
 | Event | Wire payload | Emitted from |
 | --- | --- | --- |
@@ -560,7 +560,7 @@ Contract (`docs/22`, ADR-045): tiny invalidation signals only — **no records o
   - `AGENT` — events where `assignedAgentId === self`, **or** unassigned events within the agent's own team.
   - `CUSTOMER` — only their **own** ticket (`subscriber.customerId === audience.customerId`, resolved once at connect) and only `visibility: "public"`; never internal notes, never `notification.*`.
 - Audience metadata (`customerId`, `teamId`, `assignedAgentId`, `visibility`) is server-side context only — never added to the wire frame.
-- Transport limitation (`docs/22` §10): on a serverless host a long-lived SSE connection is force-closed at `maxDuration`; client backoff-reconnect is the mitigation. Not a Ticket concern.
+- Transport limitation (`specs/features/realtime/spec.md`): on a serverless host a long-lived SSE connection is force-closed at `maxDuration`; client backoff-reconnect is the mitigation. Not a Ticket concern.
 
 ### In-app notifications (ticket-triggered)
 
@@ -909,7 +909,7 @@ Out of scope for the current system; recorded so they are not mistaken for gaps:
 - First-response-breach escalation.
 - Bulk actions, ticket merge / split, `channel` change after creation, `createdAt` date-range list filter.
 - Ticket CSV / PDF export; saved / shareable list views.
-- A dedicated durable event queue or in-process scheduler (explicitly rejected — `docs/22`, ADR-030).
+- A dedicated durable event queue or in-process scheduler (explicitly rejected — `specs/features/realtime/spec.md`, ADR-030).
 - Embeddings / semantic retrieval for AI ticket assistance (ADR-034 documents the upgrade path).
 - Auditing inbound-channel and portal ticket **creation** (a future decision covering all four non-internal creation paths together — OD-3 deliberately left this out of the current scope).
 
@@ -922,8 +922,8 @@ Out of scope for the current system; recorded so they are not mistaken for gaps:
 | Customers | `Ticket.customerId` link; channel contact guards | `Customer` record + resolution/creation (webhooks, portal `User → Customer.userId`) |
 | Departments / Teams / Branches | `Ticket.teamId` as authoritative owner; `departmentId` / `branchId` tags; adoption-on-assignment rule | Team/Dept/Branch CRUD, `Team.managerId`, `resolveActorTeamId`, `assertAgentAssignableToTicket` |
 | Conversations / Channels | `TicketMessage` / `TicketNote` shape, first-response stamping, reopen semantics, delivery-failure markers | Provider adapters, webhook signature verification, threading, commit-first outbound delivery (ADR-052) |
-| Email / SMS / WhatsApp / Live Chat | Ticket status/lifecycle/SLA/history for channel tickets | Provider config, inbound parsing, routing (`docs/20`/`21`/`23`, live-chat feature) |
-| Realtime | Which ticket events fire and their audience metadata | SSE transport, `withRealtimeOutbox`, `canReceive` (`docs/22`) |
+| Email / SMS / WhatsApp / Live Chat | Ticket status/lifecycle/SLA/history for channel tickets | Provider config, inbound parsing, routing (`specs/features/conversations-channels/spec.md`, live-chat feature) |
+| Realtime | Which ticket events fire and their audience metadata | SSE transport, `withRealtimeOutbox`, `canReceive` (`specs/features/realtime/spec.md`) |
 | Notifications | Which ticket actions notify whom (recipient rules) | `Notification` model, notification centre UI (ADR-029) |
 | SLA | Snapshot fields on `Ticket`, priority-change recalculation, auto-escalation trigger | `SlaRule` config, `deriveSla` / `sla-filter` / `sla-outcomes` shared math, cron infra |
 | Tasks / Reminders | Nothing (optional `Task.ticketId` back-reference) | Task-linkage visibility check against ticket visibility |

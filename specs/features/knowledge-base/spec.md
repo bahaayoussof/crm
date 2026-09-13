@@ -45,8 +45,9 @@ system-wide `AuditLog` used by the rest of the CRM.
 ### Why now
 
 - The CRM has a documented, actively-written system-wide `AuditLog`
-  (`specs/domain-model.md#core-entities`, `docs/06-auth-rbac.md`
-  "Audit logging — `AuditLog` and `TicketHistory`"). Knowledge Base
+  (`specs/domain-model.md#core-entities`,
+  `specs/features/auth-rbac/spec.md` "Audit logging — `AuditLog` and
+  `TicketHistory`"). Knowledge Base
   management mutations are currently **not** recorded there — an
   inconsistency with users, customers, tickets, categories, SLA rules,
   and org-structure entities, all of which audit their mutations.
@@ -74,19 +75,21 @@ system-wide `AuditLog` used by the rest of the CRM.
 - `User` — `createdById` author reference, `onDelete: Restrict`
   (unchanged).
 
-### Relevant docs / ADRs
+### Relevant decisions / specs
 
 - ADR-020 — "Knowledge Base on the Existing `KnowledgeArticle` Model"
-  (`docs/17-decisions-log.md`): plain-text body, 2-state lifecycle,
-  RBAC, portal contract.
+  (`specs/decisions.md`): plain-text body (superseded by ADR-057, below),
+  2-state lifecycle, RBAC, portal contract.
 - ADR-054 — customer-AI context boundary (published-only retrieval).
 - ADR-034 Phase 5 — KB→reply insertion deferred (no customer-safe
   absolute article URL).
-- `docs/06-auth-rbac.md` — "Internal Knowledge Base Permissions" table.
-- `docs/05-api-contract.md` — "Portal Knowledge Base" + internal
-  endpoint list.
-- `docs/18-ui-pages-spec.md` §11–13 — page structure.
-- `docs/11-ai-features.md` — published-only KB retrieval for AI.
+- ADR-057 — Knowledge Base Rich Text (`specs/decisions.md`).
+- `specs/features/auth-rbac/spec.md` — "Internal Knowledge Base
+  Permissions" table.
+- `specs/features/ai-assistance/spec.md` — published-only KB retrieval
+  for AI.
+- `docs/18-ui-pages-spec.md` §11–13 (historical/non-authoritative) — page
+  structure reference.
 
 ## Actors
 
@@ -304,10 +307,9 @@ design.
 
 ### RBAC-change note
 
-This pilot introduces **no** RBAC change, so no `docs/06-auth-rbac.md`
-permission-table change is required. `docs/06` should, at implementation
-time, gain a short note that Knowledge Base management mutations are now
-recorded in `AuditLog` (documentation follow-up, tracked in `plan.md`).
+This pilot introduces **no** RBAC change, so no permission-table change is
+required. `specs/features/auth-rbac/spec.md` notes that Knowledge Base
+management mutations are recorded in `AuditLog`.
 
 ## Audit Requirements
 
@@ -666,9 +668,9 @@ role and changes no permission. It only changes *how* the
 - `RT-7.2` The `content` field keeps its name and JSON type (string). Its
   **representation changes** from plain text to a safe rich
   representation. This is the same kind of change the ticket
-  `Message.body` field already underwent (ADR-035) and must be
-  **documented explicitly** in `docs/05-api-contract.md` so no consumer
-  is surprised.
+  `Message.body` field already underwent (ADR-035) and is documented
+  explicitly in this spec's endpoint sections so no consumer is
+  surprised.
 - `RT-7.3` In-repo consumers (internal detail page, portal detail page)
   are updated in lockstep. No out-of-repo consumer is known; if one is
   discovered during planning it must be called out, not silently broken.
@@ -806,7 +808,7 @@ Then the model receives clean plain text (no tags/markup), PUBLISHED-only, withi
 ```
 Given the Knowledge Base API
 When a client calls the internal or portal article endpoints after the enhancement
-Then routes, methods, status codes, error codes, and the { data, meta } envelope are unchanged; only the representation of `content` differs, and that change is documented in docs/05-api-contract.md.
+Then routes, methods, status codes, error codes, and the { data, meta } envelope are unchanged; only the representation of `content` differs, and that change is documented in this spec's endpoint sections.
 ```
 
 ```

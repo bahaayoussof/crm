@@ -42,7 +42,7 @@ Customers are **global, not team-owned** — unlike `Ticket.teamId`, there is no
 ### Out of scope (Customers depends on — specified elsewhere)
 
 - Ticket visibility, mutation, and lifecycle rules (`specs/features/tickets/spec.md`) — Customers only reuses the team-scoping primitive for its history sub-resource; it does not own ticket rules.
-- `User`/authentication, including customer self-registration and login (`docs/06-auth-rbac.md`, `auth.service.ts`) — Customers only consumes the resulting `Customer.userId` link.
+- `User`/authentication, including customer self-registration and login (`specs/features/auth-rbac/spec.md`, `auth.service.ts`) — Customers only consumes the resulting `Customer.userId` link.
 - Customer Portal profile self-edit (`portal-profile.service.ts`, `/api/portal/profile`) — a separate boundary from the internal `/api/customers/*` routes documented here.
 - Customer-profile attachments (`attachments` module) — Customers mounts the routes but does not own attachment storage/validation logic.
 - `AuditLog` as a system (shared with every other module).
@@ -151,7 +151,7 @@ model CustomerNote {
 
 Four roles (`Role` enum): `ADMIN`, `MANAGER`, `AGENT`, `CUSTOMER`.
 
-### Capability matrix (current behaviour, `customer.routes.ts:11-26`, verified against `docs/06-auth-rbac.md:151-160`)
+### Capability matrix (current behaviour, `customer.routes.ts:11-26`, verified against `specs/features/auth-rbac/spec.md`)
 
 | Capability | ADMIN | MANAGER | AGENT | CUSTOMER |
 | --- | --- | --- | --- | --- |
@@ -170,7 +170,7 @@ Four roles (`Role` enum): `ADMIN`, `MANAGER`, `AGENT`, `CUSTOMER`.
 
 **Non-obvious contextual rules:**
 
-- **Customer entities themselves carry no team boundary.** Any ADMIN/MANAGER/AGENT reads/searches every customer org-wide; only the `/tickets` sub-resource is team-scoped, and only for MANAGER (see next section). This is intentional and matches `docs/18-ui-pages-spec.md:151-160` and `docs/06-auth-rbac.md:22` verbatim — not a gap.
+- **Customer entities themselves carry no team boundary.** Any ADMIN/MANAGER/AGENT reads/searches every customer org-wide; only the `/tickets` sub-resource is team-scoped, and only for MANAGER (see next section). This is intentional and matches `specs/features/auth-rbac/spec.md` — not a gap.
 - Middleware is per-route (`requireRole(...customerReadRoles)` vs `requireRole(...customerWriteRoles)`), not a single router-level gate — matches `customer.routes.ts:15-26` exactly.
 - Frontend hides mutation controls and read-guards direct create/edit URL visits for AGENT (`customer-permissions.ts`, `customer-form-page.tsx`), but **the server-side `requireRole` check is the sole real boundary** — this is UX convenience only, consistent with `specs/constitution.md`.
 - `CUSTOMER`-role users are always rejected by `/api/customers/*` (`customerReadRoles`/`customerWriteRoles` never include `CUSTOMER`); own-profile access is exclusively through `/api/portal/profile`, a structurally separate boundary (`requireRole(CUSTOMER)` + `requireFreshToken`).
@@ -199,7 +199,7 @@ access: actor.role !== Role.AGENT || assignedAgentId === null || assignedAgentId
 
 An `AGENT` sees **every** ticket in the customer's full history (not team- or assignment-filtered at the row-selection level), but a ticket assigned to a *different* agent is downgraded to `"SUMMARY_ONLY"` — the frontend (`customer-tickets.tsx`) renders `SUMMARY_ONLY` rows as non-interactive with a labelled badge, never linking into `/tickets/:id` (which would 404 anyway per Ticket visibility rules). This is the ADR-014 cross-agent-summary design, reused intentionally rather than re-implemented — this endpoint never widens what Ticket detail/conversation/mutation APIs already forbid.
 
-This behaviour is **fully implemented and tested** (`customer.test.ts`, nested `describe("MANAGER customer-ticket visibility (OD-6)")`: scoped-to-managed-team, empty-page-for-teamless-manager, no-cross-team-metadata-leak, team-scope-composes-with-pagination), and matches `docs/05-api-contract.md:168` and `docs/06-auth-rbac.md:71` word-for-word. **No gap found here** — this is the resolved OD-6 decision from the Tickets feature, correctly reused rather than duplicated.
+This behaviour is **fully implemented and tested** (`customer.test.ts`, nested `describe("MANAGER customer-ticket visibility (OD-6)")`: scoped-to-managed-team, empty-page-for-teamless-manager, no-cross-team-metadata-leak, team-scope-composes-with-pagination), and matches `specs/features/tickets/spec.md` and `specs/features/auth-rbac/spec.md` word-for-word. **No gap found here** — this is the resolved OD-6 decision from the Tickets feature, correctly reused rather than duplicated.
 
 ---
 

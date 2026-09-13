@@ -266,9 +266,9 @@ business event of its own to define.
 
 ## API Contract (behavior level)
 
-See `docs/05-api-contract.md` §Tasks (updated this pass — one stale claim
-corrected, see Discovered Gaps) for the literal route table. Contract
-highlights not already covered above:
+Contract highlights not already covered above (the literal route table
+lives only here now — see Discovered Gaps DG-6 for the drift this spec
+corrected relative to the since-removed `docs/05-api-contract.md`):
 
 - `GET /api/tasks` — `?status&assigneeId&ticketId&search&page&limit`,
   strict schema (unknown query key → `400`). Default `limit=15`, max `50`.

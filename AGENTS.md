@@ -1,34 +1,68 @@
 # AI Engineering Rules
 
-This repository is a time-boxed Customer Support CRM assessment.
+This repository is a Customer Support CRM. It began as a time-boxed
+three-day assessment; the current target is full original-assignment
+coverage (see `specs/constitution.md` "Project Scope & Priorities").
 
-## Spec-Driven Development (SDD)
+## Spec-Driven Development (SDD) — `specs/` is the canonical spec system
 
-This repository also maintains a small `specs/` layer on top of `docs/`
-(see `specs/README.md`). It does not replace the preflight below — it adds
-a lightweight lifecycle for larger features. Workflow:
+**`specs/` is the single source of truth for current architecture, domain
+rules, and feature behavior.** `docs/` is historical/supporting material
+only (see `docs/README.md`) and must never override `specs/` or the actual
+implementation — if the two disagree, `specs/` + code win and the
+disagreement should be reported, not silently resolved in `docs/`'s favor.
+
+Workflow:
 
 1. Read this file (`AGENTS.md`).
-2. Read `specs/constitution.md` (stable engineering rules/constraints).
-3. Read the relevant project architecture/domain documentation —
-   `specs/architecture.md`, `specs/domain-model.md`, and the `docs/*` files
-   required by the preflight below.
-4. Read the relevant feature spec under `specs/features/<name>/` when one
-   exists for the task at hand.
-5. Inspect the current implementation before modifying any code — do not
-   implement from memory of the docs alone.
-6. Implement only the requested scope.
-7. Verify changes (typecheck/lint/tests/build as applicable) before
-   declaring the task complete.
+2. Read `specs/constitution.md` (stable engineering rules: stack, scope,
+   architecture principles, API conventions, validation, localization,
+   accessibility/design conventions, testing strategy, definition of done,
+   Git/branch rules).
+3. Read `specs/architecture.md` (system structure, module/folder
+   boundaries, runtime flows, deployment) and `specs/domain-model.md`
+   (actors, entities, ticket lifecycle, SLA, ownership rules) for global
+   rules.
+4. **Feature work starts from the owning spec.** If a
+   `specs/features/<name>/spec.md` exists for the capability you're
+   touching, read it — it is the authoritative statement of current
+   behavior, permissions, edge cases, and known limitations for that
+   feature. `specs/features/README.md` has the full feature list and
+   explains when a task needs a full spec/plan/tasks package versus when
+   it doesn't (most small fixes don't).
+5. **Implementation follows `plan.md`** when one exists for the feature —
+   it owns architecture/approach, seams to reuse, and testing strategy.
+   **Execution and verification are tracked in `tasks.md`** — task IDs,
+   status, and concise verification evidence. Do not treat `tasks.md` as a
+   session diary.
+6. Inspect the current implementation before modifying any code — do not
+   implement from memory of a spec alone; specs describe intent and
+   audited-as-of-a-date behavior, code is truth for what's actually there
+   right now.
+7. Implement only the requested scope.
+8. Verify changes (typecheck/lint/tests/build as applicable) before
+   declaring the task complete — see `specs/constitution.md` "Testing /
+   Verification" for the verification-tier vocabulary and the rule against
+   claiming unrun verification.
+9. **No feature is complete until SDD ownership/status is updated** — when
+   behavior intentionally changes, update the owning `spec.md`'s
+   Acceptance Criteria (or add a short "Implemented as" note), update
+   `tasks.md`'s status, and, if the change is architecturally significant,
+   add an entry to `specs/decisions.md`.
 
-`specs/features/README.md` explains when a task needs a full
-spec/plan/tasks package versus when it doesn't (most small fixes don't).
+Product behavior must not be inferred from historical QA/progress logs
+under `docs/` (`19-progress-tracking.md`, `24-final-qa-production-readiness.md`,
+`25-fresh-db-browser-qa.md`) — those are point-in-time evidence, not a
+live status page; current status lives in `specs/features/README.md`'s
+feature coverage matrix and each feature's own `tasks.md`.
+
 The Git Safety Rules below apply identically to SDD work: no commit, push,
 merge, rebase, or history rewrite by the AI under any circumstance.
 
 ## Mandatory Documentation Preflight
 
-Documentation is the repository's source of truth.
+`specs/` is the repository's source of truth for behavior; this preflight
+tells you which parts of it to read for a given task.
 
 **Before writing, editing, generating, or deleting any application code, the AI MUST complete the documentation preflight below.**
 
@@ -36,18 +70,26 @@ Documentation is the repository's source of truth.
 
 For every implementation task, read:
 
-1. `docs/00-project-overview.md`
-2. `docs/01-scope-and-priorities.md`
-3. `docs/02-architecture.md`
-4. `docs/15-feature-branch-workflow.md`
-5. `docs/16-definition-of-done.md`
-6. `docs/17-decisions-log.md`
+1. `specs/constitution.md`
+2. `specs/architecture.md`
+3. The owning `specs/features/<name>/spec.md`, if one exists for the task
+   (check `specs/features/README.md`'s coverage matrix).
 
 ### Progress Tracking Preflight
 
-For every task that may affect implementation or project status, also read `docs/19-progress-tracking.md`. This includes features, fixes, refactors, UI/UX, authorization, infrastructure, deployment, tests that change project status, and documentation that materially changes the roadmap or completion state.
+For every task that may affect implementation or project status, also
+check the relevant feature's `specs/features/<name>/tasks.md` (or, for
+work with no dedicated feature package, `specs/features/README.md`'s
+"Remaining CRM capability areas" section). This includes features, fixes,
+refactors, UI/UX, authorization, infrastructure, deployment, and tests that
+change project status.
 
-Before implementation, reconcile the tracker with the actual repository, current branch, working tree, Git history, implemented code, automated tests, database checks, and browser or visual evidence. Repository evidence is authoritative when it conflicts with the tracker. Report material inconsistencies during the preflight instead of copying stale status forward.
+Before implementation, reconcile the spec/tasks status with the actual
+repository, current branch, working tree, Git history, implemented code,
+automated tests, database checks, and browser or visual evidence.
+Repository evidence is authoritative when it conflicts with a spec's
+stated status. Report material inconsistencies during the preflight
+instead of copying stale status forward.
 
 ### Then Read the Relevant Domain Documents
 
@@ -57,82 +99,79 @@ The AI MUST determine the task type and read all applicable documents before tou
 
 Read:
 
-- `docs/03-folder-structure.md`
-- `docs/09-frontend-guidelines.md`
-- `docs/18-ui-pages-spec.md`
-- the domain document for the feature being implemented
+- `specs/architecture.md` (Frontend Architecture, Module/Folder Boundary
+  Conventions)
+- `specs/constitution.md` (Accessibility / UI Consistency)
+- the owning `specs/features/<name>/spec.md`
 
 Examples:
-- Ticket UI -> also read `docs/07-ticket-workflow.md` and `docs/08-sla-automation.md` when SLA is shown.
-- Authentication UI -> also read `docs/06-auth-rbac.md`.
-- Customer Portal -> also read `docs/06-auth-rbac.md` and the relevant ticket/customer documents.
+- Ticket UI -> also read `specs/features/tickets/spec.md` and, when SLA is
+  shown, `specs/features/sla-automation/spec.md`.
+- Authentication UI -> also read `specs/features/auth-rbac/spec.md`.
+- Customer Portal -> also read `specs/features/auth-rbac/spec.md` "Portal
+  privacy boundary" and the relevant ticket/customer feature spec.
 
 #### Backend / API work
 
 Read:
 
-- `docs/03-folder-structure.md`
-- `docs/04-database-design.md`
-- `docs/05-api-contract.md`
-- `docs/10-backend-guidelines.md`
-- the relevant domain document
+- `specs/architecture.md` (Module/Folder Boundary Conventions, Backend
+  Architecture)
+- `specs/domain-model.md`
+- `specs/constitution.md` (API Conventions)
+- the owning `specs/features/<name>/spec.md`
 
 #### Authentication / Authorization work
 
 Read:
 
-- `docs/04-database-design.md`
-- `docs/05-api-contract.md`
-- `docs/06-auth-rbac.md`
+- `specs/domain-model.md`
+- `specs/features/auth-rbac/spec.md`
 
 #### Ticket work
 
 Read:
 
-- `docs/04-database-design.md`
-- `docs/05-api-contract.md`
-- `docs/07-ticket-workflow.md`
-- `docs/08-sla-automation.md`
-- `docs/09-frontend-guidelines.md` and `docs/18-ui-pages-spec.md` when UI is affected
+- `specs/domain-model.md` (Ticket Lifecycle, Ownership/Assignment Rules)
+- `specs/features/tickets/spec.md`
+- `specs/features/sla-automation/spec.md` when SLA is involved
+- `specs/constitution.md` (Accessibility / UI Consistency) when UI is
+  affected
 
 #### SLA / Automation work
 
 Read:
 
-- `docs/04-database-design.md`
-- `docs/05-api-contract.md`
-- `docs/07-ticket-workflow.md`
-- `docs/08-sla-automation.md`
+- `specs/domain-model.md` (SLA)
+- `specs/features/sla-automation/spec.md`
+- `specs/features/sla-settings-categories/spec.md` (rule administration)
 
 #### AI feature work
 
 Read:
 
-- `docs/11-ai-features.md`
-- the ticket/customer documents whose data the AI feature consumes
-- frontend guidelines/page specs when UI is affected
+- `specs/features/ai-assistance/spec.md`
+- the ticket/customer feature specs whose data the AI feature consumes
 
 #### Testing work
 
 Read:
 
-- `docs/12-testing-strategy.md`
-- `docs/16-definition-of-done.md`
-- the documentation for the feature under test
+- `specs/constitution.md` (Testing / Verification, Definition of Done)
+- the spec for the feature under test
 
 #### Deployment work
 
 Read:
 
-- `docs/13-deployment.md`
-- relevant architecture/configuration documentation
+- `specs/architecture.md` (Deployment, External Provider Architecture)
 
 ### Preflight Output
 
 Before implementation, the AI should briefly state:
 
 ```text
-Docs reviewed:
+Specs reviewed:
 - <file>
 - <file>
 - ...
@@ -149,10 +188,10 @@ Planned files/areas to change:
 
 This is not optional for implementation tasks.
 
-If required documentation is missing, inconsistent, or does not define a material behavior:
+If required specs are missing, inconsistent, or do not define a material behavior:
 - DO NOT silently invent a new architecture, dependency, workflow, database model, API contract, role, permission, or visual pattern.
-- Prefer the simplest implementation compatible with existing documentation only when the decision is minor and reversible.
-- Record any meaningful assumption or architectural decision in `docs/17-decisions-log.md`.
+- Prefer the simplest implementation compatible with existing specs only when the decision is minor and reversible.
+- Record any meaningful assumption or architectural decision in `specs/decisions.md`.
 - If the missing decision would materially change product behavior or architecture, stop implementation and report the conflict instead of guessing.
 
 ### Documentation Precedence
@@ -161,16 +200,14 @@ If documents conflict, use this order:
 
 1. Explicit current developer/user instruction
 2. `AGENTS.md`
-3. Feature/domain-specific docs
-4. `docs/18-ui-pages-spec.md` for page structure and UX
-5. `docs/09-frontend-guidelines.md` for frontend/design rules
-6. `docs/05-api-contract.md` for API behavior
-7. `docs/04-database-design.md` for data model
-8. `docs/02-architecture.md`
-9. `docs/01-scope-and-priorities.md`
-10. `docs/00-project-overview.md`
+3. The owning `specs/features/<name>/spec.md`
+4. `specs/domain-model.md` for data/business rules
+5. `specs/architecture.md` for system structure and runtime flows
+6. `specs/constitution.md` for engineering rules/conventions
+7. `docs/` (historical/supporting only — never treat as authoritative over
+   the above; see `docs/README.md`)
 
-Do not resolve a meaningful contradiction silently. Report it and update documentation when appropriate.
+Do not resolve a meaningful contradiction silently. Report it and update the owning spec when appropriate.
 
 ## No-Code-Before-Docs Rule
 
@@ -205,9 +242,9 @@ Existing code does not override documented product rules automatically. If exist
 
 ## Project Progress Reviews
 
-For tasks involving project planning, progress review, roadmap status, feature completion, or deciding what to work on next, read `docs/19-progress-tracking.md`.
+For tasks involving project planning, progress review, roadmap status, feature completion, or deciding what to work on next, read `specs/features/README.md`'s feature coverage matrix and the relevant feature's `tasks.md`. `docs/19-progress-tracking.md` is a historical, non-authoritative session log (see `docs/README.md`) — useful for context on past sessions, never for current status.
 
-The progress tracker is a status summary only and does not override feature or domain documentation. Implementation tasks follow the mandatory preflight and synchronization rules in this file.
+Feature/task status is a status summary only and does not override feature or domain specs. Implementation tasks follow the mandatory preflight and synchronization rules in this file.
 
 ---
 
@@ -289,10 +326,10 @@ Do not combine unrelated features in one branch.
 Do not:
 - change the selected stack without approval
 - replace libraries because another library is preferred
-- rename public API fields without updating documentation first
-- change database relations without updating `docs/04-database-design.md`
-- add new ticket statuses without updating `docs/07-ticket-workflow.md`
-- add new roles or permissions without updating `docs/06-auth-rbac.md`
+- rename public API fields without updating the owning spec first
+- change database relations without updating `specs/domain-model.md`
+- add new ticket statuses without updating `specs/features/tickets/spec.md` and `specs/domain-model.md`
+- add new roles or permissions without updating `specs/features/auth-rbac/spec.md`
 - introduce production integrations for WhatsApp, SMS, email ingestion, ERP, or external systems unless explicitly requested
 - perform large unrelated refactors during feature implementation
 
@@ -372,9 +409,20 @@ Before declaring a task complete:
 
 ### Progress Tracking Synchronization
 
-After implementation and verification, but before the final report, update `docs/19-progress-tracking.md` when the task materially changes project status. Update only affected sections, such as the current branch; completed, integrated, uncommitted, or in-progress work; next work; deferred scope; known limitations; authorization or workflow decisions; exact test counts; lint, typecheck, and build results; PostgreSQL, browser, visual, or deployment verification; and existing build warnings.
+After implementation and verification, but before the final report, update
+the owning `specs/features/<name>/tasks.md` (task status + concise
+verification evidence) when the task materially changes project status.
+For a change with no dedicated feature package, note the status change in
+the final report instead. Optionally append a dated entry to
+`docs/19-progress-tracking.md` for continuity of that historical log — but
+`tasks.md` (or the report itself) is the authoritative record, not
+`docs/19`.
 
-Before editing the tracker, inspect its current diff and preserve unrelated developer edits, history, and completed milestones. Make the smallest accurate change, avoid whole-file rewrites and formatting-only churn, and resolve apparent contradictions from repository evidence. Stop and report if overlapping edits cannot be reconciled safely.
+Before editing a `tasks.md`, inspect its current diff and preserve
+unrelated developer edits, history, and completed milestones. Make the
+smallest accurate change, avoid whole-file rewrites and formatting-only
+churn, and resolve apparent contradictions from repository evidence. Stop
+and report if overlapping edits cannot be reconciled safely.
 
 Use status terms precisely; they are not interchangeable:
 
@@ -388,17 +436,24 @@ Use status terms precisely; they are not interchangeable:
 - `Database verified`: the configured real database was safely checked.
 - `Visually verified`: required browser routes and viewports were manually inspected.
 
-Do not infer these states from prompts, folders, documentation, or previous reports. When applicable, say: `Implemented and verified on feature/customer-portal; changes remain unstaged and uncommitted.`
+Do not infer these states from prompts, folders, specs, or previous reports. When applicable, say: `Implemented and verified on feature/customer-portal; changes remain unstaged and uncommitted.`
 
 If work stops early, do not mark it complete. Record it as blocked or in progress only when project status materially changed, state the exact blocker, preserve the last confirmed verification results, and never replace them with unrun checks or claim database or visual verification.
 
-The tracker is a project status summary only. It must not override authoritative domain documentation, redefine requirements, replace API/RBAC/workflow/SLA/frontend/UI/decision contracts, contain large implementation specifications, treat planned work as complete, invent verification, remove limitations without evidence, or erase unrelated developer updates. Detailed rules remain in `docs/05-api-contract.md`, `docs/06-auth-rbac.md`, `docs/07-ticket-workflow.md`, `docs/08-sla-automation.md`, `docs/09-frontend-guidelines.md`, `docs/18-ui-pages-spec.md`, and `docs/17-decisions-log.md`.
+`tasks.md` (and any progress note) is a project status summary only. It
+must not override the owning `spec.md`, redefine requirements, replace
+API/RBAC/workflow/SLA/frontend/UI/decision contracts, contain large
+implementation specifications, treat planned work as complete, invent
+verification, remove limitations without evidence, or erase unrelated
+developer updates. Detailed behavioral rules remain in the owning
+`specs/features/<name>/spec.md`, `specs/domain-model.md`,
+`specs/architecture.md`, and `specs/decisions.md`.
 
-A tracker update is normally unnecessary for read-only questions, explanations, prompt writing, planning without implementation, review without changes, diagnosis-only work, repository inspection with no status change, or minor wording/formatting changes that do not affect project status. State that no progress update was required when relevant.
+A status update is normally unnecessary for read-only questions, explanations, prompt writing, planning without implementation, review without changes, diagnosis-only work, repository inspection with no status change, or minor wording/formatting changes that do not affect project status. State that no progress update was required when relevant.
 
-For every implementation-task final report, state whether the tracker was updated and which sections changed; the exact Git state and whether work is unstaged, staged, committed, integrated, or pushed; completed and incomplete verification; and newly documented limitations.
+For every implementation-task final report, state whether `tasks.md` (or equivalent status record) was updated and which sections changed; the exact Git state and whether work is unstaged, staged, committed, integrated, or pushed; completed and incomplete verification; and newly documented limitations.
 
-Updating the tracker never authorizes staging, committing, pushing, merging, rebasing, amending, tagging, or otherwise altering Git history.
+Updating a status record never authorizes staging, committing, pushing, merging, rebasing, amending, tagging, or otherwise altering Git history.
 
 
 ## Frontend Design Skill
@@ -413,12 +468,11 @@ The skill is advisory only and does not override:
 
 1. Current developer instructions
 2. `AGENTS.md`
-3. Feature/domain documentation
-4. `docs/18-ui-pages-spec.md`
-5. `docs/09-frontend-guidelines.md`
-6. Existing approved product behavior
+3. The owning `specs/features/<name>/spec.md`
+4. `specs/constitution.md` (Accessibility / UI Consistency)
+5. Existing approved product behavior
 
-If the skill conflicts with higher-priority project documentation, follow the higher-priority source and report the conflict.
+If the skill conflicts with higher-priority project specs, follow the higher-priority source and report the conflict.
 
 
 <!-- openwolf:begin -->

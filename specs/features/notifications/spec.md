@@ -31,7 +31,7 @@ The Notification centre gives internal users (ADMIN / MANAGER / AGENT) a durable
 
 ### Out of scope / deferred (unchanged by this feature)
 
-- The Realtime transport itself (SSE framing/reconnect) — `docs/22`, ADR-045. Notifications is a consumer.
+- The Realtime transport itself (SSE framing/reconnect) — `specs/features/realtime/spec.md`, ADR-045. Notifications is a consumer.
 - Ticket/Task/SLA business rules that *decide when* to notify (owned by their own features) — this feature only audits and, where a targeting/navigation/read-state defect exists, fixes it.
 - A dedicated "all notifications" page — none exists today; not justified by this pass (fast-track rule: don't build UI beyond current architecture).
 - Notification preferences, delivery channels (push/email/mobile), advanced grouping ("7 new replies on Ticket #123"), filters.

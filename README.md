@@ -614,4 +614,16 @@ npm run build
 
 ## 16. Documentation
 
-Deeper architecture, workflows, decision records, the API contract, and per-integration notes live in [`docs/`](./docs). Engineering specifications and a lightweight Spec-Driven Development workflow for future features are maintained under [`specs/`](./specs).
+**[`specs/`](./specs) is the canonical source of truth** for current system
+behavior and architecture. Start at [`specs/README.md`](./specs/README.md),
+then [`specs/constitution.md`](./specs/constitution.md) (stable engineering
+rules), [`specs/architecture.md`](./specs/architecture.md) (system
+structure and runtime flows), [`specs/domain-model.md`](./specs/domain-model.md)
+(business domain), and [`specs/features/`](./specs/features) (per-feature
+behavior, one package per capability). Architectural decisions are logged
+in [`specs/decisions.md`](./specs/decisions.md).
+
+[`docs/`](./docs) holds historical/supporting material only (old QA audit
+reports, a page-by-page UI reference, dev seed-data notes) — see
+[`docs/README.md`](./docs/README.md). It is not authoritative; where it
+disagrees with `specs/` or the code, `specs/` + the implementation win.

@@ -1,8 +1,8 @@
 # Domain Model
 
-Business domain, derived from `server/prisma/schema.prisma`, server
-services, and cross-checked against `docs/04`, `docs/06`, `docs/07`,
-`docs/08`. See `## Review Notes` for discrepancies found.
+Business domain, derived from `server/prisma/schema.prisma` and server
+services. See `## Review Notes` for discrepancies found during the original
+audit.
 
 ## Actors / Roles
 
@@ -171,13 +171,14 @@ Enforced server-side, not just hidden in the UI:
 
 - **`AuditLog` vs `TicketHistory`** (reconciled 2026-09-09): both models exist
   and are actively written; the distinction is stated in `## Core Entities`
-  above and matches `docs/06-auth-rbac.md` ("Audit logging — `AuditLog` and
-  `TicketHistory`") and `docs/04-database-design.md`'s `### AuditLog` model
-  entry, neither of which frames a dedicated audit log as an open question.
+  above and matches `specs/features/auth-rbac/spec.md` ("Audit logging —
+  `AuditLog` and `TicketHistory`") and `server/prisma/schema.prisma`'s
+  `AuditLog` model, neither of which frames a dedicated audit log as an open
+  question.
 - **Escalation-notification audience** (reconciled 2026-09-09): the team-scoped
   rule above (every active `ADMIN` + only the owning-team manager; unrouted →
-  `ADMIN` only) is now stated the same way in `docs/06-auth-rbac.md` and
-  `docs/08-sla-automation.md`.
+  `ADMIN` only) is stated the same way in `specs/features/auth-rbac/spec.md`
+  and `specs/features/sla-automation/spec.md`.
 - **No legacy ticket statuses were found** in `schema.prisma` — all six
   `TicketStatus` values are currently valid and in active use. If a future
   migration or historical data reveals a retired status value, it should be

@@ -1381,3 +1381,14 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
 | 21:47 | Final SDD consistency pass: audited all 13 feature packages + global specs for stale status, ownership gaps, docs/ drift. Fixed stale `sla-automation/plan.md` status ("READY FOR TASKS" → implemented); updated `constitution.md`/`architecture.md` Rich Text sections (stale post-refactor ownership); clarified Manager Console/Team-user-mgmt ownership in `features/README.md`; added docs-consolidation migration inventory + readiness map to `specs/README.md` | specs/README.md, specs/architecture.md, specs/constitution.md, specs/features/README.md, specs/features/sla-automation/plan.md | success: no product code touched, git diff --check clean (LF/CRLF warnings only), verdict READY FOR FINAL DOCS → SPECS CONSOLIDATION | ~90k |
+
+## Session: 2026-09-13 21:54
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 22:14 | Executed full docs -> specs consolidation: removed 22 redundant/migrated docs/*.md files (00-17,20-23), created specs/decisions.md (curated ADR log) and docs/README.md, migrated scope/testing/git-workflow/definition-of-done/folder-conventions/deployment content into specs/constitution.md + specs/architecture.md, fixed dangling docs/ cross-refs in core specs + several feature specs, updated README.md and AGENTS.md to point at specs/ as canonical SSOT. Retained docs/{18,19,24,25,dev-test-data} as labeled historical/supporting. | specs/decisions.md, specs/README.md, specs/constitution.md, specs/architecture.md, specs/domain-model.md, specs/features/README.md, specs/features/{tickets,knowledge-base,customers,notifications,sla-automation,sla-settings-categories,tasks-reminders}/spec.md, docs/README.md, README.md, AGENTS.md, docs/*.md (21 deletions + 14-implementation-plan.md) | success: no server/client/prisma files touched, git diff --check clean (LF/CRLF advisories only), verdict SPECS IS NOW THE SINGLE SOURCE OF TRUTH | ~large session |
+
+## Session: 2026-09-13 22:19
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
