@@ -490,6 +490,56 @@ describe("ticket API", () => {
     expect(spoofed.status).toBe(400); expect(empty.status).toBe(400); expect(mocks.messageCreate).not.toHaveBeenCalled();
   });
 
+  // P2028 regression (runtime smoke): `requireConversationMutationAccess` used to
+  // resolve the actor's team scope (`teamScopeFor` -> one `user.findUnique`) with
+  // the GLOBAL `prisma` client from *inside* the open `prisma.$transaction`
+  // callback — mirroring `updateTicket`/`selfAssignTicket`'s pattern of resolving
+  // team scope is what keeps a real interactive transaction from having to open a
+  // second pooled connection mid-flight, which can stall it past Prisma's
+  // interactive-transaction timeout and invalidate it before `notifyWatchers`'s
+  // `tx.ticketWatcher.findMany()` runs (P2028 "Transaction not found"). This test
+  // pins call order instead of the P2028 error itself because the mock reuses one
+  // `userFindUnique` fn for both `prisma.user.findUnique` and `tx.user.findUnique`
+  // — the same reason the existing suite never caught the regression.
+  it("resolves actor team scope before opening the reply/note transaction (P2028 regression)", async () => {
+    mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: agent.id });
+    await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "Checking now." });
+    expect(mocks.userFindUnique).toHaveBeenCalled();
+    expect(mocks.transaction).toHaveBeenCalledTimes(1);
+    // The auth middleware's own `getCurrentUser` lookup also calls
+    // `user.findUnique` once per request, ahead of everything else — so pin the
+    // team-scope resolution's call (the LAST `userFindUnique` call) against the
+    // transaction's single call order, not the first `userFindUnique` invocation.
+    expect(mocks.userFindUnique.mock.invocationCallOrder.at(-1)).toBeLessThan(mocks.transaction.mock.invocationCallOrder[0]);
+
+    vi.clearAllMocks();
+    mocks.transaction.mockImplementation(async (value: unknown) => typeof value === "function" ? value({
+      ticket: { findFirst: mocks.ticketFindFirst, create: mocks.ticketCreate, update: mocks.ticketUpdate, updateMany: mocks.ticketUpdateMany, groupBy: mocks.ticketGroupBy, findUniqueOrThrow: mocks.ticketFindUniqueOrThrow },
+      ticketMessage: { create: mocks.messageCreate, findMany: mocks.messageFindMany }, ticketNote: { create: mocks.noteCreate },
+      ticketHistory: { create: mocks.historyCreate, createMany: mocks.historyCreateMany }, customer: { findUnique: mocks.customerFind },
+      ticketWatcher: { createMany: mocks.watcherCreateMany, findMany: mocks.watcherFindMany, deleteMany: mocks.watcherDeleteMany, count: mocks.watcherCount, findFirst: mocks.watcherFindFirst },
+      ticketMention: { createMany: mocks.mentionCreateMany },
+      user: { findFirst: mocks.userFindFirst, findMany: mocks.userFindMany, findUnique: mocks.userFindUnique },
+      category: { findFirst: mocks.categoryFindFirst }, department: { findUnique: mocks.departmentFind },
+      branch: { findUnique: mocks.branchFind }, team: { findUnique: mocks.teamFindUnique }, slaRule: { findFirst: mocks.slaFind },
+      notification: { createMany: mocks.notificationCreateMany },
+      auditLog: { create: mocks.auditCreate },
+      messageDelivery: { create: mocks.deliveryCreate, findUnique: mocks.deliveryFindUnique, update: mocks.deliveryUpdate, updateMany: mocks.deliveryUpdateMany },
+      attachment: { findMany: mocks.attachmentFindMany, updateMany: mocks.attachmentUpdateMany },
+    }) : Promise.all(value as Promise<unknown>[]));
+    mocks.userFindUnique.mockImplementation(async (args: { where: { id: string } }) => teamOf(args.where.id));
+    mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, subject: "Payment failed", assignedAgentId: agent.id });
+    mocks.noteCreate.mockResolvedValue({ id: "note-1", body: "Check provider logs.", createdAt: now, author: { id: agent.id, name: "Assigned Agent", role: Role.AGENT } });
+    await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/notes").set(auth(agent)).send({ body: "Check provider logs." });
+    expect(mocks.userFindUnique).toHaveBeenCalled();
+    expect(mocks.transaction).toHaveBeenCalledTimes(1);
+    // The auth middleware's own `getCurrentUser` lookup also calls
+    // `user.findUnique` once per request, ahead of everything else — so pin the
+    // team-scope resolution's call (the LAST `userFindUnique` call) against the
+    // transaction's single call order, not the first `userFindUnique` invocation.
+    expect(mocks.userFindUnique.mock.invocationCallOrder.at(-1)).toBeLessThan(mocks.transaction.mock.invocationCallOrder[0]);
+  });
+
   it("stores internal notes separately without recording first response", async () => {
     mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, subject: "Payment failed", assignedAgentId: agent.id });
     const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/notes").set(auth(agent)).send({ body: "  Check provider logs. " });

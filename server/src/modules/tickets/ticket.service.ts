@@ -155,6 +155,11 @@ export async function addTicketMessage(ticketId: string, input: TicketConversati
   const body = content.sanitizedHtml!;
   const createdAt = new Date();
   const messageId = randomUUID();
+  // Resolved BEFORE the transaction opens (P2028 fix, see requireConversationMutationAccess):
+  // a global-`prisma` query issued from inside an open interactive `tx` acquires a
+  // separate pooled connection and can stall the transaction past Prisma's
+  // interactive-transaction timeout, invalidating it before later `tx.*` calls run.
+  const team = await teamScopeFor(actor);
 
   // 1) Durable local state first. Auth / access / workflow validation, the
   //    TicketMessage, first-response stamping and watcher fan-out all commit as
@@ -163,7 +168,7 @@ export async function addTicketMessage(ticketId: string, input: TicketConversati
   //    see the reply regardless of any external provider outcome below.
   const local = await withRealtimeOutbox(async () => {
     const result = await prisma.$transaction(async (tx) => {
-      const ticket = await requireConversationMutationAccess(tx, ticketId, actor);
+      const ticket = await requireConversationMutationAccess(tx, ticketId, actor, team);
       // CONV-042: reject before any TicketMessage is created — never a
       // silent text-only fallback.
       assertOutboundAttachmentCapability(ticket.channel, input.attachmentIds);
@@ -276,9 +281,11 @@ export async function addTicketNote(ticketId: string, input: TicketConversationI
   // the `@[Name](userId)` mention tokens are plain text and survive intact.
   const content = requireConversationContent({ raw: input.body, format: "SANITIZED_HTML", source: "STAFF" });
   const body = content.sanitizedHtml!;
+  // Resolved BEFORE the transaction opens — see addTicketMessage / P2028 fix note.
+  const team = await teamScopeFor(actor);
   return withRealtimeOutbox(async () => {
    const result = await prisma.$transaction(async (tx) => {
-    const ticket = await requireConversationMutationAccess(tx, ticketId, actor);
+    const ticket = await requireConversationMutationAccess(tx, ticketId, actor, team);
     const note = await tx.ticketNote.create({
       data: { ticketId, authorUserId: actor.userId, body, contentFormat: content.contentFormat, contentSource: content.contentSource },
       select: conversationSelect,
@@ -653,8 +660,7 @@ const messageWithDeliverySelect = {
   delivery: { select: { status: true, lastErrorCode: true } },
 } satisfies Prisma.TicketMessageSelect;
 
-async function requireConversationMutationAccess(tx: Prisma.TransactionClient, ticketId: string, actor: Actor) {
-  const team = await teamScopeFor(actor);
+async function requireConversationMutationAccess(tx: Prisma.TransactionClient, ticketId: string, actor: Actor, team: TeamScope | undefined) {
   const ticket = await tx.ticket.findFirst({
     where: { id: ticketId, ...ticketVisibilityWhere(actor, team) },
     select: {

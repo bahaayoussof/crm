@@ -1427,3 +1427,26 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
+
+## Session: 2026-09-14 10:10
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-14 10:34
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-14 10:56
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-14 11:01
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 11:20 | Traced + fixed P2028 (bug-238): moved `teamScopeFor` before `$transaction` in addTicketMessage/addTicketNote | server/src/modules/tickets/ticket.service.ts | Fixed, regression test added, 1112/1112 server tests pass | ~large |
+| 11:20 | Real Neon TEST DB + browser re-smoke of ticket-reply path | manual verification only | 5 replies persisted, 5 watcher notifications, zero P2028, zero console errors | ~medium |
+| 11:20 | Updated bug log, cerebrum Do-Not-Repeat, STATUS.md, reassessment-evidence.md | .wolf/buglog.json, .wolf/cerebrum.md, .wolf/STATUS.md, specs/reassessment-evidence.md | Documented | ~medium |
