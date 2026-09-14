@@ -138,7 +138,7 @@ open items from the prior closing review. Results:
   contention on this environment, not a reproducible test or product
   defect -- no timeout values were changed to mask this.
 - **Server**: typecheck, lint, `prisma validate`, `prisma generate`, and
-  the production build all pass; full test suite 1111/1111 passes. The
+  the production build all pass; full test suite 1114/1114 passes. The
   prior `EPERM` DLL lock during `prisma generate` was caused by a locally
   running `npm run dev` (`tsx watch src/server.ts`) process holding the
   Prisma query engine binary open; stopping that process and clearing the
@@ -182,17 +182,18 @@ verification session, to close the runtime evidence gap left above.
   (reset -> 19/19 migrations -> reseed -> login sanity check) to confirm
   the environment is reliably reconstructible. **Fresh rebuild/reapply
   verified.**
-- **Browser/E2E**: still **not performed** -- no browser-automation tool
-  was available in this environment and no manual browser session was
-  driven. This remains an open gap; it is not claimed as covered by the
-  API-level verification above.
+- **Browser/E2E**: four-role smoke completed for ADMIN, MANAGER, AGENT,
+  and CUSTOMER, verifying frontend -> API -> Prisma -> Neon -> reload.
+  Final ticket-transaction verification completed with 10 sequential
+  watched-ticket replies and 3 internal notes; persistence and watcher
+  fan-out were verified with zero P2028, P1001, or transaction-expiry
+  errors in the final window. See `specs/reassessment-evidence.md`.
 - **Tooling drift found and fixed**: `server/scripts/seed-test-data.ts`
   predated the `contentFormat`/`contentSource` fields added to
   `TicketMessage`/`TicketNote` by the Conversations/Channels migrations
   and failed on a fresh DB. Fixed as a test-tooling change only (no
   product/API code touched) so the seed script matches the current schema.
 
-Remaining gaps: client full-suite flakiness (environment, not product) and
-browser/E2E smoke (tooling unavailable). Neither is a proven product
-defect. See the closing review report for the full per-test/per-area
-breakdown.
+Remaining gap: client full-suite flakiness (environment, not product).
+This is not a proven product defect. See the closing review report for the
+full per-test/per-area breakdown.
