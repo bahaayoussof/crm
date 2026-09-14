@@ -1450,3 +1450,20 @@ Session summary: Implemented the full realtime event layer per the spec. REST un
 | 11:20 | Traced + fixed P2028 (bug-238): moved `teamScopeFor` before `$transaction` in addTicketMessage/addTicketNote | server/src/modules/tickets/ticket.service.ts | Fixed, regression test added, 1112/1112 server tests pass | ~large |
 | 11:20 | Real Neon TEST DB + browser re-smoke of ticket-reply path | manual verification only | 5 replies persisted, 5 watcher notifications, zero P2028, zero console errors | ~medium |
 | 11:20 | Updated bug log, cerebrum Do-Not-Repeat, STATUS.md, reassessment-evidence.md | .wolf/buglog.json, .wolf/cerebrum.md, .wolf/STATUS.md, specs/reassessment-evidence.md | Documented | ~medium |
+
+## Session: 2026-09-14 11:46
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 12:06 | P2028 transaction-boundary fix: skip no-op firstRespondedAt update once set (bug-239); notifyWatchers stays transactional per ADR-029; timeout-increase recommended but NOT applied | server/src/modules/tickets/ticket.service.ts, server/src/modules/tickets/ticket.test.ts, specs/reassessment-evidence.md | 1113/1113 server tests green, typecheck/lint clean, real Neon repro (P2028 reproduced once post-fix, latency-driven) | ~ok |
+
+## Session: 2026-09-14 12:10
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 12:20 | bug-240: bounded {timeout:15_000} added to addTicketMessage/addTicketNote (same precedent as updateTicket); regression test + real-Neon verify (15 replies+5 notes, 0 P2028/P1001) | server/src/modules/tickets/ticket.service.ts, ticket.test.ts, specs/reassessment-evidence.md | done, uncommitted | ~9k |
+
+## Session: 2026-09-14 13:00
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|

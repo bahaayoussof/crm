@@ -201,7 +201,15 @@ export async function addTicketMessage(ticketId: string, input: TicketConversati
         },
         select: conversationSelect,
       });
-      await tx.ticket.updateMany({ where: { id: ticketId, firstRespondedAt: null }, data: { firstRespondedAt: createdAt } });
+      // Once set, firstRespondedAt never changes again — skip the round trip
+      // entirely on every reply after the first instead of sending a
+      // guaranteed-no-op UPDATE (the ticket row was already fetched above).
+      // Real Neon timing evidence showed this unconditional query adding a
+      // full extra sequential round trip inside the interactive transaction
+      // on every reply, not just the first (P2028 transaction-boundary fix).
+      if (!ticket.firstRespondedAt) {
+        await tx.ticket.updateMany({ where: { id: ticketId, firstRespondedAt: null }, data: { firstRespondedAt: createdAt } });
+      }
       // CONV-041 — atomically bind any staged attachments to this exact message.
       if (input.attachmentIds?.length) {
         await bindStagedAttachments(tx, input.attachmentIds, { ticketId, messageId }, actor.userId);
@@ -231,6 +239,13 @@ export async function addTicketMessage(ticketId: string, input: TicketConversati
         customerId: ticket.customerId,
         teamId: ticket.teamId,
       };
+    }, {
+      // Same bounded timeout as updateTicket: this is DB-only atomic work
+      // (watcher fan-out, attachment binding, delivery-row creation), but
+      // real Neon timing showed per-query spikes up to ~2.7s that can push
+      // several round trips past Prisma's 5000ms interactive-transaction
+      // default. External provider delivery happens after commit, not here.
+      timeout: 15_000,
     });
     // Committed — signal connected clients. A rolled-back transaction throws
     // above and this line never runs, so no event is published for a lost reply.
@@ -314,6 +329,11 @@ export async function addTicketNote(ticketId: string, input: TicketConversationI
       excludeUserIds: mentionedIds,
     });
     return { note: { ...note, kind: "INTERNAL_NOTE" as const }, assignedAgentId: ticket.assignedAgentId, customerId: ticket.customerId, teamId: ticket.teamId };
+   }, {
+    // Same bounded timeout as updateTicket / addTicketMessage — DB-only
+    // atomic work (mentions, attachment binding, watcher fan-out) exposed to
+    // the same real Neon latency variance. See addTicketMessage for detail.
+    timeout: 15_000,
    });
    emitTicketMessageCreated({
      ticketId,
@@ -672,6 +692,7 @@ async function requireConversationMutationAccess(tx: Prisma.TransactionClient, t
       teamId: true,
       channel: true,
       emailThreadToken: true,
+      firstRespondedAt: true,
       customer: { select: { phone: true, email: true } },
     },
   });

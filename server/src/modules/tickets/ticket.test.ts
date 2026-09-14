@@ -1470,6 +1470,49 @@ describe("ticket API", () => {
         expect(call[0].where).toMatchObject({ firstRespondedAt: null });
       }
     });
+
+    // P2028 regression (transaction-boundary minimization): real Neon timing
+    // instrumentation showed every reply — including every reply after the
+    // first — issued this UPDATE unconditionally, even though it is a
+    // guaranteed no-op once `firstRespondedAt` is set (its own WHERE clause
+    // already excludes that case at the DB). Each extra sequential round trip
+    // inside the interactive transaction adds exposure to Neon's variable
+    // per-query latency, which is what let the transaction cross Prisma's
+    // 5000ms interactive-transaction timeout in production (bug-238's fix
+    // alone was insufficient — see bug log). The already-fetched ticket row
+    // (from `requireConversationMutationAccess`) tells us `firstRespondedAt`
+    // without a second query, so a reply on an already-responded ticket must
+    // skip this call entirely rather than merely rely on the WHERE guard.
+    it("skips the firstRespondedAt round trip entirely once it is already set (P2028 transaction-boundary regression)", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({
+        id: summary.id, assignedAgentId: agent.id, channel: "WEB",
+        firstRespondedAt: new Date("2026-08-20T00:00:00.000Z"),
+      });
+      const response = await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "Already responded" });
+      expect(response.status).toBe(201);
+      expect(mocks.ticketUpdateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("P2028 — bounded transaction timeout for reply/note mutations", () => {
+    // Precedent: updateTicket already opens its interactive transaction with
+    // `{ timeout: 15_000 }` (see ticket.service.ts) because remote pooled
+    // Postgres can legitimately exceed Prisma's 5000ms default across several
+    // round trips. addTicketMessage / addTicketNote now do DB-only atomic work
+    // (external delivery + provider calls happen after commit) and are exposed
+    // to the same Neon latency variance, so they get the same bounded timeout.
+    it("uses the bounded transaction timeout for reply/note mutations after DB work minimization", async () => {
+      mocks.ticketFindFirst.mockResolvedValue({ id: summary.id, assignedAgentId: agent.id, channel: "WEB" });
+      mocks.messageCreate.mockResolvedValue({ id: "m-conv-tmo", body: "Hi", createdAt: now, author: { id: agent.id, name: "Agent", role: Role.AGENT } });
+      await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/messages").set(auth(agent)).send({ body: "<p>Hi</p>" });
+      const messageTxOptions = mocks.transaction.mock.calls.at(-1)?.[1];
+      expect(messageTxOptions).toMatchObject({ timeout: 15_000 });
+
+      mocks.noteCreate.mockResolvedValue({ id: "n-conv-tmo", body: "x", createdAt: now, author: { id: agent.id, name: "Agent", role: Role.AGENT } });
+      await request(app).post("/api/tickets/c737ce60fccf9da889f4605c0/notes").set(auth(agent)).send({ body: "<p>Note</p>" });
+      const noteTxOptions = mocks.transaction.mock.calls.at(-1)?.[1];
+      expect(noteTxOptions).toMatchObject({ timeout: 15_000 });
+    });
   });
 
   describe("CONV-045 — no audit noise for plain reads", () => {
